@@ -1,0 +1,24 @@
+/bin/
+/data/
+/logs/
+/coverage.out
+/coverage.html
+*.test
+*.out
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code per-project workspace (worktrees, agent outputs, etc.)
+/.claude/
+
+# Local convenience wrapper around `make` — per-developer, never shared.
+/run.sh
+NOTES-BEN.txt
+
+# Local runtime secrets (sourced by serve launcher) — never commit.
+*.env
+.env*
+
+# Personal /loop prompt scratch (not committed)
+loop
