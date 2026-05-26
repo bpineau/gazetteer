@@ -40,6 +40,11 @@ func (b *Builder) With(s Source) *Builder {
 }
 
 // WithHTTPClient overrides the default HTTP client propagated to Sources.
+//
+// The client is stored on ctx via WithHTTPClient when Client.Collect runs;
+// each Source reads it via HTTPClientFrom(ctx). Sources MAY still override
+// with their own Options.HTTPClient — see WithHTTPClient docstring for the
+// precedence rule across the shipped Sources.
 func (b *Builder) WithHTTPClient(c *http.Client) *Builder {
 	b.httpClient = c
 	return b

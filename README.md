@@ -53,10 +53,24 @@ func main() {
 		log.Fatalf("normalize: %v", err)
 	}
 
-	// Configure which sources to query.
+	// Configure which sources to query. Sources with strict
+	// dependencies (DVF needs an HTTP client and a geocoder; OSM
+	// needs a station catalog loaded later via UpdateCatalog) are
+	// shown here; sources whose Options have a zero-value default
+	// (ademe, georisques, locservice, …) can be constructed with
+	// `Options{}` and will fall back to gazetteer.HTTPClientFrom(ctx).
+	dvfSource := dvf.NewSource(dvf.Options{
+		HTTP:     hc,
+		Geocoder: banx.NewBANClient(hc),
+	})
+	// osm.NewSource(Options{}) returns immediately; Query will return
+	// ErrNoCatalog until the catalog is installed via UpdateCatalog
+	// (typically by a background refresh goroutine).
+	osmSource := osm.NewSource(osm.Options{})
+
 	client, err := gazetteer.NewBuilder().
-		With(dvf.NewSource(dvf.Options{})).
-		With(osm.NewSource(osm.Options{})).
+		With(dvfSource).
+		With(osmSource).
 		Build()
 	if err != nil {
 		log.Fatalf("build: %v", err)
