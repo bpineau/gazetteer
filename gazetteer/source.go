@@ -2,65 +2,53 @@ package gazetteer
 
 import (
 	"context"
-	"fmt"
 )
 
 // Status classifies the outcome of a Source.Query call. The Client sets
-// it on the Result based on what the Source returned.
-type Status int
+// it on the Result based on what the Source returned. The underlying
+// type is a string so the same Status round-trips through JSON, log
+// records, metric labels, and Go maps without conversion or a dual
+// marshal/parse code path.
+type Status string
 
 const (
 	// StatusOK indicates the Source returned a populated typed Data.
-	StatusOK Status = iota
+	StatusOK Status = "ok"
 
 	// StatusOKEmpty indicates the Source ran successfully but the typed
 	// Data reports IsEmpty() == true (no comparables, no DPE, etc.).
 	// Callers can distinguish "no data" from "data" without inspecting
 	// the typed payload.
-	StatusOKEmpty
+	StatusOKEmpty Status = "ok_empty"
 
 	// StatusSkippedPrereq indicates the Source skipped because Listing
 	// inputs were missing or out-of-scope (ErrInsufficientInputs or
 	// ErrUnsupportedPropertyType).
-	StatusSkippedPrereq
+	StatusSkippedPrereq Status = "skipped_prereq"
 
 	// StatusFailedTransient indicates a retry-friendly failure: network,
 	// 5xx, generic error.
-	StatusFailedTransient
+	StatusFailedTransient Status = "failed_transient"
 
 	// StatusFailedAntiBot indicates an anti-bot interstitial.
-	StatusFailedAntiBot
+	StatusFailedAntiBot Status = "failed_antibot"
 
 	// StatusFailedOutdated indicates the Source could not parse the
 	// upstream response — the parser is outdated. Operator-actionable.
-	StatusFailedOutdated
+	StatusFailedOutdated Status = "failed_outdated"
 
 	// StatusFailedPermanent indicates a permanent upstream breakage.
 	// Caller should not retry until the Source is fixed.
-	StatusFailedPermanent
+	StatusFailedPermanent Status = "failed_permanent"
 )
 
-// String returns a stable, snake-case identifier suitable for logs and
-// metrics labels.
+// String returns the underlying string for compatibility with consumers
+// that expect a fmt.Stringer. Equivalent to a direct cast.
 func (s Status) String() string {
-	switch s {
-	case StatusOK:
-		return "ok"
-	case StatusOKEmpty:
-		return "ok_empty"
-	case StatusSkippedPrereq:
-		return "skipped_prereq"
-	case StatusFailedTransient:
-		return "failed_transient"
-	case StatusFailedAntiBot:
-		return "failed_antibot"
-	case StatusFailedOutdated:
-		return "failed_outdated"
-	case StatusFailedPermanent:
-		return "failed_permanent"
-	default:
-		return fmt.Sprintf("unknown_%d", int(s))
+	if s == "" {
+		return "unknown_empty"
 	}
+	return string(s)
 }
 
 // Source is the central abstraction. A Source is a named, versioned data

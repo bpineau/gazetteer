@@ -9,14 +9,32 @@ import (
 
 func TestResult_ZeroValue(t *testing.T) {
 	var r Result
-	if r.Status != StatusOK {
-		t.Errorf("Status zero = %v, want StatusOK", r.Status)
+	if r.Status != "" {
+		t.Errorf("Status zero = %q, want empty string", r.Status)
 	}
 	if r.Data != nil {
 		t.Errorf("Data zero = %v, want nil", r.Data)
 	}
 	if r.Err != nil {
 		t.Errorf("Err zero = %v, want nil", r.Err)
+	}
+}
+
+// TestResult_ZeroValueIsAccessibleByGet asserts the historical
+// idiom — constructing a Result without explicitly setting Status —
+// still surfaces the typed Data through gazetteer.Get. Get treats a
+// zero-value Status ("") as OK for backwards-compatibility.
+func TestResult_ZeroValueIsAccessibleByGet(t *testing.T) {
+	type stub struct{ V int }
+	d := Dossier{Results: map[string]Result{
+		"stub": {Name: "stub", Data: &stub{V: 42}},
+	}}
+	got, ok := Get[*stub](d, "stub")
+	if !ok {
+		t.Fatal("Get returned ok=false for zero-Status Result")
+	}
+	if got.V != 42 {
+		t.Errorf("V = %d, want 42", got.V)
 	}
 }
 

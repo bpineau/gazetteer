@@ -47,7 +47,13 @@ func Get[T any](d Dossier, name string) (T, bool) {
 	if !ok {
 		return zero, false
 	}
-	if r.Status != StatusOK && r.Status != StatusOKEmpty {
+	// A zero-value Status ("") is treated as OK so consumers that
+	// construct Result literals in tests without explicitly stamping
+	// Status still see their Data — matches the historical iota=0=OK
+	// behaviour of the int Status type.
+	switch r.Status {
+	case "", StatusOK, StatusOKEmpty:
+	default:
 		return zero, false
 	}
 	typed, ok := r.Data.(T)
@@ -86,7 +92,7 @@ func (d *Dossier) UnmarshalJSON(b []byte) error {
 		out := Result{
 			Name:      r.Name,
 			Version:   r.Version,
-			Status:    parseStatus(r.Status),
+			Status:    Status(r.Status),
 			InputHash: r.InputHash,
 			FetchedAt: r.FetchedAt,
 		}
@@ -105,25 +111,4 @@ func (d *Dossier) UnmarshalJSON(b []byte) error {
 		d.Results[k] = out
 	}
 	return nil
-}
-
-func parseStatus(s string) Status {
-	switch s {
-	case "ok":
-		return StatusOK
-	case "ok_empty":
-		return StatusOKEmpty
-	case "skipped_prereq":
-		return StatusSkippedPrereq
-	case "failed_transient":
-		return StatusFailedTransient
-	case "failed_antibot":
-		return StatusFailedAntiBot
-	case "failed_outdated":
-		return StatusFailedOutdated
-	case "failed_permanent":
-		return StatusFailedPermanent
-	default:
-		return StatusFailedTransient
-	}
 }
