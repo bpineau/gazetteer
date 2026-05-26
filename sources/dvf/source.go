@@ -127,11 +127,19 @@ type Source struct {
 // for cross-source diagnostics.
 var ErrCircuitTripped = gazetteer.NewCircuitTrippedError(Name)
 
-// NewSource builds a dvf Source. Panics when opts.HTTP is nil — the
-// Source has no transport to drive without it.
-func NewSource(opts Options) *Source {
+// NewSource builds a dvf Source. Returns a non-nil error when a
+// required dependency is missing (opts.HTTP) or when the embedded
+// communes table cannot be loaded.
+//
+// Callers wiring a Builder chain typically check the error once at
+// startup:
+//
+//	src, err := dvf.NewSource(dvf.Options{HTTP: hc, Geocoder: ban})
+//	if err != nil { return err }
+//	client, _ := gazetteer.NewBuilder().With(src).Build()
+func NewSource(opts Options) (*Source, error) {
 	if opts.HTTP == nil {
-		panic("dvf.NewSource: nil HTTP client")
+		return nil, errors.New("dvf.NewSource: nil HTTP client")
 	}
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
@@ -139,7 +147,7 @@ func NewSource(opts Options) *Source {
 	if opts.Communes == nil {
 		t, err := communes.Default()
 		if err != nil {
-			panic(fmt.Sprintf("dvf.NewSource: load communes: %v", err))
+			return nil, fmt.Errorf("dvf.NewSource: load communes: %w", err)
 		}
 		opts.Communes = t
 	}
@@ -153,7 +161,7 @@ func NewSource(opts Options) *Source {
 		api:      NewAPI(opts.HTTP, tc),
 		sections: NewSectionDiscoverer(opts.SectionCache, opts.Logger),
 		communes: opts.Communes,
-	}
+	}, nil
 }
 
 // Name implements gazetteer.Source.
@@ -462,10 +470,15 @@ func (s *Source) Sections() *SectionDiscoverer { return s.sections }
 func (s *Source) API() *API { return s.api }
 
 // Query is the atomic helper for callers who don't want the builder.
-// The error is non-nil only when the Source failed; a successful but
-// empty response still returns a non-nil *Result with IsEmpty() == true.
+// The error is non-nil only when the Source failed or could not be
+// constructed; a successful but empty response still returns a
+// non-nil *Result with IsEmpty() == true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
+	s, err := NewSource(opts)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.Query(ctx, l)
 	if err != nil {
 		return nil, err
 	}

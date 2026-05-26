@@ -59,10 +59,13 @@ func main() {
 	// shown here; sources whose Options have a zero-value default
 	// (ademe, georisques, locservice, …) can be constructed with
 	// `Options{}` and will fall back to gazetteer.HTTPClientFrom(ctx).
-	dvfSource := dvf.NewSource(dvf.Options{
+	dvfSource, err := dvf.NewSource(dvf.Options{
 		HTTP:     hc,
 		Geocoder: banx.NewBANClient(hc),
 	})
+	if err != nil {
+		log.Fatalf("dvf.NewSource: %v", err)
+	}
 	// osm.NewSource(Options{}) returns immediately; Query will return
 	// ErrNoCatalog until the catalog is installed via UpdateCatalog
 	// (typically by a background refresh goroutine).
