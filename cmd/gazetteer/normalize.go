@@ -40,11 +40,12 @@ func runNormalize(ctx context.Context, args []string) error {
 
 	flags.setupLogger()
 
-	if _, err := newRuntimeDeps(); err != nil {
+	deps, err := newRuntimeDeps()
+	if err != nil {
 		return fmt.Errorf("setup: %w", err)
 	}
 
-	listing, err := gazetteer.NormalizeAddress(ctx, addr)
+	listing, err := deps.Normalizer.Normalize(ctx, addr)
 	if err != nil {
 		return fmt.Errorf("normalize %q: %w", addr, err)
 	}

@@ -39,21 +39,14 @@ func TestNewDefault_Smoke(t *testing.T) {
 	}
 }
 
-// TestNewDefault_SkipNormalizer leaves the package-level default
-// Normalizer untouched when Options.SkipNormalizer is true. We
-// observe "untouched" by asserting NormalizeAddress still returns
-// gazetteer.ErrNormalizerNotConfigured — the sentinel error produced
-// when no concrete Normalizer is installed.
+// TestNewDefault_SkipNormalizer produces a Client whose Normalize
+// returns gazetteer.ErrNormalizerNotConfigured.
 func TestNewDefault_SkipNormalizer(t *testing.T) {
-	// Snapshot + reset to the "not configured" state, then restore.
-	prev := gazetteer.SetDefaultNormalizer(nil)
-	t.Cleanup(func() { gazetteer.SetDefaultNormalizer(prev) })
-
-	_, err := factory.NewDefaultWith(context.Background(), factory.Options{SkipNormalizer: true})
+	client, err := factory.NewDefaultWith(context.Background(), factory.Options{SkipNormalizer: true})
 	if err != nil {
 		t.Fatalf("NewDefaultWith: %v", err)
 	}
-	if _, err := gazetteer.NormalizeAddress(context.Background(), "1 rue test 75001 Paris"); !errors.Is(err, gazetteer.ErrNormalizerNotConfigured) {
-		t.Errorf("SkipNormalizer=true should leave the default Normalizer as not-configured; NormalizeAddress err=%v", err)
+	if _, err := client.Normalize(context.Background(), "1 rue test 75001 Paris"); !errors.Is(err, gazetteer.ErrNormalizerNotConfigured) {
+		t.Errorf("SkipNormalizer=true should leave Client.Normalize unconfigured; got %v", err)
 	}
 }

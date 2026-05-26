@@ -93,7 +93,7 @@ func executeQuery(ctx context.Context, q *queryFlags) (gazetteer.Dossier, error)
 		return gazetteer.Dossier{}, err
 	}
 
-	listing, err := gazetteer.NormalizeAddress(ctx, q.addr)
+	listing, err := deps.Normalizer.Normalize(ctx, q.addr)
 	if err != nil {
 		return gazetteer.Dossier{}, fmt.Errorf("normalize %q: %w", q.addr, err)
 	}
