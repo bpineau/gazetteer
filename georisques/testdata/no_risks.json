@@ -1,0 +1,9 @@
+{
+  "adresse": {"libelle":"Lieu reculé","longitude":2.0,"latitude":48.0},
+  "commune": {"libelle":"Nulle Part","codePostal":"00000","codeInsee":"00000"},
+  "url": "https://www.georisques.gouv.fr/...",
+  "risquesNaturels": {
+    "inondation":{"present":false,"libelle":"Inondation","libelleStatutCommune":null,"libelleStatutAdresse":null,"specifique":null}
+  },
+  "risquesTechnologiques": {}
+}
