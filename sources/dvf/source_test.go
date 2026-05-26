@@ -315,6 +315,15 @@ func TestSource_CircuitTripped_ShortCircuits(t *testing.T) {
 	if !errors.Is(err, ErrCircuitTripped) {
 		t.Errorf("Query(circuit tripped) = %v, want ErrCircuitTripped", err)
 	}
+	if !errors.Is(err, gazetteer.ErrSourceCircuitTripped) {
+		t.Errorf("Query(circuit tripped) does not unwrap to gazetteer.ErrSourceCircuitTripped: %v", err)
+	}
+}
+
+func TestErrCircuitTripped_WrapsCanonical(t *testing.T) {
+	if !errors.Is(ErrCircuitTripped, gazetteer.ErrSourceCircuitTripped) {
+		t.Fatalf("dvf.ErrCircuitTripped must wrap gazetteer.ErrSourceCircuitTripped")
+	}
 }
 
 func TestSource_CustomSectionCache(t *testing.T) {
