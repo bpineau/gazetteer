@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/bpineau/gazetteer"
+	"github.com/bpineau/gazetteer/gazetteer"
 )
 
 // fakeHazardReporter is a minimal Result.Data type that satisfies

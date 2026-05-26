@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bpineau/gazetteer"
 	"github.com/bpineau/gazetteer/appraisal"
+	"github.com/bpineau/gazetteer/gazetteer"
 )
 
 // runAppraise implements `gazetteer appraise [--source ...] [--json]

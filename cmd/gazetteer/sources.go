@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bpineau/gazetteer"
+	"github.com/bpineau/gazetteer/gazetteer"
 )
 
 // runSources dispatches `gazetteer sources list` and `sources doc

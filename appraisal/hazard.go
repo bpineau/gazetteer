@@ -3,7 +3,7 @@ package appraisal
 import (
 	"sort"
 
-	"github.com/bpineau/gazetteer"
+	"github.com/bpineau/gazetteer/gazetteer"
 )
 
 // HazardReporter is the optional interface a Source's typed Result MAY

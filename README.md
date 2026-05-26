@@ -25,12 +25,12 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/bpineau/gazetteer"
-	"github.com/bpineau/gazetteer/dvf"
-	"github.com/bpineau/gazetteer/osm"
-	"github.com/bpineau/gazetteer/pkg/banx"
-	"github.com/bpineau/gazetteer/pkg/communes"
-	"github.com/bpineau/gazetteer/pkg/httpx"
+	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/sources/dvf"
+	"github.com/bpineau/gazetteer/sources/osm"
+	"github.com/bpineau/gazetteer/helpers/banx"
+	"github.com/bpineau/gazetteer/helpers/communes"
+	"github.com/bpineau/gazetteer/helpers/httpx"
 )
 
 func main() {
