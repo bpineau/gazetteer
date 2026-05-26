@@ -12,10 +12,8 @@ deferred until the surface stabilises.
 
 ## Quick start
 
-Starting from a raw, user-supplied address string is the common case.
-The library exposes `NormalizeAddress` to canonicalise it (BAN forward
-geocode + INSEE commune lookup) before handing the resulting `Listing`
-to the configured sources.
+The `factory` package wires every stable in-tree source with sensible
+defaults so most callers need fewer than 10 lines:
 
 ```go
 package main
@@ -25,73 +23,51 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/bpineau/gazetteer/factory"
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/sources/dvf"
-	"github.com/bpineau/gazetteer/sources/osm"
-	"github.com/bpineau/gazetteer/helpers/banx"
-	"github.com/bpineau/gazetteer/helpers/communes"
-	"github.com/bpineau/gazetteer/helpers/httpx"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// One-time setup: install the default BAN-backed Normalizer so
-	// gazetteer.NormalizeAddress can resolve a raw string into a
-	// Listing populated with INSEE, postcode, lat/lon.
-	hc, err := httpx.New(httpx.Options{})
+	// One-shot setup: builds httpx + BAN + every stable Source and
+	// installs the BAN-backed Normalizer behind gazetteer.NormalizeAddress.
+	client, err := factory.NewDefault(ctx)
 	if err != nil {
-		log.Fatalf("httpx: %v", err)
+		log.Fatalf("factory: %v", err)
 	}
-	gazetteer.SetDefaultNormalizer(
-		gazetteer.NewBANNormalizer(banx.NewBANClient(hc), communes.MustDefault()),
-	)
 
-	// Normalise the user's address.
+	// Canonicalise the user's free-text address into a Listing.
 	listing, err := gazetteer.NormalizeAddress(ctx, "1 rue de Rivoli, 75001 Paris")
 	if err != nil {
 		log.Fatalf("normalize: %v", err)
 	}
 
-	// Configure which sources to query. Sources with strict
-	// dependencies (DVF needs an HTTP client and a geocoder; OSM
-	// needs a station catalog loaded later via UpdateCatalog) are
-	// shown here; sources whose Options have a zero-value default
-	// (ademe, georisques, locservice, …) can be constructed with
-	// `Options{}` and will fall back to gazetteer.HTTPClientFrom(ctx).
-	dvfSource, err := dvf.NewSource(dvf.Options{
-		HTTP:     hc,
-		Geocoder: banx.NewBANClient(hc),
-	})
-	if err != nil {
-		log.Fatalf("dvf.NewSource: %v", err)
-	}
-	// osm.NewSource(Options{}) returns immediately; Query will return
-	// ErrNoCatalog until the catalog is installed via UpdateCatalog
-	// (typically by a background refresh goroutine).
-	osmSource := osm.NewSource(osm.Options{})
-
-	client, err := gazetteer.NewBuilder().
-		With(dvfSource).
-		With(osmSource).
-		Build()
-	if err != nil {
-		log.Fatalf("build: %v", err)
-	}
-
-	// Collect runs every configured source in parallel and aggregates
-	// their typed payloads into a Dossier.
+	// Run every configured source in parallel; aggregate the typed
+	// payloads into a Dossier.
 	dossier := client.Collect(ctx, listing)
 
 	if r, ok := dvf.From(dossier); ok {
 		fmt.Printf("DVF: sample_size=%d, level=%s\n",
 			r.SampleSize, r.Evidence.LevelUsed)
 	}
-	if r, ok := osm.From(dossier); ok {
-		fmt.Printf("OSM: %d transit station(s) in range\n", len(r.Stations))
-	}
 }
 ```
+
+Callers that need to add an out-of-tree Source (e.g. `bienici`,
+`castorus`) or override a default should use `factory.BuilderDefault`,
+chain `.With(plugin)`, then call `.Build()`:
+
+```go
+b, err := factory.BuilderDefault(ctx, factory.Options{})
+if err != nil { log.Fatal(err) }
+client, _ := b.With(myPlugin).Build()
+```
+
+`factory.NewDefault` does not currently wire the OSM transit source
+(it needs an offline station catalog); add it explicitly via the
+Builder path when needed.
 
 ## Sources shipped
 
