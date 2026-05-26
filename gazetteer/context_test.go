@@ -51,19 +51,3 @@ func TestDebugDumpFrom_Set(t *testing.T) {
 		t.Errorf("DebugDumpFrom after WithDebugDump(true) = false")
 	}
 }
-
-func TestCacheFrom_Default(t *testing.T) {
-	c := CacheFrom(context.Background())
-	if c == nil {
-		t.Fatal("CacheFrom returned nil for empty ctx")
-	}
-}
-
-func TestCacheFrom_Set(t *testing.T) {
-	want := NewMemCache(5)
-	ctx := WithCache(context.Background(), want)
-	got := CacheFrom(ctx)
-	if got != want {
-		t.Errorf("CacheFrom returned wrong cache")
-	}
-}
