@@ -121,7 +121,11 @@ type Source struct {
 // tripped the process-local circuit breaker — i.e. a run of consecutive
 // transport / context-deadline failures crossed the threshold. The flag
 // is process-scoped; a fresh run starts fresh.
-var ErrCircuitTripped = errors.New("dvf: upstream circuit tripped, skipping for the rest of this run")
+//
+// errors.Is(err, dvf.ErrCircuitTripped) keeps working for dvf-specific
+// matching. The error also matches gazetteer.ErrSourceCircuitTripped
+// for cross-source diagnostics.
+var ErrCircuitTripped = gazetteer.NewCircuitTrippedError(Name)
 
 // NewSource builds a dvf Source. Panics when opts.HTTP is nil — the
 // Source has no transport to drive without it.
