@@ -115,6 +115,35 @@ func TestSource_HappyPath_Paris15Lourmel(t *testing.T) {
 	}
 }
 
+// TestSource_CommercialNoSurface verifies that a commercial listing with no
+// surface_m2 is not rejected by OSM — the source has no property-type gate
+// and only requires lat/lon coordinates.
+func TestSource_CommercialNoSurface(t *testing.T) {
+	s := NewSource(Options{Catalog: newTestCatalog(t)})
+	// Listing with PropertyType=commercial and nil SurfaceM2 but valid coords.
+	// Uses the same Paris-XV coordinates as the happy-path test.
+	data, err := s.Query(context.Background(), gazetteer.Listing{
+		Address:      "77160 Provins",
+		City:         "Provins",
+		Zip:          "77160",
+		PropertyType: gazetteer.PropertyCommercial,
+		Lat:          ptrF64(48.8407),
+		Lon:          ptrF64(2.2880),
+		// SurfaceM2 intentionally nil
+	})
+	if err != nil {
+		t.Fatalf("Query(commercial, no surface) = %v, want nil", err)
+	}
+	res, ok := data.(*Result)
+	if !ok {
+		t.Fatalf("Query returned %T, want *Result", data)
+	}
+	// The catalog fixture is Paris XV so we expect a result, not empty.
+	if res.IsEmpty() {
+		t.Error("IsEmpty() = true, want false: OSM must not gate on property type or surface")
+	}
+}
+
 func TestSource_MissingLatLon(t *testing.T) {
 	s := NewSource(Options{Catalog: newTestCatalog(t)})
 	_, err := s.Query(context.Background(), gazetteer.Listing{})
