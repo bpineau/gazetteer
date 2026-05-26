@@ -1,0 +1,130 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.1",
+  "elements": [
+    {
+      "type": "node",
+      "id": 2032584462,
+      "lat": 48.8404,
+      "lon": 2.2876,
+      "tags": {
+        "name": "Lourmel",
+        "railway": "station",
+        "station": "subway",
+        "subway": "yes",
+        "ref": "8",
+        "route_ref": "8",
+        "network": "Métro de Paris",
+        "operator": "RATP"
+      }
+    },
+    {
+      "type": "node",
+      "id": 26904820,
+      "lat": 48.83963,
+      "lon": 2.29297,
+      "tags": {
+        "name": "Boucicaut",
+        "railway": "station",
+        "station": "subway",
+        "subway": "yes",
+        "ref": "8",
+        "network": "Métro de Paris"
+      }
+    },
+    {
+      "type": "node",
+      "id": 4382002612,
+      "lat": 48.85283,
+      "lon": 2.34878,
+      "tags": {
+        "name": "Châtelet-Les Halles",
+        "railway": "station",
+        "train": "yes",
+        "route_ref": "RER A;RER B;RER D",
+        "network": "Réseau express régional d'Île-de-France",
+        "operator": "RATP;SNCF"
+      }
+    },
+    {
+      "type": "node",
+      "id": 30443895,
+      "lat": 48.85011,
+      "lon": 2.31254,
+      "tags": {
+        "name": "Pont du Garigliano - Hôpital Européen G. Pompidou",
+        "railway": "tram_stop",
+        "ref": "3a",
+        "network": "Tramway d'Île-de-France"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2654819113,
+      "lat": 48.8809,
+      "lon": 2.3553,
+      "tags": {
+        "name": "Gare du Nord",
+        "railway": "station",
+        "train": "yes",
+        "network": "Transilien"
+      }
+    },
+    {
+      "type": "way",
+      "id": 12345678,
+      "center": { "lat": 48.84411, "lon": 2.27325 },
+      "tags": {
+        "name": "Balard",
+        "railway": "station",
+        "station": "subway",
+        "subway": "yes",
+        "ref": "8"
+      }
+    },
+    {
+      "type": "node",
+      "id": 99001,
+      "lat": 48.84,
+      "lon": 2.28,
+      "tags": {
+        "name": "Stop Bus Pasteur",
+        "highway": "bus_stop",
+        "bus": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 99002,
+      "lat": 48.84,
+      "lon": 2.281,
+      "tags": {
+        "name": "Old Tram Halt",
+        "railway": "tram_stop",
+        "disused:railway": "tram_stop",
+        "disused": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 99003,
+      "lat": 48.84,
+      "lon": 2.282,
+      "tags": {
+        "name": "Demolished Subway",
+        "demolished:railway": "station",
+        "demolished:subway": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 99004,
+      "lat": 48.84,
+      "lon": 2.283,
+      "tags": {
+        "railway": "station",
+        "subway": "yes"
+      }
+    }
+  ]
+}

@@ -1,0 +1,290 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
+	<title>Mesurer la tension locative  à Riom (63)</title>
+      <meta name="robots" content="noindex, nofollow" />
+  	<link href="/style_common_jq.css" rel="stylesheet" />
+<!--[if (!IE)|(gt IE 8)]><!-->
+<script src="/javascript/jquery-2.1.0.min.js"></script>
+<script type="text/javascript">
+	var ie = 0;
+</script>
+<!--<![endif]-->
+<!--[if lte IE 8]>
+  <script src="/javascript/jquery-1.9.1.min.js"></script>
+  <script type="text/javascript">
+	    ie = 8;
+  </script>
+<![endif]-->
+<script src="/javascript/alert_jquery.js"></script>
+  <script src="/javascript/s2j.js?v=3"></script>
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<link href="/knacss.css" rel="stylesheet" />
+	<link href="https://fonts.googleapis.com/css?family=Muli|Raleway" rel="stylesheet">
+	<link href="/javascript/jquery/jquery-ui.min.css" rel="stylesheet">
+	<link href="/style_cote.css" rel="stylesheet" type="text/css" />
+	<link href="/style_flat.css" rel="stylesheet" />
+	<link href="/javascript/jquery/jquery-ui.min.css" rel="stylesheet">
+	<link href="/javascript/jquery/jquery.validate.css" rel="stylesheet" type="text/css" />
+	<script type="text/javascript" src="/javascript/sticky_footer.js"></script>
+	<script type="text/javascript" src="/javascript/jquery/jquery-ui.min.js"></script>
+	<script type="text/javascript" src="/javascript/flat_jquery.js"></script>
+  <script type="text/javascript" src="https://try.abtasty.com/e7fc5869c30b7f09ac6eee3875571273.js"></script></head>
+<body>
+	<div id="help" class="infobulle" ></div>
+	<header id="header" role="banner" class="center ptm pbs">
+		<div id="subheader">
+		<div id="logo_container" class="txtcenter mod fl"><a href="/" title="LocService : location entre particuliers"><img id="logo" src="/images/flat/logo3.png" alt="Location &agrave; l&#x27;ann&eacute;e de particulier &agrave; particulier" class="mbs" /></a></div>
+<div id="menuheader" class="" onclick='$("#bloc_header #navigation").removeClass("mod").toggle();'><span>Menu</span></div><div id="bloc_header">
+<nav id="navigation" role="navigation" class="mod"><ul><li><a id="accueil" class="" href="/" title="">Location</a></li>
+<li><a id="colocation" class="" href="/colocation/" title="">Colocation</a></li>
+<li><span id="etudiant" class="" onclick="return false;" title="">&Eacute;tudiants</span>
+<ul>
+<li><a href="/logement-etudiant.html" title="">Logement &Eacute;tudiant de particulier</a></li>
+<li><a href="/residences-etudiantes/" title="">R&eacute;sidences Etudiantes</a></li>
+<li><a href="/cple/" title="">Coup Pouce Logement &Eacute;tudiant</a></li>
+</ul>
+</li>
+<li><a id="cote" class="current" href="/simulateurs.html" title="">Simulateurs</a></li>
+<li><span id="guide" class="" onclick="return false;" title="">Guides</span>
+<ul>
+<li><a href="/guides/guide-locataire" title="">Guide Locataire</a></li>
+<li><a href="/guides/guide-proprietaire" title="">Guide Propri&eacute;taire</a></li>
+<li><a href="/guides/guide-colocataire" title="">Guide Colocataire</a></li>
+<li><a href="/guides/guide-logement-etudiant" title="">Guide Logement Etudiant</a></li>
+</ul>
+</li>
+<li class="accesMobile"><span data-h='=wWb0hmLzV2YjF2Lu9Wa0BXayN2cul2L' class='s2j' data-c='' data-d='' data-t='==QZjFGczVEIu9WbgsTZ2FmcnFmJgIXZktTZ0V3YhVmJjNWQ'></span></li></ul>
+</nav>
+</div>		</div>
+		<div class="clearfix"></div>
+	</header>
+	<div id="alert_jq"></div>
+  <section id="ariane" class="newAriane">
+    <div id="YouAreThere"><a href="/simulateurs.html" title="Evaluez le march&eacute; dans votre ville - LocService">Simulateurs LocService</a> &gt;&gt; Tensiom&egrave;tre Locatif</div>
+  </section>
+	<section id="fakeslider" class="bg-prim"><div class="widthMax center">
+  	<img class="fl mrl" src="/images/tensiometre/tensiometre.png">
+		<h1 class="ptl">Tensiom&egrave;tre Locatif</h1>
+		<p>Estimez en deux clics la tension locative dans votre ville.</p>
+		<div class="clearfix"></div>
+	</div></section>
+	<section class=""><div class="widthMax center">
+
+		<div id="CoteLoyer">
+    	<div id="coteblock">
+    		<h2>Le Tensiom&egrave;tre Locatif &eacute;value le march&eacute; locatif pour :</h2>
+        <form name="Form0" onsubmit="return false;" class="CoteGraph">
+        	<label class="title">Ville ou code postal :</label>
+        	<input type="text" style="width:192px;" value="Riom - 63200" name="uiVille" id="uiVille" autocomplete="off" />
+        	<br />
+        	<br />
+        	<label class="title">Type de logement :</label>
+      		<select id="Logement" name="Logement">
+    			<option value="">Tous</option><option value="chambre" >Chambre</option><option value="studio" >Studio / T1</option><option value="T2" >Appartement T2</option><option value="T3" >Appartement T3</option><option value="T4" >Appartement T4</option><option value="T5+" >Appartement T5+</option><option value="F3" >Petite maison</option><option value="F4+" >Grande maison</option>      		</select>
+        	<input type="hidden" name="Ville" id="Ville" value="Riom" disabled="disabled" />
+        	<input type="hidden" name="Zip" id="Zip" value="63200" disabled="disabled" />
+        	<input type="hidden" name="Insee" id="Insee" value="63300" />
+        </form>
+	      <div class="clearfix"></div>
+                <div id="result0">
+        	<h2 style="font-size:14px;">Analyse du march&eacute; locatif  &agrave; Riom</h2><br /><br /><p class="result0tensio">Le march&eacute; locatif n&#x27;est pas suffisamment actif  &agrave; Riom pour obtenir des donn&eacute;es fiables</p>        </div>
+        			</div>
+      <div id="googleblock" class="extended pts">
+				<div id="innerAdGtm"></div>
+      </div>
+      <br />
+		</div>
+    <div class="clearfix"></div>
+		<div style="clear:both;padding-top:20px;">
+              <p>
+          Vous &ecirc;tes &agrave; la recherche d'un logement &agrave; louer sur Riom ? Consultez nos offres de location ici : <a href="https://www.locservice.fr/puy-de-dome-63/location-particulier-riom.html" title="">Location particulier Riom</a>
+        </p>
+      
+			<p class="txtCenter">
+    		<a href="/tensiometre/pourquoi.html" title="" target="_blank">Pourquoi le Tensiom&egrave;tre Locatif ?</a>
+    		|
+    		<a href="/tensiometre/methodologie.html" title="" target="_blank">M&eacute;thodologie</a>
+    	</p>
+    </div>
+    
+		<div style="border: 1px solid #089ec6; background-color: #def2f8; max-width: 520px; margin: 20px auto; text-align:center; padding: 10px; clear:both;">
+			<p class="txtCenter" style="padding:0 0 20px 0;"><i>Vous appr&eacute;ciez le Tensiom&egrave;tre Locatif ? Faites-le conna&icirc;tre !</i></p>
+			<!--Facebook-->
+			<div id="fb-root"></div>
+			<script async defer crossorigin="anonymous" src="https://connect.facebook.net/fr_FR/sdk.js#xfbml=1&version=v10.0" nonce="LtdsvyNH"></script>
+			<div class="fb-share-button" data-href="https://www.locservice.fr/tensiometre/" data-layout="button" data-size="small"><a target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fwww.locservice.fr%2Ftensiometre%2F&amp;src=sdkpreparse" class="fb-xfbml-parse-ignore">Partager</a></div>
+			<br style="clear:float; line-height:30px; height: 30px;" />
+		</div>
+	</div>
+	<div id="stickyFooter">
+		<span data-h='vMXZylWY0F2Yvx2L' class='s2j' data-c='==Qbi1GIsFGdu9mepJ3bo1CZlRXYtlmbhByciBHIzRHcgwGbwBCbyBHI1VGbi1SY0NGIhR3Y' data-d='' data-t='=42bpRXYj9GbgUmb1BSZoNmclh2YgUmS'></span> <span data-h='vMXZylWY0VWayB3byB3L' class='s2j' data-c='==Qbi1GIsFGdu9mepJ3bo1CZlRXYtlmbhByciBHIzRHcgwGbwBCbyBHI0JXZ21SY0NGIhR3Y' data-d='' data-t='=42bpRXYj9GbgUmb1BSZz9GcvJHcgUmS'></span>		<div class="clearfix"></div>
+	</div>
+	</div></section>
+	<div id="Notify"></div>
+	<div class="clearfix"></div>
+	<div id="bottommenu"><div class="bg-third ptm pbm txtcenter" id="footer-1"><div class="widthMax grid-5 center"><a href='/infos/qui-sommes-nous.html' class='' >Qui sommes-nous ?</a><a href='/presse/espace-presse.html' class='' >Espace Presse</a><a href="/infos/legale.html" target="_blank">Mentions l&eacute;gales</a><a href='/infos/contact.html' class='' >Nous &eacute;crire</a><span><a style='display: inline;' href='https://www.facebook.com/locservice.fr/'><img src='/images/social_fb.png' /></a>&nbsp;<a style='display: inline;' href='https://twitter.com/LocService_fr'><img src='/images/social_tw.png' /></a>&nbsp;<a style='display: inline;' href='https://www.instagram.com/locservice.fr/'><img src='/images/social_insta.png' /></a></span></div></div><div class="bg-dark"><div class="widthMax center ptm pbm" id="footer-2"><p>&copy;2026 LocService - RCS Vannes n&deg; B 414 438 192 - <a href='/plan-du-site/'>Plan du site</a> - Reproduction interdite</p><a href="/location-appartement.html" title="">Appartement</a>&nbsp;|&nbsp;<a href="/location-maison.html" title="">Maison</a>&nbsp;|&nbsp;<a href="/location-studio.html" title="">Studio</a>&nbsp;|&nbsp;<a href="/location-chambre.html" title="">Chambre</a>&nbsp;|&nbsp;<a href="/location-meuble.html" title="">Location Meubl&eacute;</a>&nbsp;|&nbsp;<a href="/logement-etudiant.html" title="">Logement Etudiant</a><br/><a href="/infos/cgu.pdf" target="_blank" title="">Conditions d'utilisation</a>&nbsp;|&nbsp;<a href="/infos/politiquedonnees.html" target="_blank" title="">Politique d'utilisation des donn&eacute;es</a>&nbsp;|&nbsp;<a href="/infos/cookies.html" target="_blank" title="">Politique Cookies</a>&nbsp;|&nbsp;<a href="javascript:window.Sddan.cmp.displayUI();">Param&eacute;trer les cookies</a></div></div></div><!-- Google Tag Manager -->
+			<script type="text/javascript"> window.dataLayer = window.dataLayer || []; window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' }); </script> 
+			<script type="text/javascript" src="https://ftrnwz.locservice.fr/uhbcdqdr.js" async></script>
+			<!-- End Google Tag Manager -->
+			
+			<script>
+                (function(a,b) {
+                    var c = a.getElementsByTagName(b)[0];
+                    a = a.createElement(b);
+                    a.async = !0;
+                    a.src = 'https://collect.locservice.fr/index.min.js';
+                    c.parentNode.insertBefore(a,c);
+                    a.onload = function() {
+                        setTimeout(() => {
+                            if (window.location.href !== 'https://collect.locservice.fr/') {
+                                window.LSCollect = new LocCollect();
+                                window.LSCollect.push('pageview', 'traffic', window.location.href);
+                            }
+                        }, 100);
+                    }
+                    a.onerror = function() {
+                        console.warn('LSCollect script failed to load maybe LSCollect server is not running or script is not built.');
+                    }
+                })(document, 'script');
+            </script>
+<script type="text/javascript">dataLayer.push({"pc":"simu","hdfp":false})</script>
+	<script type="text/javascript">
+  <!--
+
+		jQuery( document ).ready(function( $ ) {
+
+			var firstSelect = new Array();
+			var autocomplete = new Array();
+
+			firstSelect.push({
+				label:		$('#uiVille').val(),
+				ouville:	$('#Ville').val(),
+				ouzip :		$('#Zip').val(),
+				ouinsee :	$('#Insee').val(),
+			});
+	    autocomplete.push($('#uiVille').autocomplete({
+	      source: function(request, response) {
+	        $.ajax({
+	          url: "/services/villes_geo.json",
+	          dataType: "json",
+	          data: { SearchField: request.term, Metropoles: 1 },
+					  success: function(data) { response( data ); $(".ui-autocomplete-input").removeClass("ui-autocomplete-loading");}
+	        });
+	      },
+	      minLength: 2,
+	      autoFocus: true,
+	      focus: function(event, ui) {
+		      var data = ui.item.label.split('-');
+		      firstSelect[0].label = ui.item.label;
+		      firstSelect[0].ouville = data[0];
+		      firstSelect[0].ouzip = data[1];
+		      firstSelect[0].ouinsee = ui.item.value;
+		      return false;
+		     },
+	      select: function(event, ui) {
+		      var data = ui.item.label.split('-');
+		      var logement = $('#Logement').val();
+					$('#uiVille').val(ui.item.label);
+					$('#Ville').val(data[0]);
+					$('#Zip').val(data[1]);
+		      $('#Insee').val(ui.item.value);
+		      if (logement != '') logement = logement.replace('+', '') + '-';
+					document.location.href = 'tensiometre-' + logement + $('#Insee').val() + '.html';
+		      return false;
+		    },
+	    }).autocomplete("instance")._renderItem = function(ul, item) { return $("<li>").append( "<a>" + item.label + "</a>" ).appendTo(ul); });
+
+	    $('#uiVille').blur(function() {
+				if (($(this).val() != '') && ($(this).val() != firstSelect[0].label)) {
+		      var logement = $('#Logement').val();
+					$(this).val(firstSelect.label);
+					$('#uiVille').val(firstSelect[0].label);
+					$('#Ville').val(firstSelect[0].ouville);
+					$('#Zip').val(firstSelect[0].ouzip);
+					$('#Insee').val(firstSelect[0].ouinsee);
+		      if (logement != '') logement = logement.replace('+', '') + '-';
+					document.location.href = 'tensiometre-' + logement + $('#Insee').val() + '.html';
+				}
+				else if ($(this).val() == '') {
+					$('#uiVille').val("Riom - 63200");
+					$('#Ville').val("Riom");
+					$('#Zip').val("63200");
+					$('#Insee').val("63300");
+				}
+				return false;
+			});
+
+							firstSelect.push({
+					label:		$('#uiVilleComp').val(),
+					ouville:	$('#VilleComp').val(),
+					ouzip:		$('#ZipComp').val(),
+					ouinsee:	$('#InseeComp').val(),
+				});
+
+		    autocomplete.push($('#uiVilleComp').autocomplete({
+		      source: function(request, response) {
+		        $.ajax({
+		          url: "/services/villes_geo.json",
+		          dataType: "json",
+		          data: { SearchField: request.term, Metropoles: 1 },
+						  success: function(data) { response( data ); $(".ui-autocomplete-input").removeClass("ui-autocomplete-loading");}
+		        });
+		      },
+		      minLength: 2,
+		      autoFocus: true,
+		      focus: function(event, ui) {
+			      var data = ui.item.label.split('-');
+			      firstSelect[1].label = ui.item.label;
+			      firstSelect[1].ouville = data[0];
+			      firstSelect[1].ouzip = data[1];
+			      firstSelect[1].ouinsee = ui.item.value;
+			      return false;
+			     },
+		      select: function(event, ui) {
+			      var data = ui.item.label.split('-');
+						var logement = $('#Logement').val();
+						$('#uiVilleComp').val(ui.item.label);
+						$('#VilleComp').val(data[0]);
+						$('#ZipComp').val(data[1]);
+			      $('#InseeComp').val(ui.item.value);
+						if (logement != '') logement = logement.replace('+', '') + '-';
+						document.location.href = 'tensiometre-' + logement + '63300-' + $('#InseeComp').val() + '.html';
+			      return false;
+			    },
+		    }).autocomplete("instance")._renderItem = function(ul, item) { return $("<li>").append( "<a>" + item.label + "</a>" ).appendTo(ul); });
+
+		    $('#uiVilleComp').blur(function() {
+					if (($(this).val() != '') && ($(this).val() != firstSelect[1].label)) {
+			      var logement = $('#Logement').val();
+						$(this).val(firstSelect[1].label);
+						$('#uiVilleComp').val(firstSelect[1].label);
+						$('#VilleComp').val(firstSelect[1].ouville);
+						$('#ZipComp').val(firstSelect[1].ouzip);
+						$('#InseeComp').val(firstSelect[1].ouinsee);
+						if (logement != '') logement = logement.replace('+', '') + '-';
+						document.location.href = 'tensiometre-' + logement + '63300-' + $('#InseeComp').val() + '.html';
+					}
+					else if ($(this).val() == '') {
+			      var logement = $('#Logement').val();
+						if (logement != '') logement = logement.replace('+', '') + '-';
+						document.location.href = 'tensiometre-' + logement + '63300.html';
+					}
+					return false;
+				});
+			
+			$('#Logement').change(function() {
+				if ($('#Insee').val() != '') {
+		      var logement = $('#Logement').val();
+					if (logement != '') logement = logement.replace('+', '') + '-';
+					document.location.href = 'tensiometre-' + logement + $('#Insee').val() + '.html';
+				}
+				return true;
+			});
+
+		});
+  //-->
+  </script>
+  </body>
+</html>

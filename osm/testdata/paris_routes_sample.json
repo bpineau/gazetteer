@@ -1,0 +1,114 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.1",
+  "elements": [
+    {
+      "type": "relation",
+      "id": 123564,
+      "tags": {
+        "type": "route",
+        "route": "subway",
+        "ref": "8",
+        "name": "Ligne 8 : Pointe du Lac → Balard",
+        "network": "Métro de Paris"
+      },
+      "members": [
+        { "type": "node", "ref": 260231831, "role": "stop" },
+        { "type": "node", "ref": 260231832, "role": "stop" }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 7731215,
+      "tags": {
+        "type": "route",
+        "route": "subway",
+        "ref": "8",
+        "name": "Ligne 8 : Balard → Pointe du Lac",
+        "network": "Métro de Paris"
+      },
+      "members": [
+        { "type": "node", "ref": 260231831, "role": "stop" }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 100001,
+      "tags": {
+        "type": "route",
+        "route": "subway",
+        "ref": "12",
+        "name": "Ligne 12",
+        "network": "Métro de Paris"
+      },
+      "members": [
+        { "type": "node", "ref": 260231831, "role": "stop" }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 200001,
+      "tags": {
+        "type": "route",
+        "route": "subway",
+        "ref": "A",
+        "name": "Ligne A : Perrache ⇒ Vaulx-en-Velin"
+      },
+      "members": [
+        { "type": "node", "ref": 3349897009, "role": "stop" },
+        { "type": "node", "ref": 3349897010, "role": "stop" }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 3205870,
+      "tags": {
+        "type": "public_transport",
+        "public_transport": "stop_area",
+        "name": "Charpennes - Charles Hernu"
+      },
+      "members": [
+        { "type": "node", "ref": 6022264659, "role": "" },
+        { "type": "node", "ref": 3349897009, "role": "stop" }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 300001,
+      "tags": {
+        "type": "route",
+        "route": "tram",
+        "ref": "T3",
+        "name": "Tram T3"
+      },
+      "members": [
+        { "type": "node", "ref": 30443895, "role": "stop" }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 400001,
+      "tags": {
+        "type": "route",
+        "route": "train",
+        "ref": "RER A",
+        "name": "RER A"
+      },
+      "members": [
+        { "type": "node", "ref": 4382002612, "role": "stop" }
+      ]
+    },
+    {
+      "type": "relation",
+      "id": 500001,
+      "tags": {
+        "type": "route",
+        "route": "subway",
+        "name": "Ligne sans ref"
+      },
+      "members": [
+        { "type": "node", "ref": 99999, "role": "stop" }
+      ]
+    }
+  ]
+}
