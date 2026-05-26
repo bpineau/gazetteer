@@ -1,0 +1,168 @@
+package carteloyers
+
+import (
+	"bytes"
+	"embed"
+	"encoding/csv"
+	"fmt"
+	"io"
+	"strconv"
+	"strings"
+	"sync"
+)
+
+//go:embed data/carte_loyers_appartement.csv data/carte_loyers_maison.csv data/carte_loyers_app12.csv data/carte_loyers_app3.csv
+var carteLoyersFS embed.FS
+
+// Row captures one INSEE × typology observation. Loyers are in
+// EUR/m²/month, charges comprises (CC).
+type Row struct {
+	InseeCode    string
+	Department   string
+	LoyerMedCC   float64 // loypredm2 — médiane EUR/m²/mois CC
+	LoyerLowerCC float64 // lwr_IPm2 — borne basse intervalle de prédiction
+	LoyerUpperCC float64 // upr_IPm2 — borne haute intervalle de prédiction
+	PredType     string  // "maille" (rare obs, mailled neighbours) | "commune" (≥ floor)
+	NbObsCommune int     // nombre d'observations sur la commune
+}
+
+// Index holds the lookup index for every typology.
+type Index struct {
+	byTypology map[Typology]map[string]Row
+}
+
+var (
+	indexOnce  sync.Once
+	indexCache *Index
+	indexErr   error
+)
+
+// Load returns the singleton lookup index, parsing the four embedded
+// CSV files on first call. Subsequent calls hit the cache.
+//
+// Errors are sticky : if the first call fails, every subsequent call
+// returns the same error (the embedded files cannot change between
+// calls so re-parsing buys nothing).
+func Load() (*Index, error) {
+	indexOnce.Do(func() {
+		indexCache, indexErr = parseAll()
+	})
+	return indexCache, indexErr
+}
+
+// Lookup returns the carte des loyers observation for the given INSEE
+// code under the requested typology. The `ok` flag is false when the
+// INSEE is not in the dataset (e.g. DOM-TOM, recently-merged commune).
+func (idx *Index) Lookup(insee string, typ Typology) (Row, bool) {
+	if idx == nil {
+		return Row{}, false
+	}
+	insee = strings.TrimSpace(insee)
+	if insee == "" {
+		return Row{}, false
+	}
+	per, ok := idx.byTypology[typ]
+	if !ok {
+		return Row{}, false
+	}
+	r, ok := per[insee]
+	return r, ok
+}
+
+// Count returns the number of observations parsed for the given
+// typology. Useful for tests and operator-facing tools.
+func (idx *Index) Count(typ Typology) int {
+	if idx == nil {
+		return 0
+	}
+	return len(idx.byTypology[typ])
+}
+
+func parseAll() (*Index, error) {
+	idx := &Index{
+		byTypology: map[Typology]map[string]Row{},
+	}
+	files := map[Typology]string{
+		TypologyApartment: "data/carte_loyers_appartement.csv",
+		TypologyHouse:     "data/carte_loyers_maison.csv",
+		TypologyApt12:     "data/carte_loyers_app12.csv",
+		TypologyApt3:      "data/carte_loyers_app3.csv",
+	}
+	for typ, path := range files {
+		raw, err := carteLoyersFS.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("carteloyers: read embedded %s: %w", path, err)
+		}
+		rows, err := parseCSV(raw)
+		if err != nil {
+			return nil, fmt.Errorf("carteloyers: parse %s: %w", path, err)
+		}
+		idx.byTypology[typ] = rows
+	}
+	return idx, nil
+}
+
+func parseCSV(raw []byte) (map[string]Row, error) {
+	r := csv.NewReader(bytes.NewReader(raw))
+	r.Comma = ';'
+	// header
+	header, err := r.Read()
+	if err != nil {
+		return nil, fmt.Errorf("read header: %w", err)
+	}
+	col := map[string]int{}
+	for i, name := range header {
+		col[strings.TrimSpace(name)] = i
+	}
+	required := []string{"INSEE_C", "DEP", "loypredm2", "lwr_IPm2", "upr_IPm2", "TYPPRED", "nbobs_com"}
+	for _, name := range required {
+		if _, ok := col[name]; !ok {
+			return nil, fmt.Errorf("missing column %q in header %v", name, header)
+		}
+	}
+	out := make(map[string]Row, 35_000)
+	for {
+		rec, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read row: %w", err)
+		}
+		insee := strings.TrimSpace(rec[col["INSEE_C"]])
+		if insee == "" {
+			continue
+		}
+		med, err1 := parseCommaFloat(rec[col["loypredm2"]])
+		lo, err2 := parseCommaFloat(rec[col["lwr_IPm2"]])
+		hi, err3 := parseCommaFloat(rec[col["upr_IPm2"]])
+		if err1 != nil || err2 != nil || err3 != nil {
+			// Skip malformed rows quietly — the dataset rarely
+			// carries them but we don't want a single bad value
+			// to abort startup.
+			continue
+		}
+		nb, _ := strconv.Atoi(strings.TrimSpace(rec[col["nbobs_com"]]))
+		out[insee] = Row{
+			InseeCode:    insee,
+			Department:   strings.TrimSpace(rec[col["DEP"]]),
+			LoyerMedCC:   med,
+			LoyerLowerCC: lo,
+			LoyerUpperCC: hi,
+			PredType:     strings.TrimSpace(rec[col["TYPPRED"]]),
+			NbObsCommune: nb,
+		}
+	}
+	return out, nil
+}
+
+// parseCommaFloat parses an INRAE-style decimal ("9,75769") into a
+// float64. Whitespace is trimmed.
+func parseCommaFloat(s string) (float64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, fmt.Errorf("empty")
+	}
+	s = strings.ReplaceAll(s, ",", ".")
+	return strconv.ParseFloat(s, 64)
+}
