@@ -1,9 +1,9 @@
 # gazetteer
 
 A Go library that compiles geographic and real-estate data about French
-addresses from multiple sources. Given a `Listing` (address + coordinates
-+ property attributes), it queries a configurable set of sources in
-parallel and returns a typed `Dossier` aggregating every result.
+addresses from multiple sources. Given a free-text address (or a fully
+populated `Listing`), it queries a configurable set of sources in parallel
+and returns a typed `Dossier` aggregating every result.
 
 ## Status
 
@@ -12,36 +12,66 @@ deferred until the surface stabilises.
 
 ## Quick start
 
+Starting from a raw, user-supplied address string is the common case.
+The library exposes `NormalizeAddress` to canonicalise it (BAN forward
+geocode + INSEE commune lookup) before handing the resulting `Listing`
+to the configured sources.
+
 ```go
 package main
 
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/bpineau/gazetteer"
 	"github.com/bpineau/gazetteer/dvf"
 	"github.com/bpineau/gazetteer/osm"
+	"github.com/bpineau/gazetteer/pkg/banx"
+	"github.com/bpineau/gazetteer/pkg/communes"
+	"github.com/bpineau/gazetteer/pkg/httpx"
 )
 
 func main() {
-	client, _ := gazetteer.NewBuilder().
+	ctx := context.Background()
+
+	// One-time setup: install the default BAN-backed Normalizer so
+	// gazetteer.NormalizeAddress can resolve a raw string into a
+	// Listing populated with INSEE, postcode, lat/lon.
+	hc, err := httpx.New(httpx.Options{})
+	if err != nil {
+		log.Fatalf("httpx: %v", err)
+	}
+	gazetteer.SetDefaultNormalizer(
+		gazetteer.NewBANNormalizer(banx.NewBANClient(hc), communes.MustDefault()),
+	)
+
+	// Normalise the user's address.
+	listing, err := gazetteer.NormalizeAddress(ctx, "1 rue de Rivoli, 75001 Paris")
+	if err != nil {
+		log.Fatalf("normalize: %v", err)
+	}
+
+	// Configure which sources to query.
+	client, err := gazetteer.NewBuilder().
 		With(dvf.NewSource(dvf.Options{})).
 		With(osm.NewSource(osm.Options{})).
 		Build()
-
-	listing := gazetteer.Listing{
-		Address: "1 rue de Rivoli",
-		City:    "Paris",
-		Zip:     "75001",
-		Lat:     48.8566,
-		Lon:     2.3522,
+	if err != nil {
+		log.Fatalf("build: %v", err)
 	}
 
-	d := client.Collect(context.Background(), listing)
+	// Collect runs every configured source in parallel and aggregates
+	// their typed payloads into a Dossier.
+	dossier := client.Collect(ctx, listing)
 
-	if r, ok := dvf.From(d); ok {
-		fmt.Println("DVF median EUR/m²:", r.MedianEurPerM2)
+	if r, ok := dvf.From(dossier); ok {
+		fmt.Printf("DVF: sample_size=%d, level=%s\n",
+			r.SampleSize, r.Evidence.LevelUsed)
+	}
+	if r, ok := osm.From(dossier); ok {
+		fmt.Printf("OSM: %d transit station(s) in range\n", len(r.Stations))
 	}
 }
 ```
@@ -58,11 +88,11 @@ func main() {
 | `dvf`          | Demandes de Valeurs Foncières — historical transaction prices    |
 | `carteloyers`  | National rent observatory tiers                                  |
 | `encadrement`  | Rent control zones (Paris, Lille, Lyon, etc.)                    |
-| `filosofi`     | INSEE Filosofi income/poverty statistics by IRIS                 |
+| `filosofi`     | INSEE Filosofi income / poverty statistics by IRIS               |
 | `taxefonciere` | Property tax ratios by commune                                   |
 | `vacance`      | Vacancy taxation status by commune                               |
 
-Plus an `appraisal/` layer combining the above into rent + price
+Plus an `appraisal/` layer combining the above into rent and price
 estimates with confidence bands.
 
 ## CLI
@@ -91,15 +121,16 @@ gazetteer setup            # one-shot initial data fetch
 - **Result** — the framework envelope around a Source's typed payload
 - **Dossier** — the aggregated output of one `Client.Collect` call
 - **Builder / Client** — configure sources, then run them in parallel
-- **Cache** — pluggable backend for intermediate state (MemCache default)
+- **Cache** — pluggable backend for intermediate state (in-memory default)
 - **Normalizer** — canonicalises a free-text address into a Listing
 
 ## Plugins
 
-Out-of-tree source packages (private antibot scrapers, paid APIs, etc.)
-implement the same `Source` interface and register their typed payload
-via `gazetteer.Register` in `init()`. Callers wire them with
-`builder.With(...)` like any official source.
+Out-of-tree source packages implement the same `Source` interface and
+register their typed payload via `gazetteer.Register` in `init()`.
+Callers wire them with `builder.With(...)` like any official source —
+the framework itself has no compile-time knowledge of which sources are
+available.
 
 ## License
 
