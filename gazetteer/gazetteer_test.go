@@ -58,13 +58,11 @@ func TestBuilder_Build_DuplicateNamesError(t *testing.T) {
 func TestBuilder_OptionSetters(t *testing.T) {
 	customHC := &http.Client{}
 	customLog := slog.Default().With("x", "y")
-	customCache := NewMemCache(7)
 
 	b := NewBuilder().
 		WithHTTPClient(customHC).
 		WithLogger(customLog).
 		WithDebugDump(true).
-		WithCache(customCache).
 		WithMaxConcurrency(3).
 		WithNormalizer(&fakeNormalizer{})
 
@@ -76,9 +74,6 @@ func TestBuilder_OptionSetters(t *testing.T) {
 	}
 	if !b.debugDump {
 		t.Errorf("WithDebugDump did not apply")
-	}
-	if b.cache != customCache {
-		t.Errorf("WithCache did not apply")
 	}
 	if b.maxConcur != 3 {
 		t.Errorf("WithMaxConcurrency = %d, want 3", b.maxConcur)

@@ -17,7 +17,6 @@ type Builder struct {
 	httpClient *http.Client
 	logger     *slog.Logger
 	debugDump  bool
-	cache      Cache
 	maxConcur  int
 	normalizer Normalizer
 }
@@ -63,13 +62,6 @@ func (b *Builder) WithDebugDump(on bool) *Builder {
 	return b
 }
 
-// WithCache installs a persistent Cache backend. The default is the
-// process-wide MemCache fallback.
-func (b *Builder) WithCache(c Cache) *Builder {
-	b.cache = c
-	return b
-}
-
 // WithMaxConcurrency caps the number of Sources executed in parallel by
 // Client.Collect. Zero or negative = unlimited.
 func (b *Builder) WithMaxConcurrency(n int) *Builder {
@@ -100,7 +92,6 @@ func (b *Builder) Build() (*Client, error) {
 		httpClient: b.httpClient,
 		logger:     b.logger,
 		debugDump:  b.debugDump,
-		cache:      b.cache,
 		maxConcur:  b.maxConcur,
 	}
 	return c, nil
@@ -112,7 +103,6 @@ type Client struct {
 	httpClient *http.Client
 	logger     *slog.Logger
 	debugDump  bool
-	cache      Cache
 	maxConcur  int
 }
 
@@ -122,17 +112,15 @@ type Client struct {
 // itself does not return an error.
 //
 // Concurrency is unlimited unless WithMaxConcurrency was set. The shared
-// ctx propagates HTTP client / logger / debug-dump / cache to each
-// Source via the context-key helpers.
+// ctx propagates HTTP client / logger / debug-dump to each Source via
+// the context-key helpers. Sources that need a persistent kvcache.Cache
+// receive it via their own Options field instead of a framework slot.
 func (c *Client) Collect(ctx context.Context, l Listing) Dossier {
 	started := time.Now()
 
 	ctx = WithHTTPClient(ctx, c.httpClient)
 	ctx = WithLogger(ctx, c.logger)
 	ctx = WithDebugDump(ctx, c.debugDump)
-	if c.cache != nil {
-		ctx = WithCache(ctx, c.cache)
-	}
 
 	var sem chan struct{}
 	if c.maxConcur > 0 {

@@ -12,7 +12,6 @@ const (
 	ctxKeyHTTPClient ctxKey = iota
 	ctxKeyLogger
 	ctxKeyDebugDump
-	ctxKeyCache
 )
 
 // WithHTTPClient stores an HTTP client in ctx for Sources to read with
@@ -72,20 +71,3 @@ func DebugDumpFrom(ctx context.Context) bool {
 	v, _ := ctx.Value(ctxKeyDebugDump).(bool)
 	return v
 }
-
-// WithCache stores a Cache on ctx.
-func WithCache(ctx context.Context, c Cache) context.Context {
-	return context.WithValue(ctx, ctxKeyCache, c)
-}
-
-// CacheFrom returns the Cache set on ctx, or a process-wide MemCache
-// fallback if none. The fallback is shared across calls so cache hits
-// persist for the lifetime of the process.
-func CacheFrom(ctx context.Context) Cache {
-	if c, ok := ctx.Value(ctxKeyCache).(Cache); ok && c != nil {
-		return c
-	}
-	return defaultCache
-}
-
-var defaultCache Cache = NewMemCache(4096)
