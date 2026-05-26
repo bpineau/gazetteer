@@ -337,7 +337,7 @@ func (s *Source) resolveINSEE(ctx context.Context, l gazetteer.Listing) (insee, 
 		Reverse: reverseGC,
 	}
 	res, rerr := resolver.Resolve(ctx, banx.INSEEQuery{
-		Address: strings.TrimSpace(addr + " " + zip + " " + city),
+		Address: addr, // GeocodeQuery.String() appends zip/city only when absent
 		City:    city,
 		Zip:     zip,
 		Lat:     auctionLat,
