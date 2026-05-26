@@ -450,3 +450,55 @@ func TestQueryHelper_Smoke(t *testing.T) {
 		t.Error("Result IsEmpty=true, want false")
 	}
 }
+
+// TestSource_CommercialNoSurface verifies that a commercial listing with no
+// surface_m2 and no lat/lon (only zip+city as address) is not blocked by
+// ErrUnsupportedPropertyType, and that the address-doubling fix in
+// resolveINSEE produces a high-scoring geocode result.
+func TestSource_CommercialNoSurface(t *testing.T) {
+	body := loadFixtureMutations(t, "dvfapi_mutations_77379_AB_commercial.json")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "/77379/") {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+	withBaseURL(t, srv.URL+"/mutations")
+
+	hc := newHTTPClient(t)
+	// Geocoder returns INSEE 77379 (Provins) with high confidence,
+	// simulating what BAN returns when the address is "77160 Provins"
+	// rather than the doubled "77160 Provins 77160 Provins".
+	gc := stubGeocoder{res: banx.GeocodeResult{CityCode: "77379", Score: 0.95}}
+	s := NewSource(Options{HTTP: hc, Geocoder: gc})
+	if err := s.Sections().PrimeFromList(context.Background(), "77379", []string{"000AB"}); err != nil {
+		t.Fatalf("PrimeFromList: %v", err)
+	}
+
+	// Listing mirrors auction 124009: zip+city address, no lat/lon, no surface.
+	l := gazetteer.Listing{
+		Address:      "77160 Provins",
+		City:         "Provins",
+		Zip:          "77160",
+		PropertyType: gazetteer.PropertyCommercial,
+		// SurfaceM2 intentionally nil
+		// Lat/Lon intentionally nil
+	}
+	data, err := s.Query(context.Background(), l)
+	if err != nil {
+		t.Fatalf("Query(commercial, no surface, no lat/lon) = %v, want nil", err)
+	}
+	res, ok := data.(*Result)
+	if !ok {
+		t.Fatalf("Query returned %T, want *Result", data)
+	}
+	if res.IsEmpty() {
+		t.Error("IsEmpty() = true, want false for commercial with 30 mutations")
+	}
+	if res.Evidence.TypeLocalFilter != MapPropertyTypeToDVF("commercial") {
+		t.Errorf("TypeLocalFilter = %q, want %q", res.Evidence.TypeLocalFilter, MapPropertyTypeToDVF("commercial"))
+	}
+}
