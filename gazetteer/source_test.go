@@ -20,15 +20,14 @@ func TestStatus_String(t *testing.T) {
 	}
 	for _, c := range cases {
 		if got := c.s.String(); got != c.want {
-			t.Errorf("Status(%d).String() = %q, want %q", c.s, got, c.want)
+			t.Errorf("Status(%q).String() = %q, want %q", string(c.s), got, c.want)
 		}
 	}
 }
 
-func TestStatus_StringUnknown(t *testing.T) {
-	s := Status(99)
-	if got := s.String(); got == "" {
-		t.Errorf("unknown Status.String() returned empty; want a sentinel like 'unknown_99'")
+func TestStatus_StringEmpty(t *testing.T) {
+	if got := Status("").String(); got == "" {
+		t.Errorf("zero-value Status.String() returned empty; want a sentinel")
 	}
 }
 

@@ -63,7 +63,7 @@ func (r Result) MarshalJSON() ([]byte, error) {
 	type wire struct {
 		Name      string          `json:"name"`
 		Version   int             `json:"version"`
-		Status    string          `json:"status"`
+		Status    Status          `json:"status"`
 		InputHash string          `json:"input_hash,omitempty"`
 		FetchedAt time.Time       `json:"fetched_at,omitzero"`
 		Err       string          `json:"err,omitempty"`
@@ -72,7 +72,7 @@ func (r Result) MarshalJSON() ([]byte, error) {
 	w := wire{
 		Name:      r.Name,
 		Version:   r.Version,
-		Status:    r.Status.String(),
+		Status:    r.Status,
 		InputHash: r.InputHash,
 		FetchedAt: r.FetchedAt,
 	}
