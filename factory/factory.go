@@ -7,12 +7,13 @@
 //	ctx := context.Background()
 //	client, err := factory.NewDefault(ctx)
 //	if err != nil { /* handle */ }
+//	listing, err := client.Normalize(ctx, "1 rue de Rivoli, 75001 Paris")
 //	dossier := client.Collect(ctx, listing)
 //
-// The factory installs a BAN-backed Normalizer as a side effect so
-// gazetteer.NormalizeAddress works from anywhere in the process.
-// Callers that need to override individual Sources should construct
-// their own *gazetteer.Builder directly — see gazetteer/doc.go.
+// The factory installs a BAN-backed Normalizer on the Client so
+// client.Normalize works without further setup. Callers that need to
+// override individual Sources should construct their own
+// *gazetteer.Builder directly — see gazetteer/doc.go.
 //
 // This package lives outside the top-level gazetteer package to avoid
 // the import cycle that would otherwise arise from gazetteer importing
@@ -53,9 +54,10 @@ type Options struct {
 	// factory loads the embedded default via communes.MustDefault.
 	Communes communes.Communes
 
-	// SkipNormalizer suppresses the side-effect installation of the
-	// BAN-backed default Normalizer. Set to true if the caller has
-	// already installed its own via gazetteer.SetDefaultNormalizer.
+	// SkipNormalizer leaves Client.Normalize unconfigured (it will
+	// return gazetteer.ErrNormalizerNotConfigured). Set to true when
+	// the caller plans to install a custom Normalizer via the
+	// Builder path returned by BuilderDefault.
 	SkipNormalizer bool
 }
 
@@ -108,9 +110,6 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 	if com == nil {
 		com = communes.MustDefault()
 	}
-	if !opts.SkipNormalizer {
-		gazetteer.SetDefaultNormalizer(gazetteer.NewBANNormalizer(ban, com))
-	}
 
 	dvfSrc, err := dvf.NewSource(dvf.Options{HTTP: hc, Geocoder: ban, Communes: com})
 	if err != nil {
@@ -118,8 +117,11 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 	}
 
 	b := gazetteer.NewBuilder().
-		WithHTTPClient(hc.HTTPClient()).
-		With(dvfSrc).
+		WithHTTPClient(hc.HTTPClient())
+	if !opts.SkipNormalizer {
+		b = b.WithNormalizer(gazetteer.NewBANNormalizer(ban, com))
+	}
+	b = b.With(dvfSrc).
 		With(ademe.NewSource(ademe.Options{Geocoder: ban})).
 		With(bdnb.NewSource(bdnb.Options{Geocoder: ban})).
 		With(georisques.NewSource(georisques.Options{Geocoder: ban})).
