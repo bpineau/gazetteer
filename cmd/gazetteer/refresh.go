@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bpineau/gazetteer"
+	"github.com/bpineau/gazetteer/gazetteer"
 )
 
 // runRefresh is a v1 stub. The eventual `refresh` implementation

@@ -4,7 +4,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/bpineau/gazetteer"
+	"github.com/bpineau/gazetteer/gazetteer"
 )
 
 // RentEstimator is the optional interface a Source's typed Result MAY
