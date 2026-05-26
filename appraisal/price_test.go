@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bpineau/gazetteer"
+	"github.com/bpineau/gazetteer/gazetteer"
 )
 
 // fakePriceEstimator is a minimal Result.Data type that satisfies

@@ -6,10 +6,10 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/bpineau/gazetteer"
-	"github.com/bpineau/gazetteer/pkg/banx"
-	"github.com/bpineau/gazetteer/pkg/communes"
-	"github.com/bpineau/gazetteer/pkg/httpx"
+	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
+	"github.com/bpineau/gazetteer/helpers/communes"
+	"github.com/bpineau/gazetteer/helpers/httpx"
 )
 
 // commonFlags is the per-sub-command flag bundle every "real" command

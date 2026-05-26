@@ -3,7 +3,7 @@ package appraisal
 import (
 	"testing"
 
-	"github.com/bpineau/gazetteer"
+	"github.com/bpineau/gazetteer/gazetteer"
 )
 
 // fakeRentEstimator is a minimal Result.Data type that satisfies

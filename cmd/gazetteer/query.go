@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bpineau/gazetteer"
+	"github.com/bpineau/gazetteer/gazetteer"
 )
 
 // runQuery implements `gazetteer query [--source ...] [--json] [--verbose]

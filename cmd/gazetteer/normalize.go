@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bpineau/gazetteer"
+	"github.com/bpineau/gazetteer/gazetteer"
 )
 
 // runNormalize implements `gazetteer normalize [--json] <addr>`. Calls
