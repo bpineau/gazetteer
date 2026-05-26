@@ -7,6 +7,26 @@ import (
 
 // Result is the framework envelope around one Source's contribution to a
 // Dossier. Built by the Client — never directly by Sources.
+//
+// # Conventions on Data
+//
+// Every shipped Source returns the same shape for Data: a pointer to a
+// package-defined `Result` struct (e.g. `*dvf.Result`, `*osm.Result`).
+// The Source registers a factory for that struct via gazetteer.Register
+// in init() so Dossier JSON unmarshal can reconstitute concrete types.
+//
+// The typed Data MAY:
+//   - Implement EmptyReporter to signal "successful but no useful data";
+//     the framework then records Status == StatusOKEmpty automatically.
+//   - Carry a separate `Evidence` field (tagged `json:"-"`) holding
+//     reproducibility metadata (input fingerprint, ladder tier used,
+//     resolver provenance). This is a strong convention across every
+//     shipped Source but not part of the framework contract — callers
+//     read it directly from the typed Data once retrieved via Get[T].
+//
+// The typed Data MUST be safe to JSON-marshal and unmarshal via the
+// factory registered in gazetteer.Register; otherwise Dossier
+// roundtrip will silently drop the payload.
 type Result struct {
 	Name      string // == Source.Name()
 	Version   int    // == Source.Version() at the time of Query
@@ -15,6 +35,25 @@ type Result struct {
 	FetchedAt time.Time
 	Err       error // non-nil iff Status is a failure status
 	Data      any   // typed payload struct; may be non-nil even for StatusOKEmpty
+}
+
+// IsEmpty reports whether the underlying typed Data implements
+// EmptyReporter and reports itself as empty. Returns false when Data is
+// nil, when Data does not implement EmptyReporter, or when IsEmpty()
+// returns false on the typed payload.
+//
+// This is a convenience over a type assertion — callers consuming
+// JSON-roundtripped Dossiers can ask `r.IsEmpty()` without knowing the
+// concrete Data type.
+func (r Result) IsEmpty() bool {
+	if r.Data == nil {
+		return false
+	}
+	er, ok := r.Data.(EmptyReporter)
+	if !ok {
+		return false
+	}
+	return er.IsEmpty()
 }
 
 // MarshalJSON emits a stable wire representation. Err is serialised as a
