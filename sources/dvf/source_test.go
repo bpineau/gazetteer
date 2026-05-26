@@ -64,14 +64,37 @@ func newHTTPClient(t *testing.T) *httpx.Client {
 	return c
 }
 
+// mustNewSource is a test-only convenience that fails the test
+// (rather than returning an error) when NewSource cannot build the
+// Source. Tests that *want* to assert on the construction error
+// continue to call NewSource directly.
+func mustNewSource(t *testing.T, opts Options) *Source {
+	t.Helper()
+	s, err := NewSource(opts)
+	if err != nil {
+		t.Fatalf("NewSource: %v", err)
+	}
+	return s
+}
+
 func TestSource_NameVersion(t *testing.T) {
 	hc := newHTTPClient(t)
-	s := NewSource(Options{HTTP: hc, Geocoder: stubGeocoder{}})
+	s := mustNewSource(t, Options{HTTP: hc, Geocoder: stubGeocoder{}})
 	if s.Name() != Name {
 		t.Errorf("Name() = %q, want %q", s.Name(), Name)
 	}
 	if s.Version() != sourceVersion {
 		t.Errorf("Version() = %d, want %d", s.Version(), sourceVersion)
+	}
+}
+
+func TestNewSource_NilHTTPClientReturnsError(t *testing.T) {
+	_, err := NewSource(Options{})
+	if err == nil {
+		t.Fatal("NewSource(Options{}) returned nil error, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "nil HTTP client") {
+		t.Errorf("err = %q, want mention of nil HTTP client", err)
 	}
 }
 
@@ -89,7 +112,7 @@ func TestSource_HappyPath_Commune(t *testing.T) {
 	withBaseURL(t, srv.URL+"/mutations")
 
 	hc := newHTTPClient(t)
-	s := NewSource(Options{
+	s := mustNewSource(t, Options{
 		HTTP:     hc,
 		Geocoder: stubGeocoder{res: banx.GeocodeResult{Lat: 48.85, Lon: 2.31, CityCode: "75107"}},
 	})
@@ -143,7 +166,7 @@ func TestSource_HappyPath_Commune(t *testing.T) {
 
 func TestSource_UnsupportedPropertyType(t *testing.T) {
 	hc := newHTTPClient(t)
-	s := NewSource(Options{HTTP: hc, Geocoder: stubGeocoder{}})
+	s := mustNewSource(t, Options{HTTP: hc, Geocoder: stubGeocoder{}})
 	l := gazetteer.Listing{
 		Address:      "x",
 		City:         "Paris",
@@ -157,7 +180,7 @@ func TestSource_UnsupportedPropertyType(t *testing.T) {
 
 func TestSource_InsufficientInputs_NoGeocoder(t *testing.T) {
 	hc := newHTTPClient(t)
-	s := NewSource(Options{HTTP: hc})
+	s := mustNewSource(t, Options{HTTP: hc})
 	l := gazetteer.Listing{
 		Address:      "1 rue test",
 		City:         "Paris",
@@ -171,7 +194,7 @@ func TestSource_InsufficientInputs_NoGeocoder(t *testing.T) {
 
 func TestSource_InsufficientInputs_NoAddress(t *testing.T) {
 	hc := newHTTPClient(t)
-	s := NewSource(Options{HTTP: hc, Geocoder: stubGeocoder{}})
+	s := mustNewSource(t, Options{HTTP: hc, Geocoder: stubGeocoder{}})
 	l := gazetteer.Listing{
 		PropertyType: gazetteer.PropertyApartment,
 	}
@@ -195,7 +218,7 @@ func TestSource_INSEEListingShortCircuit(t *testing.T) {
 	withBaseURL(t, srv.URL+"/mutations")
 
 	hc := newHTTPClient(t)
-	s := NewSource(Options{HTTP: hc}) // no Geocoder
+	s := mustNewSource(t, Options{HTTP: hc}) // no Geocoder
 	if err := s.Sections().PrimeFromList(context.Background(), "75107", []string{"000AD"}); err != nil {
 		t.Fatalf("PrimeFromList: %v", err)
 	}
@@ -258,7 +281,7 @@ func TestSource_AddressRadius(t *testing.T) {
 	withBaseURL(t, srv.URL+"/mutations")
 
 	hc := newHTTPClient(t)
-	src := NewSource(Options{
+	src := mustNewSource(t, Options{
 		HTTP:     hc,
 		Geocoder: stubGeocoder{res: banx.GeocodeResult{Lat: mLat, Lon: mLon, CityCode: insee}},
 	})
@@ -300,7 +323,7 @@ func TestSource_AddressRadius(t *testing.T) {
 func TestSource_CircuitTripped_ShortCircuits(t *testing.T) {
 	hc := newHTTPClient(t)
 	tripped := &atomic.Bool{}
-	s := NewSource(Options{
+	s := mustNewSource(t, Options{
 		HTTP:           hc,
 		Geocoder:       stubGeocoder{res: banx.GeocodeResult{Lat: 48.85, Lon: 2.31, CityCode: "75107"}},
 		CircuitTripped: tripped,
@@ -341,7 +364,7 @@ func TestSource_CustomSectionCache(t *testing.T) {
 
 	cache := memcache.New()
 	hc := newHTTPClient(t)
-	s := NewSource(Options{
+	s := mustNewSource(t, Options{
 		HTTP:         hc,
 		Geocoder:     stubGeocoder{res: banx.GeocodeResult{CityCode: "75107"}},
 		SectionCache: cache,
@@ -482,7 +505,7 @@ func TestSource_CommercialNoSurface(t *testing.T) {
 	// simulating what BAN returns when the address is "77160 Provins"
 	// rather than the doubled "77160 Provins 77160 Provins".
 	gc := stubGeocoder{res: banx.GeocodeResult{CityCode: "77379", Score: 0.95}}
-	s := NewSource(Options{HTTP: hc, Geocoder: gc})
+	s := mustNewSource(t, Options{HTTP: hc, Geocoder: gc})
 	if err := s.Sections().PrimeFromList(context.Background(), "77379", []string{"000AB"}); err != nil {
 		t.Fatalf("PrimeFromList: %v", err)
 	}

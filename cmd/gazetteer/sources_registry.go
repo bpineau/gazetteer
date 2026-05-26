@@ -46,7 +46,7 @@ func sourceCatalog() []sourceFactory {
 			Name:    dvf.Name,
 			Default: true,
 			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
-				return dvf.NewSource(dvf.Options{HTTP: d.HTTP, Geocoder: d.BAN, Communes: d.Communes}), nil
+				return dvf.NewSource(dvf.Options{HTTP: d.HTTP, Geocoder: d.BAN, Communes: d.Communes})
 			},
 		},
 		{

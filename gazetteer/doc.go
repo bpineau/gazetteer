@@ -13,10 +13,10 @@
 //
 // # Quick start
 //
-//	client, _ := gazetteer.NewBuilder().
-//	    With(dvf.NewSource(dvf.Options{})).
-//	    With(osm.NewSource(osm.Options{})).
-//	    Build()
+//	dvfSrc, err := dvf.NewSource(dvf.Options{HTTP: hc, Geocoder: ban})
+//	if err != nil { /* handle */ }
+//	osmSrc := osm.NewSource(osm.Options{}) // call UpdateCatalog later
+//	client, _ := gazetteer.NewBuilder().With(dvfSrc).With(osmSrc).Build()
 //
 //	d := client.Collect(ctx, listing)
 //	if r, ok := dvf.From(d); ok {

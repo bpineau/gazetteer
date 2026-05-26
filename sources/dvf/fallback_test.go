@@ -16,7 +16,7 @@ import (
 func newLadderHarness(t *testing.T, auctionLat, auctionLon *float64) (*Source, *tierContext) {
 	t.Helper()
 	hc := newHTTPClient(t)
-	s := NewSource(Options{
+	s := mustNewSource(t, Options{
 		HTTP:     hc,
 		Geocoder: stubGeocoder{res: banx.GeocodeResult{}},
 	})
