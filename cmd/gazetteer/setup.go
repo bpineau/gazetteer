@@ -43,15 +43,16 @@ func (c *commonFlags) setupLogger() *slog.Logger {
 // the gazetteer lib end-to-end against live HTTP backends. Built once
 // per process via newRuntimeDeps and reused across calls.
 type runtimeDeps struct {
-	HTTP     *httpx.Client
-	BAN      *banx.BANClient
-	Communes communes.Communes
+	HTTP       *httpx.Client
+	BAN        *banx.BANClient
+	Communes   communes.Communes
+	Normalizer gazetteer.Normalizer
 }
 
 // newRuntimeDeps builds the shared httpx.Client, the BAN client, and
-// the embedded communes table. Also installs the lib's default
-// Normalizer so gazetteer.NormalizeAddress works from anywhere in the
-// process — mirrors what internal/cli/root.go does in encheridor.
+// the embedded communes table, plus a BAN-backed Normalizer ready to
+// be wired into gazetteer.Builder.WithNormalizer (or called directly
+// via Normalizer.Normalize).
 func newRuntimeDeps() (*runtimeDeps, error) {
 	hc, err := httpx.New(httpx.Options{})
 	if err != nil {
@@ -59,8 +60,8 @@ func newRuntimeDeps() (*runtimeDeps, error) {
 	}
 	ban := banx.NewBANClient(hc)
 	com := communes.MustDefault()
-	gazetteer.SetDefaultNormalizer(gazetteer.NewBANNormalizer(ban, com))
-	return &runtimeDeps{HTTP: hc, BAN: ban, Communes: com}, nil
+	norm := gazetteer.NewBANNormalizer(ban, com)
+	return &runtimeDeps{HTTP: hc, BAN: ban, Communes: com, Normalizer: norm}, nil
 }
 
 // parsePositional joins the remaining positional args of fs into a

@@ -69,9 +69,10 @@ func (b *Builder) WithMaxConcurrency(n int) *Builder {
 	return b
 }
 
-// WithNormalizer installs a Normalizer. Currently unused by the Builder
-// itself (the Normalizer is called via the top-level NormalizeAddress
-// facade) but reserved for future Builder-driven auto-normalize.
+// WithNormalizer installs a Normalizer on the Builder. The built
+// Client exposes a Normalize method that delegates to it. When no
+// Normalizer is installed, Client.Normalize returns
+// ErrNormalizerNotConfigured.
 func (b *Builder) WithNormalizer(n Normalizer) *Builder {
 	b.normalizer = n
 	return b
@@ -93,6 +94,7 @@ func (b *Builder) Build() (*Client, error) {
 		logger:     b.logger,
 		debugDump:  b.debugDump,
 		maxConcur:  b.maxConcur,
+		normalizer: b.normalizer,
 	}
 	return c, nil
 }
@@ -104,6 +106,7 @@ type Client struct {
 	logger     *slog.Logger
 	debugDump  bool
 	maxConcur  int
+	normalizer Normalizer
 }
 
 // Collect runs every configured Source in parallel, populates a Dossier
