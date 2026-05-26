@@ -142,7 +142,9 @@ func RentValue(d gazetteer.Dossier, opts ...RentOptions) RentConsolidated {
 	var inputs []RentInput
 	for _, name := range names {
 		r := d.Results[name]
-		if r.Status != gazetteer.StatusOK && r.Status != gazetteer.StatusOKEmpty {
+		switch r.Status {
+		case "", gazetteer.StatusOK, gazetteer.StatusOKEmpty:
+		default:
 			continue
 		}
 		est, ok := r.Data.(RentEstimator)

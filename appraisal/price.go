@@ -95,7 +95,9 @@ func PricePerM2(d gazetteer.Dossier, opts ...PriceOptions) PriceConsolidated {
 	var inputs []PriceInput
 	for _, name := range names {
 		r := d.Results[name]
-		if r.Status != gazetteer.StatusOK && r.Status != gazetteer.StatusOKEmpty {
+		switch r.Status {
+		case "", gazetteer.StatusOK, gazetteer.StatusOKEmpty:
+		default:
 			continue
 		}
 		est, ok := r.Data.(PriceEstimator)
