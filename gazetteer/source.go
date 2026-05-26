@@ -92,3 +92,31 @@ type Source interface {
 type EmptyReporter interface {
 	IsEmpty() bool
 }
+
+// QueryWither is an opt-in interface a Source MAY implement to accept
+// extra arguments beyond Listing on a side-entry Query path. The
+// framework's Client.Collect always calls Source.Query — QueryWith is
+// for direct callers that need to pass additional context (a
+// pre-resolved id, a session token, a per-call timeout override).
+//
+// The args slice is a Source-specific contract; each implementing
+// Source documents the shape it accepts. Sources that don't need
+// extra arguments leave the interface unimplemented; callers fall
+// back to Source.Query in that case.
+//
+// Generic call pattern from a consumer that doesn't know the concrete
+// Source type:
+//
+//	if q, ok := src.(gazetteer.QueryWither); ok {
+//	    data, err := q.QueryWith(ctx, listing, myExtraArg)
+//	    ...
+//	} else {
+//	    data, err := src.Query(ctx, listing)
+//	}
+//
+// Implementations should treat unrecognised args as a degenerate case
+// and fall back to the Listing-only Query path rather than returning
+// an error, so callers can pass best-effort hints without coupling.
+type QueryWither interface {
+	QueryWith(ctx context.Context, listing Listing, args ...any) (any, error)
+}
