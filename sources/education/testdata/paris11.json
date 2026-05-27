@@ -1,0 +1,11 @@
+{
+  "total_count": 6,
+  "results": [
+    {"type_etablissement": null, "count(*)": 4},
+    {"type_etablissement": "Collège", "count(*)": 14},
+    {"type_etablissement": "Ecole", "count(*)": 54},
+    {"type_etablissement": "Lycée", "count(*)": 15},
+    {"type_etablissement": "Médico-social", "count(*)": 6},
+    {"type_etablissement": "Service Administratif", "count(*)": 2}
+  ]
+}
