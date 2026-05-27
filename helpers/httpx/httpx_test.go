@@ -758,7 +758,7 @@ func TestCache_FixtureHit_NoNetwork(t *testing.T) {
 
 	// Build a synthetic request and pre-populate its cache entry.
 	req, _ := http.NewRequest(http.MethodGet, "http://fixture.invalid/x", nil)
-	hash := requestHash(req, "")
+	hash := requestHash(req)
 	metaPath, bodyPath := ct.pathsFor(hash)
 	meta := &cacheMeta{
 		URL:          req.URL.String(),
@@ -803,7 +803,7 @@ func TestCache_FixtureRevalidation_304(t *testing.T) {
 	// Pre-populate stale entry with ETag.
 	pre := newCacheTransport(unreachableTransport{}, r, dir)
 	req, _ := http.NewRequest(http.MethodGet, "http://fixture.invalid/y", nil)
-	hash := requestHash(req, "")
+	hash := requestHash(req)
 	metaPath, bodyPath := pre.pathsFor(hash)
 	hdr := http.Header{}
 	hdr.Set("ETag", `"abc"`)

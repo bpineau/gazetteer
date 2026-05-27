@@ -1,0 +1,98 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  # Allow generated files to bypass most checks.
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    # Default core set (kept; covers compiler vet, error checking,
+    # static-analysis, unused identifiers, ineffective assignments).
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # Bug-class extras worth the noise.
+    - bodyclose        # missed Body.Close() on http.Response — high-signal.
+    - errorlint        # error-wrapping correctness with %w.
+    - copyloopvar      # since Go 1.22 loop-var capture is fixed; still
+                       # warn on the historical `x := x` shim that
+                       # programs no longer need.
+    - durationcheck    # `time.Duration * time.Duration` traps.
+    - nilerr           # `return nil` when err is non-nil.
+    - prealloc         # cheap `make([]T, 0, n)` hints in hot loops.
+    - rowserrcheck     # missed rows.Err() on database/sql.Rows.
+    - sqlclosecheck    # missed Close() on sql.Rows / sql.Stmt.
+    - unconvert        # T(x) where x is already T.
+    - unparam          # always-unused function parameters.
+
+    # NOT enabled: misspell — the codebase legitimately carries French
+    # vocabulary (Demandes, Territoires, perimetre, naturels,
+    # existant, …) and the linter only knows English.
+
+  settings:
+    errcheck:
+      # Idiomatic close-on-defer + stdout-print return values are
+      # noise, not bugs. Acknowledged via this list rather than per
+      # call-site `_ =` so the readable form stays in source.
+      exclude-functions:
+        - (io.Closer).Close
+        - (*net/http.Response.Body).Close
+        - fmt.Fprintf(os.Stdout)
+        - fmt.Fprintf(os.Stderr)
+        - fmt.Fprintln(os.Stdout)
+        - fmt.Fprintln(os.Stderr)
+        - fmt.Fprint(os.Stdout)
+        - fmt.Fprint(os.Stderr)
+
+  exclusions:
+    rules:
+      # Test files have looser standards (table-driven cases often
+      # produce errcheck noise; sub-tests legitimately discard
+      # cleanup-only errors).
+      - path: _test\.go
+        linters:
+          - errcheck
+          - unparam
+          - prealloc
+          - bodyclose
+
+      # Cache-write fallbacks intentionally swallow the secondary
+      # error (the primary result has already succeeded, so a cache
+      # write failure must not break the call). Marked nilerr at the
+      # package level rather than per call-site.
+      - path: helpers/banx/cache\.go
+        linters:
+          - nilerr
+      - path: sources/bdnb/parser\.go
+        linters:
+          - nilerr
+      - path: sources/dvf/sections\.go
+        linters:
+          - nilerr
+
+      # CLI sub-commands fmt.Fprintf into io.Writer (stdout) — the
+      # return is structurally unhandleable for a printer. Skip
+      # errcheck on the cmd/ tree.
+      - path: cmd/
+        linters:
+          - errcheck
+
+      # Generated catalogs (embed/*.go) and *_gen.go skipped.
+      - path: .*_gen\.go
+        linters:
+          - all
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/bpineau/gazetteer

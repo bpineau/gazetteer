@@ -169,7 +169,7 @@ func collapse(entries []Entry, label, zoneSource string, rooms int, ev Evidence)
 		if e.Maison {
 			continue
 		}
-		if e.Piece != piece && !(e.PieceOpenEnded && piece >= e.Piece) {
+		if e.Piece != piece && (!e.PieceOpenEnded || piece < e.Piece) {
 			continue
 		}
 		if e.LoyerRefMaxEURPerM2HC > 0 {
