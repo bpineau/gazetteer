@@ -6,12 +6,12 @@
 // GET https://dvf-api.data.gouv.fr/mutations/{INSEE}/{section}. Both
 // INSEE (5 digits) and section (5 chars, e.g. "000AD") are required.
 //
-// Migration history (2026-05-03): switched from the legacy
+// Migration history: switched from the legacy
 // app.dvf.etalab.gouv.fr/api/mutations3/... endpoint to the production
 // dvf-api.data.gouv.fr/mutations/... endpoint. Same path shape and same
 // field names but the new API returns properly typed JSON (float/int/null
-// vs strings / "None") and is fresher (rolling 5-year window updated more
-// often). Envelope key changed `mutations` → `data`. Cf. doc/validation/A76.
+// vs strings / "None") and is fresher (rolling 5-year window updated
+// more often). Envelope key changed `mutations` → `data`.
 //
 // # Strategy
 //
@@ -31,9 +31,9 @@
 //
 // Cadastral sections (per INSEE) are looked up via cadastre.data.gouv.fr
 // once and persisted in a kvcache.Cache. The package's SectionDiscoverer
-// (sections.go) is the canonical façade for both a downstream adapter
-// (wired against the bun-backed kv_cache table) and standalone users
-// (wired against an in-memory cache).
+// (sections.go) is the canonical façade for both production callers
+// (wired against a persistent kvcache.Cache backend) and standalone
+// users (wired against an in-memory cache).
 //
 // # Rhythm
 //

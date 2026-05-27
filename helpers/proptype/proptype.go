@@ -2,11 +2,10 @@ package proptype
 
 import "strings"
 
-// PropertyType is the canonical enum value stored in auctions.property_type.
-//
-// Distinct from `a downstream consumer` (the extractor's
-// internal enum) — this type carries the read-side canonical strings
-// every consumer compares against.
+// PropertyType is the canonical enum value Sources compare against when
+// gating per-Source eligibility (see gazetteer.PropertyType). Carried
+// as a typed string so it round-trips through JSON, log records and
+// map keys without conversion.
 type PropertyType string
 
 // Canonical property-type values. The empty string Unknown denotes a
@@ -46,16 +45,8 @@ func (p PropertyType) IsKnown() bool {
 // raw input onto the canonical PropertyType. Lookup is exact-match on
 // the already-normalised key, so we keep the table small and explicit.
 //
-// Sources consulted when seeding this table (so future contributors
-// understand which spellings each call site contributed):
-//
-//   - a downstream web layer::typeSynonyms (the broadest existing
-//     alias map, French + abbreviations)
-//   - a sibling module::classifyTitle
-//   - a downstream consumer::propertyTypePatterns
-//   - a downstream loader::canonicalPropertyTypes
-//   - per-enricher MapPropertyType* helpers (MA, DVF, PappersImmo, BienIci,
-//     LocService) which each accepted FR + EN spellings
+// The table seeds from FR + EN spellings observed in real-estate
+// listings, classified-ad titles and DPE / DVF / IGN feeds.
 //
 // Keep alphabetical within each canonical bucket so drift on review is
 // easy to spot.

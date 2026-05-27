@@ -30,6 +30,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/bpineau/gazetteer/helpers/fraddr"
@@ -84,46 +85,103 @@ func ParseList(body []byte) ([]Row, error) {
 	return env.Results, nil
 }
 
-// PickBestByNumber tries to find the index of the row whose adresse_ban
-// (or adresse_brut, as fallback) starts with `wantNum` followed by a
-// non-digit. This is the post-filter applied when the full-text query
-// returned several rows on the same street and the listing had a known
-// street number — we want "82 RUE", not "78 RUE".
+// PickBestByNumber narrows rows to those whose adresse_ban (or
+// adresse_brut, as fallback) starts with `wantNum` followed by a
+// non-digit boundary, then picks one. This is the post-filter applied
+// when the full-text query returned several rows on the same street
+// and the listing had a known street number — we want "82 RUE", not
+// "78 RUE".
+//
+// When `wantSurface` > 0 and several rows at the same street number
+// publish a `surface_habitable_logement` (typical of apartment
+// buildings where ADEME holds one DPE per dwelling), the picker
+// selects the row whose surface is closest to `wantSurface`. This
+// turns "DPE at the listing's address" into "DPE of the dwelling the
+// caller actually means". Rows without a surface fall back to the
+// first match in document order.
+//
+// Pass `wantSurface = 0` to skip the surface tie-break entirely (the
+// picker then returns the first number-matching row, preserving the
+// pre-tie-break behaviour).
 //
 // Range labels like "80-82" / "80/82" / "80 - 82" are also accepted
 // when their right-hand bound matches `wantNum`. Returns (-1, false)
 // when no row matches; callers then fall back to PickBest.
-func PickBestByNumber(rows []Row, wantNum string) (int, bool) {
+func PickBestByNumber(rows []Row, wantNum string, wantSurface float64) (int, bool) {
 	wantNum = strings.TrimSpace(wantNum)
 	if wantNum == "" {
 		return -1, false
 	}
+	var matches []int
 	for i, r := range rows {
 		if rowStartsWithNumber(r, wantNum) {
-			return i, true
+			matches = append(matches, i)
 		}
 	}
-	return -1, false
+	if len(matches) == 0 {
+		return -1, false
+	}
+	return pickClosestBySurface(rows, matches, wantSurface), true
 }
 
 // PickBest returns the index of the best row when no number match is
 // available. Strategy: prefer rows with a non-empty `etiquette_dpe`
-// (the column we actually need), then the most recent DPE
-// (`date_etablissement_dpe` desc). The data-fair API already sorts by
-// `_score, date_etablissement_dpe desc`, so without further filtering
-// rows[0] is typically returned.
+// (the column we actually need), then — when `wantSurface` > 0 —
+// the row whose `surface_habitable_logement` is closest to
+// `wantSurface`. Rows without a DPE label fall to the very end, rows
+// without a surface fall back to document order within the DPE-bearing
+// set. The data-fair API already sorts by `_score,
+// date_etablissement_dpe desc`, so when no surface anchor is supplied
+// the first DPE-bearing row is returned.
 //
 // Returns (-1, false) on an empty list.
-func PickBest(rows []Row) (int, bool) {
+func PickBest(rows []Row, wantSurface float64) (int, bool) {
 	if len(rows) == 0 {
 		return -1, false
 	}
+	var withDPE, withoutDPE []int
 	for i, r := range rows {
 		if r.EtiquetteDPE != "" {
-			return i, true
+			withDPE = append(withDPE, i)
+		} else {
+			withoutDPE = append(withoutDPE, i)
 		}
 	}
-	return 0, true
+	if len(withDPE) > 0 {
+		return pickClosestBySurface(rows, withDPE, wantSurface), true
+	}
+	return pickClosestBySurface(rows, withoutDPE, wantSurface), true
+}
+
+// pickClosestBySurface ranks `indices` by |row.SurfaceHabitableLogement
+// − wantSurface|, returning the closest match. Rows without a published
+// surface sink to the bottom of the ranking. When wantSurface <= 0 or
+// no row in the slice publishes a surface, returns indices[0] (the
+// pre-existing "first match wins" behaviour).
+func pickClosestBySurface(rows []Row, indices []int, wantSurface float64) int {
+	if len(indices) == 0 {
+		return -1
+	}
+	if wantSurface <= 0 || len(indices) == 1 {
+		return indices[0]
+	}
+	bestIdx := indices[0]
+	bestDelta := math.MaxFloat64
+	for _, i := range indices {
+		s := rows[i].SurfaceHabitableLogement
+		if s == nil || *s <= 0 {
+			continue
+		}
+		d := *s - wantSurface
+		if d < 0 {
+			d = -d
+		}
+		if d < bestDelta {
+			bestDelta = d
+			bestIdx = i
+		}
+	}
+	return bestIdx
 }
 
 // rowStartsWithNumber reports whether `r.AdresseBAN` (or AdresseBrut as

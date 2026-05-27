@@ -32,14 +32,14 @@ func main() {
 	ctx := context.Background()
 
 	// One-shot setup: builds httpx + BAN + every stable Source and
-	// installs the BAN-backed Normalizer behind gazetteer.NormalizeAddress.
+	// installs the BAN-backed Normalizer on the Client.
 	client, err := factory.NewDefault(ctx)
 	if err != nil {
 		log.Fatalf("factory: %v", err)
 	}
 
 	// Canonicalise the user's free-text address into a Listing.
-	listing, err := gazetteer.NormalizeAddress(ctx, "1 rue de Rivoli, 75001 Paris")
+	listing, err := client.Normalize(ctx, "1 rue de Rivoli, 75001 Paris")
 	if err != nil {
 		log.Fatalf("normalize: %v", err)
 	}

@@ -15,10 +15,8 @@ const (
 	ConfidenceNone = ""
 )
 
-// Result is the typed payload returned by Source.Query. Mirrors the
-// VacanceEntry shape currently persisted by a downstream consumer's rental
-// enricher so the wrapper can re-serialise it 1:1 into its
-// EnrichPayload.Result.
+// Result is the typed payload returned by Source.Query. Exposes the
+// commune-level vacancy + long-term vacancy split.
 type Result struct {
 	// VacancePct is the taux de logements vacants 2025 in the parc
 	// privé (%). Zero when the commune was filtered out at LOVAC

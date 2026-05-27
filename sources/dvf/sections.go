@@ -16,9 +16,9 @@ import (
 const SectionTTL = 90 * 24 * time.Hour
 
 // CacheKeyPrefix is the kv_cache key prefix for the per-commune section
-// list. Bumped to v2 (2026-05-02) to invalidate the legacy "all
-// 676 sections exist" caches built before the API contract change was
-// detected. Bump this constant whenever the discovery semantics change.
+// list. The `v2:` segment exists to invalidate legacy "all 676 sections
+// exist" caches built before the API contract change was detected.
+// Bump this constant whenever the discovery semantics change.
 const CacheKeyPrefix = "dvf:sections:v2:"
 
 // SectionDiscoverer manages the per-commune cadastral section cache.

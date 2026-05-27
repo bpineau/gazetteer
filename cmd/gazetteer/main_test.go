@@ -18,8 +18,8 @@ import (
 // usage-error path).
 //
 // E2E tests that hit BAN / live HTTP backends are deliberately out of
-// scope here — they would need stub servers and add complexity that
-// belongs in Phase 6 v2.
+// scope here — they would need stub servers and pull the cmd target
+// further out of "smoke" territory.
 func TestSmoke_BuildAndVersion(t *testing.T) {
 	// CI / sandboxed environments without a usable Go toolchain on
 	// PATH would falsely fail this test; check first.
@@ -72,7 +72,7 @@ func TestSmoke_BuildAndVersion(t *testing.T) {
 			stdoutHas: "loyer_med_eur_per_m2_cc",
 		},
 		{
-			name:      "refresh_stub_announces_phase6_v2",
+			name:      "refresh_stub_returns_not_implemented",
 			args:      []string{"refresh", "dvf"},
 			wantExit:  0,
 			stdoutHas: "not implemented",

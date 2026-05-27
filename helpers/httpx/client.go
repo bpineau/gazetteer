@@ -141,7 +141,7 @@ func (c *Client) GetBytes(ctx context.Context, url string, hdr http.Header) ([]b
 // outgoing request unless the caller (or per-host override) already set
 // them. Empty values mean "skip this header".
 //
-// Captured live from the operator's Chrome via `nc -l 4242` (2026-05-02).
+// Captured live from a real Chrome session via `nc -l 4242`.
 // Bump alongside DefaultUserAgent when Chrome rolls a major.
 //
 // IMPORTANT — Accept-Encoding is intentionally OMITTED from this bundle.
@@ -153,9 +153,9 @@ func (c *Client) GetBytes(ctx context.Context, url string, hdr http.Header) ([]b
 // transparently appends `Accept-Encoding: gzip` and decodes the response —
 // exactly what every parser in the project wants. The trade-off (we lose
 // brotli + zstd negotiation) is acceptable at our volume (< 1 K req/min).
-// The bienici enricher keeps its `Accept-Encoding: identity` override
-// (cf. a downstream consumer) — strictly more restrictive
-// than the default and still compatible.
+// Out-of-tree scrapers that need a specific Accept-Encoding (e.g.
+// `identity` to force the upstream to skip compression) are free to
+// set it explicitly per-request — that overrides this default bundle.
 var browserClientHints = [...]struct {
 	name, value string
 }{

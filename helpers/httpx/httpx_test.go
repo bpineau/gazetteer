@@ -309,19 +309,17 @@ func TestDownload_SHA256_Atomic_Skip(t *testing.T) {
 	}
 }
 
-// Bug #12 — an earlier release dataset report.
-//
-// 3.9 GB of snapshots ended up under data/raw/_/2026-05-02/_/ instead of
-// being tagged source=<src> / runID=<id>. The pipeline tags ctx for
-// "fetch listings" requests but the document downloader (httpx.Download)
-// uses a sibling ctx without the WithSource / WithRunID tags. This test
-// nails the contract end of the contract that lives inside httpx :
-// when ctx IS tagged, Download must produce snapshots under
+// Regression pin: snapshots used to land under data/raw/_/<date>/_/
+// instead of the tagged source=<src> / runID=<id> layout, because
+// callers tagged ctx for "fetch" requests but the document downloader
+// (httpx.Download) used a sibling ctx without the WithSource /
+// WithRunID tags. This test nails the contract that lives inside
+// httpx: when ctx IS tagged, Download must produce snapshots under
 // <SnapshotDir>/<source>/<date>/<runID>/, just like GetBytes does.
 //
-// (The other half of the fix — making sure the pipeline propagates the
-// tagged ctx into Download — lives in a downstream consumer and is
-// owned by another sub-agent.)
+// (The other half of the fix — making sure the caller's pipeline
+// propagates the tagged ctx into Download — lives outside this
+// package; this test only covers the contract httpx itself owes.)
 func TestSnapshot_DocumentsTaggedBySource(t *testing.T) {
 	payload := []byte("PDFlikepayload")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -694,7 +692,7 @@ func TestPerHost_HeadersAndUA(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	customUA := "a downstream consumer-test/1.0"
+	customUA := "gazetteer-test/1.0"
 	c := newTestClient(t, Options{
 		RateLimitPerHost: 1000,
 		PerHost: map[string]HostOptions{
@@ -1013,28 +1011,23 @@ func TestIsRetryableNetErr(t *testing.T) {
 	}
 }
 
-// A14 regression — Bug critique transversal detecte 2026-05-02 22:50 CEST.
+// Regression pin: when browserClientHints advertised
+// `Accept-Encoding: gzip, deflate, br, zstd`, Go's net/http Transport
+// stopped auto-decompressing (the stdlib treats a caller-set
+// Accept-Encoding as the caller taking responsibility for decoding),
+// and parsers received the gzipped bytes raw.
 //
-// Symptome live : l'enricher locservice produisait 198 / 198 parse failures
-// . Cause : le bundle
-// browserClientHints (aligne Chrome 147 reel le matin meme) contenait
-// `Accept-Encoding: gzip, deflate, br, zstd`. Quand le caller pose
-// Accept-Encoding manuellement, Go's net/http Transport considere que c'est
-// la responsabilite du caller de decompresser et n'auto-decompresse plus.
-// Les parsers recevaient donc les bytes gzippes bruts. bienici avait ete
-// workaround-e avec `Accept-Encoding: identity` hardcode (cf. A20a, fetcher.go).
+// This test :
+//  1. runs a server that gzips the body when the client advertises
+//     Accept-Encoding: gzip;
+//  2. uses a default httpx.Client;
+//  3. asserts GetBytes returns the PLAINTEXT, not the gzipped bytes.
 //
-// Ce test :
-//  1. lance un serveur qui sert du gzip si le client annonce Accept-Encoding: gzip ;
-//  2. utilise un httpx.Client default ;
-//  3. verifie que le body retourne par GetBytes est le PLAINTEXT decompresse,
-//     pas les bytes gzippes bruts.
-//
-// Fail avant le fix (Accept-Encoding defini par browserClientHints empeche
-// l'auto-decompression). Vert apres le fix (drop d'Accept-Encoding du bundle
-// → stdlib ajoute gzip + decompresse de maniere transparente).
+// Fails when Accept-Encoding is forced in the default header bundle;
+// passes when the bundle leaves Accept-Encoding alone and lets the
+// stdlib add+decompress gzip transparently.
 func TestAcceptEncoding_AutoDecompressed(t *testing.T) {
-	plain := []byte("a downstream consumer-plaintext-payload-which-must-be-decompressed-by-stdlib")
+	plain := []byte("plaintext-payload-which-must-be-decompressed-by-stdlib")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ae := r.Header.Get("Accept-Encoding")

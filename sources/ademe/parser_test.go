@@ -74,17 +74,17 @@ func TestPickBestByNumber_LeadingMatch(t *testing.T) {
 		{AdresseBAN: "82 Rue de la Roquette 75011 Paris", EtiquetteDPE: "D"},
 		{AdresseBAN: "84 Rue de la Roquette 75011 Paris", EtiquetteDPE: "C"},
 	}
-	idx, ok := PickBestByNumber(rows, "82")
+	idx, ok := PickBestByNumber(rows, "82", 0)
 	if !ok || idx != 1 {
 		t.Fatalf("PickBestByNumber(82) = (%d, %v), want (1, true)", idx, ok)
 	}
-	if i, ok := PickBestByNumber(rows, "78"); !ok || i != 0 {
+	if i, ok := PickBestByNumber(rows, "78", 0); !ok || i != 0 {
 		t.Errorf("PickBestByNumber(78) = (%d, %v), want (0, true)", i, ok)
 	}
-	if i, ok := PickBestByNumber(rows, "99"); ok || i != -1 {
+	if i, ok := PickBestByNumber(rows, "99", 0); ok || i != -1 {
 		t.Errorf("PickBestByNumber(99) = (%d, %v), want (-1, false)", i, ok)
 	}
-	if i, ok := PickBestByNumber(rows, ""); ok || i != -1 {
+	if i, ok := PickBestByNumber(rows, "", 0); ok || i != -1 {
 		t.Errorf("PickBestByNumber(\"\") = (%d, %v), want (-1, false)", i, ok)
 	}
 }
@@ -94,10 +94,10 @@ func TestPickBestByNumber_DoesNotMatchOnPrefix(t *testing.T) {
 	rows := []Row{
 		{AdresseBAN: "180 Rue X 75011 Paris"},
 	}
-	if i, ok := PickBestByNumber(rows, "18"); ok || i != -1 {
+	if i, ok := PickBestByNumber(rows, "18", 0); ok || i != -1 {
 		t.Errorf("PickBestByNumber(18) on 180 = (%d, %v), want (-1, false)", i, ok)
 	}
-	if i, ok := PickBestByNumber(rows, "180"); !ok || i != 0 {
+	if i, ok := PickBestByNumber(rows, "180", 0); !ok || i != 0 {
 		t.Errorf("PickBestByNumber(180) on 180 = (%d, %v), want (0, true)", i, ok)
 	}
 }
@@ -106,7 +106,7 @@ func TestPickBestByNumber_LetterSuffix(t *testing.T) {
 	rows := []Row{
 		{AdresseBAN: "82B Rue X"},
 	}
-	if i, ok := PickBestByNumber(rows, "82"); !ok || i != 0 {
+	if i, ok := PickBestByNumber(rows, "82", 0); !ok || i != 0 {
 		t.Errorf("PickBestByNumber(82) on 82B = (%d, %v), want (0, true)", i, ok)
 	}
 }
@@ -129,7 +129,7 @@ func TestPickBestByNumber_RangeRightBound(t *testing.T) {
 		{"99", -1},
 	}
 	for _, tc := range cases {
-		i, ok := PickBestByNumber(rows, tc.num)
+		i, ok := PickBestByNumber(rows, tc.num, 0)
 		if (tc.idx == -1 && (ok || i != -1)) || (tc.idx >= 0 && (!ok || i != tc.idx)) {
 			t.Errorf("PickBestByNumber(%q) = (%d, %v), want (%d, %v)", tc.num, i, ok, tc.idx, tc.idx >= 0)
 		}
@@ -141,7 +141,7 @@ func TestPickBestByNumber_FallbackToAdresseBrut(t *testing.T) {
 	rows := []Row{
 		{AdresseBrut: "82 RUE DE LA ROQUETTE"},
 	}
-	if i, ok := PickBestByNumber(rows, "82"); !ok || i != 0 {
+	if i, ok := PickBestByNumber(rows, "82", 0); !ok || i != 0 {
 		t.Errorf("PickBestByNumber on AdresseBrut = (%d, %v), want (0, true)", i, ok)
 	}
 }
@@ -151,7 +151,7 @@ func TestPickBest_PrefersFilledEtiquette(t *testing.T) {
 		{NumeroDPE: "a"},
 		{NumeroDPE: "b", EtiquetteDPE: "D"},
 	}
-	idx, ok := PickBest(rows)
+	idx, ok := PickBest(rows, 0)
 	if !ok || idx != 1 {
 		t.Fatalf("PickBest = (%d, %v), want (1, true)", idx, ok)
 	}
@@ -159,16 +159,73 @@ func TestPickBest_PrefersFilledEtiquette(t *testing.T) {
 
 func TestPickBest_EmptyEtiquetteFallsBackToZero(t *testing.T) {
 	rows := []Row{{NumeroDPE: "a"}}
-	idx, ok := PickBest(rows)
+	idx, ok := PickBest(rows, 0)
 	if !ok || idx != 0 {
 		t.Fatalf("PickBest = (%d, %v), want (0, true)", idx, ok)
 	}
 }
 
 func TestPickBest_Empty(t *testing.T) {
-	idx, ok := PickBest(nil)
+	idx, ok := PickBest(nil, 0)
 	if ok || idx != -1 {
 		t.Fatalf("PickBest(nil) = (%d, %v), want (-1, false)", idx, ok)
+	}
+}
+
+func TestPickBestByNumber_SurfaceTieBreak(t *testing.T) {
+	// Apartment building: three DPE rows at "82 RUE X", different
+	// surfaces. The caller's surface is 46 → the row with
+	// SurfaceHabitableLogement closest to 46 must win.
+	s38 := 38.0
+	s48 := 48.0
+	s103 := 103.0
+	rows := []Row{
+		{AdresseBAN: "82 Rue X", EtiquetteDPE: "F", SurfaceHabitableLogement: &s103},
+		{AdresseBAN: "82 Rue X", EtiquetteDPE: "E", SurfaceHabitableLogement: &s38},
+		{AdresseBAN: "82 Rue X", EtiquetteDPE: "D", SurfaceHabitableLogement: &s48},
+	}
+	idx, ok := PickBestByNumber(rows, "82", 46)
+	if !ok || idx != 2 {
+		t.Errorf("PickBestByNumber(82, 46) = (%d, %v), want (2, true)", idx, ok)
+	}
+	// Caller wants 100 m² → picks the 103 m² row.
+	if i, _ := PickBestByNumber(rows, "82", 100); i != 0 {
+		t.Errorf("PickBestByNumber(82, 100) = %d, want 0", i)
+	}
+	// wantSurface == 0 keeps the historical "first match" behaviour.
+	if i, _ := PickBestByNumber(rows, "82", 0); i != 0 {
+		t.Errorf("PickBestByNumber(82, 0) = %d, want 0 (first match)", i)
+	}
+}
+
+func TestPickBestByNumber_SurfaceTieBreak_IgnoresRowsWithoutSurface(t *testing.T) {
+	// Two rows match the number; one has no surface. The other one
+	// wins regardless of how close its surface is, because the
+	// surface-less row can't be ranked.
+	s500 := 500.0
+	rows := []Row{
+		{AdresseBAN: "82 Rue X", EtiquetteDPE: "G"},
+		{AdresseBAN: "82 Rue X", EtiquetteDPE: "F", SurfaceHabitableLogement: &s500},
+	}
+	if i, _ := PickBestByNumber(rows, "82", 46); i != 1 {
+		t.Errorf("PickBestByNumber(82, 46) = %d, want 1 (only ranked row)", i)
+	}
+}
+
+func TestPickBest_SurfaceTieBreak(t *testing.T) {
+	s38 := 38.0
+	s48 := 48.0
+	s103 := 103.0
+	rows := []Row{
+		{EtiquetteDPE: "F", SurfaceHabitableLogement: &s103},
+		{EtiquetteDPE: "E", SurfaceHabitableLogement: &s38},
+		{EtiquetteDPE: "D", SurfaceHabitableLogement: &s48},
+	}
+	if i, _ := PickBest(rows, 46); i != 2 {
+		t.Errorf("PickBest(rows, 46) = %d, want 2 (closest to 46)", i)
+	}
+	if i, _ := PickBest(rows, 0); i != 0 {
+		t.Errorf("PickBest(rows, 0) = %d, want 0 (no surface tie-break)", i)
 	}
 }
 

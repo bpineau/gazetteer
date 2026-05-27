@@ -65,7 +65,7 @@ var (
 // the per-source sentinel then matches by pointer identity.
 type CircuitTrippedError struct {
 	// Source is the gazetteer.Source.Name() of the originating source
-	// (e.g. "dvf", "bienici"). Used to render the Error() message.
+	// (e.g. "dvf"). Used to render the Error() message.
 	Source string
 }
 

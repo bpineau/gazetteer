@@ -6,16 +6,13 @@ import (
 	"github.com/bpineau/gazetteer/appraisal"
 )
 
-// Result is the typed payload returned by Source.Query. Mirrors the
-// shape currently persisted by a downstream enricher (resultBlob
-// with value_eur_per_m2_centimes, p25/p75, sample_size, confidence)
-// so a downstream adapter can re-serialise it 1:1 into its
-// EnrichPayload.Result.
+// Result is the typed payload returned by Source.Query. Exposes the
+// DVF-derived per-m² and total value (in cents) plus p25/p75
+// quartiles, sample size and a confidence string.
 //
-// Envelope-only fields (schema_version, enricher_version, computed_at,
-// input_hash) are NOT part of the gazetteer payload — those are the
-// framework's responsibility (Result envelope in gazetteer.Result, or
-// in a downstream payload struct).
+// Envelope-only fields (schema_version, source_version, computed_at,
+// input_hash) are NOT part of this payload — those are the framework's
+// responsibility (see gazetteer.Result).
 type Result struct {
 	// ValueEURPerM2Cents is the median price-per-m² over the filtered
 	// mutations, in centimes (NOT euros). Nil when the sample is

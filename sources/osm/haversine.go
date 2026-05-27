@@ -14,9 +14,9 @@ const EarthRadiusMeters = geodist.EarthRadiusKm * 1000
 // WalkSinuosityMultiplier scales straight-line (haversine) distance up
 // to "approximate distance walked on a real street grid". 1.3 is the
 // figure published by the OpenStreetMap routing community for dense
-// urban areas (Paris, Lyon — where most of our stations live) ; rural
-// France is closer to 1.4 but the operator wants one homogeneous
-// estimate, not a per-row mode switch.
+// urban areas (where most stations live); rural France is closer to
+// 1.4, but the Source keeps one homogeneous estimate rather than a
+// per-row mode switch.
 const WalkSinuosityMultiplier = 1.3
 
 // WalkSpeedMetersPerMinute is the canonical adult walking speed used to
@@ -32,9 +32,9 @@ func HaversineMeters(lat1, lon1, lat2, lon2 float64) float64 {
 }
 
 // WalkingMetersFromHaversine returns the haversine distance scaled up
-// by the urban sinuosity multiplier. Rounds to the nearest metre — the
-// downstream consumer is a UI label ("~8 min à pied"), sub-metre
-// precision is meaningless.
+// by the urban sinuosity multiplier. Rounds to the nearest metre —
+// downstream consumers typically render a UI label ("~8 min à pied"),
+// where sub-metre precision is meaningless.
 func WalkingMetersFromHaversine(haversineMeters float64) int {
 	v := haversineMeters * WalkSinuosityMultiplier
 	if v < 0 {

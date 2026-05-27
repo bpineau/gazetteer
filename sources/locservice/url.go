@@ -10,7 +10,7 @@ import (
 
 // BaseURL is the LocService tensiometre endpoint root. Variable (not
 // const) so tests can swap it with httptest.NewServer.URL — same
-// pattern as bdnb / georisques / bienici.
+// pattern as the other HTTP-backed Sources.
 var BaseURL = "https://www.locservice.fr/tensiometre"
 
 // ErrInsufficientFilter is returned by URLForINSEE when its inputs
@@ -57,7 +57,7 @@ func NormalizeLogement(s string) string {
 // Returns the empty string ("Tous types") for unsupported combinations
 // — caller then issues the commune-wide call.
 //
-// Conversion rules (mirror the a downstream consumer-side enricher pre-port):
+// Conversion rules:
 //
 //	Apartment + rooms=1  → "studio"
 //	Apartment + rooms=2  → "T2"
