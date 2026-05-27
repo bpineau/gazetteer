@@ -35,13 +35,7 @@
 //
 // When the upstream value isn't an address-shaped €/m² number, wrap
 // fallback.Walk in a tiny adapter that maps your native output to/from
-// fallback.Output. This is what every enricher in
-// a downstream consumer<name>/fallback.go does. The 5-line adapter
-// preserves the free slog observability without a generic Output type
-// blowing up the surface area.
-//
-// # Stability
-//
-// Public API is frozen for the duration of the library-stabilisation
-// project
+// fallback.Output. The 5-line adapter preserves the free slog
+// observability without a generic Output type blowing up the surface
+// area.
 package fallback
