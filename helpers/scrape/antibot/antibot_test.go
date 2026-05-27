@@ -50,8 +50,7 @@ func TestDefaultDetector_DataDomeBlocked(t *testing.T) {
 // embeds the DataDome client SDK at //js.datadome.co/tags.js as a
 // regular asset. The detector MUST NOT flag those pages — a regression
 // here turns every successful enrich response into a 24h ErrAntiBot
-// skip and silently kills the enricher. Documented in
-// doc/specs/library_extraction_plan.md §step 7.
+// skip and silently kills the enricher.
 func TestDataDome_LegitTagsJS_NotBlocked(t *testing.T) {
 	body := []byte(`<!DOCTYPE html><html><head>` +
 		`<script async src="//js.datadome.co/tags.js"></script>` +

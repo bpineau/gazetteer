@@ -16,7 +16,7 @@ const Name = "filosofi"
 // sourceVersion bumps when the Source's internal logic changes.
 //
 // History:
-//   - v1: initial port from internal/core/enrich/rental/filosofi.
+//   - v1: initial port from a downstream consumer
 //     Per-commune Filosofi 2021 indicators (median revenu disponible +
 //     minima sociaux %). Risk classifier thresholds calibrated against
 //     the 2021 national distribution.

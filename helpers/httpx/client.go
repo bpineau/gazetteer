@@ -154,7 +154,7 @@ func (c *Client) GetBytes(ctx context.Context, url string, hdr http.Header) ([]b
 // exactly what every parser in the project wants. The trade-off (we lose
 // brotli + zstd negotiation) is acceptable at our volume (< 1 K req/min).
 // The bienici enricher keeps its `Accept-Encoding: identity` override
-// (cf. internal/core/enrich/bienici/fetcher.go) — strictly more restrictive
+// (cf. a downstream consumer) — strictly more restrictive
 // than the default and still compatible.
 var browserClientHints = [...]struct {
 	name, value string

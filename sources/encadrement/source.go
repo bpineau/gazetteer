@@ -17,7 +17,7 @@ const Name = "encadrement"
 // sourceVersion bumps when the Source's internal logic changes.
 //
 // History:
-//   - v1: initial port from internal/core/enrich/rental/encadrement.
+//   - v1: initial port from a downstream consumer
 //     Paris arrondissement match via zip (75001..75020, 75116); Lyon
 //     via INSEE (69381..69389, 69266); Plaine Commune returns
 //     ConfidenceNone (no commune→zone map yet).

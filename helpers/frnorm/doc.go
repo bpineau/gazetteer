@@ -27,8 +27,8 @@
 //
 // # Stability
 //
-// Symbols moved verbatim from internal/sources/normalize when the
-// package was promoted (cf. doc/specs/library_extraction_plan.md §2.3);
+// Symbols moved verbatim from a sibling module when the
+// package was promoted;
 // adopters see no behaviour change. Public API is frozen for the
 // lifetime of the package — additions are welcome, renames and
 // removals require a deprecation cycle.

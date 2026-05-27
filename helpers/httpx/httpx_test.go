@@ -249,7 +249,7 @@ func TestRetry_HonoursRetryAfter(t *testing.T) {
 // Test #6 — Download: sha256 correct, .tmp cleaned on error,
 // rename atomic, SkipIfExists no-network.
 func TestDownload_SHA256_Atomic_Skip(t *testing.T) {
-	payload := []byte("a downstream consumer-download-payload")
+	payload := []byte("gazetteer-download-payload")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		_, _ = w.Write(payload)
@@ -320,7 +320,7 @@ func TestDownload_SHA256_Atomic_Skip(t *testing.T) {
 // <SnapshotDir>/<source>/<date>/<runID>/, just like GetBytes does.
 //
 // (The other half of the fix — making sure the pipeline propagates the
-// tagged ctx into Download — lives in internal/core/pipeline and is
+// tagged ctx into Download — lives in a downstream consumer and is
 // owned by another sub-agent.)
 func TestSnapshot_DocumentsTaggedBySource(t *testing.T) {
 	payload := []byte("PDFlikepayload")
@@ -1016,7 +1016,7 @@ func TestIsRetryableNetErr(t *testing.T) {
 // A14 regression — Bug critique transversal detecte 2026-05-02 22:50 CEST.
 //
 // Symptome live : l'enricher locservice produisait 198 / 198 parse failures
-// (cf. doc/validation/runs/A9_locservice_20260502-204223.log). Cause : le bundle
+// . Cause : le bundle
 // browserClientHints (aligne Chrome 147 reel le matin meme) contenait
 // `Accept-Encoding: gzip, deflate, br, zstd`. Quand le caller pose
 // Accept-Encoding manuellement, Go's net/http Transport considere que c'est
