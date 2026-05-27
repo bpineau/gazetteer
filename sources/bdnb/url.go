@@ -10,7 +10,7 @@ import (
 
 // BaseURL is the BDNB PostgREST endpoint root. Variable (not const)
 // so tests can swap it with httptest.NewServer.URL — same pattern as
-// bienici / locservice.
+// the other HTTP-backed Sources.
 var BaseURL = "https://api.bdnb.io/v1/bdnb/donnees/batiment_groupe_complet"
 
 // DefaultLimit is the PostgREST `limit` applied. At most a handful of
@@ -85,8 +85,7 @@ const SelectFields = "" +
 
 // MatchStrategy enumerates the supported lookup modes. The Source
 // records the chosen strategy in the Evidence sidecar so downstream
-// callers (e.g. a downstream adapter) can flag medium-confidence
-// results.
+// consumers can flag medium-confidence results.
 type MatchStrategy string
 
 const (
@@ -185,9 +184,8 @@ func AddressPattern(addr string) string {
 // fraddr extracts the leading numeric run only ("75", "12", "31") and
 // keeps the rest of the field as-is; the connector ("bis", "ter", "à",
 // "et") and any range upper-bound digit then leak into StreetTokens,
-// polluting the ilike pattern. Audit 2026-05-17 found these orphans
-// account for the residual range-pollution shape after the parser's
-// Step 1.5 fix retired the residence-prefix leak.
+// polluting the ilike pattern. The orphan list below is the residual
+// range-pollution shape after fraddr drops the residence-name prefix.
 var rangeOrphanTokens = map[string]bool{
 	"bis":    true,
 	"ter":    true,

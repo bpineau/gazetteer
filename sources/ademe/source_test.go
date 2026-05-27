@@ -447,8 +447,8 @@ func TestResult_JSONRoundtrip(t *testing.T) {
 // / URL are all set) and skipped-empty path (where PickedIndex = -1
 // and RawCount is the raw row count from the upstream response).
 //
-// The a downstream consumer adapter reads Evidence to fill EnrichPayload.Method.Params;
-// regressions here silently null out the reproducibility blob.
+// Downstream consumers read Evidence to record method/params for
+// reproducibility; regressions here silently null out that blob.
 func TestSource_PopulatesEvidence(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		body := []byte(`{"total":3,"results":[

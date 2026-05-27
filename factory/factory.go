@@ -94,8 +94,7 @@ func NewDefaultWith(ctx context.Context, opts Options) (*gazetteer.Client, error
 
 // BuilderDefault returns a *gazetteer.Builder pre-populated with every
 // stable in-tree Source. Callers can chain .With(extra) before
-// .Build() to add their own Sources (typically out-of-tree plugins
-// like bienici, castorus, licitorweb, pappersimmo).
+// .Build() to add their own out-of-tree Source plugins.
 //
 //	b, err := factory.BuilderDefault(ctx, factory.Options{})
 //	if err != nil { ... }

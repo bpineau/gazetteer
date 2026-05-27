@@ -16,8 +16,8 @@ import (
 )
 
 // Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers (a rental wrapper, dashboards) can
-// match on them without importing this package's constants.
+// downstream consumers (appraisers, dashboards) can match on them
+// without importing this package's constants.
 const (
 	ConfidenceHigh   = "high"
 	ConfidenceMedium = "medium"
@@ -47,20 +47,18 @@ const (
 	TypologyApt3 Typology = "apt_3_plus"
 )
 
-// Result is the typed payload returned by Source.Query. Mirrors the
-// MarketEstimate shape currently persisted by a downstream consumer's rental
-// enricher (loyer médian, lo/hi prediction interval, typology,
-// confidence, sample size) so the a downstream consumer wrapper can re-serialise
-// it 1:1 into its EnrichPayload.Result.
+// Result is the typed payload returned by Source.Query. Exposes the
+// loyer médian + lo/hi prediction interval + typology + confidence +
+// sample size for the commune × typology bucket.
 //
 // Loyers are in EUR/m²/month "charges comprises" (CC) — the source
 // dataset publishes them CC and we keep that convention here. The
-// caller decides whether to apply a CC→HC factor (a downstream consumer's wrapper
-// applies Config.CCtoHCFactor = 0.90 by default).
+// caller decides whether to apply a CC→HC factor (a typical default
+// is 0.90).
 //
-// Envelope-only fields (schema_version, enricher_version, computed_at,
-// input_hash) are NOT part of the gazetteer payload — those are the
-// framework's responsibility.
+// Envelope-only fields (schema_version, source_version, computed_at,
+// input_hash) are NOT part of this payload — those are the framework's
+// responsibility (see gazetteer.Result).
 type Result struct {
 	// LoyerMedEURPerM2CC is the median rent EUR/m²/month CC for the
 	// commune × typology. Zero when no row was found.

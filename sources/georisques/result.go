@@ -7,8 +7,8 @@ import (
 )
 
 // Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers (a downstream adapter, dashboards) can match on
-// them without importing this package's constants.
+// downstream consumers (appraisers, dashboards) can match on them
+// without importing this package's constants.
 const (
 	ConfidenceHigh   = "high"
 	ConfidenceMedium = "medium"
@@ -21,27 +21,23 @@ const (
 	SkipReasonNoMatch = "no_match"
 )
 
-// LevelAddress / LevelCommune are the granularity tiers exposed via the
-// canonical `level_used` field — symmetric with DVF / MA / Pappers /
-// Castorus. LevelAddress means BRGM resolved the request down to the
-// building's exact lat/lon (Adresse.Libelle populated, statutAdresse
-// surfaceable). LevelCommune is the broader fallback when only the
-// commune scope is available.
+// LevelAddress / LevelCommune are the granularity tiers exposed via
+// the canonical `level_used` field. LevelAddress means BRGM resolved
+// the request down to the building's exact lat/lon (Adresse.Libelle
+// populated, statutAdresse surfaceable). LevelCommune is the broader
+// fallback when only the commune scope is available.
 const (
 	LevelAddress = "address"
 	LevelCommune = "commune"
 )
 
-// Result is the typed payload returned by Source.Query. Mirrors the
-// shape currently persisted by a downstream consumer's Géorisques enricher
-// (resultBlob with Address / Commune / Naturels / Technos / Summary
-// sub-blobs) so a downstream adapter can re-serialise it 1:1 into its
-// EnrichPayload.Result.
+// Result is the typed payload returned by Source.Query. Groups the
+// BRGM rapport-risque output into Address / Commune / Naturels /
+// Technos / Summary sub-blobs.
 //
-// Envelope-only fields (schema_version, enricher_version, computed_at,
-// input_hash) are NOT part of the gazetteer payload — those are the
-// framework's responsibility (Result envelope in gazetteer.Result, or
-// in a downstream payload struct).
+// Envelope-only fields (schema_version, source_version, computed_at,
+// input_hash) are NOT part of this payload — those are the framework's
+// responsibility (see gazetteer.Result).
 type Result struct {
 	// Address carries the BRGM-resolved address scope (libelle + lat/lon
 	// echoed back by the API). Nil when BRGM downgraded to commune-scope.

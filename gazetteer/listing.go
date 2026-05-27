@@ -27,8 +27,8 @@ type Listing struct {
 }
 
 // PropertyType is a coarse, source-agnostic classification used to gate
-// per-source eligibility (e.g. DVF skips parking lots, BienIci skips
-// commercial).
+// per-source eligibility (e.g. DVF skips parking lots; residential-only
+// Sources skip commercial).
 type PropertyType string
 
 const (

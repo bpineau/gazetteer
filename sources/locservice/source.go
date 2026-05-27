@@ -17,13 +17,12 @@ import (
 // gazetteer.Dossier results key and the registry key.
 const Name = "locservice"
 
-// sourceVersion bumps when the Source's internal logic changes. Callers
-// (a stateful runner) gate cache invalidation on it.
+// sourceVersion bumps when the Source's internal logic changes.
+// Stateful callers gate cache invalidation on it.
 const sourceVersion = 1
 
-// Version exposes sourceVersion so callers that wrap the Source (e.g.
-// a downstream adapter) can mirror it without reaching into the package
-// internals.
+// Version exposes sourceVersion so callers that wrap the Source can
+// mirror it without reaching into the package internals.
 const Version = sourceVersion
 
 // Options configures a locservice Source. The zero value is usable: every
@@ -92,8 +91,9 @@ func (s *Source) Version() int { return sourceVersion }
 // StatusOKEmpty.
 //
 // Logging: emits one DEBUG log line per query via
-// gazetteer.LoggerFrom(ctx) at the "locservice" component. The
-// a downstream consumer adapter on top adds INFO once per work-unit.
+// gazetteer.LoggerFrom(ctx) at the "locservice" component. Wrappers
+// that batch many queries typically log a single INFO line per
+// work-unit.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	logger := gazetteer.LoggerFrom(ctx).With(slog.String("source", Name))
 
@@ -161,8 +161,8 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 }
 
 // BuildResult renders a ParsedResult into the typed Result blob. Pure
-// function — exposed so a downstream adapter can reuse the same
-// projection without re-implementing the rules.
+// function — exposed so callers can reuse the same projection without
+// re-implementing the rules.
 //
 // Confidence calibration:
 //

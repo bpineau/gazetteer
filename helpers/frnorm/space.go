@@ -2,13 +2,9 @@ package frnorm
 
 import "strings"
 
-// NormaliseSpace collapses any run of whitespace — including ASCII space,
-// tab, newline, carriage-return and Unicode non-breaking space (U+00A0) —
-// into a single ASCII space, then trims the result.
-//
-// This is the canonical implementation, consolidated from identical copies in
-// a sibling module and a sibling module Vench does not use
-// this function (its whitespace handling is embedded in its slug helper).
+// NormaliseSpace collapses any run of whitespace — including ASCII
+// space, tab, newline, carriage-return and Unicode non-breaking space
+// (U+00A0) — into a single ASCII space, then trims the result.
 //
 // The function is pure, allocation-bounded and safe for concurrent use.
 func NormaliseSpace(s string) string {

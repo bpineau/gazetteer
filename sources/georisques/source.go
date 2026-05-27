@@ -17,13 +17,12 @@ import (
 // gazetteer.Dossier results key and the registry key.
 const Name = "georisques"
 
-// sourceVersion bumps when the Source's internal logic changes. Callers
-// (a stateful runner) gate cache invalidation on it.
+// sourceVersion bumps when the Source's internal logic changes.
+// Stateful callers gate cache invalidation on it.
 const sourceVersion = 1
 
-// Version exposes sourceVersion so callers that wrap the Source (e.g.
-// a downstream adapter) can mirror it without reaching into the package
-// internals.
+// Version exposes sourceVersion so callers that wrap the Source can
+// mirror it without reaching into the package internals.
 const Version = sourceVersion
 
 // Options configures a georisques Source. The zero value is usable: every
@@ -87,8 +86,9 @@ func (s *Source) Version() int { return sourceVersion }
 // IsEmpty()==true and the framework records StatusOKEmpty.
 //
 // Logging: emits one DEBUG log line per query via
-// gazetteer.LoggerFrom(ctx) at the "georisques" component. The
-// a downstream consumer adapter on top adds INFO once per work-unit.
+// gazetteer.LoggerFrom(ctx) at the "georisques" component. Wrappers
+// that batch many queries typically log a single INFO line per
+// work-unit.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	logger := gazetteer.LoggerFrom(ctx).With(slog.String("source", Name))
 

@@ -40,9 +40,10 @@ type sourceFactory struct {
 }
 
 // sourceCatalog returns the registry of source factories the CLI
-// exposes. Order is the canonical "official + atomic rental" grouping
-// from the design spec §7. The function returns a fresh slice on each
-// call so callers can mutate / filter it without affecting peers.
+// exposes. Order groups Sources by their primary thematic axis
+// (building / market / commune-level / transit). The function returns
+// a fresh slice on each call so callers can mutate / filter it without
+// affecting peers.
 //
 // Defaults: every source EXCEPT osm_transit (it needs an offline
 // catalog the CLI doesn't yet wire; --source osm_transit opts in and

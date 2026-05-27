@@ -63,9 +63,10 @@ type PriceInput struct {
 	ExcludedWhy string
 }
 
-// DefaultPriceWeights is the lib-shipped default weighting for known
-// sources. Plugin source names (meilleursagents, bienici, …) appear as
-// strings — no Go-level dependency on plugin packages is introduced.
+// DefaultPriceWeights is the lib-shipped default weighting keyed by
+// Source.Name. Names appear as plain strings so no Go-level dependency
+// on out-of-tree plugin packages is introduced; callers consume their
+// own weighting by overriding PriceOptions.Weights.
 var DefaultPriceWeights = map[string]float64{
 	"meilleursagents": 1.0,
 	"dvf":             0.9,

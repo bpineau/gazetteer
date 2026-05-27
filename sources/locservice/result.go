@@ -1,8 +1,8 @@
 package locservice
 
 // Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers (a downstream adapter, dashboards) can match on
-// them without importing this package's constants.
+// downstream consumers (appraisers, dashboards) can match on them
+// without importing this package's constants.
 const (
 	ConfidenceHigh   = "high"
 	ConfidenceMedium = "medium"
@@ -38,16 +38,12 @@ const (
 	LabelTresTendu   TensionLabel = "très tendu"
 )
 
-// Result is the typed payload returned by Source.Query. Mirrors the JSON
-// shape currently persisted by a downstream enricher
-// (resultBlob with tension/budget scores + scale + description +
-// confidence) so a downstream adapter can re-serialise it 1:1 into
-// its EnrichPayload.Result.
+// Result is the typed payload returned by Source.Query. Exposes the
+// LocService tension/budget scores + scale + description + confidence.
 //
-// Envelope-only fields (schema_version, enricher_version, computed_at,
-// input_hash) are NOT part of the gazetteer payload — those are the
-// framework's responsibility (Result envelope in gazetteer.Result, or
-// in a downstream payload struct).
+// Envelope-only fields (schema_version, source_version, computed_at,
+// input_hash) are NOT part of this payload — those are the framework's
+// responsibility (see gazetteer.Result).
 type Result struct {
 	// TensionLabel is the tensiometer bucket derived from TensionScore.
 	// Sentinel value LabelEquilibre is stamped on the no-data branch

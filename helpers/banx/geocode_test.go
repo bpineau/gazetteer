@@ -145,11 +145,10 @@ func TestBANClient_NotFound(t *testing.T) {
 // (lat=48.876, lon=2.296) → 17e arrondissement (75117).
 const reverseFixture = `{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[2.296,48.876]},"properties":{"label":"5 Rue Brey 75017 Paris","score":0.95,"citycode":"75117","postcode":"75017"}}]}`
 
-// TestCachedGeocoder_ImplementsReverseGeocoder is the A20 reproducer:
-// when a Geocoder is wrapped by CachedGeocoder, the INSEEResolver
-// cascade must still be able to invoke reverse on it. Before A20, the
-// wrapper did not implement ReverseGeocoder, so DVF/pappersimmo
-// resolveINSEE failed-fast on low-score forwards.
+// TestCachedGeocoder_ImplementsReverseGeocoder regression-pins the
+// requirement that when a Geocoder is wrapped by CachedGeocoder, the
+// INSEEResolver cascade can still invoke Reverse on it. Without this,
+// consumers fall through to a fail-fast on low-score forwards.
 func TestCachedGeocoder_ImplementsReverseGeocoder(t *testing.T) {
 	hc, _ := httpx.New(httpx.Options{})
 	defer func() { _ = hc.Close() }()
@@ -320,12 +319,9 @@ func cacheHas(t *testing.T, c kvcache.Cache, key string) bool {
 	return false
 }
 
-// TestZipsShareDepartment covers the exported dept-prefix predicate used
-// by the BAN cache layer (and any future geo consumer that wants a
-// single helper instead of re-implementing the 2-digit / DOM-TOM
-// branching). Mirrors the semantics of the unexported helpers already
-// present in castorus / bienici / meilleursagents (memory
-// `zipmatch_enricher_protocol`).
+// TestZipsShareDepartment covers the exported dept-prefix predicate
+// used by the BAN cache layer (and any geo consumer that wants a single
+// helper instead of re-implementing the 2-digit / DOM-TOM branching).
 func TestZipsShareDepartment(t *testing.T) {
 	cases := []struct {
 		name string

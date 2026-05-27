@@ -9,7 +9,7 @@ import (
 
 // BaseURL is the Georisques rapport-risque endpoint root. Variable
 // (not const) so tests can swap it with httptest.NewServer.URL — same
-// pattern as bdnb / bienici / locservice.
+// pattern as the other HTTP-backed Sources.
 var BaseURL = "https://georisques.gouv.fr/api/v1/resultats_rapport_risque"
 
 // LatLonDecimals is the precision (in decimal places) we send to

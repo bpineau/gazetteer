@@ -138,7 +138,8 @@ func TestAddressPattern_StopsAtPostal(t *testing.T) {
 }
 
 // IlikePatternFor strips the range-orphan leak that fraddr.Parse leaves
-// in the StreetTokens slice. Cases drawn from the 2026-05-17 BDNB audit.
+// in the StreetTokens slice. Cases drawn from real BDNB ilike-pattern
+// pollution observed in production.
 func TestIlikePatternFor_TrimsRangeOrphans(t *testing.T) {
 	tests := []struct {
 		in   string
