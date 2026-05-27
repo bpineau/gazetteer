@@ -17,6 +17,8 @@ func mustReadFixture(t *testing.T, name string) []byte {
 }
 
 func TestParseReport_Paris11(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "paris11.json")
 	r, err := ParseReport(body)
 	if err != nil {
@@ -72,6 +74,8 @@ func TestParseReport_Paris11(t *testing.T) {
 }
 
 func TestParseReport_Empty(t *testing.T) {
+	t.Parallel()
+
 	r, err := ParseReport(mustReadFixture(t, "empty.json"))
 	if err != nil {
 		t.Fatalf("ParseReport(empty): %v", err)
@@ -88,12 +92,16 @@ func TestParseReport_Empty(t *testing.T) {
 }
 
 func TestParseReport_NilBody(t *testing.T) {
+	t.Parallel()
+
 	if _, err := ParseReport(nil); !errors.Is(err, ErrEmptyBody) {
 		t.Errorf("ParseReport(nil) = %v, want ErrEmptyBody", err)
 	}
 }
 
 func TestParseReport_Garbage(t *testing.T) {
+	t.Parallel()
+
 	_, err := ParseReport([]byte("not json"))
 	if !errors.Is(err, ErrEmptyBody) {
 		t.Errorf("ParseReport(garbage) = %v, want ErrEmptyBody wrap", err)
@@ -101,6 +109,8 @@ func TestParseReport_Garbage(t *testing.T) {
 }
 
 func TestCanonicalLists_StableOrder(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "paris11.json")
 	r, err := ParseReport(body)
 	if err != nil {
@@ -125,6 +135,8 @@ func TestCanonicalLists_StableOrder(t *testing.T) {
 }
 
 func TestCanonicalLists_NilSafe(t *testing.T) {
+	t.Parallel()
+
 	if got := CanonicalNaturels(nil); got != nil {
 		t.Errorf("CanonicalNaturels(nil) = %v, want nil", got)
 	}
@@ -134,6 +146,8 @@ func TestCanonicalLists_NilSafe(t *testing.T) {
 }
 
 func TestStatutAdresseExisting(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		risk Risk
@@ -157,6 +171,8 @@ func TestStatutAdresseExisting(t *testing.T) {
 }
 
 func TestStatutCommuneExisting(t *testing.T) {
+	t.Parallel()
+
 	if !StatutCommuneExisting(Risk{LibelleStatutCommune: "Risque Existant - important"}) {
 		t.Error("expected Existant - important to be true at commune scale")
 	}
@@ -166,6 +182,8 @@ func TestStatutCommuneExisting(t *testing.T) {
 }
 
 func TestContainsCI_HasPrefixCI_Smoke(t *testing.T) {
+	t.Parallel()
+
 	if !containsCI("Risque Existant", "existant") {
 		t.Error("containsCI failed")
 	}
@@ -181,6 +199,8 @@ func TestContainsCI_HasPrefixCI_Smoke(t *testing.T) {
 }
 
 func TestBuildResult_NilReport(t *testing.T) {
+	t.Parallel()
+
 	rb := BuildResult(nil)
 	if rb.Confidence != ConfidenceLow {
 		t.Errorf("Confidence(nil) = %q, want low", rb.Confidence)
@@ -200,6 +220,8 @@ func TestBuildResult_NilReport(t *testing.T) {
 // Castorus. Address-scope when BRGM resolved the request to the building's
 // exact lat/lon (Adresse.Libelle populated) ; commune-scope otherwise.
 func TestBuildResult_LevelUsed(t *testing.T) {
+	t.Parallel()
+
 	t.Run("address_when_libelle_populated", func(t *testing.T) {
 		r, err := ParseReport(mustReadFixture(t, "paris11.json"))
 		if err != nil {
@@ -225,6 +247,8 @@ func TestBuildResult_LevelUsed(t *testing.T) {
 }
 
 func TestBuildResult_FixtureSummary(t *testing.T) {
+	t.Parallel()
+
 	r, err := ParseReport(mustReadFixture(t, "paris11.json"))
 	if err != nil {
 		t.Fatalf("ParseReport: %v", err)
