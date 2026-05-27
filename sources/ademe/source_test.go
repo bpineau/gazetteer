@@ -72,6 +72,8 @@ func newStubServer(t *testing.T, status int, body []byte) *stubServer {
 }
 
 func TestSource_NameVersion(t *testing.T) {
+	t.Parallel()
+
 	s := NewSource(Options{})
 	if s.Name() != Name {
 		t.Errorf("Name() = %q, want %q", s.Name(), Name)
@@ -82,6 +84,8 @@ func TestSource_NameVersion(t *testing.T) {
 }
 
 func TestSource_HappyPath(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "list_paris11.json")
 	srv := newStubServer(t, http.StatusOK, body)
 
@@ -138,6 +142,8 @@ func TestSource_HappyPath(t *testing.T) {
 }
 
 func TestSource_EmptyResponse(t *testing.T) {
+	t.Parallel()
+
 	srv := newStubServer(t, http.StatusOK, []byte(`{"total":0,"results":[]}`))
 
 	s := NewSource(Options{
@@ -170,6 +176,8 @@ func TestSource_EmptyResponse(t *testing.T) {
 }
 
 func TestSource_HTTP5xx_ErrUpstreamUnavailable(t *testing.T) {
+	t.Parallel()
+
 	srv := newStubServer(t, http.StatusServiceUnavailable, []byte(`{"error":"down"}`))
 
 	s := NewSource(Options{
@@ -183,6 +191,8 @@ func TestSource_HTTP5xx_ErrUpstreamUnavailable(t *testing.T) {
 }
 
 func TestSource_HTTP4xx_ErrUpstreamPermanent(t *testing.T) {
+	t.Parallel()
+
 	srv := newStubServer(t, http.StatusForbidden, []byte(`{"error":"forbidden"}`))
 
 	s := NewSource(Options{
@@ -196,6 +206,8 @@ func TestSource_HTTP4xx_ErrUpstreamPermanent(t *testing.T) {
 }
 
 func TestSource_InsufficientInputs_NoAddress(t *testing.T) {
+	t.Parallel()
+
 	s := NewSource(Options{Geocoder: stubGeocoder{postCode: "75011"}})
 	_, err := s.Query(context.Background(), gazetteer.Listing{})
 	if !errors.Is(err, gazetteer.ErrInsufficientInputs) {
@@ -204,6 +216,8 @@ func TestSource_InsufficientInputs_NoAddress(t *testing.T) {
 }
 
 func TestSource_InsufficientInputs_ZipUnresolvable(t *testing.T) {
+	t.Parallel()
+
 	// Zip missing on the listing → geocoder is invoked, returns an
 	// error, which propagates as ErrInsufficientInputs.
 	s := NewSource(Options{
@@ -218,6 +232,8 @@ func TestSource_InsufficientInputs_ZipUnresolvable(t *testing.T) {
 }
 
 func TestSource_InsufficientInputs_NoStreetTokens(t *testing.T) {
+	t.Parallel()
+
 	// Listing has a zip-only address (no street tokens). The
 	// fraddr parser yields an empty query, which the Source rejects.
 	srv := newStubServer(t, http.StatusOK, []byte(`{"total":0,"results":[]}`))
@@ -235,6 +251,8 @@ func TestSource_InsufficientInputs_NoStreetTokens(t *testing.T) {
 }
 
 func TestSource_FallsBackToGeocoderForZip(t *testing.T) {
+	t.Parallel()
+
 	// Listing zip is missing — the Source must call the geocoder and
 	// use its PostCode in the URL filter.
 	body := mustReadFixture(t, "list_paris11.json")
@@ -260,6 +278,8 @@ func TestSource_FallsBackToGeocoderForZip(t *testing.T) {
 }
 
 func TestSource_PicksRowMatchingStreetNumber(t *testing.T) {
+	t.Parallel()
+
 	// Synthetic body with three rows differing only in the number.
 	// The listing is at "82" so we expect index 1 to be picked, and
 	// the confidence high.
@@ -290,6 +310,8 @@ func TestSource_PicksRowMatchingStreetNumber(t *testing.T) {
 }
 
 func TestSource_ConfidenceMediumWhenNoNumberMatch(t *testing.T) {
+	t.Parallel()
+
 	// None of the rows match the listing's number "82" → PickBest
 	// fallback (row 0); confidence should be medium because the
 	// etiquette is filled but the number did not match.
@@ -316,6 +338,8 @@ func TestSource_ConfidenceMediumWhenNoNumberMatch(t *testing.T) {
 }
 
 func TestSource_FetcherTransportError(t *testing.T) {
+	t.Parallel()
+
 	// Closed server → connection refused → transport error wraps as
 	// ErrUpstreamUnavailable.
 	srv := newStubServer(t, http.StatusOK, []byte(`{}`))
@@ -332,6 +356,8 @@ func TestSource_FetcherTransportError(t *testing.T) {
 }
 
 func TestSource_ParseFailureMapsToUpstreamUnavailable(t *testing.T) {
+	t.Parallel()
+
 	srv := newStubServer(t, http.StatusOK, []byte(`not json`))
 	s := NewSource(Options{
 		BaseURL:  srv.URL,
@@ -344,6 +370,8 @@ func TestSource_ParseFailureMapsToUpstreamUnavailable(t *testing.T) {
 }
 
 func TestQueryAtomicHelper(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "list_paris11.json")
 	srv := newStubServer(t, http.StatusOK, body)
 
@@ -360,6 +388,8 @@ func TestQueryAtomicHelper(t *testing.T) {
 }
 
 func TestSource_RegistryRoundtrip(t *testing.T) {
+	t.Parallel()
+
 	// Confirm the init() registration is in place: Lookup(Name) must
 	// return a factory producing *Result.
 	factory := gazetteer.Lookup(Name)
@@ -373,6 +403,8 @@ func TestSource_RegistryRoundtrip(t *testing.T) {
 }
 
 func TestFrom_Dossier(t *testing.T) {
+	t.Parallel()
+
 	// Build a Dossier manually with a synthetic Result entry and
 	// verify From extracts the typed *Result.
 	res := &Result{Confidence: ConfidenceHigh, SampleSize: 1}
@@ -392,6 +424,8 @@ func TestFrom_Dossier(t *testing.T) {
 }
 
 func TestFrom_DossierMissing(t *testing.T) {
+	t.Parallel()
+
 	d := gazetteer.Dossier{Results: map[string]gazetteer.Result{}}
 	got, ok := gazetteer.Get[*Result](d, Name)
 	if ok || got != nil {
@@ -400,6 +434,8 @@ func TestFrom_DossierMissing(t *testing.T) {
 }
 
 func TestResult_JSONRoundtrip(t *testing.T) {
+	t.Parallel()
+
 	// Marshal a populated Result and confirm the wire shape carries
 	// the expected snake_case keys.
 	body := mustReadFixture(t, "list_paris11.json")
@@ -450,6 +486,8 @@ func TestResult_JSONRoundtrip(t *testing.T) {
 // Downstream consumers read Evidence to record method/params for
 // reproducibility; regressions here silently null out that blob.
 func TestSource_PopulatesEvidence(t *testing.T) {
+	t.Parallel()
+
 	t.Run("happy path", func(t *testing.T) {
 		body := []byte(`{"total":3,"results":[
             {"numero_dpe":"a","etiquette_dpe":"E","adresse_ban":"78 Rue X 75011 Paris"},

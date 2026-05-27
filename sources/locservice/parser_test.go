@@ -19,6 +19,8 @@ func mustReadFixture(t *testing.T, name string) []byte {
 }
 
 func TestParse_Paris7All_HasData(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "paris7_all.html")
 	got, err := Parse(body)
 	if err != nil {
@@ -45,6 +47,8 @@ func TestParse_Paris7All_HasData(t *testing.T) {
 }
 
 func TestParse_TroyesT2_HasData(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "troyes_t2.html")
 	got, err := Parse(body)
 	if err != nil {
@@ -62,6 +66,8 @@ func TestParse_TroyesT2_HasData(t *testing.T) {
 }
 
 func TestParse_LimogesAll_Equilibre(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "limoges_all.html")
 	got, err := Parse(body)
 	if err != nil {
@@ -79,6 +85,8 @@ func TestParse_LimogesAll_Equilibre(t *testing.T) {
 }
 
 func TestParse_Paris7Chambre_Detendu(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "paris7_chambre.html")
 	got, err := Parse(body)
 	if err != nil {
@@ -97,6 +105,8 @@ func TestParse_Paris7Chambre_Detendu(t *testing.T) {
 }
 
 func TestParse_Riom_NoData(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "riom_no_data.html")
 	got, err := Parse(body)
 	if err != nil {
@@ -111,6 +121,8 @@ func TestParse_Riom_NoData(t *testing.T) {
 }
 
 func TestParse_Empty(t *testing.T) {
+	t.Parallel()
+
 	if _, err := Parse(nil); err == nil {
 		t.Error("expected error for empty body")
 	}
@@ -120,6 +132,8 @@ func TestParse_Empty(t *testing.T) {
 }
 
 func TestScoreToLabel(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		score int
 		want  TensionLabel

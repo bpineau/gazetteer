@@ -6,6 +6,8 @@ import (
 )
 
 func TestExtractRedFlags(t *testing.T) {
+	t.Parallel()
+
 	result := map[string]any{
 		"summary": map[string]any{
 			"red_flags": []any{"seisme", "RETRAIT_ARGILE", "seisme", "  ", "radon"},
@@ -22,6 +24,8 @@ func TestExtractRedFlags(t *testing.T) {
 }
 
 func TestExtractRedFlags_Absent(t *testing.T) {
+	t.Parallel()
+
 	if _, ok := ExtractRedFlags(map[string]any{}); ok {
 		t.Errorf("missing summary → ok should be false")
 	}
@@ -34,6 +38,8 @@ func TestExtractRedFlags_Absent(t *testing.T) {
 }
 
 func TestExtractActiveNaturalRisks(t *testing.T) {
+	t.Parallel()
+
 	result := map[string]any{
 		"naturels": map[string]any{
 			"inondation":     map[string]any{"present": true},
@@ -54,6 +60,8 @@ func TestExtractActiveNaturalRisks(t *testing.T) {
 }
 
 func TestExtractActiveTechnoRisks(t *testing.T) {
+	t.Parallel()
+
 	result := map[string]any{
 		"technos": map[string]any{
 			"icpe":          map[string]any{"present": true},
@@ -72,6 +80,8 @@ func TestExtractActiveTechnoRisks(t *testing.T) {
 }
 
 func TestExtractActiveRisks_Empty(t *testing.T) {
+	t.Parallel()
+
 	if _, ok := ExtractActiveNaturalRisks(map[string]any{}); ok {
 		t.Errorf("empty input → ok should be false")
 	}
