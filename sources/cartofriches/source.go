@@ -90,11 +90,26 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	return &Result{
 		SiteCount:      e.SiteCount,
 		TotalSurfaceM2: e.TotalSurfaceM2,
-		ByType:         e.ByType,
-		ByStatus:       e.ByStatus,
+		ByType:         copyIntMap(e.ByType),
+		ByStatus:       copyIntMap(e.ByStatus),
 		Confidence:     ConfidenceHigh,
 		Evidence:       ev,
 	}, nil
+}
+
+// copyIntMap returns a shallow copy of m. The Source's embedded
+// singleton index is shared across all Query calls; without the copy
+// a caller mutating Result.ByType would corrupt the next call's
+// reading. Cheap (these maps carry at most ~16 entries per commune).
+func copyIntMap(m map[string]int) map[string]int {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]int, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }
 
 // Query is the atomic helper for callers who don't want the builder.
