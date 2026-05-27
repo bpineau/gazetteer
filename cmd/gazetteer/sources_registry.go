@@ -8,9 +8,12 @@ import (
 	"github.com/bpineau/gazetteer/sources/ademe"
 	"github.com/bpineau/gazetteer/sources/anct"
 	"github.com/bpineau/gazetteer/sources/bdnb"
+	"github.com/bpineau/gazetteer/sources/bpe"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/cartofriches"
+	"github.com/bpineau/gazetteer/sources/chomage"
 	"github.com/bpineau/gazetteer/sources/delinquance"
+	"github.com/bpineau/gazetteer/sources/dpedist"
 	"github.com/bpineau/gazetteer/sources/dvf"
 	"github.com/bpineau/gazetteer/sources/education"
 	"github.com/bpineau/gazetteer/sources/encadrement"
@@ -149,6 +152,27 @@ func sourceCatalog() []sourceFactory {
 			Default: true,
 			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
 				return cartofriches.NewSource(cartofriches.Options{}), nil
+			},
+		},
+		{
+			Name:    chomage.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return chomage.NewSource(chomage.Options{}), nil
+			},
+		},
+		{
+			Name:    bpe.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return bpe.NewSource(bpe.Options{}), nil
+			},
+		},
+		{
+			Name:    dpedist.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return dpedist.NewSource(dpedist.Options{}), nil
 			},
 		},
 		{

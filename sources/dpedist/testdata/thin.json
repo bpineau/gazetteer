@@ -1,0 +1,9 @@
+{
+  "total": 5,
+  "total_values": 2,
+  "total_other": 0,
+  "aggs": [
+    {"total": 3, "value": "C"},
+    {"total": 2, "value": "F"}
+  ]
+}

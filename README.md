@@ -75,8 +75,9 @@ Building / energy / risk:
 
 | Source         | What it provides                                                 |
 |----------------|------------------------------------------------------------------|
-| `ademe`        | DPE (energy performance certificates)                            |
+| `ademe`        | DPE (energy performance certificates) at the address             |
 | `bdnb`         | Base de Données Nationale des Bâtiments — building age, type     |
+| `dpedist`      | DPE class distribution per commune (passoire share F+G)          |
 | `georisques`   | Natural and technological hazards (flood, soil, industrial)      |
 
 Market data:
@@ -95,6 +96,7 @@ Commune-level signals for the investor:
 | Source         | What it provides                                                 |
 |----------------|------------------------------------------------------------------|
 | `filosofi`     | INSEE Filosofi income / poverty statistics by IRIS               |
+| `chomage`      | INSEE local unemployment rate by zone d'emploi (quarterly)       |
 | `delinquance`  | SSMSI État 4001 — per-commune crime indicators                   |
 | `zonageabc`    | Official A bis / A / B1 / B2 / C tension classification          |
 | `zonetendue`   | "Zone tendue" + TLV-2013 + tendue-touristique flags              |
@@ -102,6 +104,7 @@ Commune-level signals for the investor:
 | `qpv`          | Quartiers Prioritaires de la politique de la Ville membership    |
 | `cartofriches` | Cerema brownfield inventory aggregated per commune               |
 | `education`    | Count of open schools per commune (live API)                     |
+| `bpe`          | INSEE BPE — curated commerce / health / services counts          |
 
 Transport:
 
