@@ -4,9 +4,14 @@
 //
 // The Source resolves the listing's zip via a banx.Geocoder when
 // missing, hits the ADEME endpoint with an address pattern derived
-// from fraddr.Parse, picks the best candidate by (label score,
-// recency) and returns a *Result carrying DPE label, GES label,
-// surface, build year and dwelling type.
+// from fraddr.Parse, then picks the best candidate by street-number
+// match first and — when several rows share the same number and the
+// Listing carries a SurfaceM2 anchor — the row whose
+// surface_habitable_logement is closest to that anchor. Without a
+// SurfaceM2 anchor the picker preserves the upstream
+// (_score, date_etablissement_dpe desc) order. Returns a *Result
+// carrying DPE label, GES label, surface, build year and dwelling
+// type.
 //
 // Example — wire the Source, query a Listing, and read the typed
 // payload:
