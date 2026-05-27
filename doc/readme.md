@@ -13,13 +13,13 @@ godoc found via `go doc github.com/bpineau/gazetteer/...`.
 
 | Document                                | Audience                              |
 |-----------------------------------------|---------------------------------------|
-| [CONCEPTS.md](CONCEPTS.md)              | New users — mental model of the API   |
-| [SOURCES.md](SOURCES.md)                | Operators — what each Source provides |
-| [PLUGINS.md](PLUGINS.md)                | Source authors                        |
-| [CIRCUIT_BREAKERS.md](CIRCUIT_BREAKERS.md) | Source authors and operators       |
-| [CACHING.md](CACHING.md)                | Source authors                        |
-| [TESTING.md](TESTING.md)                | Library consumers writing tests       |
-| [CLI.md](CLI.md)                        | End users of `cmd/gazetteer`          |
+| [concepts.md](concepts.md)              | New users — mental model of the API   |
+| [sources.md](sources.md)                | What each Source provides             |
+| [plugins.md](plugins.md)                | Source authors                        |
+| [circuit_breakers.md](circuit_breakers.md) | Source authors                     |
+| [caching.md](caching.md)                | Source authors                        |
+| [testing.md](testing.md)                | Library consumers writing tests       |
+| [cli.md](cli.md)                        | End users of `cmd/gazetteer`          |
 
 For runnable examples, look at `gazetteer/example_test.go` and the
 per-source `example_test.go` files; they are reachable via

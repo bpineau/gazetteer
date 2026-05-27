@@ -134,7 +134,7 @@ Some Sources expose a `Cache` slot on their Options:
 | `sources/dvf.SectionDiscoverer` | per-INSEE cadastral section lists | in-memory memcache (`Options.SectionCache == nil`) |
 
 Plugins that scrape per-zone data typically follow the same pattern
-(see [PLUGINS.md](PLUGINS.md)). A persistent backend is recommended
+(see [plugins.md](plugins.md)). A persistent backend is recommended
 in production; the in-memory default is fine for tests.
 
 ## Cache-key namespacing
