@@ -291,12 +291,12 @@ func (t *Table) NearestDept(lat, lon float64) string {
 	return bestDept
 }
 
-// HaversineKm returns the great-circle distance between two
-// (lat,lon) points in kilometers. Re-export historique de
-// [geodist.KmBetween] : `helpers/communes` était l'unique pkg publique
-// pour cette utility, donc les callers existants y dépendent. Les
-// nouveaux callers devraient importer `helpers/geodist` directement pour
-// éviter de tirer l'embed CSV INSEE (~100 KB) avec eux.
+// HaversineKm returns the great-circle distance between two (lat, lon)
+// points in kilometers. Historical re-export of [geodist.KmBetween]:
+// `helpers/communes` was the only public package exposing this utility,
+// so existing callers depend on it. New callers should import
+// `helpers/geodist` directly to avoid pulling the embedded INSEE CSV
+// (~100 KB) along with them.
 func HaversineKm(lat1, lon1, lat2, lon2 float64) float64 {
 	return geodist.KmBetween(lat1, lon1, lat2, lon2)
 }
