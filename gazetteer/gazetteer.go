@@ -173,6 +173,9 @@ func runOne(ctx context.Context, s Source, l Listing) Result {
 	if er, ok := data.(EmptyReporter); ok && er.IsEmpty() {
 		r.Status = StatusOKEmpty
 	}
+	if ev, ok := data.(Evidencer); ok {
+		r.Evidence = ev.Evidence()
+	}
 	return r
 }
 
