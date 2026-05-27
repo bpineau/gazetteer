@@ -105,12 +105,6 @@ func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, err
 	return res, nil
 }
 
-// From extracts the typed *Result from a Dossier. Returns (nil, false)
-// when the source is absent, failed, or the Data does not match.
-func From(d gazetteer.Dossier) (*Result, bool) {
-	return gazetteer.Get[*Result](d, Name)
-}
-
 func init() {
 	gazetteer.Register(Name, func() any { return &Result{} })
 }

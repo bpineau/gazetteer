@@ -19,7 +19,7 @@
 //	client, _ := gazetteer.NewBuilder().With(dvfSrc).With(osmSrc).Build()
 //
 //	d := client.Collect(ctx, listing)
-//	if r, ok := dvf.From(d); ok {
+//	if r, ok := gazetteer.Get[*dvf.Result](d, dvf.Name); ok {
 //	    fmt.Println(r.MedianEurPerM2)
 //	}
 //
