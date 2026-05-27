@@ -20,6 +20,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `anct`           | INSEE                                          | offline ANCT programme list |
 | `bdnb`           | address + INSEE                                | data.gouv.fr BDNB PostgREST |
 | `bpe`            | INSEE                                          | offline INSEE BPE 2024 subset |
+| `cadastre`       | lat/lon                                        | apicarto.ign.fr + cadastre.data.gouv.fr |
 | `carteloyers`    | INSEE + property_type + rooms                  | offline ANIL / DHUP dataset |
 | `cartofriches`   | INSEE                                          | offline Cerema brownfields  |
 | `chomage`        | INSEE                                          | offline INSEE chômage ZE2020|
@@ -66,6 +67,36 @@ Building-level facts from the Base de Données Nationale des Bâtiments
   Callers wire a `helpers/circuit.HTTPFetcher` (see
   [circuit_breakers.md](circuit_breakers.md)) to trip the breaker on
   `x-quota-remaining: 0` or HTTP 429.
+
+## `sources/cadastre`
+
+French cadastral parcel under a listing's lat/lon, with an optional
+building-footprint analysis (count + total emprise + ratio).
+
+- **Needs**: lat/lon (resolved via Geocoder when absent).
+- **Result**: `cadastre.Result` carries a one-element `Parcels` slice
+  with the 14-char Etalab id, contenance in m² / ares / hectares and
+  a deeplink to the Etalab cadastre viewer. When `IncludeBati: true`,
+  also carries `BatiM2`, `BatiCount`, `EmpriseRatio`.
+- **`IsEmpty()`**: true when the API returns zero features (typical
+  when the point falls on unsurveyed land or in a Livre-Foncier area
+  not covered by the cadastre tradition).
+- **Backends**:
+  - `apicarto.ign.fr/api/cadastre/parcelle` for the parcel under the
+    point — public, no auth, GeoJSON FeatureCollection.
+  - `cadastre.data.gouv.fr/bundler/cadastre-etalab/communes/{insee}/
+    geojson/batiments` for the opt-in bâti dump (gzipped, several MB
+    per commune). The Source caches the dump in-process per INSEE.
+- **Bâti soft-fail**: when `IncludeBati: true` and the bâti dump
+  fetch / parse fails, the parcel data is still returned with bâti
+  fields nil and `Evidence.BatiError` populated.
+- **Bâti emprise**: filter is centroid-PIP + raw building area. Small
+  over-estimate when a building overhangs the parcel boundary,
+  acceptable for an UI footprint readout (parcel-intersection area
+  is a v2 candidate).
+- **Default factory wiring**: `IncludeBati: false` — opt-in via
+  `BuilderDefault` + custom `cadastre.NewSource(...)` when callers want
+  the building analysis.
 
 ## `sources/carteloyers`
 

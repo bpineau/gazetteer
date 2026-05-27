@@ -64,14 +64,27 @@ single feature that contains the point (in practice always exactly one
 when the point falls on cadastered land).
 
 Each feature's `properties` carries (relevant fields):
-- `code_insee` (5)
-- `prefixe` (3, typically `"000"`)
-- `section` (1–2 chars, e.g. `"A"`, `"BB"`)
-- `numero` (1–4 chars, zero-padded only in the composed id)
-- `contenance` (int, m²)
-- `code_dep`, `code_com` — redundant with INSEE; not used.
-- `idu` — 14-char parcel id, when present (sometimes absent on older
-  records). When absent we recompose it from INSEE + prefixe + section + numero.
+- `code_insee` (5) — commune INSEE; for Paris/Lyon/Marseille this is the
+  *parent* code (e.g. `75056`), NOT the arrondissement (corrected: live
+  API confirmed 2026-05-28).
+- `com_abs` (3, typically `"000"`) — the prefix component of the
+  Etalab id. The API does NOT expose a `prefixe` field (corrected: live
+  API confirmed; the spec previously assumed `prefixe`).
+- `section` (2 chars, zero-padded — e.g. `"AE"`, `"0B"`). The API
+  already left-pads single-letter section codes.
+- `numero` (4 chars, zero-padded — e.g. `"0003"`, `"0698"`).
+- `contenance` (int, m²).
+- `code_dep`, `code_com`, `code_arr` — redundant with INSEE; not used
+  directly, but `code_arr` carries the arrondissement code which the
+  Etalab `idu` uses in place of `code_insee` for Paris/Lyon/Marseille.
+- `idu` — 14-char parcel id, when present. For Paris/Lyon/Marseille
+  parcels the idu's first 5 chars are the *arrondissement* INSEE
+  (e.g. `75104000AE0003` for a parcel that has `code_insee=75056` +
+  `code_arr=104`), so we ALWAYS prefer the idu over recomposing.
+  When idu is absent (rare on older records), we recompose from
+  `code_insee + com_abs + section + numero` and live with the parent-
+  commune mismatch on Paris/Lyon/Marseille — strictly better than no
+  id at all.
 
 Failure modes
 - HTTP 5xx / transport / parse → `ErrUpstreamUnavailable`.
@@ -168,7 +181,10 @@ can override it via `Options.BaseURL` without touching package state
 3.  Parse FeatureCollection.
 3a.   0 features → empty *Result + nil → StatusOKEmpty.
 3b.   1+ feature → pick the first whose polygon contains (lon,lat);
-       fall back to the first feature if none claim the point.
+       fall back to the first feature if none claim the point. The
+       API returns each feature's `geometry.type` as `"MultiPolygon"`
+       (corrected: live API confirmed 2026-05-28; previous spec wording
+       implied bare `Polygon`).
 4.  Build Parcel{ID, INSEE, ..., contenance trio, MapURL}.
 5.  If !IncludeBati → return.
 6.  Get bâti polygons for Parcel.INSEE:
