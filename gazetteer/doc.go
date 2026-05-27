@@ -37,5 +37,6 @@
 // gazetteer.Register in init(). Callers wire them with builder.With(...)
 // like any official source.
 //
-// See doc/gazetteer/2026-05-25-extraction-design.md for the full design.
+// See doc/ in the repository root for long-form documentation:
+// CONCEPTS, SOURCES, PLUGINS, CIRCUIT_BREAKERS, CACHING, TESTING, CLI.
 package gazetteer
