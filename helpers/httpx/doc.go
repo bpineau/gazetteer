@@ -58,11 +58,4 @@
 //
 // All three implement error and play with errors.Is / errors.As. No
 // string matching is required (or wanted).
-//
-// # Specs
-//
-// See doc/specs/chantiers/02-httpx.md and SPECS.md §8 for the design
-// document. Public API is frozen for the duration of the
-// library-extraction effort (doc/specs/library_extraction_plan.md
-// §2.1).
 package httpx

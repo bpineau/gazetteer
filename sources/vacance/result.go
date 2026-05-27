@@ -16,7 +16,7 @@ const (
 )
 
 // Result is the typed payload returned by Source.Query. Mirrors the
-// VacanceEntry shape currently persisted by encheridor's rental
+// VacanceEntry shape currently persisted by a downstream consumer's rental
 // enricher so the wrapper can re-serialise it 1:1 into its
 // EnrichPayload.Result.
 type Result struct {

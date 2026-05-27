@@ -15,7 +15,7 @@ import (
 // parameter).
 //
 // Combines the cases from the legacy
-// `internal/core/enrich/meilleursagents/fallback_test.go` table with the
+// `a downstream consumer` table with the
 // `enrich_ma_ban_retry_test.go` postCode-empty pinning.
 func TestStripTrailingZipCity(t *testing.T) {
 	cases := []struct {

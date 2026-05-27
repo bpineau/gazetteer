@@ -1,25 +1,3 @@
-// Package geodist computes great-circle (haversine) distances between
-// (lat, lon) points on Earth.
-//
-// Extracted into its own package because at least 5 call sites across
-// the codebase reimplemented the same haversine formula independently
-// (cf. `pkg/communes/communes.go::HaversineKm`,
-// `internal/core/auctionview/builder.go::haversineKm`,
-// `internal/core/enrich/osm/haversine.go::HaversineMeters`,
-// `internal/web/handlers/map.go::haversineKmMap`,
-// `internal/store/doctor_helpers.go::haversineKm`). Each duplication is
-// a small risk of drift (different R radius, different rounding) and
-// pollutes search results when grepping the codebase.
-//
-// `pkg/communes` re-exports `HaversineKm` as a thin wrapper to keep
-// existing callers working without churn ; new callers should depend
-// on `pkg/geodist` directly to avoid pulling the embedded INSEE CSV
-// table (~400 lines + 100 KB data) that lives in `pkg/communes`.
-//
-// Earth radius : R = 6371.0 km — the mean radius standard adopted by
-// IUGG. Choice of mean (vs equatorial 6378.1 or polar 6356.8) is the
-// convention used by every prior implementation in the repo, so we
-// keep it for byte-for-byte compatibility.
 package geodist
 
 import "math"

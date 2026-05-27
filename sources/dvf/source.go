@@ -24,7 +24,7 @@ import (
 const Name = "dvf"
 
 // sourceVersion bumps when the Source's internal logic changes. Callers
-// (encheridor's runner) gate cache invalidation on it.
+// (a stateful runner) gate cache invalidation on it.
 //
 // History:
 //   - v1: initial release (commune → neighborhood → department ladder, no
@@ -41,7 +41,7 @@ const Name = "dvf"
 const sourceVersion = 3
 
 // Version exposes sourceVersion so callers that wrap the Source (e.g.
-// encheridor's adapter) can mirror it without reaching into the package
+// a downstream adapter) can mirror it without reaching into the package
 // internals.
 const Version = sourceVersion
 
@@ -94,7 +94,7 @@ type Options struct {
 	// SectionCache is the kvcache backend the SectionDiscoverer uses
 	// to memoise per-commune section lists. Defaults to an in-memory
 	// memcache when nil; callers that want cross-run persistence
-	// (encheridor's adapter) supply a bun-backed adapter here.
+	// (a downstream adapter) supply a bun-backed adapter here.
 	SectionCache kvcache.Cache
 
 	// Logger overrides slog.Default(). Optional.
@@ -307,7 +307,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 }
 
 // resolveINSEE returns the 5-digit commune code for the listing via
-// the shared INSEE cascade (cf. `pkg/gazetteer/pkg/banx/insee_resolver.go`):
+// the shared INSEE cascade (cf. `helpers/banx/insee_resolver.go`):
 //
 //  1. listing.INSEE when non-empty (trusted).
 //  2. BAN forward on the address (high-confidence trust).
@@ -466,7 +466,7 @@ func (s *Source) Sections() *SectionDiscoverer { return s.sections }
 
 // API exposes the Source's underlying API client. Useful for callers
 // that need to issue raw GetMutations calls outside the ladder (e.g.
-// the encheridor adapter's separate code paths).
+// a downstream adapter's separate code paths).
 func (s *Source) API() *API { return s.api }
 
 // Query is the atomic helper for callers who don't want the builder.

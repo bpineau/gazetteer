@@ -1,18 +1,3 @@
-// Command gazetteer is a CLI front-end for the gazetteer library.
-//
-// Sub-commands:
-//
-//	gazetteer query     [--source dvf,osm,...] [--json] [--verbose] [--dump] <addr>
-//	gazetteer appraise  [--source dvf,osm,...] [--json] [--verbose] [--dump] <addr>
-//	gazetteer normalize [--json] <addr>
-//	gazetteer sources   list
-//	gazetteer sources   doc <name>
-//	gazetteer refresh   <source>                  (stub for v1)
-//	gazetteer version
-//
-// The binary lives at pkg/gazetteer/cmd/gazetteer/ in the encheridor
-// repo today; it will move with the lib in Phase 7 to its dedicated
-// repository.
 package main
 
 import (
