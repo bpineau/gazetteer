@@ -14,6 +14,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/cartofriches"
 	"github.com/bpineau/gazetteer/sources/chomage"
 	"github.com/bpineau/gazetteer/sources/delinquance"
+	"github.com/bpineau/gazetteer/sources/dpedist"
 	"github.com/bpineau/gazetteer/sources/dvf"
 	"github.com/bpineau/gazetteer/sources/education"
 	"github.com/bpineau/gazetteer/sources/encadrement"
@@ -114,6 +115,7 @@ var sourceRenderers = map[string]sourceRenderer{
 	cartofriches.Name: renderCartofriches,
 	chomage.Name:      renderChomage,
 	delinquance.Name:  renderDelinquance,
+	dpedist.Name:      renderDPEDist,
 	dvf.Name:          renderDVF,
 	education.Name:    renderEducation,
 	encadrement.Name:  renderEncadrement,
@@ -365,6 +367,26 @@ func renderChomage(data any) (string, []string) {
 	headline := fmt.Sprintf("chômage %.1f%% en ZE %s (%s, national %.1f%%, écart %+.1f pp, %s)",
 		r.RatePct, r.ZECode, r.ZELabel, r.NationalRatePct, r.DeltaVsNationalPP, r.Tension)
 	return headline, nil
+}
+
+func renderDPEDist(data any) (string, []string) {
+	r, ok := data.(*dpedist.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no DPE in this commune", nil
+	}
+	headline := fmt.Sprintf("%d DPE issued (F+G %.1f%%, A+B %.1f%%, conf %s)",
+		r.NbTotal, r.PassoireSharePct, r.EfficientSharePct, r.Confidence)
+	parts := []string{}
+	for _, l := range dpedist.AllLabels {
+		if n := r.Get(l); n > 0 {
+			parts = append(parts, fmt.Sprintf("%s=%d (%.1f%%)", l, n, r.Share(l)))
+		}
+	}
+	var extra []string
+	if len(parts) > 0 {
+		extra = append(extra, "by class: "+strings.Join(parts, ", "))
+	}
+	return headline, extra
 }
 
 func renderDelinquance(data any) (string, []string) {

@@ -1,0 +1,14 @@
+{
+  "total": 13537,
+  "total_values": 7,
+  "total_other": 0,
+  "aggs": [
+    {"total": 6269, "value": "C"},
+    {"total": 4249, "value": "D"},
+    {"total": 1659, "value": "E"},
+    {"total": 612, "value": "F"},
+    {"total": 464, "value": "B"},
+    {"total": 257, "value": "G"},
+    {"total": 27, "value": "A"}
+  ]
+}
