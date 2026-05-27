@@ -81,6 +81,20 @@ type EmptyReporter interface {
 	IsEmpty() bool
 }
 
+// Evidencer is an opt-in interface a Source's typed Data MAY implement
+// to expose its Evidence sidecar through the framework Result envelope.
+// When Data satisfies Evidencer, the framework stamps Result.Evidence
+// with what Evidence() returns; consumers can then read
+// dossier.Results["dvf"].Evidence without type-asserting on the typed
+// Data.
+//
+// Implementations typically return the same value that lives on the
+// typed Result struct as a `json:"-"` Evidence field — i.e. a single
+// shared instance, no defensive copy.
+type Evidencer interface {
+	Evidence() any
+}
+
 // QueryWither is an opt-in interface a Source MAY implement to accept
 // extra arguments beyond Listing on a side-entry Query path. The
 // framework's Client.Collect always calls Source.Query — QueryWith is

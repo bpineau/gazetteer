@@ -35,6 +35,20 @@ type Result struct {
 	FetchedAt time.Time
 	Err       error // non-nil iff Status is a failure status
 	Data      any   // typed payload struct; may be non-nil even for StatusOKEmpty
+
+	// Evidence is the reproducibility sidecar — input fingerprint,
+	// ladder tier used, resolver provenance, sample-size hints. The
+	// framework populates it during runOne when Data implements
+	// Evidencer; consumers reach it through the envelope without
+	// type-asserting on Data:
+	//
+	//	if ev, ok := r.Evidence.(*dvf.Evidence); ok { ... }
+	//
+	// Sources that don't implement Evidencer leave this nil. The
+	// typed Data MAY still carry its own Evidence field — the
+	// framework slot is a uniform-access convenience, not a
+	// replacement for the per-Source typed shape.
+	Evidence any
 }
 
 // IsEmpty reports whether the underlying typed Data implements
