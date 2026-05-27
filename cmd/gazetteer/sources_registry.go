@@ -6,16 +6,23 @@ import (
 
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/sources/ademe"
+	"github.com/bpineau/gazetteer/sources/anct"
 	"github.com/bpineau/gazetteer/sources/bdnb"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
+	"github.com/bpineau/gazetteer/sources/cartofriches"
+	"github.com/bpineau/gazetteer/sources/delinquance"
 	"github.com/bpineau/gazetteer/sources/dvf"
+	"github.com/bpineau/gazetteer/sources/education"
 	"github.com/bpineau/gazetteer/sources/encadrement"
 	"github.com/bpineau/gazetteer/sources/filosofi"
 	"github.com/bpineau/gazetteer/sources/georisques"
 	"github.com/bpineau/gazetteer/sources/locservice"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
+	"github.com/bpineau/gazetteer/sources/qpv"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
+	"github.com/bpineau/gazetteer/sources/zonageabc"
+	"github.com/bpineau/gazetteer/sources/zonetendue"
 )
 
 // sourceCatalog is the CLI-side enumeration of every gazetteer.Source
@@ -120,6 +127,55 @@ func sourceCatalog() []sourceFactory {
 			Default: true,
 			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
 				return vacance.NewSource(vacance.Options{}), nil
+			},
+		},
+		{
+			Name:    anct.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return anct.NewSource(anct.Options{}), nil
+			},
+		},
+		{
+			Name:    cartofriches.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return cartofriches.NewSource(cartofriches.Options{}), nil
+			},
+		},
+		{
+			Name:    delinquance.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return delinquance.NewSource(delinquance.Options{}), nil
+			},
+		},
+		{
+			Name:    education.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return education.NewSource(education.Options{}), nil
+			},
+		},
+		{
+			Name:    qpv.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return qpv.NewSource(qpv.Options{}), nil
+			},
+		},
+		{
+			Name:    zonageabc.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return zonageabc.NewSource(zonageabc.Options{}), nil
+			},
+		},
+		{
+			Name:    zonetendue.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return zonetendue.NewSource(zonetendue.Options{}), nil
 			},
 		},
 	}
