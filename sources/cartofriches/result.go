@@ -1,21 +1,3 @@
-// Package cartofriches ships an offline Source that aggregates the
-// Cerema "Cartofriches" national inventory of friches (industrial /
-// commercial / habitation brownfields) per commune.
-//
-// For a rental investor this Source carries a dual signal:
-//
-//   - High count → the commune has substantial vacant/derelict stock
-//     that could pressure values OR conversely represent regeneration
-//     upside (Action Logement / EPF / Denormandie pipeline).
-//   - Zero/low count → mature, stable urban tissue.
-//
-// The Source returns the per-commune count, breakdowns by site type
-// (industriel, habitat, commercial, …) and by site status (avec
-// projet, sans projet, reconverti), plus the cumulative unite
-// foncière surface in m².
-//
-// The Source is fully offline: the aggregate ships embedded under
-// `data/`.
 package cartofriches
 
 // Confidence values returned in Result.Confidence. Stable strings so

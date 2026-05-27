@@ -24,12 +24,29 @@
 // (which matches gazetteer.ErrSourceCircuitTripped for cross-source
 // matching).
 //
-// Example:
+// Example — wire the Source, query a Listing, and read the typed
+// payload:
 //
 //	src, err := dvf.NewSource(dvf.Options{
 //	    HTTP:     hc,                    // *httpx.Client
 //	    Geocoder: ban,                   // banx.Geocoder
 //	    Communes: communes.MustDefault(),// optional, embedded default
 //	})
-//	r, err := src.Query(ctx, listing)
+//	if err != nil { log.Fatal(err) }
+//	data, err := src.Query(ctx, gazetteer.Listing{
+//	    Address: "10 rue de Rivoli", Zip: "75001",
+//	    PropertyType: gazetteer.PropertyApartment,
+//	    SurfaceM2: &surface,
+//	})
+//	if err != nil { log.Fatal(err) }
+//	r := data.(*dvf.Result)
+//	if r.IsEmpty() {
+//	    fmt.Println("no DVF transactions matched")
+//	    return
+//	}
+//	if r.ValueEURPerM2Cents != nil {
+//	    eurPerM2 := float64(*r.ValueEURPerM2Cents) / 100
+//	    fmt.Printf("median %.0f €/m² over %d sales (tier=%s, confidence=%s)\n",
+//	        eurPerM2, r.SampleSize, r.Evidence.LevelUsed, r.Confidence)
+//	}
 package dvf

@@ -10,11 +10,27 @@
 // returns no data the Source widens to the commune-wide call in a
 // single retry and stamps Evidence.FellBack = true on success.
 //
-// Example:
+// Example — wire the Source, query a Listing, and read the typed
+// payload:
 //
 //	src := locservice.NewSource(locservice.Options{
 //	    BaseURL:  srv.URL,
 //	    Geocoder: ban,
 //	})
-//	r, err := src.Query(ctx, listing)
+//	rooms := 2
+//	data, err := src.Query(ctx, gazetteer.Listing{
+//	    INSEE: "75119",
+//	    PropertyType: gazetteer.PropertyApartment,
+//	    Rooms: &rooms,
+//	})
+//	if err != nil { log.Fatal(err) }
+//	r := data.(*locservice.Result)
+//	if r.NoData {
+//	    fmt.Println("no LocService reading for this INSEE × typology")
+//	    return
+//	}
+//	fmt.Printf("tension: %s\n", r.TensionLabel)
+//	if r.TensionScore != nil {
+//	    fmt.Printf("supply tightness score: %d/8\n", *r.TensionScore)
+//	}
 package locservice

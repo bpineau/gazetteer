@@ -17,11 +17,25 @@
 // MaxNearestStationMeters the Source returns IsEmpty()==true with
 // SkipReason = SkipReasonOutOfRange.
 //
-// Example:
+// Example — wire the Source, query a Listing, and read the typed
+// payload:
 //
 //	src := osm.NewSource(osm.Options{})
 //	src.UpdateCatalog(loadedCatalog)
-//	r, err := src.Query(ctx, listing)
+//	data, err := src.Query(ctx, gazetteer.Listing{
+//	    Lat: &lat, Lon: &lon,
+//	})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	r := data.(*osm.Result)
+//	if r.IsEmpty() {
+//	    fmt.Println("no transit station within range")
+//	    return
+//	}
+//	fmt.Printf("nearest %s station: %s (%d min walk, lines %v)\n",
+//	    r.NearestTransitType, r.NearestTransitName,
+//	    r.NearestTransitWalkMin, r.NearestTransitLines)
 //
 // To refresh the catalog out-of-band:
 //

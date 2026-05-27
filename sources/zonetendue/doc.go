@@ -31,6 +31,21 @@
 //
 // Property type is irrelevant: the zonage classifies the whole
 // commune.
+//
+// Example — wire the Source, query a Listing, and read the typed
+// payload:
+//
+//	src := zonetendue.NewSource(zonetendue.Options{})
+//	data, err := src.Query(ctx, gazetteer.Listing{INSEE: "75119"})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	r := data.(*zonetendue.Result)
+//	fmt.Printf("tier=%s tendue=%v tlv2013=%v\n",
+//	    r.Tier, r.IsTendue, r.FlaggedTLV2013)
+//	if r.IsTendue {
+//	    fmt.Println("tenant notice shortened to 1 month; TLV/THRS applicable")
+//	}
 package zonetendue
 
 // Tier enumerates the three published classifications. Stable strings
