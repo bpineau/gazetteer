@@ -100,7 +100,7 @@ func (t *snapshotTransport) writeSnapshot(req *http.Request, resp *http.Response
 		runID = "_"
 	}
 	day := start.UTC().Format("2006-01-02")
-	hash := requestHash(req, "")
+	hash := requestHash(req)
 	ext := guessExt(resp.Header.Get("Content-Type"))
 
 	dir := filepath.Join(baseDir, src, day, runID)
