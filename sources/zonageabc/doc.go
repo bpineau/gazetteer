@@ -19,6 +19,24 @@
 //
 // Property type is irrelevant: the zonage applies to the commune as a
 // whole.
+//
+// Example — wire the Source, query a Listing, and read the typed
+// payload:
+//
+//	src := zonageabc.NewSource(zonageabc.Options{})
+//	data, err := src.Query(ctx, gazetteer.Listing{INSEE: "75107"})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	r := data.(*zonageabc.Result)
+//	if r.IsEmpty() {
+//	    fmt.Println("commune absent from the September 2025 zonage")
+//	    return
+//	}
+//	fmt.Printf("zone=%s tension=%d\n", r.Zone, r.TensionScore)
+//	if r.Zone == zonageabc.ZoneAbis || r.Zone == zonageabc.ZoneA {
+//	    fmt.Println("tight market: applicable to most logement-intermédiaire devices")
+//	}
 package zonageabc
 
 // Confidence values returned in Result.Confidence. Stable strings so

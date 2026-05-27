@@ -6,8 +6,17 @@
 // consulted (vacance is a commune-wide metric). Missing communes
 // (secret statistique) surface as IsEmpty()==true.
 //
-// Example:
+// Example — wire the Source, query a Listing, and read the typed
+// payload:
 //
 //	src := vacance.NewSource(vacance.Options{})
-//	r, err := src.Query(ctx, gazetteer.Listing{INSEE: "75101"})
+//	data, err := src.Query(ctx, gazetteer.Listing{INSEE: "75101"})
+//	if err != nil { log.Fatal(err) }
+//	r := data.(*vacance.Result)
+//	if r.IsEmpty() {
+//	    fmt.Println("commune absent from LOVAC (secret statistique)")
+//	    return
+//	}
+//	fmt.Printf("vacancy rate: %.1f%% (long-term: %.1f%%)\n",
+//	    r.VacancePct, r.VacanceLongPct)
 package vacance

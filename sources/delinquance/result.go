@@ -1,18 +1,3 @@
-// Package delinquance ships an offline Source exposing per-commune
-// crime / security indicators recorded by police and gendarmerie. The
-// data originate from the SSMSI (Service Statistique Ministériel de la
-// Sécurité Intérieure) "bases statistiques communale" dataset on
-// data.gouv.fr — the official État 4001 framework.
-//
-// For a rental investor this Source is a coarse first-order signal:
-// communes with high burglary or vandalism rates carry more landlord
-// risk (vacancy, churn, insurance premiums). The Source exposes a
-// short list of indicators normalised to "per 1 000 inhabitants" rates
-// for the latest reference year (2024 at the time of the embed) plus
-// a peer-relative risk flag.
-//
-// The Source is fully offline: the SSMSI extract ships embedded as a
-// gzipped JSON under `data/`.
 package delinquance
 
 // Confidence values returned in Result.Confidence. Stable strings so

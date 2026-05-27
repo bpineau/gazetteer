@@ -15,13 +15,26 @@
 // label the rent as a "loyer de référence" rather than a market
 // estimate.
 //
-// Example:
+// Example — wire the Source, query a Listing, and read the typed
+// payload:
 //
 //	src := encadrement.NewSource(encadrement.Options{})
-//	r, err := src.Query(ctx, gazetteer.Listing{
+//	rooms, surface := 3, 50.0
+//	data, err := src.Query(ctx, gazetteer.Listing{
 //	    Zip:          "75001",
 //	    PropertyType: gazetteer.PropertyApartment,
-//	    Rooms:        intPtr(3),
-//	    SurfaceM2:    floatPtr(50),
+//	    Rooms:        &rooms,
+//	    SurfaceM2:    &surface,
 //	})
+//	if err != nil { log.Fatal(err) }
+//	r := data.(*encadrement.Result)
+//	if r.IsEmpty() {
+//	    fmt.Println("address falls outside any encadrement zone")
+//	    return
+//	}
+//	fmt.Printf("zone %s (%s)\n", r.Zone, r.ZoneSource)
+//	fmt.Printf("loyer de référence    : %.2f €/m²/mois HC\n",
+//	    r.LoyerRefEURPerM2HC)
+//	fmt.Printf("loyer de réf. majoré  : %.2f €/m²/mois HC (legal max)\n",
+//	    r.LoyerRefMajEURPerM2HC)
 package encadrement
