@@ -17,16 +17,24 @@ The table below summarises each Source. Detailed contracts follow.
 | Name             | Inputs from Listing                            | Backend                     |
 |------------------|------------------------------------------------|-----------------------------|
 | `ademe`          | address / zip                                  | data.gouv.fr `dpe03existant`|
+| `anct`           | INSEE                                          | offline ANCT programme list |
 | `bdnb`           | address + INSEE                                | data.gouv.fr BDNB PostgREST |
 | `carteloyers`    | INSEE + property_type + rooms                  | offline ANIL / DHUP dataset |
+| `cartofriches`   | INSEE                                          | offline Cerema brownfields  |
+| `delinquance`    | INSEE                                          | offline SSMSI État 4001     |
 | `dvf`            | INSEE or address + property_type (+ surface)   | data.gouv.fr Etalab DVF     |
+| `education`      | INSEE                                          | data.education.gouv.fr API  |
 | `encadrement`    | zip or INSEE + property_type + rooms (+ surface)| offline DRIHL JSON          |
 | `filosofi`       | INSEE                                          | offline INSEE Filosofi 2021 |
 | `georisques`     | lat/lon (or address)                           | georisques.gouv.fr report   |
 | `locservice`     | INSEE + property_type + rooms                  | locservice.fr HTML scrape   |
 | `osm`            | lat/lon + offline station catalog              | OSM Overpass (refresh only) |
+| `pinel`          | INSEE                                          | offline arrêté Pinel ABC    |
+| `qpv`            | INSEE                                          | offline ANCT QPV 2024 list  |
 | `taxefonciere`   | INSEE + surface_m2                             | offline DGFiP rates         |
 | `vacance`        | INSEE                                          | offline LOVAC 2025          |
+| `zonageabc`      | INSEE                                          | offline arrêté 2025-09-05   |
+| `zonetendue`     | INSEE                                          | offline décret 2013-392     |
 
 ## `sources/ademe`
 
@@ -177,6 +185,101 @@ Per-commune vacancy rate from the LOVAC 2025 dataset.
 - **Needs**: INSEE.
 - **Result**: vacancy rate %, long-term vacancy split. Missing
   communes (secret statistique) surface as `IsEmpty()`.
+
+## `sources/anct`
+
+ANCT (Agence Nationale de la Cohésion des Territoires) territorial
+revitalization programme flags per commune.
+
+- **Needs**: INSEE.
+- **Result**: `anct.Result` with booleans for `ActionCoeurDeVille`,
+  `PetitesVillesDeDemain`, `ORTSigned`, plus a `DenormandieEligible`
+  flag (= ORT-signed).
+- **Backend**: offline merged extract under `data/` (Action Cœur de
+  Ville + Petites Villes de Demain + Opération de Revitalisation de
+  Territoire), covering ~2 400 communes.
+
+## `sources/cartofriches`
+
+Cerema "Cartofriches" national brownfield inventory aggregated per
+commune.
+
+- **Needs**: INSEE.
+- **Result**: `cartofriches.Result` with `SiteCount`, breakdowns by
+  type (industriel / habitat / commercial / …) and status (avec projet
+  / sans projet / reconverti), plus cumulative surface in m².
+- **Backend**: offline aggregate of ~28 000 sites across ~9 100
+  communes.
+
+## `sources/delinquance`
+
+Per-commune crime / security indicators from the SSMSI État 4001
+framework.
+
+- **Needs**: INSEE.
+- **Result**: `delinquance.Result` exposing rates per 1 000 inhabitants
+  for ~14 indicators (cambriolage, vandalisme, violences, vols,
+  fraude, stupéfiants) plus a peer-relative risk flag for the latest
+  reference year (2024 at the time of the embed).
+- **Backend**: gzipped JSON embedded under `data/`.
+
+## `sources/education`
+
+Live count of open schools (école, collège, lycée, médico-social) per
+commune from the Annuaire de l'Éducation Nationale.
+
+- **Needs**: INSEE.
+- **Result**: `education.Result` with `TotalOpen` plus breakdown by
+  type for establishments currently OUVERT.
+- **Backend**: HTTP GET against `data.education.gouv.fr` (Opendatasoft
+  API). Honours `Options.BaseURL` for tests.
+
+## `sources/pinel`
+
+Zonage ABC per commune (arrêté du 5 sep 2025) plus the derived
+Pinel / Denormandie / PTZ / Loc'Avantages eligibility decision.
+
+- **Needs**: INSEE. Paris / Lyon / Marseille arrondissements fold to
+  the parent commune.
+- **Result**: `pinel.Result` with `Zone` (Abis / A / B1 / B2 / C),
+  tension bucket, and per-device eligibility flags.
+- **Backend**: offline CSV under `data/`, ~35 000 communes.
+
+## `sources/qpv`
+
+Quartiers Prioritaires de la politique de la Ville (decree 2023-1314)
+membership at commune granularity.
+
+- **Needs**: INSEE.
+- **Result**: `qpv.Result` with `HasQPV`, count of QPV in the commune,
+  and the codes + labels.
+- **Backend**: offline JSON under `data/`, ~840 communes / ~1 584 QPV.
+
+## `sources/zonageabc`
+
+Same official zonage A bis / A / B1 / B2 / C as `pinel`, exposed as a
+raw classification (no derived eligibility logic).
+
+- **Needs**: INSEE.
+- **Result**: `zonageabc.Result` with `Zone` and the legal source
+  arrêté reference.
+- **Backend**: offline JSON under `data/`, ~34 875 communes with
+  arrondissement fold.
+- **When to prefer `pinel`**: when the caller wants the tax-device
+  decision shortcut. `zonageabc` is the data-only surface.
+
+## `sources/zonetendue`
+
+Décret 2013-392 (and 2025-1267) "zone tendue" + "tendue touristique"
+classification, plus the TLV-2013 (Taxe sur les Logements Vacants
+2013-area) flag.
+
+- **Needs**: INSEE.
+- **Result**: `zonetendue.Result` with `Tendue`, `TenduTouristique`,
+  `TLV2013` booleans, driving signal of préavis-réduit-1-mois, TLV /
+  THRS surcharges, and encadrement à la relocation.
+- **Backend**: offline JSON under `data/`, ~3 725 listed communes
+  (absence = non tendue).
 
 ## Cross-cutting conventions
 
