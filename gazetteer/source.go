@@ -81,6 +81,28 @@ type EmptyReporter interface {
 	IsEmpty() bool
 }
 
+// BaseURLer is an opt-in interface a Source MAY implement to expose
+// its effective remote-endpoint root, typically captured from
+// Options.BaseURL (or its source-specific equivalent) at construction
+// time.
+//
+// Use cases:
+//   - Test harnesses that want to assert "this Source instance was
+//     pointed at httptest.NewServer.URL"; they type-assert
+//     `if u, ok := src.(gazetteer.BaseURLer); ok { ... }`.
+//   - Operator diagnostics ("which upstream is dvf hitting in this
+//     process?") without reading the Options struct.
+//
+// The convention across shipped Sources is to expose a BaseURL string
+// (or a domain-specific equivalent — SuggestBaseURL / ListingBaseURL
+// for bienici, SiteRoot for castorus) on the Options struct. Sources
+// that implement BaseURLer return the *effective* URL — i.e. the one
+// the Source will actually use for outgoing requests, after
+// Options-vs-package-var fallback resolution.
+type BaseURLer interface {
+	BaseURL() string
+}
+
 // Evidencer is an opt-in interface a Source's typed Data MAY implement
 // to expose its Evidence sidecar through the framework Result envelope.
 // When Data satisfies Evidencer, the framework stamps Result.Evidence
