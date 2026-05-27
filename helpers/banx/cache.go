@@ -28,7 +28,7 @@ var ErrIncoherentBANResponse = errors.New("banx: incoherent BAN response (CityCo
 // in dept 42 because BAN's free-form matcher prefers a higher-scored
 // homonyme when the address tokens are ambiguous. Reusing the same
 // dept-guard semantics as the castorus / bienici / meilleursagents
-// enrichers (memory `zipmatch_enricher_protocol`) — symmetric coverage
+// enrichers — symmetric coverage
 // across every fuzzy-resolver hop, no asymmetric leak.
 //
 // On this error the caller MUST treat the lookup as a miss; the cache
@@ -168,7 +168,7 @@ func (c *CachedGeocoder) Geocode(ctx context.Context, q GeocodeQuery) (GeocodeRe
 	// 78550 → a Loire commune in dept 42). Reject upstream — the caller
 	// sees ErrDepartmentMismatch and treats it as a miss; the cache is
 	// not poisoned. Mirrors the dept-guard in MA / castorus / bienici
-	// pickers (memory `zipmatch_enricher_protocol`).
+	// pickers .
 	if inputZip := strings.TrimSpace(q.Zip); inputZip != "" && res.PostCode != "" {
 		if !ZipsShareDepartment(inputZip, res.PostCode) {
 			c.logger.Warn("geocode.dept_mismatch: BAN candidate outside input zip département",

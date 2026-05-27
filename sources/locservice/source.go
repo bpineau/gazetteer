@@ -18,11 +18,11 @@ import (
 const Name = "locservice"
 
 // sourceVersion bumps when the Source's internal logic changes. Callers
-// (encheridor's runner) gate cache invalidation on it.
+// (a stateful runner) gate cache invalidation on it.
 const sourceVersion = 1
 
 // Version exposes sourceVersion so callers that wrap the Source (e.g.
-// encheridor's adapter) can mirror it without reaching into the package
+// a downstream adapter) can mirror it without reaching into the package
 // internals.
 const Version = sourceVersion
 
@@ -78,7 +78,7 @@ func (s *Source) Version() int { return sourceVersion }
 // stamps Evidence.FellBack=true on success.
 //
 // Error mapping (the framework translates these to a Result.Status per
-// the table in pkg/gazetteer/source.go):
+// the table in gazetteer/source.go):
 //
 //   - Missing address+city+zip → gazetteer.ErrInsufficientInputs (wrapped)
 //   - Geocoder cannot resolve INSEE → gazetteer.ErrInsufficientInputs (wrapped)
@@ -93,7 +93,7 @@ func (s *Source) Version() int { return sourceVersion }
 //
 // Logging: emits one DEBUG log line per query via
 // gazetteer.LoggerFrom(ctx) at the "locservice" component. The
-// encheridor adapter on top adds INFO once per work-unit.
+// a downstream consumer adapter on top adds INFO once per work-unit.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	logger := gazetteer.LoggerFrom(ctx).With(slog.String("source", Name))
 
@@ -161,7 +161,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 }
 
 // BuildResult renders a ParsedResult into the typed Result blob. Pure
-// function — exposed so the encheridor adapter can reuse the same
+// function — exposed so a downstream adapter can reuse the same
 // projection without re-implementing the rules.
 //
 // Confidence calibration:

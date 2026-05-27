@@ -3,9 +3,9 @@ package banx
 import "testing"
 
 // TestDeptFromZip covers the canonical zip → département encoding shared
-// by tribunal lookups (internal/cli/llm_extract_dbload_listing,
-// internal/core/pipeline/sources) and Pappers slug routing
-// (internal/core/enrich/pappersimmo). The cases exercise the four
+// by tribunal lookups (a downstream loader,
+// a downstream consumer) and Pappers slug routing
+// (a downstream consumer). The cases exercise the four
 // branches: 2-digit métropole, Corsica 2A/2B split, DOM-TOM 3-digit,
 // rejection of malformed input.
 func TestDeptFromZip(t *testing.T) {

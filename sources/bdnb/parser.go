@@ -335,7 +335,7 @@ func PickConfidence(matched bool, banExactHit bool, fiabilite string) string {
 // BuildResult renders a Row into the typed Result struct (excluding the
 // Confidence / SampleSize / Skipped / Evidence fields, which are set by
 // the caller). Pure function — exposed so adapters that drive their own
-// HTTP transport (e.g. encheridor's adapter with its quota-tripped
+// HTTP transport (e.g. a downstream adapter with its quota-tripped
 // fetcher) can reuse the same row→Result projection without invoking
 // Source.Query.
 func BuildResult(r Row) *Result {

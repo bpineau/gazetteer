@@ -9,8 +9,8 @@ package frnorm
 //
 // Run :
 //
-//	go test -bench=. -benchmem ./pkg/frnorm/
-//	go test -bench=BenchmarkParseFRPriceToCentimes -benchmem ./pkg/frnorm/
+//	go test -bench=. -benchmem ./helpers/frnorm/
+//	go test -bench=BenchmarkParseFRPriceToCentimes -benchmem ./helpers/frnorm/
 //
 // Baseline on Apple M1 Max, Go 1.26 :
 //

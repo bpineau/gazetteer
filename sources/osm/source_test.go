@@ -176,7 +176,7 @@ func TestSource_NoCatalog_ReturnsErrNoCatalog(t *testing.T) {
 
 func TestSource_EmptyCatalogOptions_TreatedAsNoCatalog(t *testing.T) {
 	// Passing an empty (non-nil) catalog must be treated as "no catalog"
-	// — Query returns ErrNoCatalog. This matches the encheridor behaviour
+	// — Query returns ErrNoCatalog. This matches the a downstream consumer behaviour
 	// the boot sequence relies on (the serve process registers the
 	// enricher with an empty catalog and starts a background refresh).
 	s := NewSource(Options{Catalog: &Catalog{}})

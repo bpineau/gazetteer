@@ -4,8 +4,7 @@ import (
 	"net/http"
 )
 
-// composeTransport assembles the layered http.RoundTripper documented in
-// doc/specs/chantiers/02-httpx.md §"Composition du RoundTripper":
+// composeTransport assembles the layered http.RoundTripper:
 //
 //	client.Do
 //	   └─ snapshot       (captures effective response, after cache or net)

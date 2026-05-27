@@ -24,7 +24,7 @@ const (
 )
 
 // Result is the typed payload returned by Source.Query. Mirrors the
-// PropertyTaxV2Estimate shape currently persisted by encheridor's
+// PropertyTaxV2Estimate shape currently persisted by a downstream consumer's
 // rental enricher (with the V1 fallback fields surfaced so the
 // wrapper can mirror the existing wire format byte-for-byte).
 //

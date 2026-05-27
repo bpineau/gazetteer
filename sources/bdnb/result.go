@@ -1,7 +1,7 @@
 package bdnb
 
 // Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers (encheridor's adapter, dashboards) can match on
+// downstream consumers (a downstream adapter, dashboards) can match on
 // them without importing this package's constants.
 const (
 	ConfidenceHigh   = "high"
@@ -16,14 +16,14 @@ const (
 )
 
 // Result is the typed payload returned by Source.Query. Mirrors the
-// shape currently persisted by encheridor's BDNB enricher (resultBlob
+// shape currently persisted by a downstream enricher (resultBlob
 // with Identity / Building / DPE / Risks / Fiabilite sub-blobs) so the
-// encheridor adapter can re-serialise it 1:1 into its EnrichPayload.Result.
+// a downstream consumer adapter can re-serialise it 1:1 into its EnrichPayload.Result.
 //
 // Envelope-only fields (schema_version, enricher_version, computed_at,
 // input_hash) are NOT part of the gazetteer payload — those are the
 // framework's responsibility (Result envelope in gazetteer.Result, or
-// in encheridor's enrich.EnrichPayload).
+// in a downstream payload struct).
 type Result struct {
 	// Identity carries the batiment_groupe id + address normalisation.
 	// Nil when the picked row had no batiment_groupe_id AND no
@@ -70,13 +70,13 @@ type Result struct {
 	// produced this Result. Not part of the wire data (json:"-") —
 	// populated by Source.Query, consumed in-process by callers that
 	// need to log or audit how the answer was derived (e.g.
-	// encheridor's EnrichPayload.Method.Params).
+	// a downstream payload's method params).
 	Evidence Evidence `json:"-"`
 }
 
 // Evidence captures reproducibility metadata about the query that
 // produced a Result. Consumers that need to log or audit how the answer
-// was derived (e.g. encheridor's EnrichPayload.Method.Params) read
+// was derived (e.g. a downstream payload's method params) read
 // these fields. Other callers can ignore them.
 //
 // Sidecar — not part of the wire data. Travels in-process from
@@ -98,7 +98,7 @@ type Evidence struct {
 
 	// INSEEResolutionSource records which step of the INSEE cascade
 	// produced INSEE: "ban_forward" or "ban_reverse" (cf.
-	// pkg/gazetteer/pkg/banx/insee_resolver.go). Useful to audit which
+	// helpers/banx/insee_resolver.go). Useful to audit which
 	// listings had a fragile address resolution — earlier audits
 	// (#119/#124) caught BDNB silently trusting low-score Paris matches
 	// for Breton zips because the cascade and its score gate were

@@ -249,7 +249,7 @@ func TestRetry_HonoursRetryAfter(t *testing.T) {
 // Test #6 — Download: sha256 correct, .tmp cleaned on error,
 // rename atomic, SkipIfExists no-network.
 func TestDownload_SHA256_Atomic_Skip(t *testing.T) {
-	payload := []byte("encheridor-download-payload")
+	payload := []byte("gazetteer-download-payload")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		_, _ = w.Write(payload)
@@ -309,7 +309,7 @@ func TestDownload_SHA256_Atomic_Skip(t *testing.T) {
 	}
 }
 
-// Bug #12 — chantier 2026-05-02 dataset report.
+// Bug #12 — an earlier release dataset report.
 //
 // 3.9 GB of snapshots ended up under data/raw/_/2026-05-02/_/ instead of
 // being tagged source=<src> / runID=<id>. The pipeline tags ctx for
@@ -320,7 +320,7 @@ func TestDownload_SHA256_Atomic_Skip(t *testing.T) {
 // <SnapshotDir>/<source>/<date>/<runID>/, just like GetBytes does.
 //
 // (The other half of the fix — making sure the pipeline propagates the
-// tagged ctx into Download — lives in internal/core/pipeline and is
+// tagged ctx into Download — lives in a downstream consumer and is
 // owned by another sub-agent.)
 func TestSnapshot_DocumentsTaggedBySource(t *testing.T) {
 	payload := []byte("PDFlikepayload")
@@ -593,7 +593,7 @@ func TestNoGoroutineLeak(t *testing.T) {
 // Test #11 — colly compatibility surface: Transport() returns the same
 // underlying RoundTripper exposed to the world. This test is minimal as
 // the spec says: a real colly integration test is out of scope here
-// (colly is wired by the source chantiers).
+// (colly is wired by individual sources).
 func TestTransport_Exposed(t *testing.T) {
 	c := newTestClient(t, Options{RateLimitPerHost: 1000})
 	if c.Transport() == nil {
@@ -694,7 +694,7 @@ func TestPerHost_HeadersAndUA(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	customUA := "encheridor-test/1.0"
+	customUA := "a downstream consumer-test/1.0"
 	c := newTestClient(t, Options{
 		RateLimitPerHost: 1000,
 		PerHost: map[string]HostOptions{
@@ -1016,7 +1016,7 @@ func TestIsRetryableNetErr(t *testing.T) {
 // A14 regression — Bug critique transversal detecte 2026-05-02 22:50 CEST.
 //
 // Symptome live : l'enricher locservice produisait 198 / 198 parse failures
-// (cf. doc/validation/runs/A9_locservice_20260502-204223.log). Cause : le bundle
+// . Cause : le bundle
 // browserClientHints (aligne Chrome 147 reel le matin meme) contenait
 // `Accept-Encoding: gzip, deflate, br, zstd`. Quand le caller pose
 // Accept-Encoding manuellement, Go's net/http Transport considere que c'est
@@ -1034,7 +1034,7 @@ func TestIsRetryableNetErr(t *testing.T) {
 // l'auto-decompression). Vert apres le fix (drop d'Accept-Encoding du bundle
 // → stdlib ajoute gzip + decompresse de maniere transparente).
 func TestAcceptEncoding_AutoDecompressed(t *testing.T) {
-	plain := []byte("encheridor-plaintext-payload-which-must-be-decompressed-by-stdlib")
+	plain := []byte("a downstream consumer-plaintext-payload-which-must-be-decompressed-by-stdlib")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ae := r.Header.Get("Accept-Encoding")

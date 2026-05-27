@@ -6,12 +6,11 @@ import (
 	"time"
 )
 
-// Default values for Options. Mirror the defaults documented in
-// doc/specs/chantiers/02-httpx.md §"Options et configuration".
+// Default values for Options.
 const (
-	// DefaultUserAgent matches the Chrome 147 / macOS UA captured from the
-	// operator's real browser. We mimic a vanilla desktop Chrome rather
-	// than identifying as `encheridor/...` because (a) DataDome / similar
+	// DefaultUserAgent matches a Chrome 147 / macOS UA captured from a
+	// real browser. We mimic a vanilla desktop Chrome rather
+	// than identifying as a custom UA because (a) DataDome / similar
 	// anti-bot stacks score unknown UAs aggressively, and (b) every
 	// scraped site we hit is fine with desktop Chrome traffic. Bump the
 	// Chrome major version when the operator's local Chrome bumps.

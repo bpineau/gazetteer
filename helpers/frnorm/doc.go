@@ -24,12 +24,4 @@
 // the input is already canonical — ISO-8601 dates, decimal-dot
 // monetary values from a JSON API, ASCII-only addresses — strconv,
 // time.Parse and the stdlib regex / unicode packages are a better fit.
-//
-// # Stability
-//
-// Symbols moved verbatim from internal/sources/normalize when the
-// package was promoted (cf. doc/specs/library_extraction_plan.md §2.3);
-// adopters see no behaviour change. Public API is frozen for the
-// lifetime of the package — additions are welcome, renames and
-// removals require a deprecation cycle.
 package frnorm

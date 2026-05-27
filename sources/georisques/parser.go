@@ -247,7 +247,7 @@ func hasPrefixCI(s, prefix string) bool {
 }
 
 // BuildResult renders a Report into the typed Result blob. Pure
-// function — exposed so the encheridor adapter can reuse the same
+// function — exposed so a downstream adapter can reuse the same
 // projection without re-implementing the flattening rules.
 //
 // Stamps `level_used`:

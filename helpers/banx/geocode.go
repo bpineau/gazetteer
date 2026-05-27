@@ -75,7 +75,7 @@ func containsToken(s, tok string) bool {
 //
 // Empty inputs are treated as "no anchor → no rejection" (returns true),
 // matching the existing semantics in the castorus / bienici /
-// meilleursagents enricher pickers (memory `zipmatch_enricher_protocol`).
+// meilleursagents enricher pickers .
 // Malformed inputs shorter than 2 chars fall back to equality.
 //
 // Exported here so the BAN cache layer and any future geo consumer can
