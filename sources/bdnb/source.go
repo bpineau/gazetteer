@@ -116,6 +116,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bdnb: build url: %w", err)
 	}
+	u = s.applyBaseURL(u)
 
 	// emptyEvidence pre-fills the sidecar fields known before the row
 	// pick. RawCount and PickedIndex are overwritten on every return
@@ -203,6 +204,18 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		URL:                   u,
 	}
 	return out, nil
+}
+
+// applyBaseURL rewrites the leading endpoint root with s.opts.BaseURL
+// when set. The URL builders embed the package-level BaseURL var; this
+// method lets tests (and any caller that wires Options.BaseURL) point
+// the Source at an httptest.NewServer without mutating package state,
+// keeping concurrent tests under -race safe.
+func (s *Source) applyBaseURL(u string) string {
+	if s.opts.BaseURL == "" {
+		return u
+	}
+	return s.opts.BaseURL + strings.TrimPrefix(u, BaseURL)
 }
 
 // fetch performs the HTTP GET and translates transport / status-code

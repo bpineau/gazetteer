@@ -8,6 +8,8 @@ import (
 )
 
 func TestURLForAddress_Happy(t *testing.T) {
+	t.Parallel()
+
 	got, err := URLForAddress("", "75011", "82 Roquette")
 	if err != nil {
 		t.Fatalf("URLForAddress: %v", err)
@@ -44,6 +46,8 @@ func TestURLForAddress_Happy(t *testing.T) {
 }
 
 func TestURLForAddress_CustomBase(t *testing.T) {
+	t.Parallel()
+
 	got, err := URLForAddress("http://stub.local/x", "75011", "Roquette")
 	if err != nil {
 		t.Fatalf("URLForAddress: %v", err)
@@ -54,6 +58,8 @@ func TestURLForAddress_CustomBase(t *testing.T) {
 }
 
 func TestURLForAddress_MissingInputs(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		zip, query string
 	}{
@@ -71,6 +77,8 @@ func TestURLForAddress_MissingInputs(t *testing.T) {
 }
 
 func TestParseAddress(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		in     string
 		num    string
@@ -101,6 +109,8 @@ func TestParseAddress(t *testing.T) {
 }
 
 func TestParseAddress_StopsAtPostal(t *testing.T) {
+	t.Parallel()
+
 	got := ParseAddress("75011 Paris")
 	if got.Number != "" || len(got.StreetTokens) != 0 {
 		t.Errorf("ParseAddress(zip-only) = %+v, want empty", got)

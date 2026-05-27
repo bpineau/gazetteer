@@ -6,6 +6,8 @@ import (
 )
 
 func TestParseList_Paris11(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "list_paris11.json")
 	rows, err := ParseList(body)
 	if err != nil {
@@ -45,6 +47,8 @@ func TestParseList_Paris11(t *testing.T) {
 }
 
 func TestParseList_Empty(t *testing.T) {
+	t.Parallel()
+
 	rows, err := ParseList(mustReadFixture(t, "list_empty.json"))
 	if err != nil {
 		t.Fatalf("ParseList(empty): %v", err)
@@ -55,6 +59,8 @@ func TestParseList_Empty(t *testing.T) {
 }
 
 func TestParseList_EmptyBody(t *testing.T) {
+	t.Parallel()
+
 	_, err := ParseList(nil)
 	if !errors.Is(err, ErrEmptyBody) {
 		t.Fatalf("ParseList(nil) = %v, want ErrEmptyBody", err)
@@ -62,6 +68,8 @@ func TestParseList_EmptyBody(t *testing.T) {
 }
 
 func TestParseList_Garbage(t *testing.T) {
+	t.Parallel()
+
 	_, err := ParseList([]byte("not json"))
 	if !errors.Is(err, ErrEmptyBody) {
 		t.Fatalf("ParseList(garbage) = %v, want ErrEmptyBody wrap", err)
@@ -69,6 +77,8 @@ func TestParseList_Garbage(t *testing.T) {
 }
 
 func TestPickBestByNumber_LeadingMatch(t *testing.T) {
+	t.Parallel()
+
 	rows := []Row{
 		{AdresseBAN: "78 Rue de la Roquette 75011 Paris", EtiquetteDPE: "E"},
 		{AdresseBAN: "82 Rue de la Roquette 75011 Paris", EtiquetteDPE: "D"},
@@ -90,6 +100,8 @@ func TestPickBestByNumber_LeadingMatch(t *testing.T) {
 }
 
 func TestPickBestByNumber_DoesNotMatchOnPrefix(t *testing.T) {
+	t.Parallel()
+
 	// "180 Rue" must not match "18" — digit boundary.
 	rows := []Row{
 		{AdresseBAN: "180 Rue X 75011 Paris"},
@@ -103,6 +115,8 @@ func TestPickBestByNumber_DoesNotMatchOnPrefix(t *testing.T) {
 }
 
 func TestPickBestByNumber_LetterSuffix(t *testing.T) {
+	t.Parallel()
+
 	rows := []Row{
 		{AdresseBAN: "82B Rue X"},
 	}
@@ -112,6 +126,8 @@ func TestPickBestByNumber_LetterSuffix(t *testing.T) {
 }
 
 func TestPickBestByNumber_RangeRightBound(t *testing.T) {
+	t.Parallel()
+
 	rows := []Row{
 		{AdresseBAN: "80-82 Rue X"},
 		{AdresseBAN: "100/102 Rue Y"},
@@ -137,6 +153,8 @@ func TestPickBestByNumber_RangeRightBound(t *testing.T) {
 }
 
 func TestPickBestByNumber_FallbackToAdresseBrut(t *testing.T) {
+	t.Parallel()
+
 	// AdresseBAN empty but AdresseBrut starts with the right number.
 	rows := []Row{
 		{AdresseBrut: "82 RUE DE LA ROQUETTE"},
@@ -147,6 +165,8 @@ func TestPickBestByNumber_FallbackToAdresseBrut(t *testing.T) {
 }
 
 func TestPickBest_PrefersFilledEtiquette(t *testing.T) {
+	t.Parallel()
+
 	rows := []Row{
 		{NumeroDPE: "a"},
 		{NumeroDPE: "b", EtiquetteDPE: "D"},
@@ -158,6 +178,8 @@ func TestPickBest_PrefersFilledEtiquette(t *testing.T) {
 }
 
 func TestPickBest_EmptyEtiquetteFallsBackToZero(t *testing.T) {
+	t.Parallel()
+
 	rows := []Row{{NumeroDPE: "a"}}
 	idx, ok := PickBest(rows, 0)
 	if !ok || idx != 0 {
@@ -166,6 +188,8 @@ func TestPickBest_EmptyEtiquetteFallsBackToZero(t *testing.T) {
 }
 
 func TestPickBest_Empty(t *testing.T) {
+	t.Parallel()
+
 	idx, ok := PickBest(nil, 0)
 	if ok || idx != -1 {
 		t.Fatalf("PickBest(nil) = (%d, %v), want (-1, false)", idx, ok)
@@ -173,6 +197,8 @@ func TestPickBest_Empty(t *testing.T) {
 }
 
 func TestPickBestByNumber_SurfaceTieBreak(t *testing.T) {
+	t.Parallel()
+
 	// Apartment building: three DPE rows at "82 RUE X", different
 	// surfaces. The caller's surface is 46 → the row with
 	// SurfaceHabitableLogement closest to 46 must win.
@@ -199,6 +225,8 @@ func TestPickBestByNumber_SurfaceTieBreak(t *testing.T) {
 }
 
 func TestPickBestByNumber_SurfaceTieBreak_IgnoresRowsWithoutSurface(t *testing.T) {
+	t.Parallel()
+
 	// Two rows match the number; one has no surface. The other one
 	// wins regardless of how close its surface is, because the
 	// surface-less row can't be ranked.
@@ -213,6 +241,8 @@ func TestPickBestByNumber_SurfaceTieBreak_IgnoresRowsWithoutSurface(t *testing.T
 }
 
 func TestPickBest_SurfaceTieBreak(t *testing.T) {
+	t.Parallel()
+
 	s38 := 38.0
 	s48 := 48.0
 	s103 := 103.0
@@ -230,6 +260,8 @@ func TestPickBest_SurfaceTieBreak(t *testing.T) {
 }
 
 func TestPickConfidence(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		matched   bool
@@ -254,6 +286,8 @@ func TestPickConfidence(t *testing.T) {
 }
 
 func TestMatchAddrNumber_Empty(t *testing.T) {
+	t.Parallel()
+
 	if matchAddrNumber("", "82") {
 		t.Error("matchAddrNumber(empty, 82) = true, want false")
 	}
@@ -263,6 +297,8 @@ func TestMatchAddrNumber_Empty(t *testing.T) {
 }
 
 func TestBuildResult_NilSafeOnSparseRow(t *testing.T) {
+	t.Parallel()
+
 	r := buildResult(Row{})
 	if r.DPE != nil || r.Logement != nil || r.Adresse != nil {
 		t.Errorf("expected all-nil sub-blobs on empty Row, got %+v", r)

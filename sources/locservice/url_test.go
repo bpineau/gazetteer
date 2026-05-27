@@ -9,6 +9,8 @@ import (
 )
 
 func TestURLForINSEE(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		insee     string
@@ -64,6 +66,8 @@ func TestURLForINSEE(t *testing.T) {
 }
 
 func TestNormalizeLogement(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]string{
 		"":    "",
 		"T2":  "T2",
@@ -79,6 +83,8 @@ func TestNormalizeLogement(t *testing.T) {
 }
 
 func TestMapTypeToLogement(t *testing.T) {
+	t.Parallel()
+
 	r1, r2, r3, r4, r5, r6 := 1, 2, 3, 4, 5, 6
 	cases := []struct {
 		name  string

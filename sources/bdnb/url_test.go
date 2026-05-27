@@ -8,6 +8,8 @@ import (
 )
 
 func TestURLForBANID_Happy(t *testing.T) {
+	t.Parallel()
+
 	got, err := URLForBANID("75111", "75111_6507_00003")
 	if err != nil {
 		t.Fatalf("URLForBANID: %v", err)
@@ -35,6 +37,8 @@ func TestURLForBANID_Happy(t *testing.T) {
 }
 
 func TestURLForBANID_MissingInputs(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		insee, ban string
 	}{
@@ -51,6 +55,8 @@ func TestURLForBANID_MissingInputs(t *testing.T) {
 }
 
 func TestURLForAddress_Happy(t *testing.T) {
+	t.Parallel()
+
 	got, err := URLForAddress("75111", "Voltaire")
 	if err != nil {
 		t.Fatalf("URLForAddress: %v", err)
@@ -69,6 +75,8 @@ func TestURLForAddress_Happy(t *testing.T) {
 }
 
 func TestURLForAddress_PreservesExplicitWildcard(t *testing.T) {
+	t.Parallel()
+
 	got, err := URLForAddress("75111", "Bd*Voltaire")
 	if err != nil {
 		t.Fatalf("URLForAddress: %v", err)
@@ -80,6 +88,8 @@ func TestURLForAddress_PreservesExplicitWildcard(t *testing.T) {
 }
 
 func TestURLForAddress_MissingInputs(t *testing.T) {
+	t.Parallel()
+
 	if _, err := URLForAddress("", "Voltaire"); !errors.Is(err, ErrInsufficientFilter) {
 		t.Errorf("URLForAddress(empty insee) = %v", err)
 	}
@@ -89,6 +99,8 @@ func TestURLForAddress_MissingInputs(t *testing.T) {
 }
 
 func TestAddressPattern(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		in, want string
 	}{
@@ -112,6 +124,8 @@ func TestAddressPattern(t *testing.T) {
 }
 
 func TestParseAddress_NumberKept(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		in, num string
 	}{
@@ -132,6 +146,8 @@ func TestParseAddress_NumberKept(t *testing.T) {
 }
 
 func TestAddressPattern_StopsAtPostal(t *testing.T) {
+	t.Parallel()
+
 	if got := AddressPattern("75011 Paris"); got != "" {
 		t.Errorf("AddressPattern(zip-only) = %q, want empty", got)
 	}
@@ -141,6 +157,8 @@ func TestAddressPattern_StopsAtPostal(t *testing.T) {
 // in the StreetTokens slice. Cases drawn from real BDNB ilike-pattern
 // pollution observed in production.
 func TestIlikePatternFor_TrimsRangeOrphans(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		in   string
 		want string
@@ -164,6 +182,8 @@ func TestIlikePatternFor_TrimsRangeOrphans(t *testing.T) {
 }
 
 func TestAddressPattern_ResidencePrefix(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		in          string
 		wantPattern string
