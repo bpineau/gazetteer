@@ -1,5 +1,5 @@
 // Package atomicfs is a tiny set of helpers for atomic file writes and
-// cheap stat-based pre-validation, shared across the encheridor
+// cheap stat-based pre-validation, shared across the a downstream consumer
 // catalog/dump/enricher pipelines.
 //
 // "Atomic" here means rename(2)-based : we write to a sibling tmpfile

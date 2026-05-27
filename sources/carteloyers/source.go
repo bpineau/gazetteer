@@ -23,7 +23,7 @@ const Name = "carteloyers"
 const sourceVersion = 1
 
 // Version exposes sourceVersion so callers that wrap the Source (e.g.
-// encheridor's rental wrapper) can mirror it without reaching into
+// a rental wrapper) can mirror it without reaching into
 // the package internals.
 const Version = sourceVersion
 

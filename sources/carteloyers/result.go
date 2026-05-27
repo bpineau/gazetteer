@@ -16,7 +16,7 @@ import (
 )
 
 // Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers (encheridor's rental wrapper, dashboards) can
+// downstream consumers (a rental wrapper, dashboards) can
 // match on them without importing this package's constants.
 const (
 	ConfidenceHigh   = "high"
@@ -48,14 +48,14 @@ const (
 )
 
 // Result is the typed payload returned by Source.Query. Mirrors the
-// MarketEstimate shape currently persisted by encheridor's rental
+// MarketEstimate shape currently persisted by a downstream consumer's rental
 // enricher (loyer médian, lo/hi prediction interval, typology,
-// confidence, sample size) so the encheridor wrapper can re-serialise
+// confidence, sample size) so the a downstream consumer wrapper can re-serialise
 // it 1:1 into its EnrichPayload.Result.
 //
 // Loyers are in EUR/m²/month "charges comprises" (CC) — the source
 // dataset publishes them CC and we keep that convention here. The
-// caller decides whether to apply a CC→HC factor (encheridor's wrapper
+// caller decides whether to apply a CC→HC factor (a downstream consumer's wrapper
 // applies Config.CCtoHCFactor = 0.90 by default).
 //
 // Envelope-only fields (schema_version, enricher_version, computed_at,
@@ -90,7 +90,7 @@ type Result struct {
 	// produced this Result. Not part of the wire data (json:"-") —
 	// populated by Source.Query, consumed in-process by callers that
 	// need to log or audit how the answer was derived (e.g.
-	// encheridor's EnrichPayload.Method.Params).
+	// a downstream payload's method params).
 	Evidence Evidence `json:"-"`
 }
 

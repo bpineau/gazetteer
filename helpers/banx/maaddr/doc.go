@@ -19,5 +19,5 @@
 // Both helpers were promoted from
 // `internal/core/enrich/meilleursagents/fallback.go` so the in-tree
 // enricher and the handler-side queue resolver share a single
-// implementation (memory `matcher_cluster_online_symmetry`).
+// implementation .
 package maaddr

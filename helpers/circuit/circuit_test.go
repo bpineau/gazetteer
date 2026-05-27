@@ -318,7 +318,7 @@ func TestHTTPFetcher_CircuitTripped_DisabledWhenThresholdZero(t *testing.T) {
 // The process-wide trip counter must increment exactly once per
 // false→true flip of the shared atomic — not on every subsequent Fetch
 // that observes the already-tripped flag. The metrics handler exposes
-// this counter as `encheridor_enrich_circuit_tripped_total{source}` so
+// this counter as a Prometheus counter labelled by source, so
 // it must reflect "number of flips" semantics.
 func TestHTTPFetcher_CircuitTripCounter_BumpsOnce(t *testing.T) {
 	ResetCircuitTripCountersForTest()

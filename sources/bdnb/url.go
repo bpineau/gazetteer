@@ -85,7 +85,7 @@ const SelectFields = "" +
 
 // MatchStrategy enumerates the supported lookup modes. The Source
 // records the chosen strategy in the Evidence sidecar so downstream
-// callers (e.g. encheridor's adapter) can flag medium-confidence
+// callers (e.g. a downstream adapter) can flag medium-confidence
 // results.
 type MatchStrategy string
 

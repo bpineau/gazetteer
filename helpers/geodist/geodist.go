@@ -7,7 +7,7 @@
 // `internal/core/auctionview/builder.go::haversineKm`,
 // `internal/core/enrich/osm/haversine.go::HaversineMeters`,
 // `internal/web/handlers/map.go::haversineKmMap`,
-// `internal/store/doctor_helpers.go::haversineKm`). Each duplication is
+// `a sibling distance helper elsewhere in the codebase`). Each duplication is
 // a small risk of drift (different R radius, different rounding) and
 // pollutes search results when grepping the codebase.
 //
