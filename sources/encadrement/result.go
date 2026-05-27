@@ -9,6 +9,7 @@ package encadrement
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/bpineau/gazetteer/appraisal"
 )
@@ -130,7 +131,7 @@ func (r *Result) RentEstimate() appraisal.RentEstimate {
 		return appraisal.RentEstimate{}
 	}
 	return appraisal.RentEstimate{
-		EurPerM2Cents: int64(r.LoyerRefEURPerM2HC * 100),
+		EurPerM2Cents: int64(math.Round(r.LoyerRefEURPerM2HC * 100)),
 		Confidence:    mapEncConfidence(r.Confidence),
 		Bracket:       bracketFor(r),
 		Method: fmt.Sprintf("encadrement_%s_p%d",

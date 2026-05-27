@@ -11,6 +11,7 @@ package carteloyers
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/bpineau/gazetteer/appraisal"
 )
@@ -152,7 +153,7 @@ func (r *Result) RentEstimate() appraisal.RentEstimate {
 		return appraisal.RentEstimate{}
 	}
 	return appraisal.RentEstimate{
-		EurPerM2Cents: int64(r.LoyerMedEURPerM2CC * 100),
+		EurPerM2Cents: int64(math.Round(r.LoyerMedEURPerM2CC * 100)),
 		Confidence:    mapCLConfidence(r.Confidence),
 		Method:        fmt.Sprintf("carteloyers_%s", nonEmptyTypology(r.Typology)),
 	}
