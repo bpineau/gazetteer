@@ -179,6 +179,10 @@ func runOne(ctx context.Context, s Source, l Listing) Result {
 	return r
 }
 
+// classifyErr maps a Source-returned error to the public Status taxonomy.
+// Each sentinel has an explicit arm so the table self-documents:
+// removing an arm makes the change visible in a diff rather than
+// silently rerouting through the default StatusFailedTransient.
 func classifyErr(err error) Status {
 	switch {
 	case errors.Is(err, ErrInsufficientInputs), errors.Is(err, ErrUnsupportedPropertyType):
@@ -189,7 +193,13 @@ func classifyErr(err error) Status {
 		return StatusFailedOutdated
 	case errors.Is(err, ErrUpstreamPermanent):
 		return StatusFailedPermanent
+	case errors.Is(err, ErrUpstreamUnavailable),
+		errors.Is(err, ErrSourceCircuitTripped):
+		return StatusFailedTransient
 	default:
+		// Anything Sources return without wrapping a known sentinel
+		// (raw context.DeadlineExceeded, ad-hoc errors, …) lands here.
+		// Treat as transient so a stateful runner retries.
 		return StatusFailedTransient
 	}
 }
