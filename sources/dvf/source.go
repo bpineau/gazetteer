@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -259,20 +260,24 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 
 	var valuePerM2Cents, valueCents *int64
 	if p50 > 0 {
-		v := int64(p50 * 100)
+		v := int64(math.Round(p50 * 100))
 		valuePerM2Cents = &v
 		if l.SurfaceM2 != nil && *l.SurfaceM2 > 0 {
-			tot := v * int64(*l.SurfaceM2)
+			// Compute the total in float space so a fractional surface
+			// (90.5 m²) is not silently truncated to its integer floor —
+			// the previous `v * int64(*l.SurfaceM2)` lost up to 0.99 m²
+			// of value on every non-integer surface.
+			tot := int64(math.Round(p50 * (*l.SurfaceM2) * 100))
 			valueCents = &tot
 		}
 	}
 	var p25c, p75c *int64
 	if p25v > 0 {
-		v := int64(p25v * 100)
+		v := int64(math.Round(p25v * 100))
 		p25c = &v
 	}
 	if p75v > 0 {
-		v := int64(p75v * 100)
+		v := int64(math.Round(p75v * 100))
 		p75c = &v
 	}
 

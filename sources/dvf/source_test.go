@@ -534,3 +534,78 @@ func TestSource_CommercialNoSurface(t *testing.T) {
 		t.Errorf("TypeLocalFilter = %q, want %q", res.Evidence.TypeLocalFilter, MapPropertyTypeToDVF("commercial"))
 	}
 }
+
+// TestSource_FractionalSurfaceNotTruncated pins the rounding-vs-truncation
+// fix on the total-value computation. The previous code did
+// `int64(perM2Cents) * int64(*l.SurfaceM2)` which silently floors a
+// 90.5 m² surface to 90 m², discarding up to 0.99 m² of value on every
+// non-integer surface. The new code rounds the float product.
+//
+// The test builds a synthetic single-row body so the median price/m² is
+// exactly 5 000 €. For a 90.5 m² surface, the expected total is
+// 5 000 × 90.5 = 452 500 € = 45 250 000 cents. The old truncating code
+// returned 45 000 000 cents (250 000 cents short = 2 500 €).
+func TestSource_FractionalSurfaceNotTruncated(t *testing.T) {
+	// Build a body with 12 identical mutations so the address_radius
+	// tier (MinSample 12) succeeds even without coords -- but actually
+	// we don't have coords, so the commune tier will win (MinSample 10).
+	// 12 rows ensures we're well above both floors.
+	var rows []map[string]any
+	for i := 0; i < 12; i++ {
+		rows = append(rows, map[string]any{
+			"id_mutation":         "x" + string(rune('a'+i)),
+			"date_mutation":       "2025-01-01",
+			"nature_mutation":     "Vente",
+			"valeur_fonciere":     250000.0,
+			"type_local":          "Appartement",
+			"surface_reelle_bati": 50.0,
+			"id_parcelle":         "p_" + string(rune('a'+i)), // distinct so parcelle cap doesn't kick in
+		})
+	}
+	bodyMap := map[string]any{"data": rows}
+	body, _ := json.Marshal(bodyMap)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+	withBaseURL(t, srv.URL+"/mutations")
+
+	hc := newHTTPClient(t)
+	s := mustNewSource(t, Options{
+		HTTP:     hc,
+		Geocoder: stubGeocoder{res: banx.GeocodeResult{CityCode: "75107"}},
+	})
+	if err := s.Sections().PrimeFromList(context.Background(), "75107", []string{"000AD"}); err != nil {
+		t.Fatalf("PrimeFromList: %v", err)
+	}
+
+	surface := 90.5
+	l := gazetteer.Listing{
+		Address:      "1 rue test",
+		City:         "Paris 7e",
+		Zip:          "75007",
+		PropertyType: gazetteer.PropertyApartment,
+		SurfaceM2:    &surface,
+	}
+	data, err := s.Query(context.Background(), l)
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	res := data.(*Result)
+	if res.ValueEURPerM2Cents == nil {
+		t.Fatal("nil ValueEURPerM2Cents")
+	}
+	if *res.ValueEURPerM2Cents != 500_000 {
+		t.Errorf("ValueEURPerM2Cents = %d, want 500_000 (5_000 €/m²)", *res.ValueEURPerM2Cents)
+	}
+	if res.ValueEURCents == nil {
+		t.Fatal("nil ValueEURCents")
+	}
+	want := int64(45_250_000) // 5_000 × 90.5 × 100
+	if *res.ValueEURCents != want {
+		t.Errorf("ValueEURCents = %d, want %d (5_000 × 90.5 × 100, not truncated to 90 m²)",
+			*res.ValueEURCents, want)
+	}
+}
