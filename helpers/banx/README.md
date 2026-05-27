@@ -49,9 +49,9 @@ import (
     "context"
     "fmt"
 
-    "myrepo/pkg/banx"
-    "myrepo/pkg/httpx"
-    "myrepo/pkg/kvcache/memcache"
+    "github.com/bpineau/gazetteer/helpers/banx"
+    "github.com/bpineau/gazetteer/helpers/httpx"
+    "github.com/bpineau/gazetteer/helpers/kvcache/memcache"
 )
 
 func main() {
@@ -95,9 +95,10 @@ func main() {
 
 ## Dependencies
 
-- `myrepo/pkg/httpx` — the shared HTTP client.
-- `myrepo/pkg/kvcache` — the cache backend interface (only used by
-  `CachedGeocoder`; the raw `BANClient` itself has no kvcache dep).
+- `github.com/bpineau/gazetteer/helpers/httpx` — the shared HTTP client.
+- `github.com/bpineau/gazetteer/helpers/kvcache` — the cache backend
+  interface (only used by `CachedGeocoder`; the raw `BANClient` itself
+  has no kvcache dep).
 
 No transitive dependency on any other internal package.
 

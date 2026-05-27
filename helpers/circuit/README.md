@@ -38,8 +38,8 @@ import (
     "log/slog"
     "sync/atomic"
 
-    "myrepo/pkg/circuit"
-    "myrepo/pkg/httpx"
+    "github.com/bpineau/gazetteer/helpers/circuit"
+    "github.com/bpineau/gazetteer/helpers/httpx"
 )
 
 func Scrape(ctx context.Context, httpClient *httpx.Client) {
@@ -123,7 +123,7 @@ The same `*atomic.Bool` is flipped by both the streak counter and the
 rate-window — callers check `Load()` once on the hot path. Auto-reset
 is opt-in because quota-style breakers (BDNB, ADEME) must stay tripped
 for the rest of the run; transient-transport breakers (Georisques
-HTTP/2, Castorus anti-bot) want auto-recovery.
+HTTP/2, scrapers behind anti-bot CDNs) want auto-recovery.
 
 ## Quota signals
 
@@ -139,6 +139,7 @@ Either signal flips the flag at most once per process lifetime
 
 ## Dependencies
 
-- `myrepo/pkg/httpx` — request types and error sentinels.
+- `github.com/bpineau/gazetteer/helpers/httpx` — request types and error
+  sentinels.
 
 No other internal dependency.
