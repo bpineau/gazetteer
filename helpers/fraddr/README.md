@@ -20,7 +20,7 @@ package main
 import (
     "fmt"
 
-    "myrepo/pkg/fraddr"
+    "github.com/bpineau/gazetteer/helpers/fraddr"
 )
 
 func main() {

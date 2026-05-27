@@ -29,7 +29,7 @@ package main
 import (
     "fmt"
 
-    "myrepo/pkg/communes"
+    "github.com/bpineau/gazetteer/helpers/communes"
 )
 
 func main() {

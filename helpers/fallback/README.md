@@ -2,8 +2,8 @@
 
 A tiny, observable orchestrator for the "try strategy A, then B, then C,
 return the first usable answer" pattern. ~150 LOC of production code,
-zero dependencies beyond `log/slog`. Used by every enricher in this
-project.
+zero dependencies beyond `log/slog`. Used by every Source that needs to
+zoom out between strategies.
 
 ## Why a ladder?
 
@@ -28,7 +28,7 @@ A typed `[]Tier` per consumer gives:
 
 - **A tier is a strategy, not a request.** Per-call retries, timeouts
   and rate-limiting belong inside the `Try` function (typically
-  delegated to `pkg/httpx`). The ladder only orchestrates between
+  delegated to `helpers/httpx`). The ladder only orchestrates between
   strategies.
 - **"Succeeded but useless" is a soft miss.** Use `SkipOn` to express
   "the call returned 200 but the answer is unusable" (zero-sample
@@ -46,7 +46,7 @@ A typed `[]Tier` per consumer gives:
 
 ```go
 import (
-    "encheridor/pkg/fallback"
+    "github.com/bpineau/gazetteer/helpers/fallback"
     "log/slog"
 )
 
@@ -80,7 +80,8 @@ if err != nil {
 
 ## Public API
 
-See `go doc encheridor/pkg/fallback` for the godoc-rendered surface:
+See `go doc github.com/bpineau/gazetteer/helpers/fallback` for the
+godoc-rendered surface:
 
 - `type Tier struct { Name, Description string; Try func; SkipOn func }`
 - `type Input  struct { Address, City, Zip string; Lat, Lon *float64 }`
@@ -101,8 +102,9 @@ options:
 2. **Compose at a higher level.** If the data shape is materially
    different (e.g. you're returning a building identifier, not a
    €/m²), wrap `fallback.Walk` in a tiny adapter that maps your
-   native output to/from `fallback.Output`. This is what every
-   enricher in `internal/core/enrich/<name>/fallback.go` does.
+   native output to/from `fallback.Output`. The shipped Sources that
+   ladder between strategies (DVF address-radius → commune →
+   neighbourhood → department) follow this pattern.
 
 The package deliberately does not provide generics on `Output`. The
 canonical address-shape is the friction point worth solving — the rest
@@ -130,5 +132,5 @@ strategy across enrichers.
 
 ## Status
 
-Stable. Public API frozen for the duration of the library-extraction
-chantier (`doc/specs/library_extraction_plan.md` §2.6).
+Stable. Symbols may be added but not renamed or removed without a
+deprecation cycle.

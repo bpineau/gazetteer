@@ -22,11 +22,11 @@ struct.
 
 ## Why this package exists
 
-Every scraper in the project used to wire up its own `*http.Client`
-with its own retry loop, its own UA, its own polite-rate-limit
-estimate, its own debug snapshot scheme. The copies drifted: a fix in
-one parser regressed in another. `httpx` is the one place those layers
-live; every client embeds it.
+Without a shared HTTP client, every scraper ends up wiring its own
+`*http.Client` with its own retry loop, its own UA, its own polite
+per-host rate-limit estimate, its own debug snapshot scheme — and the
+copies drift: a fix in one parser regresses in another. `httpx` is the
+one place those layers live; every consumer embeds it.
 
 ## Principles
 
@@ -58,7 +58,7 @@ live; every client embeds it.
 ```go
 import (
     "context"
-    "encheridor/pkg/httpx"
+    "github.com/bpineau/gazetteer/helpers/httpx"
 )
 
 cli, _ := httpx.New(httpx.Options{
@@ -87,8 +87,8 @@ collector.WithTransport(cli.Transport())
 
 ## Public API
 
-See `go doc encheridor/pkg/httpx` for the godoc-rendered surface. The
-headline types and functions:
+See `go doc github.com/bpineau/gazetteer/helpers/httpx` for the
+godoc-rendered surface. The headline types and functions:
 
 - `func New(Options) (*Client, error)`
 - `(*Client) GetBytes(ctx, url, http.Header) ([]byte, *Response, error)`
@@ -122,8 +122,7 @@ the spec rather than reading the resolver.
 
 ## Status
 
-Stable. ~600 LOC production code + ~1100 LOC tests. Public API frozen
-for the duration of the library-extraction chantier
-(`doc/specs/library_extraction_plan.md` §2.1). The `Default*`
-constants and the `Options` field set are versioned alongside the chantier
-spec at `doc/specs/chantiers/02-httpx.md`.
+Stable. ~600 LOC production code + ~1100 LOC tests. The `Default*`
+constants document the on-the-wire behaviour — read them as the spec
+rather than reading the resolver. Symbols may be added but not renamed
+or removed without a deprecation cycle.

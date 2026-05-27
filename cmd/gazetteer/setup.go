@@ -64,12 +64,43 @@ func newRuntimeDeps() (*runtimeDeps, error) {
 	return &runtimeDeps{HTTP: hc, BAN: ban, Communes: com, Normalizer: norm}, nil
 }
 
+// parseInterleaved runs fs.Parse repeatedly, harvesting positional
+// arguments around mid-command flags. Go's flag package stops at the
+// first non-flag token, which makes `gazetteer query '<addr>' -surface 46`
+// silently treat `-surface 46` as part of the address. This helper
+// re-enters Parse on the remainder after each positional, so flags
+// interleaved with positional arguments work as users expect.
+//
+// `--` ends parsing: anything after it is taken as positional verbatim.
+func parseInterleaved(fs *flag.FlagSet, argv []string) ([]string, error) {
+	var positional []string
+	rest := argv
+	for {
+		if err := fs.Parse(rest); err != nil {
+			return nil, err
+		}
+		rest = fs.Args()
+		if len(rest) == 0 {
+			return positional, nil
+		}
+		if rest[0] == "--" {
+			positional = append(positional, rest[1:]...)
+			return positional, nil
+		}
+		positional = append(positional, rest[0])
+		rest = rest[1:]
+	}
+}
+
 // parsePositional joins the remaining positional args of fs into a
 // single string (typically the address). Returns errUsage when nothing
 // follows the flags.
-func parsePositional(fs *flag.FlagSet, what string) (string, error) {
-	rest := fs.Args()
-	if len(rest) == 0 {
+//
+// Callers MUST have invoked parseInterleaved before this so flags
+// after the address (e.g. `<addr> -surface 46`) are recognised
+// rather than collapsed into the address text.
+func parsePositional(fs *flag.FlagSet, positional []string, what string) (string, error) {
+	if len(positional) == 0 {
 		fmt.Fprintf(fs.Output(), "missing %s\n\n", what)
 		fs.Usage()
 		return "", errUsage
@@ -77,11 +108,11 @@ func parsePositional(fs *flag.FlagSet, what string) (string, error) {
 	// Operators frequently forget to quote multi-word addresses;
 	// re-join silently so `gazetteer query 10 rue de la paix 75002`
 	// works as if it had been quoted.
-	if len(rest) == 1 {
-		return rest[0], nil
+	if len(positional) == 1 {
+		return positional[0], nil
 	}
-	joined := rest[0]
-	for _, w := range rest[1:] {
+	joined := positional[0]
+	for _, w := range positional[1:] {
 		joined += " " + w
 	}
 	return joined, nil
