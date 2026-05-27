@@ -3,6 +3,8 @@ package bdnb
 import "testing"
 
 func TestExtractBuildingYear_PrefersDPE(t *testing.T) {
+	t.Parallel()
+
 	result := map[string]any{
 		"building": map[string]any{
 			"annee_construction":     float64(1900),
@@ -16,6 +18,8 @@ func TestExtractBuildingYear_PrefersDPE(t *testing.T) {
 }
 
 func TestExtractBuildingYear_FallsBackToCadastre(t *testing.T) {
+	t.Parallel()
+
 	result := map[string]any{
 		"building": map[string]any{
 			"annee_construction": float64(1885),
@@ -28,6 +32,8 @@ func TestExtractBuildingYear_FallsBackToCadastre(t *testing.T) {
 }
 
 func TestExtractBuildingYear_AbsentOrZero(t *testing.T) {
+	t.Parallel()
+
 	cases := []map[string]any{
 		nil,
 		{"building": map[string]any{}},
@@ -42,6 +48,8 @@ func TestExtractBuildingYear_AbsentOrZero(t *testing.T) {
 }
 
 func TestExtractBuildingFloors(t *testing.T) {
+	t.Parallel()
+
 	result := map[string]any{"building": map[string]any{"nb_niveau": float64(4)}}
 	got, ok := ExtractBuildingFloors(result)
 	if !ok || got != 4 {
@@ -50,6 +58,8 @@ func TestExtractBuildingFloors(t *testing.T) {
 }
 
 func TestExtractDwellingCount(t *testing.T) {
+	t.Parallel()
+
 	result := map[string]any{"building": map[string]any{"nb_log": float64(28)}}
 	got, ok := ExtractDwellingCount(result)
 	if !ok || got != 28 {
@@ -58,6 +68,8 @@ func TestExtractDwellingCount(t *testing.T) {
 }
 
 func TestExtractBuildingDPEClass(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		in     string
 		wantOk bool
@@ -80,6 +92,8 @@ func TestExtractBuildingDPEClass(t *testing.T) {
 }
 
 func TestExtractMonumentDistanceM(t *testing.T) {
+	t.Parallel()
+
 	result := map[string]any{"risks": map[string]any{"monument_historique_m": float64(180)}}
 	got, ok := ExtractMonumentDistanceM(result)
 	if !ok || got != 180 {
@@ -88,6 +102,8 @@ func TestExtractMonumentDistanceM(t *testing.T) {
 }
 
 func TestExtractQuartierPrioritaire(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		raw    any
 		wantOk bool
@@ -116,6 +132,8 @@ func TestExtractQuartierPrioritaire(t *testing.T) {
 }
 
 func TestExtractBuildingHeightM(t *testing.T) {
+	t.Parallel()
+
 	result := map[string]any{"building": map[string]any{"hauteur_mean_m": float64(12)}}
 	got, ok := ExtractBuildingHeightM(result)
 	if !ok || got != 12 {
@@ -124,6 +142,8 @@ func TestExtractBuildingHeightM(t *testing.T) {
 }
 
 func TestExtractABFPerimeter(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		risks  map[string]any
 		want   bool
@@ -151,6 +171,8 @@ func TestExtractABFPerimeter(t *testing.T) {
 }
 
 func TestExtractPLUBatiPatrimonial(t *testing.T) {
+	t.Parallel()
+
 	if got, ok := ExtractPLUBatiPatrimonial(map[string]any{"risks": map[string]any{"zone_plu_bati_patrimonial": float64(1)}}); !ok || !got {
 		t.Errorf("PLU=1: got (%v, %v), want (true, true)", got, ok)
 	}
@@ -163,6 +185,8 @@ func TestExtractPLUBatiPatrimonial(t *testing.T) {
 }
 
 func TestExtractUsagePrincipal(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		building map[string]any
 		want     string
