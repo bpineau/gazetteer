@@ -54,7 +54,7 @@ import "strings"
 
 // PropertyType is the canonical enum value stored in auctions.property_type.
 //
-// Distinct from `internal/core/extract.PropertyType` (the extractor's
+// Distinct from `a downstream consumer` (the extractor's
 // internal enum) — this type carries the read-side canonical strings
 // every consumer compares against.
 type PropertyType string
@@ -99,11 +99,11 @@ func (p PropertyType) IsKnown() bool {
 // Sources consulted when seeding this table (so future contributors
 // understand which spellings each call site contributed):
 //
-//   - internal/web/handlers/search.go::typeSynonyms (the broadest existing
+//   - a downstream web layer::typeSynonyms (the broadest existing
 //     alias map, French + abbreviations)
-//   - internal/sources/licitor/property_type.go::classifyTitle
-//   - internal/core/extract/property_type.go::propertyTypePatterns
-//   - internal/cli/llm_extract_dbload.go::canonicalPropertyTypes
+//   - a sibling module::classifyTitle
+//   - a downstream consumer::propertyTypePatterns
+//   - a downstream loader::canonicalPropertyTypes
 //   - per-enricher MapPropertyType* helpers (MA, DVF, PappersImmo, BienIci,
 //     LocService) which each accepted FR + EN spellings
 //

@@ -6,7 +6,7 @@
 // Scope deliberately narrow: pure string + Geocoder calls, no HTTP, no
 // DB, no enricher-specific sentinels. The MA enricher's own
 // `IsAutocompleteSoftErr` sentinel set stays in
-// `internal/core/enrich/meilleursagents` because it is keyed on
+// `a downstream consumer` because it is keyed on
 // MA-autocomplete error shapes.
 //
 // Helpers:
@@ -17,7 +17,7 @@
 //     BAN label so the result is just the street + house number.
 //
 // Both helpers were promoted from
-// `internal/core/enrich/meilleursagents/fallback.go` so the in-tree
+// `a downstream consumer` so the in-tree
 // enricher and the handler-side queue resolver share a single
 // implementation .
 package maaddr
