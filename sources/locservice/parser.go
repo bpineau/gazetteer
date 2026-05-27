@@ -118,6 +118,15 @@ var (
 
 	// Strip any HTML tag.
 	reTag = regexp.MustCompile(`<[^>]+>`)
+
+	// Full sentence used by the "marche pas suffisamment actif"
+	// fallback branch. Captures from "Le marché" through
+	// "obtenir des données fiables" with a small slack window.
+	reNoDataFull = regexp.MustCompile(`(?i)Le\s+march[eé][^<]{0,200}pour\s+obtenir\s+des\s+donn[eé]es\s+fiables`)
+
+	// Header line LocService renders for the targeted commune, used
+	// by extractCityLabel.
+	reCityLabel = regexp.MustCompile(`(?s)<h2[^>]*>Analyse du march[^<]*&agrave;\s*([^<]+)</h2>`)
 )
 
 // Parse extracts the tensiometer signal from one LocService HTML
@@ -145,11 +154,9 @@ func Parse(body []byte) (ParsedResult, error) {
 	sDecoded := decodeEntities(s)
 	const noDataMarker = "pas suffisamment actif"
 	if idx := strings.Index(sDecoded, noDataMarker); idx >= 0 {
-		// Capture the full sentence for traceability via a regex over
-		// the decoded text. Decoded entities mean we can use plain
-		// ASCII in the pattern.
-		fullRe := regexp.MustCompile(`(?i)Le\s+march[eé][^<]{0,200}pour\s+obtenir\s+des\s+donn[eé]es\s+fiables`)
-		if full := fullRe.FindString(sDecoded); full != "" {
+		// Capture the full sentence for traceability via the
+		// package-level reNoDataFull regex over the decoded text.
+		if full := reNoDataFull.FindString(sDecoded); full != "" {
 			res.NoDataMessage = reWhitespace.ReplaceAllString(strings.TrimSpace(full), " ")
 		} else {
 			start := idx
@@ -220,8 +227,7 @@ func ScoreToLabel(s int) TensionLabel {
 // extractCityLabel returns the commune name LocService rendered in the
 // "Analyse du marche locatif a <city>" header. Returns "" on miss.
 func extractCityLabel(s string) string {
-	re := regexp.MustCompile(`(?s)<h2[^>]*>Analyse du march[^<]*&agrave;\s*([^<]+)</h2>`)
-	if m := re.FindStringSubmatch(s); len(m) >= 2 {
+	if m := reCityLabel.FindStringSubmatch(s); len(m) >= 2 {
 		return strings.TrimSpace(decodeEntities(m[1]))
 	}
 	return ""
