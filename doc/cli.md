@@ -13,9 +13,9 @@ go install github.com/bpineau/gazetteer/cmd/gazetteer@latest
 ## Sub-commands
 
 ```
-gazetteer query      [--source dvf,osm_transit,...] [--json] [--verbose] [--dump] <addr>
-gazetteer appraise   [--source dvf,osm_transit,...] [--json] [--verbose] [--dump] <addr>
-gazetteer normalize  [--json] [--verbose]                                          <addr>
+gazetteer query      [flags] <addr>
+gazetteer appraise   [flags] <addr>
+gazetteer normalize  [--json] [--verbose] <addr>
 gazetteer sources    list
 gazetteer sources    doc       <name>
 gazetteer refresh    <source>|all
@@ -32,18 +32,32 @@ per-source human summary or the full Dossier as JSON.
 ```bash
 $ gazetteer query "1 rue de Rivoli, 75001 Paris"
 
+$ gazetteer query --surface 46 --rooms 2 "10 rue Dareau, 75014 Paris"
+
 $ gazetteer query --source dvf,osm_transit "10 rue Dareau, 75014 Paris"
 
 $ gazetteer query --json "1 rue de Rivoli, 75001 Paris" | jq .
 ```
 
+- `--property-type apartment|house|land|commercial` — drives Source
+  eligibility (DVF, encadrement, MeilleursAgents). Default: `apartment`.
+- `--surface <m²>` — habitable surface. Required by DVF, taxe-foncière
+  and encadrement to produce a useful answer; ADEME also uses it to
+  pick the right dwelling when an address carries several DPE rows.
+- `--rooms <N>` — room count. Required by carteloyers, encadrement and
+  locservice to pick the typology bucket.
 - `--source` — comma-separated Source names. Default: every Source
-  the CLI knows how to instantiate.
+  the CLI knows how to instantiate (every `Default: true` entry in the
+  registry — `bdnb` and `osm_transit` are opt-in, see below).
 - `--json` — emit the full Dossier as indented JSON instead of the
   human summary.
 - `--verbose` — DEBUG-level slog output to stderr.
 - `--dump` — log raw HTTP request/response payloads for Sources that
-  honour the flag (`gazetteer.WithDebugDump`).
+  honour the flag.
+
+The flag set is identical for `appraise`. Flags may appear before or
+after the positional address; quoted multi-word addresses are not
+required.
 
 ### `appraise`
 
@@ -84,9 +98,12 @@ $ gazetteer sources list
 ademe           v2
 anct            v1
 bdnb            v2  (opt-in via --source)
+bpe             v1
 carteloyers     v1
 cartofriches    v1
+chomage         v1
 delinquance     v1
+dpedist         v1
 dvf             v4
 education       v1
 encadrement     v1
