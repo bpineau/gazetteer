@@ -82,8 +82,16 @@ func init() {
 ```
 
 This lets `Dossier.UnmarshalJSON` reconstitute concrete typed values
-from wire bytes. Without registration, JSON roundtrip silently drops
-the payload (`Result.Data` stays nil).
+from wire bytes.
+
+- Unregistered Source name on the wire → degraded mode: the envelope
+  fields (`Name`, `Status`, `Err`, `Version`, …) are preserved but
+  `Result.Data` stays nil. The framework has no factory for the typed
+  Result so dropping silently is the only safe move.
+- Registered Source name with a payload the factory cannot parse →
+  `Dossier.UnmarshalJSON` returns a wrapped error naming the Source.
+  This is a schema-drift signal: the persisted bytes were written by
+  a different Result shape than the one currently registered.
 
 ### Error semantics
 
