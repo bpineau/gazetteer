@@ -6,6 +6,8 @@ import (
 )
 
 func TestParseList_Paris11(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "list_paris11.json")
 	rows, err := ParseList(body)
 	if err != nil {
@@ -67,6 +69,8 @@ func TestParseList_Paris11(t *testing.T) {
 }
 
 func TestParseList_Empty(t *testing.T) {
+	t.Parallel()
+
 	rows, err := ParseList(mustReadFixture(t, "list_empty.json"))
 	if err != nil {
 		t.Fatalf("ParseList(empty): %v", err)
@@ -77,6 +81,8 @@ func TestParseList_Empty(t *testing.T) {
 }
 
 func TestParseList_EmptyBody(t *testing.T) {
+	t.Parallel()
+
 	_, err := ParseList(nil)
 	if !errors.Is(err, ErrEmptyBody) {
 		t.Fatalf("ParseList(nil) = %v, want ErrEmptyBody", err)
@@ -84,6 +90,8 @@ func TestParseList_EmptyBody(t *testing.T) {
 }
 
 func TestParseList_Garbage(t *testing.T) {
+	t.Parallel()
+
 	_, err := ParseList([]byte("not json"))
 	if !errors.Is(err, ErrEmptyBody) {
 		t.Fatalf("ParseList(garbage) = %v, want ErrEmptyBody wrap", err)
@@ -91,6 +99,8 @@ func TestParseList_Garbage(t *testing.T) {
 }
 
 func TestPickBest_BANIDExact(t *testing.T) {
+	t.Parallel()
+
 	rows := []Row{
 		{CleInteropAdrPrincipale: "AAA"},
 		{CleInteropAdrPrincipale: "BBB"},
@@ -103,6 +113,8 @@ func TestPickBest_BANIDExact(t *testing.T) {
 }
 
 func TestPickBest_BANIDCaseInsensitive(t *testing.T) {
+	t.Parallel()
+
 	rows := []Row{
 		{CleInteropAdrPrincipale: "75111_6507_00003"},
 	}
@@ -113,6 +125,8 @@ func TestPickBest_BANIDCaseInsensitive(t *testing.T) {
 }
 
 func TestPickBest_FallbackCompleteness(t *testing.T) {
+	t.Parallel()
+
 	year := 1990
 	nb := 5
 	dist := 100
@@ -132,6 +146,8 @@ func TestPickBest_FallbackCompleteness(t *testing.T) {
 }
 
 func TestPickBest_Empty(t *testing.T) {
+	t.Parallel()
+
 	idx, ok := PickBest(nil, "")
 	if ok || idx != -1 {
 		t.Fatalf("PickBest(nil) = (%d, %v), want (-1, false)", idx, ok)
@@ -139,6 +155,8 @@ func TestPickBest_Empty(t *testing.T) {
 }
 
 func TestFlexString_DecodeVariants(t *testing.T) {
+	t.Parallel()
+
 	body := []byte(`[
         {"quartier_prioritaire":null},
         {"quartier_prioritaire":true},
@@ -165,6 +183,8 @@ func TestFlexString_DecodeVariants(t *testing.T) {
 }
 
 func TestPickBestByNumber(t *testing.T) {
+	t.Parallel()
+
 	rows := []Row{
 		{LibelleAdrPrincipale: "8 Rue Aubert 93200 Saint-Denis"},
 		{LibelleAdrPrincipale: "9 Rue Aubert 93200 Saint-Denis"},
@@ -194,6 +214,8 @@ func TestPickBestByNumber(t *testing.T) {
 }
 
 func TestPickConfidence(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		matched   bool
@@ -218,6 +240,8 @@ func TestPickConfidence(t *testing.T) {
 }
 
 func TestBuildResult_NilSafeOnSparseRow(t *testing.T) {
+	t.Parallel()
+
 	out := BuildResult(Row{})
 	if out.Identity != nil || out.Building != nil || out.DPE != nil || out.Risks != nil || out.Fiabilite != nil {
 		t.Errorf("expected all-nil sub-blobs on empty Row, got %+v", out)
@@ -225,6 +249,8 @@ func TestBuildResult_NilSafeOnSparseRow(t *testing.T) {
 }
 
 func TestBuildResult_DistributionPrefer2021(t *testing.T) {
+	t.Parallel()
+
 	a, b := 1, 2
 	r := Row{
 		NbClasseBilanDPEA:               &a,
@@ -241,6 +267,8 @@ func TestBuildResult_DistributionPrefer2021(t *testing.T) {
 }
 
 func TestBuildResult_Fallback2012WhenNoBilan(t *testing.T) {
+	t.Parallel()
+
 	c := 5
 	r := Row{NbClasseConsoEnergieArrete2012C: &c}
 	out := BuildResult(r)
