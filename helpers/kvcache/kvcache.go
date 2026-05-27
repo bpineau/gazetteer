@@ -8,7 +8,7 @@
 // decide whether to honour ExpiresAt) and gives a way to garbage-collect
 // expired rows out-of-band (DeleteExpired). Concrete backends live in
 // sibling packages; see
-// pkg/kvcache/memcache for an in-memory reference implementation and
+// helpers/kvcache/memcache for an in-memory reference implementation and
 // an external persistent kvcache adapter for the bun-backed adapter that powers
 // every shipping consumer today.
 package kvcache
