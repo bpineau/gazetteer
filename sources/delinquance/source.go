@@ -71,7 +71,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	if idx == nil {
 		loaded, err := Load()
 		if err != nil {
-			return nil, fmt.Errorf("delinquance: load dataset: %w", err)
+			return nil, fmt.Errorf("delinquance: %w: load dataset: %w", gazetteer.ErrUpstreamPermanent, err)
 		}
 		idx = loaded
 	}
