@@ -37,16 +37,9 @@ func newListingParis7() gazetteer.Listing {
 	}
 }
 
-// withBaseURL swaps the package-level BaseURL for the duration of a
-// test. Restores it on cleanup.
-func withBaseURL(t *testing.T, u string) {
-	t.Helper()
-	prev := BaseURL
-	BaseURL = u
-	t.Cleanup(func() { BaseURL = prev })
-}
-
 func TestSource_NameVersion(t *testing.T) {
+	t.Parallel()
+
 	s := NewSource(Options{})
 	if s.Name() != Name {
 		t.Errorf("Name() = %q, want %q", s.Name(), Name)
@@ -57,6 +50,8 @@ func TestSource_NameVersion(t *testing.T) {
 }
 
 func TestSource_HappyPath_AllTypes(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "paris7_all.html")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasSuffix(r.URL.Path, "/tensiometre-75107.html") {
@@ -67,9 +62,7 @@ func TestSource_HappyPath_AllTypes(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	t.Cleanup(srv.Close)
-	withBaseURL(t, srv.URL+"/tensiometre")
-
-	s := NewSource(Options{Geocoder: stubGeocoder{cityCode: "75107"}})
+	s := NewSource(Options{BaseURL: srv.URL + "/tensiometre", Geocoder: stubGeocoder{cityCode: "75107"}})
 	data, err := s.Query(context.Background(), newListingParis7())
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -102,6 +95,8 @@ func TestSource_HappyPath_AllTypes(t *testing.T) {
 }
 
 func TestSource_LogementMapping_T2(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "troyes_t2.html")
 	hits := atomic.Int32{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -114,15 +109,13 @@ func TestSource_LogementMapping_T2(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	t.Cleanup(srv.Close)
-	withBaseURL(t, srv.URL+"/tensiometre")
-
 	rooms := 2
 	l := gazetteer.Listing{
 		City:         "Troyes",
 		PropertyType: gazetteer.PropertyApartment,
 		Rooms:        &rooms,
 	}
-	s := NewSource(Options{Geocoder: stubGeocoder{cityCode: "10387"}})
+	s := NewSource(Options{BaseURL: srv.URL + "/tensiometre", Geocoder: stubGeocoder{cityCode: "10387"}})
 	data, err := s.Query(context.Background(), l)
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -143,6 +136,8 @@ func TestSource_LogementMapping_T2(t *testing.T) {
 }
 
 func TestSource_FallbackToAllTypes(t *testing.T) {
+	t.Parallel()
+
 	noDataBody := mustReadFixture(t, "riom_no_data.html")
 	allBody := mustReadFixture(t, "limoges_all.html")
 	calls := atomic.Int32{}
@@ -159,15 +154,13 @@ func TestSource_FallbackToAllTypes(t *testing.T) {
 		}
 	}))
 	t.Cleanup(srv.Close)
-	withBaseURL(t, srv.URL+"/tensiometre")
-
 	rooms := 5
 	l := gazetteer.Listing{
 		City:         "Limoges",
 		PropertyType: gazetteer.PropertyApartment,
 		Rooms:        &rooms,
 	}
-	s := NewSource(Options{Geocoder: stubGeocoder{cityCode: "87085"}})
+	s := NewSource(Options{BaseURL: srv.URL + "/tensiometre", Geocoder: stubGeocoder{cityCode: "87085"}})
 	data, err := s.Query(context.Background(), l)
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -191,16 +184,16 @@ func TestSource_FallbackToAllTypes(t *testing.T) {
 }
 
 func TestSource_NoData(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "riom_no_data.html")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=ISO-8859-1")
 		_, _ = w.Write(body)
 	}))
 	t.Cleanup(srv.Close)
-	withBaseURL(t, srv.URL+"/tensiometre")
-
 	l := gazetteer.Listing{City: "Riom"}
-	s := NewSource(Options{Geocoder: stubGeocoder{cityCode: "63300"}})
+	s := NewSource(Options{BaseURL: srv.URL + "/tensiometre", Geocoder: stubGeocoder{cityCode: "63300"}})
 	data, err := s.Query(context.Background(), l)
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -221,6 +214,8 @@ func TestSource_NoData(t *testing.T) {
 }
 
 func TestSource_NoAddress_Insufficient(t *testing.T) {
+	t.Parallel()
+
 	s := NewSource(Options{Geocoder: stubGeocoder{cityCode: "75107"}})
 	_, err := s.Query(context.Background(), gazetteer.Listing{})
 	if !errors.Is(err, gazetteer.ErrInsufficientInputs) {
@@ -229,6 +224,8 @@ func TestSource_NoAddress_Insufficient(t *testing.T) {
 }
 
 func TestSource_GeocodeFails_Insufficient(t *testing.T) {
+	t.Parallel()
+
 	s := NewSource(Options{Geocoder: stubGeocoder{err: errors.New("no address")}})
 	_, err := s.Query(context.Background(), newListingParis7())
 	if !errors.Is(err, gazetteer.ErrInsufficientInputs) {
@@ -237,6 +234,8 @@ func TestSource_GeocodeFails_Insufficient(t *testing.T) {
 }
 
 func TestSource_GeocodeReturnsEmptyCityCode_Insufficient(t *testing.T) {
+	t.Parallel()
+
 	s := NewSource(Options{Geocoder: stubGeocoder{cityCode: ""}})
 	_, err := s.Query(context.Background(), newListingParis7())
 	if !errors.Is(err, gazetteer.ErrInsufficientInputs) {
@@ -245,6 +244,8 @@ func TestSource_GeocodeReturnsEmptyCityCode_Insufficient(t *testing.T) {
 }
 
 func TestSource_UsesListingINSEEWhenSet(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "paris7_all.html")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasSuffix(r.URL.Path, "/tensiometre-75107.html") {
@@ -255,11 +256,9 @@ func TestSource_UsesListingINSEEWhenSet(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	t.Cleanup(srv.Close)
-	withBaseURL(t, srv.URL+"/tensiometre")
-
 	// Geocoder would return a different INSEE if consulted — verify
 	// we use the listing-provided one.
-	s := NewSource(Options{Geocoder: stubGeocoder{cityCode: "99999"}})
+	s := NewSource(Options{BaseURL: srv.URL + "/tensiometre", Geocoder: stubGeocoder{cityCode: "99999"}})
 	l := newListingParis7()
 	l.INSEE = "75107"
 	data, err := s.Query(context.Background(), l)
@@ -273,13 +272,13 @@ func TestSource_UsesListingINSEEWhenSet(t *testing.T) {
 }
 
 func TestSource_Upstream5xx_Transient(t *testing.T) {
+	t.Parallel()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	t.Cleanup(srv.Close)
-	withBaseURL(t, srv.URL+"/tensiometre")
-
-	s := NewSource(Options{Geocoder: stubGeocoder{cityCode: "75107"}})
+	s := NewSource(Options{BaseURL: srv.URL + "/tensiometre", Geocoder: stubGeocoder{cityCode: "75107"}})
 	_, err := s.Query(context.Background(), newListingParis7())
 	if !errors.Is(err, gazetteer.ErrUpstreamUnavailable) {
 		t.Errorf("Query(5xx) = %v, want ErrUpstreamUnavailable", err)
@@ -287,13 +286,13 @@ func TestSource_Upstream5xx_Transient(t *testing.T) {
 }
 
 func TestSource_Upstream4xx_Permanent(t *testing.T) {
+	t.Parallel()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	}))
 	t.Cleanup(srv.Close)
-	withBaseURL(t, srv.URL+"/tensiometre")
-
-	s := NewSource(Options{Geocoder: stubGeocoder{cityCode: "75107"}})
+	s := NewSource(Options{BaseURL: srv.URL + "/tensiometre", Geocoder: stubGeocoder{cityCode: "75107"}})
 	_, err := s.Query(context.Background(), newListingParis7())
 	if !errors.Is(err, gazetteer.ErrUpstreamPermanent) {
 		t.Errorf("Query(400) = %v, want ErrUpstreamPermanent", err)
@@ -301,13 +300,13 @@ func TestSource_Upstream4xx_Permanent(t *testing.T) {
 }
 
 func TestSource_Upstream404_Permanent(t *testing.T) {
+	t.Parallel()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.NotFound(w, nil)
 	}))
 	t.Cleanup(srv.Close)
-	withBaseURL(t, srv.URL+"/tensiometre")
-
-	s := NewSource(Options{Geocoder: stubGeocoder{cityCode: "00000"}})
+	s := NewSource(Options{BaseURL: srv.URL + "/tensiometre", Geocoder: stubGeocoder{cityCode: "00000"}})
 	_, err := s.Query(context.Background(), newListingParis7())
 	if !errors.Is(err, gazetteer.ErrUpstreamPermanent) {
 		t.Errorf("Query(404) = %v, want ErrUpstreamPermanent", err)
@@ -315,14 +314,14 @@ func TestSource_Upstream404_Permanent(t *testing.T) {
 }
 
 func TestSource_GarbageBody_Transient(t *testing.T) {
+	t.Parallel()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=ISO-8859-1")
 		_, _ = w.Write([]byte("<html><body>nothing useful</body></html>"))
 	}))
 	t.Cleanup(srv.Close)
-	withBaseURL(t, srv.URL+"/tensiometre")
-
-	s := NewSource(Options{Geocoder: stubGeocoder{cityCode: "75107"}})
+	s := NewSource(Options{BaseURL: srv.URL + "/tensiometre", Geocoder: stubGeocoder{cityCode: "75107"}})
 	_, err := s.Query(context.Background(), newListingParis7())
 	if !errors.Is(err, gazetteer.ErrUpstreamUnavailable) {
 		t.Errorf("Query(garbage) = %v, want ErrUpstreamUnavailable", err)
@@ -330,15 +329,15 @@ func TestSource_GarbageBody_Transient(t *testing.T) {
 }
 
 func TestQuery_TypedHelper(t *testing.T) {
+	t.Parallel()
+
 	body := mustReadFixture(t, "paris7_all.html")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=ISO-8859-1")
 		_, _ = w.Write(body)
 	}))
 	t.Cleanup(srv.Close)
-	withBaseURL(t, srv.URL+"/tensiometre")
-
-	res, err := Query(context.Background(), Options{Geocoder: stubGeocoder{cityCode: "75107"}}, newListingParis7())
+	res, err := Query(context.Background(), Options{BaseURL: srv.URL + "/tensiometre", Geocoder: stubGeocoder{cityCode: "75107"}}, newListingParis7())
 	if err != nil {
 		t.Fatalf("Query helper: %v", err)
 	}
@@ -348,6 +347,8 @@ func TestQuery_TypedHelper(t *testing.T) {
 }
 
 func TestFrom_RoundtripFromDossier(t *testing.T) {
+	t.Parallel()
+
 	factory := gazetteer.Lookup(Name)
 	if factory == nil {
 		t.Fatalf("gazetteer.Lookup(%q) = nil, expected init() to register", Name)
@@ -359,6 +360,8 @@ func TestFrom_RoundtripFromDossier(t *testing.T) {
 }
 
 func TestBuildResult(t *testing.T) {
+	t.Parallel()
+
 	t.Run("has_data_no_fallback", func(t *testing.T) {
 		p := ParsedResult{HasData: true, TensionScore: 7, Label: LabelTresTendu, HasBudget: true, BudgetScore: 5}
 		r := BuildResult(p, false)
