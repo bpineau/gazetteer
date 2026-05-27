@@ -40,11 +40,14 @@ func runQuery(ctx context.Context, args []string) error {
 // Both sub-commands take the same set; `appraise` adds the appraisal
 // synthesis on top of the same collect pipeline.
 type queryFlags struct {
-	common  commonFlags
-	sources string
-	jsonOut bool
-	dump    bool
-	addr    string
+	common       commonFlags
+	sources      string
+	propertyType string  // "apartment" (default) | "house" | "land" | "commercial"
+	surface      float64 // m²; 0 ⇒ unset
+	rooms        int     // 0 ⇒ unset
+	jsonOut      bool
+	dump         bool
+	addr         string
 }
 
 // parseQueryFlags wires the shared flag set used by `query` and
@@ -55,7 +58,8 @@ func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "Usage: gazetteer %s [--source dvf,osm_transit,...] [--json] [--verbose] [--dump] <addr>\n", cmd)
+		fmt.Fprintf(fs.Output(),
+			"Usage: gazetteer %s [--property-type apartment|house|land|commercial] [--surface m²] [--rooms N] [--source dvf,osm_transit,...] [--json] [--verbose] [--dump] <addr>\n", cmd)
 		fmt.Fprintln(fs.Output())
 		fmt.Fprintf(fs.Output(), "Available sources: %s\n", strings.Join(allSourceNames(), ", "))
 		fmt.Fprintln(fs.Output())
@@ -63,6 +67,12 @@ func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 	}
 	q.common.registerVerbose(fs)
 	fs.StringVar(&q.sources, "source", "", "Comma-separated source names (default: all officials + atomic rental). See list above.")
+	fs.StringVar(&q.propertyType, "property-type", "apartment",
+		"Property type: apartment | house | land | commercial. Drives source eligibility (DVF, MA, encadrement, …).")
+	fs.Float64Var(&q.surface, "surface", 0,
+		"Habitable surface in m² (e.g. 45). Required by DVF, taxe-foncière, encadrement for a meaningful answer.")
+	fs.IntVar(&q.rooms, "rooms", 0,
+		"Room count (1, 2, 3…). Required by carteloyers / encadrement / locservice for a typed rent reference.")
 	fs.BoolVar(&q.jsonOut, "json", false, "Emit the full Dossier as indented JSON")
 	fs.BoolVar(&q.dump, "dump", false, "Log raw HTTP request/response payloads (sources that honour it)")
 	if err := fs.Parse(args); err != nil {
@@ -74,6 +84,25 @@ func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 	}
 	q.addr = addr
 	return &q, nil
+}
+
+// parsePropertyType maps the --property-type flag onto the
+// gazetteer.PropertyType enum. Empty string defaults to apartment
+// (the most common rental-investor case). Unknown values are
+// rejected so the user doesn't silently get an unfiltered run.
+func parsePropertyType(s string) (gazetteer.PropertyType, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", "apartment", "appartement", "flat":
+		return gazetteer.PropertyApartment, nil
+	case "house", "maison":
+		return gazetteer.PropertyHouse, nil
+	case "land", "terrain":
+		return gazetteer.PropertyLand, nil
+	case "commercial", "commerce", "local":
+		return gazetteer.PropertyCommercial, nil
+	default:
+		return "", fmt.Errorf("unknown --property-type %q (want apartment | house | land | commercial)", s)
+	}
 }
 
 // executeQuery is the shared collect pipeline used by `query` and
@@ -96,6 +125,24 @@ func executeQuery(ctx context.Context, q *queryFlags) (gazetteer.Dossier, error)
 	listing, err := deps.Normalizer.Normalize(ctx, q.addr)
 	if err != nil {
 		return gazetteer.Dossier{}, fmt.Errorf("normalize %q: %w", q.addr, err)
+	}
+
+	// Layer the user-supplied property attributes on top of the
+	// normalised Listing so sources that gate on them (DVF, encadrement,
+	// taxefonciere, carteloyers, locservice, …) can produce a useful
+	// answer.
+	pt, err := parsePropertyType(q.propertyType)
+	if err != nil {
+		return gazetteer.Dossier{}, err
+	}
+	listing.PropertyType = pt
+	if q.surface > 0 {
+		s := q.surface
+		listing.SurfaceM2 = &s
+	}
+	if q.rooms > 0 {
+		r := q.rooms
+		listing.Rooms = &r
 	}
 
 	builder := gazetteer.NewBuilder().
