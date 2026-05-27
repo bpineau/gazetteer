@@ -28,7 +28,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `filosofi`       | INSEE                                          | offline INSEE Filosofi 2021 |
 | `georisques`     | lat/lon (or address)                           | georisques.gouv.fr report   |
 | `locservice`     | INSEE + property_type + rooms                  | locservice.fr HTML scrape   |
-| `osm`            | lat/lon + offline station catalog              | OSM Overpass (refresh only) |
+| `osm_transit`    | lat/lon + offline station catalog              | OSM Overpass (refresh only) |
 | `qpv`            | INSEE                                          | offline ANCT QPV 2024 list  |
 | `taxefonciere`   | INSEE + surface_m2                             | offline DGFiP rates         |
 | `vacance`        | INSEE                                          | offline LOVAC 2025          |
@@ -150,7 +150,8 @@ Rental-market tension labels from locservice.fr.
 ## `sources/osm`
 
 Walking distance to the nearest métro / RER / tram / Transilien
-station, from an OpenStreetMap Overpass extract.
+station, from an OpenStreetMap Overpass extract. Registered under the
+canonical name `osm_transit`.
 
 - **Needs**: lat/lon AND a non-empty offline catalog.
 - **Catalog**: installed at `Source` construction (`Options.Catalog`)
