@@ -11,8 +11,8 @@ import (
 )
 
 // runNormalize implements `gazetteer normalize [--json] <addr>`. Calls
-// the lib's BAN-backed Normalizer (via gazetteer.NormalizeAddress) and
-// prints the resulting Listing.
+// the lib's BAN-backed Normalizer (via Client.Normalize) and prints
+// the resulting Listing.
 func runNormalize(ctx context.Context, args []string) error {
 	var (
 		flags   commonFlags
