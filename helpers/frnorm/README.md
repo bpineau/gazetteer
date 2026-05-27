@@ -7,11 +7,11 @@ concurrent use.
 
 ## Why this package exists
 
-Multiple HTML / PDF scrapers in the same project independently re-derived
-the same regex (`\d{5}` for a postcode, "is this a French month name?",
-"what is `1.336.500,50 €` in cents?"). The copies drifted: a fix landed in
-one parser and regressed in another. `frnorm` is the one place those
-helpers live; every scraper imports it.
+Multiple HTML / PDF scrapers can independently re-derive the same regex
+(`\d{5}` for a postcode, "is this a French month name?", "what is
+`1.336.500,50 €` in cents?"). The copies drift: a fix lands in one parser
+and regresses in another. `frnorm` is the one place those helpers live;
+every consumer imports it.
 
 ## Principles
 
@@ -26,14 +26,11 @@ helpers live; every scraper imports it.
   Lower-casing is a separate concern that callers compose on top.
 - **Pure.** Every function is deterministic, allocation-bounded and safe
   for concurrent calls. No package-level mutable state.
-- **Verbatim across the migration.** Symbols moved from
-  `internal/sources/normalize` without rename so adopters see no
-  behaviour change.
 
 ## Quick start
 
 ```go
-import "encheridor/pkg/frnorm"
+import "github.com/bpineau/gazetteer/helpers/frnorm"
 
 cents := frnorm.ParseFRPriceToCentimes("1 336 500,50 €")
 // cents == 133650050  // 1 336 500.50 €
@@ -56,8 +53,8 @@ hhmm := frnorm.NormalizeHearingTime("14h30")
 
 ## Public API
 
-See `go doc encheridor/pkg/frnorm` for the godoc-rendered surface. The
-exported helpers are:
+See `go doc github.com/bpineau/gazetteer/helpers/frnorm` for the
+godoc-rendered surface. The exported helpers are:
 
 - `ParseFRPriceToCentimes(string) int64` — FR-formatted money → centimes
 - `ExtractZipFromAddress(string) (zip string, ok bool)`
@@ -86,6 +83,5 @@ HTML scraping, PDF extraction or operator-supplied search filters.
 
 ## Status
 
-Stable. Public API frozen for the duration of the library-extraction
-chantier (`doc/specs/library_extraction_plan.md` §2.3). Symbols may be
-added but not renamed or removed without a deprecation cycle.
+Stable. Symbols may be added but not renamed or removed without a
+deprecation cycle.

@@ -75,10 +75,11 @@ func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 		"Room count (1, 2, 3…). Required by carteloyers / encadrement / locservice for a typed rent reference.")
 	fs.BoolVar(&q.jsonOut, "json", false, "Emit the full Dossier as indented JSON")
 	fs.BoolVar(&q.dump, "dump", false, "Log raw HTTP request/response payloads (sources that honour it)")
-	if err := fs.Parse(args); err != nil {
+	positional, err := parseInterleaved(fs, args)
+	if err != nil {
 		return nil, errUsage
 	}
-	addr, err := parsePositional(fs, "<addr>")
+	addr, err := parsePositional(fs, positional, "<addr>")
 	if err != nil {
 		return nil, err
 	}

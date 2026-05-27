@@ -30,10 +30,11 @@ func runNormalize(ctx context.Context, args []string) error {
 	}
 	flags.registerVerbose(fs)
 	fs.BoolVar(&jsonOut, "json", false, "Emit the Listing as indented JSON instead of a human summary")
-	if err := fs.Parse(args); err != nil {
+	positional, err := parseInterleaved(fs, args)
+	if err != nil {
 		return errUsage
 	}
-	addr, err := parsePositional(fs, "<addr>")
+	addr, err := parsePositional(fs, positional, "<addr>")
 	if err != nil {
 		return err
 	}
