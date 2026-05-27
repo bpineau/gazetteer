@@ -20,7 +20,7 @@ const Name = "ademe"
 
 // sourceVersion bumps when the Source's internal logic changes.
 // Stateful callers gate cache invalidation on it.
-const sourceVersion = 1
+const sourceVersion = 2
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
