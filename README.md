@@ -126,13 +126,29 @@ go install github.com/bpineau/gazetteer/cmd/gazetteer@latest
 Sub-commands:
 
 ```
-gazetteer sources          # list registered sources
-gazetteer query   <addr>   # run every source against a free-text address
-gazetteer appraise <addr>  # produce rent + price estimates
-gazetteer normalize <addr> # canonicalise a free-text address
-gazetteer refresh          # refresh local data files
-gazetteer setup            # one-shot initial data fetch
+gazetteer sources list                  # list every registered Source + version
+gazetteer sources doc <name>            # print a Source's typed Result skeleton
+gazetteer query     [flags] <addr>      # run every Source against an address
+gazetteer appraise  [flags] <addr>      # query + consolidated price/rent/hazard view
+gazetteer normalize [--json] <addr>     # resolve a free-text address to a Listing
+gazetteer refresh   <source>|all        # re-fetch upstream data (stub today)
+gazetteer version                       # build version
 ```
+
+`query` and `appraise` honour the listing's property attributes when
+supplied — DVF, encadrement, taxe-foncière and the rental Sources need
+them to produce a useful answer:
+
+```
+--property-type apartment|house|land|commercial   (default: apartment)
+--surface <m²>
+--rooms <N>
+--source <comma-separated names>                  (default: every Source the CLI knows)
+--json                                            (emit the full Dossier)
+--verbose --dump                                  (debug)
+```
+
+See [doc/cli.md](doc/cli.md) for the full reference.
 
 ## Concepts
 
