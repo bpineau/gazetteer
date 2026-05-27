@@ -3,6 +3,7 @@ package gazetteer
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -163,5 +164,31 @@ func TestDossier_JSONRoundtrip_UnknownNamePreservesEnvelope(t *testing.T) {
 	}
 	if r.Status != StatusOK {
 		t.Errorf("Status = %v, want StatusOK", r.Status)
+	}
+}
+
+// TestDossier_JSONRoundtrip_RegisteredNameJSONErrorSurfaces verifies
+// that a payload whose registered factory can't parse the bytes
+// (schema drift, wire-format corruption) surfaces as an UnmarshalJSON
+// error rather than silently leaving Data == nil. This is the case
+// the caller MUST see — a registered source with a typed Result whose
+// shape no longer matches the wire payload is a class-B silent leak
+// otherwise.
+func TestDossier_JSONRoundtrip_RegisteredNameJSONErrorSurfaces(t *testing.T) {
+	type stubPayload struct {
+		Count int `json:"count"`
+	}
+	registerForTest(t, "schemadrift", func() any { return &stubPayload{} })
+
+	// `count` is declared as an int on stubPayload but the wire sends
+	// a string. json.Unmarshal returns an UnmarshalTypeError.
+	js := `{"results":{"schemadrift":{"name":"schemadrift","version":1,"status":"ok","data":{"count":"not-a-number"}}}}`
+	var d Dossier
+	err := json.Unmarshal([]byte(js), &d)
+	if err == nil {
+		t.Fatal("Unmarshal succeeded; expected a typed-Data parse error to surface")
+	}
+	if !strings.Contains(err.Error(), "schemadrift") {
+		t.Errorf("error %q should mention the source name", err)
 	}
 }

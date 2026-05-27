@@ -102,11 +102,21 @@ func (d *Dossier) UnmarshalJSON(b []byte) error {
 		if len(r.Data) > 0 {
 			if factory := Lookup(r.Name); factory != nil {
 				val := factory()
-				if err := json.Unmarshal(r.Data, val); err == nil {
-					out.Data = val
+				if err := json.Unmarshal(r.Data, val); err != nil {
+					// A registered Source whose payload no longer
+					// parses into its typed Result is a wire-format
+					// drift the caller MUST see — silently dropping
+					// the payload would hide schema mismatches that
+					// only manifest as "nil Data" downstream. Fail
+					// the whole UnmarshalJSON so the caller can
+					// pin the version + line up a fix.
+					return fmt.Errorf("gazetteer: dossier: unmarshal Result.Data for %q: %w", r.Name, err)
 				}
+				out.Data = val
 			}
-			// Unknown name: leave Data nil (degraded mode).
+			// Unknown name: leave Data nil (degraded mode); the
+			// framework has no factory for the typed Result so
+			// dropping the payload is the only safe move.
 		}
 		d.Results[k] = out
 	}
