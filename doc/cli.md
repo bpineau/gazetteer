@@ -13,9 +13,9 @@ go install github.com/bpineau/gazetteer/cmd/gazetteer@latest
 ## Sub-commands
 
 ```
-gazetteer query      [--source dvf,osm,...] [--json] [--verbose] [--dump] <addr>
-gazetteer appraise   [--source dvf,osm,...] [--json] [--verbose] [--dump] <addr>
-gazetteer normalize  [--json] [--verbose]                                  <addr>
+gazetteer query      [--source dvf,osm_transit,...] [--json] [--verbose] [--dump] <addr>
+gazetteer appraise   [--source dvf,osm_transit,...] [--json] [--verbose] [--dump] <addr>
+gazetteer normalize  [--json] [--verbose]                                          <addr>
 gazetteer sources    list
 gazetteer sources    doc       <name>
 gazetteer refresh    <source>|all
@@ -32,7 +32,7 @@ per-source human summary or the full Dossier as JSON.
 ```bash
 $ gazetteer query "1 rue de Rivoli, 75001 Paris"
 
-$ gazetteer query --source dvf,osm "10 rue Dareau, 75014 Paris"
+$ gazetteer query --source dvf,osm_transit "10 rue Dareau, 75014 Paris"
 
 $ gazetteer query --json "1 rue de Rivoli, 75001 Paris" | jq .
 ```
@@ -81,23 +81,31 @@ List every Source registered with the library plus its version:
 
 ```bash
 $ gazetteer sources list
-ademe         v1
-bdnb          v2
-carteloyers   v1
-dvf           v3
-encadrement   v1
-filosofi      v1
-georisques    v1
-locservice    v1
-osm_transit   v3  (opt-in via --source)
-taxefonciere  v1
-vacance       v1
+ademe           v2
+anct            v1
+bdnb            v2  (opt-in via --source)
+carteloyers     v1
+cartofriches    v1
+delinquance     v1
+dvf             v4
+education       v1
+encadrement     v1
+filosofi        v1
+georisques      v1
+locservice      v1
+osm_transit     v3  (opt-in via --source)
+qpv             v1
+taxefonciere    v1
+vacance         v1
+zonageabc       v1
+zonetendue      v1
 ```
 
 Sources marked `(opt-in via --source)` are not part of the default
 `query` / `appraise` set; pass them explicitly via `--source` (e.g.
 `osm_transit` needs an offline station catalog the default factory
-does not currently install).
+does not currently install, `bdnb` enforces a rolling per-key quota
+the CLI does not burn by default).
 
 ### `sources doc <name>`
 
