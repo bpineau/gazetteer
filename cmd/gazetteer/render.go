@@ -11,6 +11,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/bdnb"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/cartofriches"
+	"github.com/bpineau/gazetteer/sources/chomage"
 	"github.com/bpineau/gazetteer/sources/delinquance"
 	"github.com/bpineau/gazetteer/sources/dvf"
 	"github.com/bpineau/gazetteer/sources/education"
@@ -109,6 +110,7 @@ var sourceRenderers = map[string]sourceRenderer{
 	bdnb.Name:         renderBDNB,
 	carteloyers.Name:  renderCarteloyers,
 	cartofriches.Name: renderCartofriches,
+	chomage.Name:      renderChomage,
 	delinquance.Name:  renderDelinquance,
 	dvf.Name:          renderDVF,
 	education.Name:    renderEducation,
@@ -331,6 +333,16 @@ func renderCartofriches(data any) (string, []string) {
 		extra = append(extra, "by status: "+formatMapCounts(r.ByStatus))
 	}
 	return headline, extra
+}
+
+func renderChomage(data any) (string, []string) {
+	r, ok := data.(*chomage.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no unemployment reading", nil
+	}
+	headline := fmt.Sprintf("chômage %.1f%% en ZE %s (%s, national %.1f%%, écart %+.1f pp, %s)",
+		r.RatePct, r.ZECode, r.ZELabel, r.NationalRatePct, r.DeltaVsNationalPP, r.Tension)
+	return headline, nil
 }
 
 func renderDelinquance(data any) (string, []string) {

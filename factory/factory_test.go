@@ -30,9 +30,9 @@ func TestNewDefault_Smoke(t *testing.T) {
 	d := client.Collect(context.Background(), gazetteer.Listing{})
 	wantSources := []string{
 		"dvf", "ademe", "anct", "bdnb", "georisques", "locservice",
-		"carteloyers", "cartofriches", "delinquance", "education",
-		"encadrement", "filosofi", "qpv", "taxefonciere", "vacance",
-		"zonageabc", "zonetendue",
+		"carteloyers", "cartofriches", "chomage", "delinquance",
+		"education", "encadrement", "filosofi", "qpv", "taxefonciere",
+		"vacance", "zonageabc", "zonetendue",
 	}
 	for _, name := range wantSources {
 		if _, ok := d.Results[name]; !ok {

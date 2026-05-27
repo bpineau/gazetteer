@@ -95,6 +95,7 @@ Commune-level signals for the investor:
 | Source         | What it provides                                                 |
 |----------------|------------------------------------------------------------------|
 | `filosofi`     | INSEE Filosofi income / poverty statistics by IRIS               |
+| `chomage`      | INSEE local unemployment rate by zone d'emploi (quarterly)       |
 | `delinquance`  | SSMSI État 4001 — per-commune crime indicators                   |
 | `zonageabc`    | Official A bis / A / B1 / B2 / C tension classification          |
 | `zonetendue`   | "Zone tendue" + TLV-2013 + tendue-touristique flags              |
