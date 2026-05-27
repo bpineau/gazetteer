@@ -1,0 +1,118 @@
+package qpv
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/bpineau/gazetteer/gazetteer"
+)
+
+// Name is the canonical Source identifier. Stable; used as the
+// gazetteer.Dossier results key and the registry key.
+const Name = "qpv"
+
+// sourceVersion bumps when the Source's internal logic changes.
+//
+// History:
+//   - v1: initial release. Embeds the QPV 2024 list (decree
+//     2023-1314) at commune granularity — answers "does this commune
+//     host one or more QPVs?".
+const sourceVersion = 1
+
+// Version exposes sourceVersion so callers that wrap the Source can
+// mirror it without reaching into the package internals.
+const Version = sourceVersion
+
+// Options configures a qpv Source.
+type Options struct {
+	// Index overrides the lazily-loaded singleton. Tests inject a stub
+	// here; production callers leave it nil.
+	Index *Index
+}
+
+// Source implements gazetteer.Source for the per-commune QPV lookup
+// using an embedded JSON. Use NewSource to construct.
+type Source struct {
+	opts Options
+}
+
+// NewSource builds a qpv Source. Zero-valued Options is fine.
+func NewSource(opts Options) *Source {
+	return &Source{opts: opts}
+}
+
+// Name implements gazetteer.Source.
+func (s *Source) Name() string { return Name }
+
+// Version implements gazetteer.Source.
+func (s *Source) Version() int { return sourceVersion }
+
+// Query implements gazetteer.Source. Pipeline:
+//
+//  1. Require Listing.INSEE (5-digit). Without it the Source emits
+//     gazetteer.ErrInsufficientInputs.
+//  2. Look up the commune in the embedded QPV index.
+//  3. Return (*Result, nil). Communes without QPV surface as
+//     IsEmpty() (the vast majority — only ~840 communes host QPVs).
+//
+// Property type is irrelevant — QPV designation is geographic. Note
+// also that this Source operates at the commune level, NOT the
+// address level: a positive result tells the caller the commune
+// contains QPVs, not that the specific listing is inside one.
+func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
+	_ = ctx
+	insee := strings.TrimSpace(l.INSEE)
+	if insee == "" {
+		return nil, fmt.Errorf("qpv: %w: listing.INSEE required", gazetteer.ErrInsufficientInputs)
+	}
+
+	idx := s.opts.Index
+	if idx == nil {
+		loaded, err := Load()
+		if err != nil {
+			return nil, fmt.Errorf("qpv: load dataset: %w", err)
+		}
+		idx = loaded
+	}
+
+	ev := Evidence{
+		INSEE:            insee,
+		RowCountCommunes: idx.Count(),
+	}
+	e, ok := idx.Lookup(insee)
+	if !ok {
+		return &Result{
+			Confidence: ConfidenceNone,
+			Evidence:   ev,
+		}, nil
+	}
+	ev.CommuneLabel = e.Label
+	return &Result{
+		HasQPV:     true,
+		QPVCount:   len(e.QPVs),
+		QPVs:       e.QPVs,
+		Confidence: ConfidenceHigh,
+		Evidence:   ev,
+	}, nil
+}
+
+// Query is the atomic helper for callers who don't want the builder.
+// The error is non-nil only when the Source failed; a successful but
+// empty response still returns a non-nil *Result with IsEmpty() == true.
+func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
+	data, err := NewSource(opts).Query(ctx, l)
+	if err != nil {
+		return nil, err
+	}
+	res, ok := data.(*Result)
+	if !ok {
+		return nil, errors.New("qpv: typed result mismatch")
+	}
+	return res, nil
+}
+
+func init() {
+	gazetteer.Register(Name, func() any { return &Result{} })
+}
