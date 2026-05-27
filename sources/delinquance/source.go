@@ -90,12 +90,27 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		}, nil
 	}
 	return &Result{
-		Rates:      e.Rates,
+		Rates:      copyRateMap(e.Rates),
 		Population: e.Population,
 		Flag:       classifyRisk(e.Rates),
 		Confidence: ConfidenceHigh,
 		Evidence:   ev,
 	}, nil
+}
+
+// copyRateMap returns a shallow copy of m. The Source's embedded
+// singleton index is shared across all Query calls; without the copy
+// a caller mutating Result.Rates would corrupt the next call's
+// reading. Cheap (these maps carry at most ~14 SSMSI indicators).
+func copyRateMap(m map[string]float64) map[string]float64 {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]float64, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }
 
 // Query is the atomic helper for callers who don't want the builder.
