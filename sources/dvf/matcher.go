@@ -9,7 +9,7 @@ import (
 )
 
 // Confidence values stamped into Result.Confidence by PickConfidence.
-// Stable wire-format strings — downstream consumers (encheridor's
+// Stable wire-format strings — downstream consumers (a downstream consumer's
 // adapter, dashboards) compare against these without importing the
 // package.
 const (

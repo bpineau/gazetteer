@@ -1,16 +1,3 @@
-// Package kvcache defines a backend-agnostic persistent key/value cache
-// contract used across the project: the BAN geocoder cache, the DVF
-// per-commune section cache, the enrich-runner cursor, and any future
-// caller that needs a memo with optional TTL.
-//
-// The contract is the smallest surface that lets callers do
-// stale-while-revalidate (Get returns expired rows so the caller can
-// decide whether to honour ExpiresAt) and gives a way to garbage-collect
-// expired rows out-of-band (DeleteExpired). Concrete backends live in
-// sibling packages or as adapters under internal/store; see
-// pkg/kvcache/memcache for an in-memory reference implementation and
-// internal/store/kvcacheadapter for the bun-backed adapter that powers
-// every shipping consumer today.
 package kvcache
 
 import (

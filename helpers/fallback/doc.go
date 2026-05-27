@@ -22,7 +22,7 @@
 // A Tier is a strategy. Walk runs each Tier in order; the first one
 // that returns nil error AND produces an Output that does not satisfy
 // SkipOn wins. Walk does NOT retry within a tier — per-call retries
-// belong inside the Try function (typically delegated to pkg/httpx
+// belong inside the Try function (typically delegated to helpers/httpx
 // whose retry middleware handles it for you).
 //
 // # When to reach down a layer
@@ -35,13 +35,7 @@
 //
 // When the upstream value isn't an address-shaped €/m² number, wrap
 // fallback.Walk in a tiny adapter that maps your native output to/from
-// fallback.Output. This is what every enricher in
-// internal/core/enrich/<name>/fallback.go does. The 5-line adapter
-// preserves the free slog observability without a generic Output type
-// blowing up the surface area.
-//
-// # Stability
-//
-// Public API is frozen for the duration of the library-extraction
-// project (doc/specs/library_extraction_plan.md §2.6).
+// fallback.Output. The 5-line adapter preserves the free slog
+// observability without a generic Output type blowing up the surface
+// area.
 package fallback

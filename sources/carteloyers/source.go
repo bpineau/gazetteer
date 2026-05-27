@@ -16,14 +16,14 @@ const Name = "carteloyers"
 // sourceVersion bumps when the Source's internal logic changes.
 //
 // History:
-//   - v1: initial port from internal/core/enrich/rental/carte_loyers.
+//   - v1: initial port from a downstream consumer
 //     Lookup keyed on (INSEE, typology) where typology is picked from
 //     property_type + rooms; fallback to TypologyApartment when the
 //     rooms bucket is empty for the commune.
 const sourceVersion = 1
 
 // Version exposes sourceVersion so callers that wrap the Source (e.g.
-// encheridor's rental wrapper) can mirror it without reaching into
+// a rental wrapper) can mirror it without reaching into
 // the package internals.
 const Version = sourceVersion
 

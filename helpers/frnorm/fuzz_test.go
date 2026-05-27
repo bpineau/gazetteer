@@ -10,11 +10,11 @@ package frnorm
 //
 // Run :
 //
-//	go test -fuzz=FuzzParseFRPriceToCentimes -fuzztime=60s ./pkg/frnorm/
-//	go test -fuzz=FuzzNormaliseSpace          -fuzztime=60s ./pkg/frnorm/
-//	go test -fuzz=FuzzNormalizeHearingTime    -fuzztime=60s ./pkg/frnorm/
-//	go test -fuzz=FuzzExtractZipCity          -fuzztime=60s ./pkg/frnorm/
-//	go test -fuzz=FuzzStripAccents            -fuzztime=60s ./pkg/frnorm/
+//	go test -fuzz=FuzzParseFRPriceToCentimes -fuzztime=60s ./helpers/frnorm/
+//	go test -fuzz=FuzzNormaliseSpace          -fuzztime=60s ./helpers/frnorm/
+//	go test -fuzz=FuzzNormalizeHearingTime    -fuzztime=60s ./helpers/frnorm/
+//	go test -fuzz=FuzzExtractZipCity          -fuzztime=60s ./helpers/frnorm/
+//	go test -fuzz=FuzzStripAccents            -fuzztime=60s ./helpers/frnorm/
 //
 // CI runs the seed corpus as ordinary unit tests via `go test ./...`.
 

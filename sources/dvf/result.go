@@ -7,15 +7,15 @@ import (
 )
 
 // Result is the typed payload returned by Source.Query. Mirrors the
-// shape currently persisted by encheridor's DVF enricher (resultBlob
+// shape currently persisted by a downstream enricher (resultBlob
 // with value_eur_per_m2_centimes, p25/p75, sample_size, confidence)
-// so the encheridor adapter can re-serialise it 1:1 into its
+// so a downstream adapter can re-serialise it 1:1 into its
 // EnrichPayload.Result.
 //
 // Envelope-only fields (schema_version, enricher_version, computed_at,
 // input_hash) are NOT part of the gazetteer payload — those are the
 // framework's responsibility (Result envelope in gazetteer.Result, or
-// in encheridor's enrich.EnrichPayload).
+// in a downstream payload struct).
 type Result struct {
 	// ValueEURPerM2Cents is the median price-per-m² over the filtered
 	// mutations, in centimes (NOT euros). Nil when the sample is
@@ -43,13 +43,13 @@ type Result struct {
 	// produced this Result. Not part of the wire data (json:"-") —
 	// populated by Source.Query, consumed in-process by callers that
 	// need to log or audit how the answer was derived (e.g.
-	// encheridor's EnrichPayload.Method.Params).
+	// a downstream payload's method params).
 	Evidence Evidence `json:"-"`
 }
 
 // Evidence captures reproducibility metadata about the query that
 // produced a Result. Consumers that need to log or audit how the answer
-// was derived (e.g. encheridor's EnrichPayload.Method.Params) read
+// was derived (e.g. a downstream payload's method params) read
 // these fields. Other callers can ignore them.
 //
 // Sidecar — not part of the wire data. Travels in-process from
@@ -70,7 +70,7 @@ type Evidence struct {
 
 	// INSEEResolutionSource records which step of the INSEE cascade
 	// produced PrimaryINSEE: "ban_forward" or "ban_reverse" (cf.
-	// pkg/gazetteer/pkg/banx/insee_resolver.go). Empty when the
+	// helpers/banx/insee_resolver.go). Empty when the
 	// listing carried a usable INSEE directly.
 	INSEEResolutionSource string `json:"insee_resolution_source,omitempty"`
 

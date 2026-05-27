@@ -31,7 +31,7 @@
 //
 // Cadastral sections (per INSEE) are looked up via cadastre.data.gouv.fr
 // once and persisted in a kvcache.Cache. The package's SectionDiscoverer
-// (sections.go) is the canonical façade for both the encheridor adapter
+// (sections.go) is the canonical façade for both a downstream adapter
 // (wired against the bun-backed kv_cache table) and standalone users
 // (wired against an in-memory cache).
 //

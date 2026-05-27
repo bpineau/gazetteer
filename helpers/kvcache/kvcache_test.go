@@ -1,7 +1,7 @@
 package kvcache_test
 
 // Direct unit tests for the kvcache package's option pattern + Set
-// helper. The conformance suite under pkg/kvcache/kvcachetest already
+// helper. The conformance suite under helpers/kvcache/kvcachetest already
 // exercises WithTTL end-to-end against a real Cache backend, but those
 // tests pass through to memcache.Set and can't pin the option's
 // upstream contract (what Entry is HANDED to Cache.Set ?). Pinning that

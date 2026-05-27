@@ -23,7 +23,7 @@ type OverpassFetcher interface {
 }
 
 // FuncOverpassFetcher adapts a plain function to the OverpassFetcher
-// interface — same idiom as encheridor/pkg/circuit.FuncFetcher but
+// interface — same idiom as a downstream consumer/helpers/circuit.FuncFetcher but
 // scoped to this package because Overpass uses POST not GET.
 type FuncOverpassFetcher func(ctx context.Context, ql string) ([]byte, error)
 

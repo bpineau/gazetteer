@@ -16,7 +16,7 @@ const Name = "vacance"
 // sourceVersion bumps when the Source's internal logic changes.
 //
 // History:
-//   - v1: initial port from internal/core/enrich/rental/vacance.
+//   - v1: initial port from a downstream consumer
 //     Per-commune LOVAC 2025 vacance rate + long-term split.
 const sourceVersion = 1
 

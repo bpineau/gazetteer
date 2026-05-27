@@ -7,7 +7,7 @@ import "strings"
 // into a single ASCII space, then trims the result.
 //
 // This is the canonical implementation, consolidated from identical copies in
-// internal/sources/avoventes and internal/sources/lawyer. Vench does not use
+// a sibling module and a sibling module Vench does not use
 // this function (its whitespace handling is embedded in its slug helper).
 //
 // The function is pure, allocation-bounded and safe for concurrent use.

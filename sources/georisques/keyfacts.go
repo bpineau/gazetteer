@@ -3,7 +3,7 @@
 // into the few "key facts" callers want to surface front-and-center on
 // the auction detail page.
 //
-// Like pkg/gazetteer/bdnb/keyfacts.go, this file is read-only over an
+// Like sources/bdnb/keyfacts.go, this file is read-only over an
 // already-marshalled JSON tree. Adding a key fact does NOT change the
 // parser, the fetcher, or the persisted payload — it just projects
 // what's already there.
