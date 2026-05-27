@@ -1,0 +1,10 @@
+{
+  "total": 100,
+  "total_values": 3,
+  "total_other": 5,
+  "aggs": [
+    {"total": 80, "value": "D"},
+    {"total": 10, "value": "F"},
+    {"total": 5, "value": null}
+  ]
+}
