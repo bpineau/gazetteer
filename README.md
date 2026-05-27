@@ -48,7 +48,7 @@ func main() {
 	// payloads into a Dossier.
 	dossier := client.Collect(ctx, listing)
 
-	if r, ok := dvf.From(dossier); ok {
+	if r, ok := gazetteer.Get[*dvf.Result](dossier, dvf.Name); ok {
 		fmt.Printf("DVF: sample_size=%d, level=%s\n",
 			r.SampleSize, r.Evidence.LevelUsed)
 	}

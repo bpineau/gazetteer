@@ -402,7 +402,7 @@ func TestFrom_Dossier(t *testing.T) {
 			},
 		},
 	}
-	got, ok := From(d)
+	got, ok := gazetteer.Get[*Result](d, Name)
 	if !ok || got != res {
 		t.Errorf("From(d) = (%v, %v), want (%v, true)", got, ok, res)
 	}
@@ -410,7 +410,7 @@ func TestFrom_Dossier(t *testing.T) {
 
 func TestFrom_DossierMissing(t *testing.T) {
 	d := gazetteer.Dossier{Results: map[string]gazetteer.Result{}}
-	got, ok := From(d)
+	got, ok := gazetteer.Get[*Result](d, Name)
 	if ok || got != nil {
 		t.Errorf("From(empty d) = (%v, %v), want (nil, false)", got, ok)
 	}

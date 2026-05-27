@@ -434,7 +434,7 @@ func TestSource_From(t *testing.T) {
 			},
 		},
 	}
-	r, ok := From(d)
+	r, ok := gazetteer.Get[*Result](d, Name)
 	if !ok {
 		t.Fatal("From() = false, want true")
 	}
