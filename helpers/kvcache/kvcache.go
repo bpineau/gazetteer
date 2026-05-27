@@ -7,9 +7,9 @@
 // stale-while-revalidate (Get returns expired rows so the caller can
 // decide whether to honour ExpiresAt) and gives a way to garbage-collect
 // expired rows out-of-band (DeleteExpired). Concrete backends live in
-// sibling packages or as adapters under internal/store; see
+// sibling packages; see
 // pkg/kvcache/memcache for an in-memory reference implementation and
-// internal/store/kvcacheadapter for the bun-backed adapter that powers
+// an external persistent kvcache adapter for the bun-backed adapter that powers
 // every shipping consumer today.
 package kvcache
 

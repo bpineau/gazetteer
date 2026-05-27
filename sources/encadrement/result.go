@@ -14,7 +14,7 @@ import (
 )
 
 // Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers (encheridor's rental wrapper, dashboards) can
+// downstream consumers (a rental wrapper, dashboards) can
 // match on them without importing this package's constants.
 const (
 	ConfidenceMedium = "medium"
@@ -31,7 +31,7 @@ const (
 )
 
 // Result is the typed payload returned by Source.Query. Mirrors the
-// CeilingEstimate shape currently persisted by encheridor's rental
+// CeilingEstimate shape currently persisted by a downstream consumer's rental
 // enricher (loyer de référence + majoré + zone label) so the wrapper
 // can re-serialise it 1:1 into its EnrichPayload.Result.
 //

@@ -57,7 +57,7 @@ func NormalizeLogement(s string) string {
 // Returns the empty string ("Tous types") for unsupported combinations
 // — caller then issues the commune-wide call.
 //
-// Conversion rules (mirror the encheridor-side enricher pre-port):
+// Conversion rules (mirror the a downstream consumer-side enricher pre-port):
 //
 //	Apartment + rooms=1  → "studio"
 //	Apartment + rooms=2  → "T2"

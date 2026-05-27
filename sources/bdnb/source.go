@@ -18,14 +18,14 @@ import (
 const Name = "bdnb"
 
 // sourceVersion bumps when the Source's internal logic changes. Callers
-// (encheridor's runner) gate cache invalidation on it.
+// (a stateful runner) gate cache invalidation on it.
 //
-// Version 2 carries forward the encheridor v2 logic: the residence-prefix
-// leak fix shipped in fraddr.Parse + IlikePatternFor (audit 2026-05-17).
+// Version 2 carries forward the a downstream consumer v2 logic: the residence-prefix
+// leak fix shipped in fraddr.Parse + IlikePatternFor .
 const sourceVersion = 2
 
 // Version exposes sourceVersion so callers that wrap the Source (e.g.
-// encheridor's adapter) can mirror it without reaching into the package
+// a downstream adapter) can mirror it without reaching into the package
 // internals.
 const Version = sourceVersion
 
@@ -43,7 +43,7 @@ type Options struct {
 	// 5-digit INSEE — required by BDNB's PostgREST filter to avoid
 	// 57014 timeouts. Mandatory in practice unless the Listing carries
 	// a usable Listing.INSEE (TODO: today Listing.INSEE is unused by
-	// encheridor's AuctionToListing helper, so callers always wire a
+	// a downstream consumer's AuctionToListing helper, so callers always wire a
 	// Geocoder). If the Geocoder also implements banx.ReverseGeocoder
 	// the Source uses the standard forward/reverse cascade
 	// (banx.INSEEResolver); otherwise forward-only.
@@ -79,7 +79,7 @@ func (s *Source) Version() int { return sourceVersion }
 // returns a *Result.
 //
 // Error mapping (the framework translates these to a Result.Status per
-// the table in pkg/gazetteer/source.go):
+// the table in gazetteer/source.go):
 //
 //   - Missing address+city+zip → gazetteer.ErrInsufficientInputs (wrapped)
 //   - Geocoder cannot resolve INSEE → gazetteer.ErrInsufficientInputs (wrapped)
@@ -90,7 +90,7 @@ func (s *Source) Version() int { return sourceVersion }
 //     IsEmpty()==true; the framework records StatusOKEmpty.
 //
 // Logging: emits one DEBUG log line per query via
-// gazetteer.LoggerFrom(ctx) at the "bdnb" component. The encheridor
+// gazetteer.LoggerFrom(ctx) at the "bdnb" component. The a downstream consumer
 // adapter on top adds INFO once per work-unit.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	logger := gazetteer.LoggerFrom(ctx).With(slog.String("source", Name))
@@ -249,7 +249,7 @@ func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
 }
 
 // resolveINSEE returns the 5-digit INSEE for the listing via the
-// canonical BAN cascade (`pkg/gazetteer/pkg/banx/insee_resolver.go`):
+// canonical BAN cascade (`helpers/banx/insee_resolver.go`):
 //
 //  1. BAN forward on the free-form address — used only when
 //     score ≥ 0.7 AND citycode is non-empty. The score gate is the bug

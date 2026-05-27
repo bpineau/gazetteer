@@ -7,7 +7,7 @@ import (
 )
 
 // Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers (encheridor's adapter, dashboards) can match on
+// downstream consumers (a downstream adapter, dashboards) can match on
 // them without importing this package's constants.
 const (
 	ConfidenceHigh   = "high"
@@ -33,15 +33,15 @@ const (
 )
 
 // Result is the typed payload returned by Source.Query. Mirrors the
-// shape currently persisted by encheridor's Géorisques enricher
+// shape currently persisted by a downstream consumer's Géorisques enricher
 // (resultBlob with Address / Commune / Naturels / Technos / Summary
-// sub-blobs) so the encheridor adapter can re-serialise it 1:1 into its
+// sub-blobs) so a downstream adapter can re-serialise it 1:1 into its
 // EnrichPayload.Result.
 //
 // Envelope-only fields (schema_version, enricher_version, computed_at,
 // input_hash) are NOT part of the gazetteer payload — those are the
 // framework's responsibility (Result envelope in gazetteer.Result, or
-// in encheridor's enrich.EnrichPayload).
+// in a downstream payload struct).
 type Result struct {
 	// Address carries the BRGM-resolved address scope (libelle + lat/lon
 	// echoed back by the API). Nil when BRGM downgraded to commune-scope.
@@ -90,7 +90,7 @@ type Result struct {
 	// produced this Result. Not part of the wire data (json:"-") —
 	// populated by Source.Query, consumed in-process by callers that
 	// need to log or audit how the answer was derived (e.g.
-	// encheridor's EnrichPayload.Method.Params).
+	// a downstream payload's method params).
 	Evidence Evidence `json:"-"`
 }
 
@@ -131,7 +131,7 @@ type Summary struct {
 
 // Evidence captures reproducibility metadata about the query that
 // produced a Result. Consumers that need to log or audit how the answer
-// was derived (e.g. encheridor's EnrichPayload.Method.Params) read
+// was derived (e.g. a downstream payload's method params) read
 // these fields. Other callers can ignore them.
 //
 // Sidecar — not part of the wire data. Travels in-process from

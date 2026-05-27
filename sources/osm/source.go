@@ -13,11 +13,11 @@ import (
 
 // Name is the canonical Source identifier. Stable; used as the
 // gazetteer.Dossier results key and the registry key. Re-exported by
-// the encheridor adapter as its enricher name.
+// a downstream adapter as its enricher name.
 const Name = "osm_transit"
 
 // sourceVersion bumps when the Source's internal logic changes. Callers
-// (encheridor's runner) gate cache invalidation on it.
+// (a stateful runner) gate cache invalidation on it.
 //
 // Version 3 (2026-05-18) : Station.Lines is now populated by joining
 // the parent route relations (`relation[type=route][route=*]`) and
@@ -27,7 +27,7 @@ const Name = "osm_transit"
 const sourceVersion = 3
 
 // Version exposes sourceVersion so callers that wrap the Source (e.g.
-// encheridor's adapter) can mirror it without reaching into the package
+// a downstream adapter) can mirror it without reaching into the package
 // internals.
 const Version = sourceVersion
 
@@ -90,7 +90,7 @@ func (s *Source) UpdateCatalog(c *Catalog) {
 }
 
 // Catalog returns the currently-installed catalog snapshot, or nil
-// when none has been installed. Exposed for tests + the encheridor
+// when none has been installed. Exposed for tests + the a downstream consumer
 // adapter (Reads catalog stats for the EnrichPayload.Method.Params).
 func (s *Source) Catalog() *Catalog {
 	return s.catalog.Load()
@@ -106,7 +106,7 @@ func (s *Source) Version() int { return sourceVersion }
 // station to the listing's (Lat, Lon) and returns a *Result.
 //
 // Error mapping (the framework translates these to a Result.Status per
-// the table in pkg/gazetteer/source.go):
+// the table in gazetteer/source.go):
 //
 //   - Missing Listing.Lat or Listing.Lon, or both equal to 0 (the
 //     "unset coords" sentinel) → gazetteer.ErrInsufficientInputs (wrapped).
@@ -115,14 +115,14 @@ func (s *Source) Version() int { return sourceVersion }
 //   - Successful but no station within MaxNearestStationMeters → a
 //     non-nil *Result with IsEmpty() == true and
 //     SkipReason == SkipReasonOutOfRange. The framework records
-//     StatusOKEmpty; the encheridor adapter consults SkipReason to
+//     StatusOKEmpty; a downstream adapter consults SkipReason to
 //     map this to enrich.ErrPermanentlyOutOfScope.
 //   - Successful pick → *Result with SampleSize==1 + a populated
 //     Evidence sidecar.
 //
 // Logging: emits one DEBUG log line per query via
 // gazetteer.LoggerFrom(ctx) at the "osm_transit" component. The
-// encheridor adapter on top adds INFO once per work-unit.
+// a downstream consumer adapter on top adds INFO once per work-unit.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	logger := gazetteer.LoggerFrom(ctx).With(slog.String("source", Name))
 
