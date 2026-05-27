@@ -29,7 +29,6 @@ The table below summarises each Source. Detailed contracts follow.
 | `georisques`     | lat/lon (or address)                           | georisques.gouv.fr report   |
 | `locservice`     | INSEE + property_type + rooms                  | locservice.fr HTML scrape   |
 | `osm`            | lat/lon + offline station catalog              | OSM Overpass (refresh only) |
-| `pinel`          | INSEE                                          | offline arrêté Pinel ABC    |
 | `qpv`            | INSEE                                          | offline ANCT QPV 2024 list  |
 | `taxefonciere`   | INSEE + surface_m2                             | offline DGFiP rates         |
 | `vacance`        | INSEE                                          | offline LOVAC 2025          |
@@ -234,17 +233,6 @@ commune from the Annuaire de l'Éducation Nationale.
 - **Backend**: HTTP GET against `data.education.gouv.fr` (Opendatasoft
   API). Honours `Options.BaseURL` for tests.
 
-## `sources/pinel`
-
-Zonage ABC per commune (arrêté du 5 sep 2025) plus the derived
-Pinel / Denormandie / PTZ / Loc'Avantages eligibility decision.
-
-- **Needs**: INSEE. Paris / Lyon / Marseille arrondissements fold to
-  the parent commune.
-- **Result**: `pinel.Result` with `Zone` (Abis / A / B1 / B2 / C),
-  tension bucket, and per-device eligibility flags.
-- **Backend**: offline CSV under `data/`, ~35 000 communes.
-
 ## `sources/qpv`
 
 Quartiers Prioritaires de la politique de la Ville (decree 2023-1314)
@@ -257,16 +245,15 @@ membership at commune granularity.
 
 ## `sources/zonageabc`
 
-Same official zonage A bis / A / B1 / B2 / C as `pinel`, exposed as a
-raw classification (no derived eligibility logic).
+Official zonage A bis / A / B1 / B2 / C classification per commune
+(arrêté du 5 sep 2025). The zonage anchors several housing-tension
+references (DPE displays, "logement intermédiaire", etc.).
 
-- **Needs**: INSEE.
+- **Needs**: INSEE. Paris / Lyon / Marseille arrondissements fold to
+  the parent commune.
 - **Result**: `zonageabc.Result` with `Zone` and the legal source
   arrêté reference.
-- **Backend**: offline JSON under `data/`, ~34 875 communes with
-  arrondissement fold.
-- **When to prefer `pinel`**: when the caller wants the tax-device
-  decision shortcut. `zonageabc` is the data-only surface.
+- **Backend**: offline JSON under `data/`, ~34 875 communes.
 
 ## `sources/zonetendue`
 

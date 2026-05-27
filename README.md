@@ -55,9 +55,9 @@ func main() {
 }
 ```
 
-Callers that need to add an out-of-tree Source (e.g. `bienici`,
-`castorus`) or override a default should use `factory.BuilderDefault`,
-chain `.With(plugin)`, then call `.Build()`:
+Callers that need to add an out-of-tree Source or override a default
+should use `factory.BuilderDefault`, chain `.With(plugin)`, then call
+`.Build()`:
 
 ```go
 b, err := factory.BuilderDefault(ctx, factory.Options{})
@@ -71,19 +71,43 @@ Builder path when needed.
 
 ## Sources shipped
 
+Building / energy / risk:
+
 | Source         | What it provides                                                 |
 |----------------|------------------------------------------------------------------|
 | `ademe`        | DPE (energy performance certificates)                            |
-| `osm`          | Walking distance to nearest métro / RER / tram / train station   |
 | `bdnb`         | Base de Données Nationale des Bâtiments — building age, type     |
 | `georisques`   | Natural and technological hazards (flood, soil, industrial)      |
-| `locservice`   | Rental market reference data                                     |
+
+Market data:
+
+| Source         | What it provides                                                 |
+|----------------|------------------------------------------------------------------|
 | `dvf`          | Demandes de Valeurs Foncières — historical transaction prices    |
+| `locservice`   | Rental market reference data (tension, médiane €/m²)             |
 | `carteloyers`  | National rent observatory tiers                                  |
 | `encadrement`  | Rent control zones (Paris, Lille, Lyon, etc.)                    |
-| `filosofi`     | INSEE Filosofi income / poverty statistics by IRIS               |
-| `taxefonciere` | Property tax ratios by commune                                   |
 | `vacance`      | Vacancy taxation status by commune                               |
+| `taxefonciere` | Property tax ratios by commune                                   |
+
+Commune-level signals for the investor:
+
+| Source         | What it provides                                                 |
+|----------------|------------------------------------------------------------------|
+| `filosofi`     | INSEE Filosofi income / poverty statistics by IRIS               |
+| `delinquance`  | SSMSI État 4001 — per-commune crime indicators                   |
+| `zonageabc`    | Official A bis / A / B1 / B2 / C tension classification          |
+| `zonetendue`   | "Zone tendue" + TLV-2013 + tendue-touristique flags              |
+| `anct`         | Action Cœur de Ville / Petites Villes de Demain / ORT membership |
+| `qpv`          | Quartiers Prioritaires de la politique de la Ville membership    |
+| `cartofriches` | Cerema brownfield inventory aggregated per commune               |
+| `education`    | Count of open schools per commune (live API)                     |
+
+Transport:
+
+| Source         | What it provides                                                 |
+|----------------|------------------------------------------------------------------|
+| `osm`          | Walking distance to nearest métro / RER / tram / train station   |
 
 Plus an `appraisal/` layer combining the above into rent and price
 estimates with confidence bands.
