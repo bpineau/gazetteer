@@ -37,9 +37,13 @@ const Name = "dvf"
 //     ancien-rue street-level surfaces MA and Pappersimmo measure.
 //   - v3: sub-commune `address_radius` tier inserted at top of ladder
 //     (500 m disk around `auction.lat/auction.lon`, MinSample 12).
+//   - v4: `ValueEURCents` (price × surface) now rounds in float space
+//     instead of truncating via `int64(surfaceM2)`. Removes a 0.5-1 %
+//     downward bias on every non-integer surface ; visible on the
+//     dossier's total-value field and on every appraisal aggregate.
 //     n-per-id_parcelle cap of 4 applied globally to FilterMutations
 //     as a defensive guard.
-const sourceVersion = 3
+const sourceVersion = 4
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
