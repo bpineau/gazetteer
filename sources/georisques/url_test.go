@@ -8,6 +8,8 @@ import (
 )
 
 func TestURLForLatLon_Happy(t *testing.T) {
+	t.Parallel()
+
 	got, err := URLForLatLon(48.860874, 2.370245)
 	if err != nil {
 		t.Fatalf("URLForLatLon: %v", err)
@@ -23,6 +25,8 @@ func TestURLForLatLon_Happy(t *testing.T) {
 // silently returns an empty rapport from the live API, which is the
 // kind of bug you only catch in production. Lock it here.
 func TestURLForLatLon_OrderIsLonLat(t *testing.T) {
+	t.Parallel()
+
 	// Use distinct lat / lon values so the order is unambiguous in the
 	// URL (lat=10 lon=99 → expected `latlon=99,10`).
 	got, err := URLForLatLon(10.0, 99.0)
@@ -38,6 +42,8 @@ func TestURLForLatLon_OrderIsLonLat(t *testing.T) {
 }
 
 func TestURLForLatLon_OutOfRange(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		lat, lon float64
@@ -61,6 +67,10 @@ func TestURLForLatLon_OutOfRange(t *testing.T) {
 }
 
 func TestURLForLatLon_RespectsBaseURL(t *testing.T) {
+	// NOT t.Parallel(): this test mutates the package-level BaseURL var
+	// to assert the URL builder honours the override. Parallel callers
+	// reading URLForLatLon would race the write.
+
 	old := BaseURL
 	BaseURL = "https://example.test/api/v1/risque"
 	t.Cleanup(func() { BaseURL = old })
@@ -74,6 +84,8 @@ func TestURLForLatLon_RespectsBaseURL(t *testing.T) {
 }
 
 func TestClampDecimals(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		in   string
 		n    int
@@ -97,6 +109,8 @@ func TestClampDecimals(t *testing.T) {
 }
 
 func TestURLForLatLon_TruncatesPrecision(t *testing.T) {
+	t.Parallel()
+
 	// 7 decimals → truncated to 6.
 	got, err := URLForLatLon(48.8607421, 2.3702451)
 	if err != nil {
