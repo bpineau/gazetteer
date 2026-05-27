@@ -9,6 +9,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/anct"
 	"github.com/bpineau/gazetteer/sources/bdnb"
 	"github.com/bpineau/gazetteer/sources/bpe"
+	"github.com/bpineau/gazetteer/sources/cadastre"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/cartofriches"
 	"github.com/bpineau/gazetteer/sources/chomage"
@@ -79,6 +80,13 @@ func sourceCatalog() []sourceFactory {
 			Default: false,
 			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
 				return bdnb.NewSource(bdnb.Options{Geocoder: d.BAN}), nil
+			},
+		},
+		{
+			Name:    cadastre.Name,
+			Default: true,
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return cadastre.NewSource(cadastre.Options{Geocoder: d.BAN}), nil
 			},
 		},
 		{

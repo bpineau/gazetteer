@@ -32,6 +32,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/anct"
 	"github.com/bpineau/gazetteer/sources/bdnb"
 	"github.com/bpineau/gazetteer/sources/bpe"
+	"github.com/bpineau/gazetteer/sources/cadastre"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/cartofriches"
 	"github.com/bpineau/gazetteer/sources/chomage"
@@ -72,10 +73,10 @@ type Options struct {
 }
 
 // NewDefault builds a *gazetteer.Client wired with every stable
-// in-tree Source: dvf, ademe, anct, bdnb, bpe, georisques, locservice,
-// carteloyers, cartofriches, chomage, delinquance, dpedist, education,
-// encadrement, filosofi, qpv, taxefonciere, vacance, zonageabc,
-// zonetendue.
+// in-tree Source: dvf, ademe, anct, bdnb, bpe, cadastre, georisques,
+// locservice, carteloyers, cartofriches, chomage, delinquance, dpedist,
+// education, encadrement, filosofi, qpv, taxefonciere, vacance,
+// zonageabc, zonetendue.
 //
 // The OSM transit Source is NOT included by default — it requires
 // an offline station catalog the factory does not load. Callers that
@@ -137,6 +138,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(anct.NewSource(anct.Options{})).
 		With(bdnb.NewSource(bdnb.Options{Geocoder: ban})).
 		With(bpe.NewSource(bpe.Options{})).
+		With(cadastre.NewSource(cadastre.Options{Geocoder: ban})).
 		With(georisques.NewSource(georisques.Options{Geocoder: ban})).
 		With(locservice.NewSource(locservice.Options{Geocoder: ban})).
 		With(carteloyers.NewSource(carteloyers.Options{})).
