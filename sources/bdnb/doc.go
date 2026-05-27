@@ -12,11 +12,27 @@
 // once the budget is gone. Wire a helpers/circuit.HTTPFetcher to
 // trip the breaker on either signal.
 //
-// Example:
+// Example — wire the Source, query a Listing, and read the typed
+// payload:
 //
 //	src := bdnb.NewSource(bdnb.Options{
 //	    BaseURL:  srv.URL,    // optional, defaults to package var BaseURL
 //	    Geocoder: ban,        // banx.Geocoder (forward + reverse cascade)
 //	})
-//	r, err := src.Query(ctx, listing)
+//	data, err := src.Query(ctx, gazetteer.Listing{
+//	    Address: "10 rue de Rivoli", Zip: "75001",
+//	})
+//	if err != nil { log.Fatal(err) }
+//	r := data.(*bdnb.Result)
+//	if r.IsEmpty() {
+//	    fmt.Println("no BDNB row found for this address")
+//	    return
+//	}
+//	if r.Building != nil && r.Building.AnneeConstruction != nil {
+//	    fmt.Printf("built in %d, %d dwellings\n",
+//	        *r.Building.AnneeConstruction, intOrZero(r.Building.NbLog))
+//	}
+//	if r.DPE != nil && r.DPE.ClasseBilan != "" {
+//	    fmt.Printf("DPE bilan: %s\n", r.DPE.ClasseBilan)
+//	}
 package bdnb

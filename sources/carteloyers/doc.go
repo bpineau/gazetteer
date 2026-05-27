@@ -9,12 +9,24 @@
 // commune the Source falls back to the generic apartment dataset and
 // stamps Evidence.FallbackToGeneric = true.
 //
-// Example:
+// Example — wire the Source, query a Listing, and read the typed
+// payload:
 //
 //	src := carteloyers.NewSource(carteloyers.Options{})
-//	r, err := src.Query(ctx, gazetteer.Listing{
+//	rooms := 3
+//	data, err := src.Query(ctx, gazetteer.Listing{
 //	    INSEE:        "75101",
 //	    PropertyType: gazetteer.PropertyApartment,
-//	    Rooms:        intPtr(3),
+//	    Rooms:        &rooms,
 //	})
+//	if err != nil { log.Fatal(err) }
+//	r := data.(*carteloyers.Result)
+//	if r.IsEmpty() {
+//	    fmt.Println("no rent reading for this commune × typology")
+//	    return
+//	}
+//	fmt.Printf("rent: %.2f €/m²/mois CC (range %.2f-%.2f, %d obs, %s)\n",
+//	    r.LoyerMedEURPerM2CC,
+//	    r.LoyerLowEURPerM2CC, r.LoyerHighEURPerM2CC,
+//	    r.NbObservations, r.Confidence)
 package carteloyers

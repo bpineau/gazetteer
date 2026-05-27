@@ -1,22 +1,3 @@
-// Package anct ships an offline Source that flags whether a commune
-// participates in one of France's territorial revitalization programmes
-// run by the ANCT (Agence Nationale de la Cohésion des Territoires):
-//
-//   - Action Cœur de Ville (ACV) — 245 medium-sized cities with State
-//     support for downtown revitalisation.
-//   - Petites Villes de Demain (PVD) — ~1 600 small communes (< 20 000
-//     hab) with central functions, supported on the same model.
-//   - Opération de Revitalisation de Territoire (ORT) — the legal
-//     wrapper enabling several derogations (e.g. Denormandie tax
-//     device, simplified urbanism).
-//
-// For a rental investor the signal matters because ORT-signing communes
-// unlock the Denormandie tax device on renovated rentals; ACV / PVD
-// communes typically attract State-funded urbanism projects (better
-// medium-term value trajectory).
-//
-// The Source is fully offline: the merged extract ships embedded under
-// `data/`.
 package anct
 
 // Confidence values returned in Result.Confidence. Stable strings so

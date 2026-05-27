@@ -8,16 +8,32 @@
 // recency) and returns a *Result carrying DPE label, GES label,
 // surface, build year and dwelling type.
 //
-// Example:
+// Example — wire the Source, query a Listing, and read the typed
+// payload:
 //
 //	src := ademe.NewSource(ademe.Options{
 //	    BaseURL:  srv.URL,           // optional, defaults to DefaultBaseURL
 //	    Geocoder: ban,               // banx.Geocoder
 //	})
-//	r, err := src.Query(ctx, gazetteer.Listing{
+//	data, err := src.Query(ctx, gazetteer.Listing{
 //	    Address: "1 rue de Rivoli",
 //	    Zip:     "75001",
 //	})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	r := data.(*ademe.Result)
+//	if r.IsEmpty() {
+//	    fmt.Println("no DPE found in the ADEME catalog")
+//	    return
+//	}
+//	if r.DPE != nil {
+//	    fmt.Printf("DPE %s / GES %s (confidence: %s)\n",
+//	        r.DPE.EtiquetteDPE, r.DPE.EtiquetteGES, r.Confidence)
+//	}
+//	if r.Logement != nil && r.Logement.AnneeConstruction != nil {
+//	    fmt.Printf("built in %d\n", *r.Logement.AnneeConstruction)
+//	}
 //
 // Empty responses (results: []) surface as IsEmpty()==true; the
 // framework records StatusOKEmpty.

@@ -12,11 +12,25 @@
 // habitable surface regardless of apartment vs house. Callers that
 // care can filter via Listing.PropertyType themselves.
 //
-// Example:
+// Example — wire the Source, query a Listing, and read the typed
+// payload:
 //
 //	src := taxefonciere.NewSource(taxefonciere.Options{})
-//	r, err := src.Query(ctx, gazetteer.Listing{
+//	surface := 50.0
+//	data, err := src.Query(ctx, gazetteer.Listing{
 //	    INSEE:     "75101",
-//	    SurfaceM2: floatPtr(50),
+//	    SurfaceM2: &surface,
 //	})
+//	if err != nil { log.Fatal(err) }
+//	r := data.(*taxefonciere.Result)
+//	if r.IsEmpty() {
+//	    fmt.Println("no taxe-foncière estimate for this commune")
+//	    return
+//	}
+//	fmt.Printf("estimated TF: %.0f €/an (TFPB %.2f%% + TEOM %.2f%%)\n",
+//	    r.EstimatedEURPerYear, r.TauxTFPBApplied, r.TauxTEOMApplied)
+//	if r.TEOMEURPerYear > 0 {
+//	    fmt.Printf("dont %.0f €/an récupérables auprès du locataire\n",
+//	        r.TEOMEURPerYear)
+//	}
 package taxefonciere

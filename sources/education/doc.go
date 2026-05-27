@@ -24,6 +24,23 @@
 //
 // Property type is irrelevant. The school catalog covers every French
 // commune (including DOM-TOM).
+//
+// Example — wire the Source, query a Listing, and read the typed
+// payload:
+//
+//	src := education.NewSource(education.Options{})
+//	data, err := src.Query(ctx, gazetteer.Listing{INSEE: "75111"})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	r := data.(*education.Result)
+//	if r.IsEmpty() {
+//	    fmt.Println("no schools registered for this commune")
+//	    return
+//	}
+//	fmt.Printf("%d schools total in commune:\n", r.NbTotal)
+//	fmt.Printf("  %d écoles, %d collèges, %d lycées\n",
+//	    r.NbEcole, r.NbCollege, r.NbLycee)
 package education
 
 // DefaultBaseURL is the Opendatasoft v2.1 endpoint root for the
