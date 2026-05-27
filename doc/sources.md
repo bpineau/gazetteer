@@ -21,6 +21,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `bdnb`           | address + INSEE                                | data.gouv.fr BDNB PostgREST |
 | `carteloyers`    | INSEE + property_type + rooms                  | offline ANIL / DHUP dataset |
 | `cartofriches`   | INSEE                                          | offline Cerema brownfields  |
+| `chomage`        | INSEE                                          | offline INSEE chômage ZE2020|
 | `delinquance`    | INSEE                                          | offline SSMSI État 4001     |
 | `dvf`            | INSEE or address + property_type (+ surface)   | data.gouv.fr Etalab DVF     |
 | `education`      | INSEE                                          | data.education.gouv.fr API  |
@@ -209,6 +210,24 @@ commune.
   / sans projet / reconverti), plus cumulative surface in m².
 - **Backend**: offline aggregate of ~28 000 sites across ~9 100
   communes.
+
+## `sources/chomage`
+
+Latest INSEE estimate of the local unemployment rate ("taux de chômage
+localisé") for the zone d'emploi a commune belongs to, plus a 20-quarter
+trend window.
+
+- **Needs**: INSEE.
+- **Result**: `chomage.Result` carrying the ZE2020 code + label, the
+  latest seasonally-adjusted rate, the matching national average, the
+  delta in percentage points, a peer-relative tension flag (tight /
+  balanced / loose) and a recent-quarters series suitable for a UI
+  sparkline.
+- **Backend**: offline merged JSON under `data/` (302 zones d'emploi
+  2020 + ~34 875 commune crosswalk, 20-quarter tail).
+- **Coverage**: metropolitan France + DOM. Mayotte and French Guiana
+  are excluded by INSEE per the source dataset; commune-INSEE-not-found
+  cases surface as `IsEmpty()`.
 
 ## `sources/delinquance`
 
