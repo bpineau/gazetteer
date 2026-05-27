@@ -65,7 +65,7 @@ func (t *cacheTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return t.next.RoundTrip(req)
 	}
 
-	hash := requestHash(req, "")
+	hash := requestHash(req)
 	metaPath, bodyPath := t.pathsFor(hash)
 
 	if meta, body, ok := t.readEntry(metaPath, bodyPath); ok {
@@ -256,17 +256,16 @@ func buildResponse(req *http.Request, meta *cacheMeta, body []byte, fromCache bo
 
 // requestHash returns the cache key for a request.
 //
-// Key = sha256(method "\n" url "\n" varyKey). varyKey may be empty on the
-// first request; the cache layer can add Vary-derived headers later by
-// pre-fetching a stub meta — kept simple in v1: we ignore Vary when
-// hashing the first request and rely on the response's Vary to disambiguate.
-func requestHash(req *http.Request, varyKey string) string {
+// Key = sha256(method "\n" url). v1 ignores Vary when hashing the
+// first request and relies on the response's Vary header to
+// disambiguate later — a varyKey parameter is intentionally absent
+// so the call sites stay simple. Extend the signature when v2 wires
+// proactive Vary-derived hashing.
+func requestHash(req *http.Request) string {
 	h := sha256.New()
 	_, _ = io.WriteString(h, req.Method)
 	_, _ = io.WriteString(h, "\n")
 	_, _ = io.WriteString(h, req.URL.String())
-	_, _ = io.WriteString(h, "\n")
-	_, _ = io.WriteString(h, varyKey)
 	return hex.EncodeToString(h.Sum(nil))
 }
 
