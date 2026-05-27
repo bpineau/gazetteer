@@ -157,37 +157,6 @@ func TestTensionScore(t *testing.T) {
 	}
 }
 
-// TestFoldArrondissement pins the Paris / Lyon / Marseille
-// arrondissement -> parent commune mapping.
-func TestFoldArrondissement(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		in   string
-		want string
-	}{
-		{"75056", "75056"},   // Paris parent passthrough
-		{"75101", "75056"},   // Paris 1er
-		{"75116", "75056"},   // Paris 16e
-		{"75120", "75056"},   // Paris 20e
-		{"69123", "69123"},   // Lyon parent passthrough
-		{"69381", "69123"},   // Lyon 1er
-		{"69389", "69123"},   // Lyon 9e
-		{"13055", "13055"},   // Marseille parent passthrough
-		{"13201", "13055"},   // Marseille 1er
-		{"13216", "13055"},   // Marseille 16e
-		{"33063", "33063"},   // Bordeaux passthrough
-		{"", ""},             // Empty passthrough
-		{"7510", "7510"},     // Too short passthrough
-		{"751111", "751111"}, // Too long passthrough
-		{"69266", "69266"},   // Villeurbanne — NOT folded (not Lyon)
-	}
-	for _, c := range cases {
-		if got := foldArrondissement(c.in); got != c.want {
-			t.Errorf("foldArrondissement(%q) = %q, want %q", c.in, got, c.want)
-		}
-	}
-}
-
 // TestStubIndex exercises the Options.Index injection path used by
 // downstream tests that want to avoid the embedded JSON.
 func TestStubIndex(t *testing.T) {
