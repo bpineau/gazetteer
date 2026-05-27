@@ -23,8 +23,8 @@ import (
 // gazetteer.Dossier results key and the registry key.
 const Name = "dvf"
 
-// sourceVersion bumps when the Source's internal logic changes. Callers
-// (a stateful runner) gate cache invalidation on it.
+// sourceVersion bumps when the Source's internal logic changes.
+// Stateful callers gate cache invalidation on it.
 //
 // History:
 //   - v1: initial release (commune → neighborhood → department ladder, no
@@ -40,9 +40,8 @@ const Name = "dvf"
 //     as a defensive guard.
 const sourceVersion = 3
 
-// Version exposes sourceVersion so callers that wrap the Source (e.g.
-// a downstream adapter) can mirror it without reaching into the package
-// internals.
+// Version exposes sourceVersion so callers that wrap the Source can
+// mirror it without reaching into the package internals.
 const Version = sourceVersion
 
 // DVFAddressRadiusMeters is the disk radius (in metres) used by the
@@ -94,7 +93,7 @@ type Options struct {
 	// SectionCache is the kvcache backend the SectionDiscoverer uses
 	// to memoise per-commune section lists. Defaults to an in-memory
 	// memcache when nil; callers that want cross-run persistence
-	// (a downstream adapter) supply a bun-backed adapter here.
+	// supply a persistent kvcache.Cache backend here.
 	SectionCache kvcache.Cache
 
 	// Logger overrides slog.Default(). Optional.
@@ -465,8 +464,7 @@ func (s *Source) resolveSections(ctx context.Context, insee string) []string {
 func (s *Source) Sections() *SectionDiscoverer { return s.sections }
 
 // API exposes the Source's underlying API client. Useful for callers
-// that need to issue raw GetMutations calls outside the ladder (e.g.
-// a downstream adapter's separate code paths).
+// that need to issue raw GetMutations calls outside the ladder.
 func (s *Source) API() *API { return s.api }
 
 // Query is the atomic helper for callers who don't want the builder.

@@ -2,12 +2,11 @@ package banx
 
 import "testing"
 
-// TestDeptFromZip covers the canonical zip → département encoding shared
-// by tribunal lookups (a downstream loader,
-// a downstream consumer) and Pappers slug routing
-// (a downstream consumer). The cases exercise the four
-// branches: 2-digit métropole, Corsica 2A/2B split, DOM-TOM 3-digit,
-// rejection of malformed input.
+// TestDeptFromZip covers the canonical zip → département encoding
+// shared by every consumer keyed on département (BAN dept-guard,
+// commune lookups). The cases exercise the four branches: 2-digit
+// métropole, Corsica 2A/2B split, DOM-TOM 3-digit, rejection of
+// malformed input.
 func TestDeptFromZip(t *testing.T) {
 	cases := []struct {
 		name string
@@ -57,11 +56,11 @@ func TestDeptFromZip(t *testing.T) {
 	}
 }
 
-// TestDeptMatchKey_CrossCorsica documents the deliberate divergence from
-// DeptFromZip : the match key folds both Corsican departments under a
-// single "20" prefix so that cross-island zips still pair up during
-// enricher comparable selection. Tightening the Corsica split here
-// would break MA / castorus / BAN-cache picker semantics.
+// TestDeptMatchKey_CrossCorsica documents the deliberate divergence
+// from DeptFromZip: the match key folds both Corsican departments
+// under a single "20" prefix so cross-island zips still pair up during
+// comparable selection. Tightening the Corsica split here would break
+// BAN-cache and downstream fuzzy-resolver picker semantics.
 func TestDeptMatchKey_CrossCorsica(t *testing.T) {
 	if deptMatchKey("20000") != deptMatchKey("20200") {
 		t.Errorf("deptMatchKey should fold 2A and 2B under the same key, got %q vs %q",

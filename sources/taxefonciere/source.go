@@ -15,11 +15,9 @@ const Name = "taxefonciere"
 
 // sourceVersion bumps when the Source's internal logic changes.
 //
-// History:
-//   - v1: initial port from a downstream consumer
-//     (legacy per-m² ratio fallback) + taxe_fonciere_v2 (DGFiP taux
-//     votés + VLC proxy + TEOM breakdown). V2 first, V1 only when V2
-//     misses on both commune + dept.
+// v1 combines the legacy per-m² ratio fallback with taxe_fonciere_v2
+// (DGFiP taux votés + VLC proxy + TEOM breakdown). V2 runs first; V1
+// only when V2 misses on both commune and département.
 const sourceVersion = 1
 
 // Version exposes sourceVersion so callers that wrap the Source can

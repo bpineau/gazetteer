@@ -1,8 +1,8 @@
 package bdnb
 
 // Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers (a downstream adapter, dashboards) can match on
-// them without importing this package's constants.
+// downstream consumers (appraisers, dashboards) can match on them
+// without importing this package's constants.
 const (
 	ConfidenceHigh   = "high"
 	ConfidenceMedium = "medium"
@@ -15,15 +15,13 @@ const (
 	SkipReasonNoMatch = "no_match"
 )
 
-// Result is the typed payload returned by Source.Query. Mirrors the
-// shape currently persisted by a downstream enricher (resultBlob
-// with Identity / Building / DPE / Risks / Fiabilite sub-blobs) so the
-// a downstream consumer adapter can re-serialise it 1:1 into its EnrichPayload.Result.
+// Result is the typed payload returned by Source.Query. Groups the
+// picked building's Identity / Building / DPE / Risks / Fiabilite
+// sub-blobs.
 //
-// Envelope-only fields (schema_version, enricher_version, computed_at,
-// input_hash) are NOT part of the gazetteer payload — those are the
-// framework's responsibility (Result envelope in gazetteer.Result, or
-// in a downstream payload struct).
+// Envelope-only fields (schema_version, source_version, computed_at,
+// input_hash) are NOT part of this payload — those are the framework's
+// responsibility (see gazetteer.Result).
 type Result struct {
 	// Identity carries the batiment_groupe id + address normalisation.
 	// Nil when the picked row had no batiment_groupe_id AND no

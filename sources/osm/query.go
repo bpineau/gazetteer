@@ -46,10 +46,10 @@ const OverpassDeptTimeout = 25 * time.Second
 
 // MinExpectedStations is the absolute floor below which a France-wide
 // refresh is considered failed even when every per-dept HTTP call returned
-// 200 OK. Empirically the full metropolitan catalog carries ~9 000 stations
-// (verified 2026-05-18 snapshot = 9 039); 2 000 is a conservative ~22 % of
-// that — well below the variance of OSM tag churn but well above any
-// scenario where most departments legitimately returned data.
+// 200 OK. Empirically the full metropolitan catalog carries ~9 000 stations;
+// 2 000 is a conservative ~22 % of that — well below the variance of OSM
+// tag churn but well above any scenario where most departments
+// legitimately returned data.
 //
 // Below this floor the refresh aborts WITHOUT overwriting the on-disk
 // catalog, so the operator can investigate (mirror outage, silent empty

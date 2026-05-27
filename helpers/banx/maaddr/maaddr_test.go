@@ -9,14 +9,10 @@ import (
 	"github.com/bpineau/gazetteer/helpers/banx/maaddr"
 )
 
-// TestStripTrailingZipCity pins the BAN-label trimming helper so the
+// TestStripTrailingZipCity pins the BAN-label trimming helper so a
 // retry's autocomplete query is just the street part (the autocomplete-
 // shaped caller gets city/zip via its own URL components, not the q=
 // parameter).
-//
-// Combines the cases from the legacy
-// `a downstream consumer` table with the
-// `enrich_ma_ban_retry_test.go` postCode-empty pinning.
 func TestStripTrailingZipCity(t *testing.T) {
 	cases := []struct {
 		name  string

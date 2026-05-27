@@ -15,16 +15,13 @@ const Name = "filosofi"
 
 // sourceVersion bumps when the Source's internal logic changes.
 //
-// History:
-//   - v1: initial port from a downstream consumer
-//     Per-commune Filosofi 2021 indicators (median revenu disponible +
-//     minima sociaux %). Risk classifier thresholds calibrated against
-//     the 2021 national distribution.
+// v1 exposes the per-commune Filosofi 2021 indicators (median revenu
+// disponible + minima sociaux %). Risk classifier thresholds are
+// calibrated against the 2021 national distribution.
 const sourceVersion = 1
 
-// Version exposes sourceVersion so callers that wrap the Source (e.g.
-// a rental wrapper) can mirror it without reaching into
-// the package internals.
+// Version exposes sourceVersion so callers that wrap the Source can
+// mirror it without reaching into the package internals.
 const Version = sourceVersion
 
 // Options configures a filosofi Source.

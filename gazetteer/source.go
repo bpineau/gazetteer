@@ -94,11 +94,11 @@ type EmptyReporter interface {
 //     process?") without reading the Options struct.
 //
 // The convention across shipped Sources is to expose a BaseURL string
-// (or a domain-specific equivalent — SuggestBaseURL / ListingBaseURL
-// for bienici, SiteRoot for castorus) on the Options struct. Sources
-// that implement BaseURLer return the *effective* URL — i.e. the one
-// the Source will actually use for outgoing requests, after
-// Options-vs-package-var fallback resolution.
+// (or a domain-specific equivalent when one upstream root is not
+// enough) on the Options struct. Sources that implement BaseURLer
+// return the *effective* URL — i.e. the one the Source will actually
+// use for outgoing requests, after Options-vs-package-var fallback
+// resolution.
 type BaseURLer interface {
 	BaseURL() string
 }

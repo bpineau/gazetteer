@@ -16,16 +16,13 @@ const Name = "encadrement"
 
 // sourceVersion bumps when the Source's internal logic changes.
 //
-// History:
-//   - v1: initial port from a downstream consumer
-//     Paris arrondissement match via zip (75001..75020, 75116); Lyon
-//     via INSEE (69381..69389, 69266); Plaine Commune returns
-//     ConfidenceNone (no commune→zone map yet).
+// v1 matches Paris arrondissements via zip (75001..75020, 75116) and
+// Lyon / Villeurbanne via INSEE (69381..69389, 69266). Plaine Commune
+// returns ConfidenceNone (no commune→zone map yet).
 const sourceVersion = 1
 
-// Version exposes sourceVersion so callers that wrap the Source (e.g.
-// a rental wrapper) can mirror it without reaching into
-// the package internals.
+// Version exposes sourceVersion so callers that wrap the Source can
+// mirror it without reaching into the package internals.
 const Version = sourceVersion
 
 // Options configures an encadrement Source.

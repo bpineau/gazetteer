@@ -18,13 +18,12 @@ import (
 // gazetteer.Dossier results key and the registry key.
 const Name = "ademe"
 
-// sourceVersion bumps when the Source's internal logic changes. Callers
-// (a stateful runner) gate cache invalidation on it.
+// sourceVersion bumps when the Source's internal logic changes.
+// Stateful callers gate cache invalidation on it.
 const sourceVersion = 1
 
-// Version exposes sourceVersion so callers that wrap the Source (e.g.
-// a downstream adapter) can mirror it without reaching into the package
-// internals.
+// Version exposes sourceVersion so callers that wrap the Source can
+// mirror it without reaching into the package internals.
 const Version = sourceVersion
 
 // Options configures an ademe Source. The zero value is usable: every
@@ -79,8 +78,8 @@ func (s *Source) Version() int { return sourceVersion }
 //     IsEmpty()==true; the framework records StatusOKEmpty.
 //
 // Logging: emits one DEBUG log line per query via
-// gazetteer.LoggerFrom(ctx) at the "ademe" component. The a downstream consumer
-// adapter on top adds INFO once per work-unit.
+// gazetteer.LoggerFrom(ctx) at the "ademe" component. Wrappers that
+// batch many queries typically log a single INFO line per work-unit.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	logger := gazetteer.LoggerFrom(ctx).With(slog.String("source", Name))
 
@@ -148,17 +147,25 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	}
 
 	// Pick the row whose adresse starts with the listing's number when
-	// available; otherwise fall back to PickBest.
+	// available; otherwise fall back to PickBest. Both pickers honour
+	// the listing's surface (when supplied) to disambiguate between
+	// dwellings at the same street number — apartment buildings carry
+	// one DPE row per logement and the right answer is the one whose
+	// surface is closest to what the caller actually owns.
+	wantSurface := 0.0
+	if l.SurfaceM2 != nil {
+		wantSurface = *l.SurfaceM2
+	}
 	idx := -1
 	numberMatched := false
 	if parts.Number != "" {
-		if i, ok := PickBestByNumber(rows, parts.Number); ok {
+		if i, ok := PickBestByNumber(rows, parts.Number, wantSurface); ok {
 			idx = i
 			numberMatched = true
 		}
 	}
 	if idx == -1 {
-		i, ok := PickBest(rows)
+		i, ok := PickBest(rows, wantSurface)
 		if !ok {
 			logger.Debug("ademe.no_match",
 				slog.String("zip", resolvedZip),

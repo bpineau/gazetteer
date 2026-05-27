@@ -30,10 +30,9 @@ const (
 	RiskHigh    RiskFlag = "high"
 )
 
-// Result is the typed payload returned by Source.Query. Mirrors the
-// IncomeRiskEstimate shape currently persisted by a downstream consumer's rental
-// enricher so the wrapper can re-serialise it 1:1 into its
-// EnrichPayload.Result.
+// Result is the typed payload returned by Source.Query. Exposes the
+// commune's income + minima-sociaux indicators plus the peer-relative
+// RiskFlag.
 type Result struct {
 	// MedianEUR is the commune's revenu disponible médian par UC
 	// (€/an). Zero when the commune was not found (secret statistique

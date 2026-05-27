@@ -1,35 +1,30 @@
 package osm
 
 // Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers (a downstream adapter, dashboards) can match on
-// them without importing this package's constants.
+// downstream consumers (appraisers, dashboards) can match on them
+// without importing this package's constants.
 const (
 	ConfidenceHigh = "high"
 	ConfidenceLow  = "low"
 )
 
 // SkipReason sentinels populated on empty (skipped) results. Stable
-// wire contract — downstream consumers (a downstream adapter) group on
-// these values to decide whether to surface a transient or permanent
-// skip error to the runner.
+// wire contract — downstream consumers group on these values to decide
+// whether to surface a transient or permanent skip error to the
+// runner.
 const (
 	// SkipReasonOutOfRange — the listing's coordinates resolve a
 	// nearest station BEYOND MaxNearestStationMeters. Permanent for
-	// that (lat, lon) : the metropolitan catalog will never grow
-	// fast enough to cover this point. The a downstream consumer adapter maps
-	// this to enrich.ErrPermanentlyOutOfScope.
+	// that (lat, lon): the metropolitan catalog will never grow fast
+	// enough to cover this point.
 	SkipReasonOutOfRange = "out_of_range"
 )
 
-// Result is the typed payload returned by Source.Query. Mirrors the
-// shape currently persisted by a downstream enricher
-// (resultBlob) so a downstream adapter can re-serialise it 1:1
-// into its EnrichPayload.Result.
+// Result is the typed payload returned by Source.Query.
 //
-// Envelope-only fields (schema_version, enricher_version, computed_at,
-// input_hash) are NOT part of the gazetteer payload — those are the
-// framework's responsibility (Result envelope in gazetteer.Result, or
-// in a downstream payload struct).
+// Envelope-only fields (schema_version, source_version, computed_at,
+// input_hash) are NOT part of this payload — those are the framework's
+// responsibility (see gazetteer.Result).
 type Result struct {
 	// NearestTransitName is the user-visible station name (e.g.
 	// "Lourmel"). Empty on an empty/skipped result.

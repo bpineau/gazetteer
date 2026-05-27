@@ -9,13 +9,12 @@ import (
 	"github.com/bpineau/gazetteer/gazetteer"
 )
 
-// runRefresh is a v1 stub. The eventual `refresh` implementation
-// re-fetches upstream data and regenerates the embedded CSV / JSON
-// files shipped by sources that carry one (carteloyers, encadrement,
-// filosofi, taxefonciere, vacance, osm_transit). Each source defines
-// its own data URL + parser, so the full implementation is a
-// per-source pull-request rather than a one-line CLI change — deferred
-// to Phase 6 v2 per the design plan.
+// runRefresh is a stub. The eventual `refresh` implementation re-fetches
+// upstream data and regenerates the embedded CSV / JSON files shipped
+// by Sources that carry one (carteloyers, encadrement, filosofi,
+// taxefonciere, vacance, osm_transit). Each Source defines its own
+// data URL + parser, so the full implementation lands as a per-source
+// contribution rather than a one-line CLI change.
 func runRefresh(_ context.Context, args []string) error {
 	fs := flag.NewFlagSet("refresh", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
@@ -23,8 +22,7 @@ func runRefresh(_ context.Context, args []string) error {
 		fmt.Fprintln(fs.Output(), "Usage: gazetteer refresh <source>|all")
 		fmt.Fprintln(fs.Output())
 		fmt.Fprintln(fs.Output(), "Re-fetches upstream data + regenerates the embedded file(s) for")
-		fmt.Fprintln(fs.Output(), "a source. v1: STUB ONLY — no per-source implementation has shipped yet.")
-		fmt.Fprintln(fs.Output(), "See Phase 6 v2.")
+		fmt.Fprintln(fs.Output(), "a source. STUB ONLY — no per-source implementation has shipped yet.")
 	}
 	if err := fs.Parse(args); err != nil {
 		return errUsage
@@ -47,7 +45,7 @@ func runRefresh(_ context.Context, args []string) error {
 	}
 
 	for _, name := range targets {
-		fmt.Fprintf(os.Stdout, "refresh %s: not implemented (Phase 6 v1 stub; see Phase 6 v2)\n", name)
+		fmt.Fprintf(os.Stdout, "refresh %s: not implemented (per-source refresh stub)\n", name)
 	}
 	return nil
 }

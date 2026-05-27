@@ -1,8 +1,8 @@
 package ademe
 
 // Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers (a downstream appraiser, dashboards) can match on
-// them without importing this package's constants.
+// downstream consumers (appraisers, dashboards) can match on them
+// without importing this package's constants.
 const (
 	ConfidenceHigh   = "high"
 	ConfidenceMedium = "medium"
@@ -15,15 +15,13 @@ const (
 	SkipReasonNoMatch = "no_match"
 )
 
-// Result is the typed payload returned by Source.Query. Mirrors the
-// shape currently persisted by a downstream enricher
-// (resultBlob + dpeBlob + logementBlob + adresseBlob) so the a downstream consumer
-// adapter can re-serialise it 1:1 into its EnrichPayload.Result.
+// Result is the typed payload returned by Source.Query. Groups the
+// DPE label, GES label, logement attributes, and a picked adresse
+// candidate into the four sub-blobs used by downstream renderers.
 //
-// Envelope-only fields (schema_version, enricher_version, computed_at,
-// input_hash) are NOT part of the gazetteer payload — those are the
-// framework's responsibility (Result envelope in gazetteer.Result, or
-// in a downstream payload struct).
+// Envelope-only fields (schema_version, source_version, computed_at,
+// input_hash) are NOT part of this payload — those are the framework's
+// responsibility (see gazetteer.Result).
 type Result struct {
 	// DPE is non-nil when at least one DPE-letter field was populated
 	// on the picked row. Nil-pointer = no DPE letter found.

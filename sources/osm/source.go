@@ -12,23 +12,21 @@ import (
 )
 
 // Name is the canonical Source identifier. Stable; used as the
-// gazetteer.Dossier results key and the registry key. Re-exported by
-// a downstream adapter as its enricher name.
+// gazetteer.Dossier results key and the registry key.
 const Name = "osm_transit"
 
-// sourceVersion bumps when the Source's internal logic changes. Callers
-// (a stateful runner) gate cache invalidation on it.
+// sourceVersion bumps when the Source's internal logic changes.
+// Stateful callers gate cache invalidation on it.
 //
-// Version 3 (2026-05-18) : Station.Lines is now populated by joining
-// the parent route relations (`relation[type=route][route=*]`) and
-// stop_area umbrellas. Previously the catalog only kept the `ref` /
-// `route_ref` tag carried directly on the station node, which was
-// empty for ~89 % of stations.
+// Version 3 : Station.Lines is now populated by joining the parent
+// route relations (`relation[type=route][route=*]`) and stop_area
+// umbrellas. Previously the catalog only kept the `ref` / `route_ref`
+// tag carried directly on the station node, which was empty for ~89 %
+// of stations.
 const sourceVersion = 3
 
-// Version exposes sourceVersion so callers that wrap the Source (e.g.
-// a downstream adapter) can mirror it without reaching into the package
-// internals.
+// Version exposes sourceVersion so callers that wrap the Source can
+// mirror it without reaching into the package internals.
 const Version = sourceVersion
 
 // MaxNearestStationMeters caps the haversine distance the OSM transit
@@ -90,8 +88,8 @@ func (s *Source) UpdateCatalog(c *Catalog) {
 }
 
 // Catalog returns the currently-installed catalog snapshot, or nil
-// when none has been installed. Exposed for tests + the a downstream consumer
-// adapter (Reads catalog stats for the EnrichPayload.Method.Params).
+// when none has been installed. Exposed for tests and for downstream
+// consumers that want to report catalog stats.
 func (s *Source) Catalog() *Catalog {
 	return s.catalog.Load()
 }
@@ -115,14 +113,15 @@ func (s *Source) Version() int { return sourceVersion }
 //   - Successful but no station within MaxNearestStationMeters → a
 //     non-nil *Result with IsEmpty() == true and
 //     SkipReason == SkipReasonOutOfRange. The framework records
-//     StatusOKEmpty; a downstream adapter consults SkipReason to
-//     map this to enrich.ErrPermanentlyOutOfScope.
+//     StatusOKEmpty; downstream consumers can use SkipReason to map
+//     this to a permanent skip.
 //   - Successful pick → *Result with SampleSize==1 + a populated
 //     Evidence sidecar.
 //
 // Logging: emits one DEBUG log line per query via
-// gazetteer.LoggerFrom(ctx) at the "osm_transit" component. The
-// a downstream consumer adapter on top adds INFO once per work-unit.
+// gazetteer.LoggerFrom(ctx) at the "osm_transit" component. Wrappers
+// that batch many queries typically log a single INFO line per
+// work-unit.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	logger := gazetteer.LoggerFrom(ctx).With(slog.String("source", Name))
 

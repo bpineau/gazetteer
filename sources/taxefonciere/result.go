@@ -1,13 +1,13 @@
-// Package taxefonciere ports the rental enricher's taxe foncière
-// estimators (V2 DGFiP taux votés + TEOM breakdown, V1 per-m² ratio
-// legacy fallback) into a standalone gazetteer Source.
+// Package taxefonciere provides a gazetteer.Source that estimates the
+// yearly taxe foncière a landlord pays on a French dwelling.
 //
 // Given a Listing the Source resolves the commune INSEE, looks up the
 // DGFiP voted TFPB/TEOM taux for the commune (or dept median
 // fallback), and computes the yearly TF the landlord pays plus the
-// separately-itemised TEOM (recoverable from the tenant). When the
-// V2 index has no signal at all (commune + dept both missing) the
-// Source falls back to the legacy V1 per-m² ratio.
+// separately-itemised TEOM (recoverable from the tenant). The V2 path
+// (DGFiP taux votés + TEOM breakdown) runs first; the V1 per-m² ratio
+// fallback runs only when V2 has no signal at all (commune + dept
+// both missing).
 //
 // The Source is fully offline: both embedded datasets ship under
 // `data/`.
@@ -23,13 +23,12 @@ const (
 	ConfidenceNone   = ""
 )
 
-// Result is the typed payload returned by Source.Query. Mirrors the
-// PropertyTaxV2Estimate shape currently persisted by a downstream consumer's
-// rental enricher (with the V1 fallback fields surfaced so the
-// wrapper can mirror the existing wire format byte-for-byte).
+// Result is the typed payload returned by Source.Query. Exposes both
+// the V2 (taux votés) fields and the V1 (per-m² ratio) fallback fields
+// so downstream consumers can render either path cleanly.
 //
-// Envelope-only fields are NOT part of the gazetteer payload — those
-// are the framework's responsibility.
+// Envelope-only fields are NOT part of this payload — those are the
+// framework's responsibility (see gazetteer.Result).
 type Result struct {
 	// EstimatedEURPerYear is the TF the landlord pays out-of-pocket
 	// (TFPB leg only — TEOM is recoverable). Zero when no signal

@@ -247,8 +247,8 @@ func hasPrefixCI(s, prefix string) bool {
 }
 
 // BuildResult renders a Report into the typed Result blob. Pure
-// function — exposed so a downstream adapter can reuse the same
-// projection without re-implementing the flattening rules.
+// function — exposed so callers can reuse the same projection without
+// re-implementing the flattening rules.
 //
 // Stamps `level_used`:
 //   - "address" when BRGM resolved the request down to the building's

@@ -33,18 +33,17 @@ func ParseHTML(body []byte) (*goquery.Document, error) {
 //   - "http://example.fr/foo"    → returned verbatim
 //   - "/foo"                     → base + "/foo" (root-relative)
 //   - "./foo"                    → base + "/foo" (current-page-relative
-//     collapsed to root-relative — the existing vench behaviour;
-//     site-specific path arithmetic should be done by the caller)
+//     collapsed to root-relative; site-specific path arithmetic should
+//     be done by the caller)
 //   - "foo"                      → base + "/foo" (bare path)
 //   - ""                         → "" (empty in, empty out)
 //
 // The base is used as-is without trailing-slash normalisation: a base of
-// "https://www.vench.fr" composes "https://www.vench.fr/foo"; a base
-// already ending with "/" would produce "https://www.vench.fr//foo" —
-// callers should pass a base WITHOUT a trailing slash. The helper
-// deliberately does not call net/url.Parse because the previous adapter
-// implementations did not, and the round-trip would change error
-// behaviour observable in the vench / castorus test suites.
+// "https://www.example.fr" composes "https://www.example.fr/foo"; a
+// base already ending with "/" would produce
+// "https://www.example.fr//foo" — callers should pass a base WITHOUT a
+// trailing slash. The helper deliberately does not call net/url.Parse
+// to keep error semantics simple (no parse-error surface to wrap).
 func AbsoluteURL(base, ref string) string {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {

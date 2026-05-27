@@ -6,10 +6,9 @@ import (
 )
 
 // TestCityZip_KnownCommunes exercises the happy path on a handful of
-// well-known (city, dept) pairs that drove the licitor city→zip
-// fallback (cf. doc/audits/geographic_integrity_round_n22_2026-05-19.md):
-// Vierzon 18100, Saint-Amand-Montrond 18200, Perceneige 89260,
-// Vincennes 94300. These are all single-INSEE / single-CP communes.
+// well-known (city, dept) pairs: Vierzon 18100, Saint-Amand-Montrond
+// 18200, Perceneige 89260, Vincennes 94300. These are all single-INSEE
+// / single-CP communes.
 func TestCityZip_KnownCommunes(t *testing.T) {
 	tbl, err := Default()
 	if err != nil {

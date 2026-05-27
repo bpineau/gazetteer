@@ -17,16 +17,15 @@ import (
 // gazetteer.Dossier results key and the registry key.
 const Name = "bdnb"
 
-// sourceVersion bumps when the Source's internal logic changes. Callers
-// (a stateful runner) gate cache invalidation on it.
+// sourceVersion bumps when the Source's internal logic changes.
+// Stateful callers gate cache invalidation on it.
 //
-// Version 2 carries forward the a downstream consumer v2 logic: the residence-prefix
-// leak fix shipped in fraddr.Parse + IlikePatternFor .
+// Version 2 incorporates the residence-prefix leak fix in
+// fraddr.Parse + IlikePatternFor.
 const sourceVersion = 2
 
-// Version exposes sourceVersion so callers that wrap the Source (e.g.
-// a downstream adapter) can mirror it without reaching into the package
-// internals.
+// Version exposes sourceVersion so callers that wrap the Source can
+// mirror it without reaching into the package internals.
 const Version = sourceVersion
 
 // Options configures a bdnb Source. The zero value is usable: every
@@ -41,12 +40,11 @@ type Options struct {
 
 	// Geocoder is consulted to resolve the listing's address into a
 	// 5-digit INSEE — required by BDNB's PostgREST filter to avoid
-	// 57014 timeouts. Mandatory in practice unless the Listing carries
-	// a usable Listing.INSEE (TODO: today Listing.INSEE is unused by
-	// a downstream consumer's AuctionToListing helper, so callers always wire a
-	// Geocoder). If the Geocoder also implements banx.ReverseGeocoder
-	// the Source uses the standard forward/reverse cascade
-	// (banx.INSEEResolver); otherwise forward-only.
+	// 57014 timeouts. Mandatory in practice unless the Listing already
+	// carries a usable Listing.INSEE. If the Geocoder also implements
+	// banx.ReverseGeocoder, the Source uses the standard
+	// forward/reverse cascade (banx.INSEEResolver); otherwise
+	// forward-only.
 	Geocoder banx.Geocoder
 
 	// HTTPClient overrides the per-query HTTP client. When nil, the
@@ -90,8 +88,8 @@ func (s *Source) Version() int { return sourceVersion }
 //     IsEmpty()==true; the framework records StatusOKEmpty.
 //
 // Logging: emits one DEBUG log line per query via
-// gazetteer.LoggerFrom(ctx) at the "bdnb" component. The a downstream consumer
-// adapter on top adds INFO once per work-unit.
+// gazetteer.LoggerFrom(ctx) at the "bdnb" component. Wrappers that
+// batch many queries typically log a single INFO line per work-unit.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	logger := gazetteer.LoggerFrom(ctx).With(slog.String("source", Name))
 

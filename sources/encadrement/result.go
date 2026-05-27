@@ -14,8 +14,8 @@ import (
 )
 
 // Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers (a rental wrapper, dashboards) can
-// match on them without importing this package's constants.
+// downstream consumers (appraisers, dashboards) can match on them
+// without importing this package's constants.
 const (
 	ConfidenceMedium = "medium"
 	ConfidenceNone   = ""
@@ -30,13 +30,11 @@ const (
 	ZoneSourceLyonVilleurbanne = "lyon_villeurbanne"
 )
 
-// Result is the typed payload returned by Source.Query. Mirrors the
-// CeilingEstimate shape currently persisted by a downstream consumer's rental
-// enricher (loyer de référence + majoré + zone label) so the wrapper
-// can re-serialise it 1:1 into its EnrichPayload.Result.
+// Result is the typed payload returned by Source.Query. Exposes the
+// loyer de référence + majoré + zone label trio.
 //
-// Envelope-only fields are NOT part of the gazetteer payload — those
-// are the framework's responsibility.
+// Envelope-only fields are NOT part of this payload — those are the
+// framework's responsibility (see gazetteer.Result).
 type Result struct {
 	// LoyerRefMajEURPerM2HC is the loyer de référence majoré (the legal
 	// max) in EUR/m²/month HC. Zero when the property sits outside the

@@ -176,9 +176,9 @@ func TestSource_NoCatalog_ReturnsErrNoCatalog(t *testing.T) {
 
 func TestSource_EmptyCatalogOptions_TreatedAsNoCatalog(t *testing.T) {
 	// Passing an empty (non-nil) catalog must be treated as "no catalog"
-	// — Query returns ErrNoCatalog. This matches the a downstream consumer behaviour
-	// the boot sequence relies on (the serve process registers the
-	// enricher with an empty catalog and starts a background refresh).
+	// — Query returns ErrNoCatalog. This matches the behaviour a hot-swap
+	// boot sequence relies on: register the Source with an empty catalog
+	// and start a background refresh that calls UpdateCatalog later.
 	s := NewSource(Options{Catalog: &Catalog{}})
 	_, err := s.Query(context.Background(), gazetteer.Listing{
 		Lat: ptrF64(48.84),

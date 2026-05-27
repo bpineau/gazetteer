@@ -9,9 +9,8 @@ import (
 )
 
 // Confidence values stamped into Result.Confidence by PickConfidence.
-// Stable wire-format strings — downstream consumers (a downstream consumer's
-// adapter, dashboards) compare against these without importing the
-// package.
+// Stable wire-format strings — downstream consumers (appraisers,
+// dashboards) compare against these without importing the package.
 const (
 	ConfidenceHigh   = "high"
 	ConfidenceMedium = "medium"
@@ -54,8 +53,8 @@ const (
 //
 //   - "Vente en l'état futur d'achèvement" (VEFA) is new-build sold off-plan
 //     at developer pricing, typically 30-60 % above the local ancien — its
-//     inclusion was the documented root cause of MA's apparent -23 % bias in
-//     VEFA-heavy departments (cf. doc/audits/ma_bias_per_dept_2026-05-19.md).
+//     inclusion was the documented root cause of an apparent -20 %+ bias in
+//     VEFA-heavy departments versus alternate street-level €/m² sources.
 //   - "Adjudication" duplicates the population we are scoring (forced
 //     auction sales) and creates a self-referencing feedback loop.
 //   - "Vente terrain à bâtir" mixes raw land into a per-m²-of-bati metric.

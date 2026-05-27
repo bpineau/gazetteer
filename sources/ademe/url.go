@@ -52,9 +52,9 @@ const SortOrder = "-_score,-date_etablissement_dpe"
 // not matched.
 const QFields = "adresse_ban"
 
-// MatchStrategy enumerates the supported lookup modes. Recorded in any
-// downstream payload's method.params for reproducibility (a downstream consumer
-// adapter consumes this).
+// MatchStrategy enumerates the supported lookup modes. Recorded on
+// Evidence so downstream consumers can reproduce the lookup that
+// produced a given Result.
 type MatchStrategy string
 
 const (
@@ -73,8 +73,8 @@ var ErrInsufficientFilter = errors.New("ademe: insufficient filter inputs")
 // query on the BAN adresse field (`q=<query>&q_fields=adresse_ban`).
 //
 // The Elasticsearch-style `qs=` operator is intentionally avoided —
-// ADEME's data-fair layer rejects it with HTTP 403 (verified
-// empirically 2026-05-12; equivalent results via field-equality).
+// ADEME's data-fair layer rejects it with HTTP 403 in practice;
+// field-equality on code_postal_ban produces equivalent results.
 //
 // Both `zip` and `query` are required.
 func URLForAddress(baseURL, zip, query string) (string, error) {

@@ -48,8 +48,8 @@ legal value. Each `Source` decides whether the fields it needs are
 present and returns `gazetteer.ErrInsufficientInputs` if not.
 
 `PropertyType` is the coarse, source-agnostic classification used to
-gate per-Source eligibility (DVF skips parking lots, BienIci skips
-commercial, etc.).
+gate per-Source eligibility (DVF skips parking lots; residential-only
+Sources skip commercial; etc.).
 
 ### `Source` — a named, versioned data origin
 

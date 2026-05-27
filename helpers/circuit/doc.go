@@ -65,11 +65,11 @@
 //
 //	var tripped atomic.Bool
 //	// Same atomic — TransportCircuit + ContentStreakBreaker feed one flag.
-//	cs := circuit.NewContentStreakBreaker("licitorweb", 10, &tripped, slog.Default())
+//	cs := circuit.NewContentStreakBreaker("myscraper", 10, &tripped, slog.Default())
 //	body, err := fetcher.Fetch(ctx, url)
 //	if err == nil {
 //	    cs.Observe(body, func(b []byte) bool {
-//	        return bytes.Contains(b, []byte("PartnerOffer"))
+//	        return bytes.Contains(b, []byte("expected-marker"))
 //	    })
 //	}
 //	if tripped.Load() {
