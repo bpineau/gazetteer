@@ -114,6 +114,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("locservice: %w: %w", gazetteer.ErrInsufficientInputs, err)
 	}
+	u = s.applyBaseURL(u)
 
 	body, err := s.fetch(ctx, u)
 	if err != nil {
@@ -134,6 +135,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		)
 		u2, uerr := URLForINSEE(insee, "")
 		if uerr == nil {
+			u2 = s.applyBaseURL(u2)
 			body2, ferr := s.fetch(ctx, u2)
 			if ferr == nil {
 				if p2, perr := Parse(body2); perr == nil {
@@ -213,6 +215,18 @@ func PickConfidence(p ParsedResult, fellBack bool) string {
 		return ConfidenceMedium
 	}
 	return ConfidenceHigh
+}
+
+// applyBaseURL rewrites the leading endpoint root with s.opts.BaseURL
+// when set. The URL builder embeds the package-level BaseURL var; this
+// method lets tests (and any caller that wires Options.BaseURL) point
+// the Source at an httptest.NewServer without mutating package state,
+// keeping concurrent tests under -race safe.
+func (s *Source) applyBaseURL(u string) string {
+	if s.opts.BaseURL == "" {
+		return u
+	}
+	return s.opts.BaseURL + strings.TrimPrefix(u, BaseURL)
 }
 
 // fetch performs the HTTP GET and translates transport / status-code
