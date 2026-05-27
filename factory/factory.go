@@ -29,6 +29,7 @@ import (
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/httpx"
 	"github.com/bpineau/gazetteer/sources/ademe"
+	"github.com/bpineau/gazetteer/sources/anct"
 	"github.com/bpineau/gazetteer/sources/bdnb"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/delinquance"
@@ -64,7 +65,7 @@ type Options struct {
 }
 
 // NewDefault builds a *gazetteer.Client wired with every stable
-// in-tree Source: dvf, ademe, bdnb, georisques, locservice,
+// in-tree Source: dvf, ademe, anct, bdnb, georisques, locservice,
 // carteloyers, delinquance, encadrement, filosofi, pinel,
 // taxefonciere, vacance.
 //
@@ -126,6 +127,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 	}
 	b = b.With(dvfSrc).
 		With(ademe.NewSource(ademe.Options{Geocoder: ban})).
+		With(anct.NewSource(anct.Options{})).
 		With(bdnb.NewSource(bdnb.Options{Geocoder: ban})).
 		With(georisques.NewSource(georisques.Options{Geocoder: ban})).
 		With(locservice.NewSource(locservice.Options{Geocoder: ban})).
