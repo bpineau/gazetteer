@@ -24,6 +24,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `cartofriches`   | INSEE                                          | offline Cerema brownfields  |
 | `chomage`        | INSEE                                          | offline INSEE chômage ZE2020|
 | `delinquance`    | INSEE                                          | offline SSMSI État 4001     |
+| `dpedist`        | INSEE                                          | data.ademe.fr values_agg API|
 | `dvf`            | INSEE or address + property_type (+ surface)   | data.gouv.fr Etalab DVF     |
 | `education`      | INSEE                                          | data.education.gouv.fr API  |
 | `encadrement`    | zip or INSEE + property_type + rooms (+ surface)| offline DRIHL JSON          |
@@ -100,6 +101,27 @@ data.gouv.fr Etalab.
 - **Circuit breaker**: 3 consecutive transport errors OR 3 consecutive
   429s trip the breaker. Returns `dvf.ErrCircuitTripped` (matches
   `gazetteer.ErrSourceCircuitTripped`).
+
+## `sources/dpedist`
+
+Distribution of DPE energy-performance classes (A..G + sentinel N
+for non évalué) across every DPE the ADEME indexes in the commune
+since July 2021.
+
+- **Needs**: INSEE.
+- **Result**: `dpedist.Result` with per-class counts and shares,
+  total volume, headline `PassoireSharePct` (F + G combined) and
+  `EfficientSharePct` (A + B combined).
+- **Backend**: HTTP GET on ADEME's data-fair `values_agg` endpoint
+  (`data.ademe.fr`). No auth, no documented quota. One request per
+  Listing. `Options.BaseURL` lets tests redirect to httptest.
+- **Confidence**: `high` ≥ 50 DPE observed, `low` when 1..49 (thin
+  sample — single passoire can move headline by ≥ 2 pp), `none` when
+  the commune carries zero DPE.
+- **Why this matters**: Loi Climat already excludes G-class from the
+  legal-rental scope (2025) ; F-class follows in 2028, E in 2034. The
+  per-commune passoire share is the leading proxy for how much of the
+  housing stock is about to leave the rental market.
 
 ## `sources/encadrement`
 

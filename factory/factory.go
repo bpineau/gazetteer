@@ -36,6 +36,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/cartofriches"
 	"github.com/bpineau/gazetteer/sources/chomage"
 	"github.com/bpineau/gazetteer/sources/delinquance"
+	"github.com/bpineau/gazetteer/sources/dpedist"
 	"github.com/bpineau/gazetteer/sources/dvf"
 	"github.com/bpineau/gazetteer/sources/education"
 	"github.com/bpineau/gazetteer/sources/encadrement"
@@ -72,7 +73,7 @@ type Options struct {
 
 // NewDefault builds a *gazetteer.Client wired with every stable
 // in-tree Source: dvf, ademe, anct, bdnb, bpe, georisques, locservice,
-// carteloyers, cartofriches, chomage, delinquance, education,
+// carteloyers, cartofriches, chomage, delinquance, dpedist, education,
 // encadrement, filosofi, qpv, taxefonciere, vacance, zonageabc,
 // zonetendue.
 //
@@ -142,6 +143,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(cartofriches.NewSource(cartofriches.Options{})).
 		With(chomage.NewSource(chomage.Options{})).
 		With(delinquance.NewSource(delinquance.Options{})).
+		With(dpedist.NewSource(dpedist.Options{})).
 		With(education.NewSource(education.Options{})).
 		With(encadrement.NewSource(encadrement.Options{})).
 		With(filosofi.NewSource(filosofi.Options{})).

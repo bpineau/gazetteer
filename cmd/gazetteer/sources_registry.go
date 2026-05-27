@@ -13,6 +13,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/cartofriches"
 	"github.com/bpineau/gazetteer/sources/chomage"
 	"github.com/bpineau/gazetteer/sources/delinquance"
+	"github.com/bpineau/gazetteer/sources/dpedist"
 	"github.com/bpineau/gazetteer/sources/dvf"
 	"github.com/bpineau/gazetteer/sources/education"
 	"github.com/bpineau/gazetteer/sources/encadrement"
@@ -165,6 +166,13 @@ func sourceCatalog() []sourceFactory {
 			Default: true,
 			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
 				return bpe.NewSource(bpe.Options{}), nil
+			},
+		},
+		{
+			Name:    dpedist.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return dpedist.NewSource(dpedist.Options{}), nil
 			},
 		},
 		{
