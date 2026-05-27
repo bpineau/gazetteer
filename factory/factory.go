@@ -35,6 +35,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/cartofriches"
 	"github.com/bpineau/gazetteer/sources/delinquance"
 	"github.com/bpineau/gazetteer/sources/dvf"
+	"github.com/bpineau/gazetteer/sources/education"
 	"github.com/bpineau/gazetteer/sources/encadrement"
 	"github.com/bpineau/gazetteer/sources/filosofi"
 	"github.com/bpineau/gazetteer/sources/georisques"
@@ -42,6 +43,8 @@ import (
 	"github.com/bpineau/gazetteer/sources/qpv"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
+	"github.com/bpineau/gazetteer/sources/zonageabc"
+	"github.com/bpineau/gazetteer/sources/zonetendue"
 )
 
 // Options tunes the defaults wired by NewDefault.
@@ -67,8 +70,8 @@ type Options struct {
 
 // NewDefault builds a *gazetteer.Client wired with every stable
 // in-tree Source: dvf, ademe, anct, bdnb, georisques, locservice,
-// carteloyers, cartofriches, delinquance, encadrement, filosofi,
-// qpv, taxefonciere, vacance.
+// carteloyers, cartofriches, delinquance, education, encadrement,
+// filosofi, qpv, taxefonciere, vacance, zonageabc, zonetendue.
 //
 // The OSM transit Source is NOT included by default — it requires
 // an offline station catalog the factory does not load. Callers that
@@ -134,10 +137,13 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(carteloyers.NewSource(carteloyers.Options{})).
 		With(cartofriches.NewSource(cartofriches.Options{})).
 		With(delinquance.NewSource(delinquance.Options{})).
+		With(education.NewSource(education.Options{})).
 		With(encadrement.NewSource(encadrement.Options{})).
 		With(filosofi.NewSource(filosofi.Options{})).
 		With(qpv.NewSource(qpv.Options{})).
 		With(taxefonciere.NewSource(taxefonciere.Options{})).
-		With(vacance.NewSource(vacance.Options{}))
+		With(vacance.NewSource(vacance.Options{})).
+		With(zonageabc.NewSource(zonageabc.Options{})).
+		With(zonetendue.NewSource(zonetendue.Options{}))
 	return b, nil
 }
