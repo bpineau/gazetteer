@@ -9,9 +9,12 @@ import (
 	"github.com/bpineau/gazetteer/sources/ademe"
 	"github.com/bpineau/gazetteer/sources/anct"
 	"github.com/bpineau/gazetteer/sources/bdnb"
+	"github.com/bpineau/gazetteer/sources/bpe"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/cartofriches"
+	"github.com/bpineau/gazetteer/sources/chomage"
 	"github.com/bpineau/gazetteer/sources/delinquance"
+	"github.com/bpineau/gazetteer/sources/dpedist"
 	"github.com/bpineau/gazetteer/sources/dvf"
 	"github.com/bpineau/gazetteer/sources/education"
 	"github.com/bpineau/gazetteer/sources/encadrement"
@@ -107,9 +110,12 @@ var sourceRenderers = map[string]sourceRenderer{
 	ademe.Name:        renderAdeme,
 	anct.Name:         renderAnct,
 	bdnb.Name:         renderBDNB,
+	bpe.Name:          renderBPE,
 	carteloyers.Name:  renderCarteloyers,
 	cartofriches.Name: renderCartofriches,
+	chomage.Name:      renderChomage,
 	delinquance.Name:  renderDelinquance,
+	dpedist.Name:      renderDPEDist,
 	dvf.Name:          renderDVF,
 	education.Name:    renderEducation,
 	encadrement.Name:  renderEncadrement,
@@ -329,6 +335,56 @@ func renderCartofriches(data any) (string, []string) {
 	}
 	if len(r.ByStatus) > 0 {
 		extra = append(extra, "by status: "+formatMapCounts(r.ByStatus))
+	}
+	return headline, extra
+}
+
+func renderBPE(data any) (string, []string) {
+	r, ok := data.(*bpe.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no facilities indexed", nil
+	}
+	headline := fmt.Sprintf("%d facilities in curated subset", r.TotalFacilities)
+	// Stable label order from AllBuckets so the CLI output is reproducible.
+	parts := []string{}
+	for _, b := range bpe.AllBuckets {
+		if n := r.Get(b); n > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", n, b))
+		}
+	}
+	var extra []string
+	if len(parts) > 0 {
+		extra = append(extra, "by bucket: "+strings.Join(parts, ", "))
+	}
+	return headline, extra
+}
+
+func renderChomage(data any) (string, []string) {
+	r, ok := data.(*chomage.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no unemployment reading", nil
+	}
+	headline := fmt.Sprintf("chômage %.1f%% en ZE %s (%s, national %.1f%%, écart %+.1f pp, %s)",
+		r.RatePct, r.ZECode, r.ZELabel, r.NationalRatePct, r.DeltaVsNationalPP, r.Tension)
+	return headline, nil
+}
+
+func renderDPEDist(data any) (string, []string) {
+	r, ok := data.(*dpedist.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no DPE in this commune", nil
+	}
+	headline := fmt.Sprintf("%d DPE issued (F+G %.1f%%, A+B %.1f%%, conf %s)",
+		r.NbTotal, r.PassoireSharePct, r.EfficientSharePct, r.Confidence)
+	parts := []string{}
+	for _, l := range dpedist.AllLabels {
+		if n := r.Get(l); n > 0 {
+			parts = append(parts, fmt.Sprintf("%s=%d (%.1f%%)", l, n, r.Share(l)))
+		}
+	}
+	var extra []string
+	if len(parts) > 0 {
+		extra = append(extra, "by class: "+strings.Join(parts, ", "))
 	}
 	return headline, extra
 }
