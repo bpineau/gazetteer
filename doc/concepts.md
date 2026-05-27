@@ -68,7 +68,7 @@ type Source interface {
 - `Query` returns a typed payload; the framework wraps the (payload,
   error) pair into a `Result`.
 
-A Source MAY implement optional interfaces — see [PLUGINS.md](PLUGINS.md).
+A Source MAY implement optional interfaces — see [plugins.md](plugins.md).
 
 ### `Result` — the framework envelope
 
@@ -173,7 +173,7 @@ cross-run memo can consume:
 - DVF cadastral section catalog (`sources/dvf.SectionDiscoverer`)
 - Any out-of-tree Source's per-zone lookups
 
-See [CACHING.md](CACHING.md) for the contract and conformance suite.
+See [caching.md](caching.md) for the contract and conformance suite.
 
 ## Concurrency model
 
@@ -223,7 +223,7 @@ errors.Is(err, dvf.ErrCircuitTripped)
 ```
 
 matches by pointer identity against the Source's own singleton. See
-[CIRCUIT_BREAKERS.md](CIRCUIT_BREAKERS.md).
+[circuit_breakers.md](circuit_breakers.md).
 
 ## Quick example
 

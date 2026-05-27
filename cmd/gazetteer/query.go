@@ -180,9 +180,11 @@ func splitCSV(s string) []string {
 	return out
 }
 
-// printDossierSummary renders one line per source: status + a short,
-// source-agnostic detail (err message or "ok"). Sources are printed in
-// sorted name order for stable, diff-friendly output.
+// printDossierSummary renders the Listing context and one block per
+// Source: a header line (name, version, status, one-line headline
+// extracted by the source-specific renderer) plus any extra detail
+// lines (indented). Sources are printed in sorted name order for
+// stable, diff-friendly output.
 func printDossierSummary(out io.Writer, d gazetteer.Dossier) {
 	fmt.Fprintln(out, "listing:")
 	if l := d.Listing; l.Address != "" {
@@ -194,6 +196,15 @@ func printDossierSummary(out io.Writer, d gazetteer.Dossier) {
 	if d.Listing.Lat != nil && d.Listing.Lon != nil {
 		fmt.Fprintf(out, "  lat,lon  %.6f,%.6f\n", *d.Listing.Lat, *d.Listing.Lon)
 	}
+	if d.Listing.PropertyType != "" {
+		fmt.Fprintf(out, "  type     %s\n", d.Listing.PropertyType)
+	}
+	if d.Listing.SurfaceM2 != nil {
+		fmt.Fprintf(out, "  surface  %.0f m²\n", *d.Listing.SurfaceM2)
+	}
+	if d.Listing.Rooms != nil {
+		fmt.Fprintf(out, "  rooms    %d\n", *d.Listing.Rooms)
+	}
 	fmt.Fprintln(out)
 
 	fmt.Fprintln(out, "results:")
@@ -204,11 +215,12 @@ func printDossierSummary(out io.Writer, d gazetteer.Dossier) {
 	sort.Strings(names)
 	for _, n := range names {
 		r := d.Results[n]
-		detail := r.Status.String()
-		if r.Err != nil {
-			detail += ": " + r.Err.Error()
+		headline, extra := summariseResult(n, r)
+		fmt.Fprintf(out, "  %-14s v%d  %-9s  %s\n",
+			n, r.Version, abbreviateStatus(r.Status), headline)
+		for _, line := range extra {
+			fmt.Fprintf(out, "                          %s\n", line)
 		}
-		fmt.Fprintf(out, "  %-14s v%d  %s\n", n, r.Version, detail)
 	}
 
 	if !d.StartedAt.IsZero() && !d.FinishedAt.IsZero() {

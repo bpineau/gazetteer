@@ -96,7 +96,7 @@ return nil, fmt.Errorf("myplugin: %w: <detail>", gazetteer.ErrUpstreamUnavailabl
 return nil, fmt.Errorf("myplugin: %w: <detail>", gazetteer.ErrAntiBot)
 ```
 
-See [CONCEPTS.md](CONCEPTS.md) for the full `Status` × sentinel table.
+See [concepts.md](concepts.md) for the full `Status` × sentinel table.
 
 ## Optional interfaces
 
@@ -187,7 +187,7 @@ field on your constructor (overrides ctx); fall back to
 
 Plugins that need cross-run memo (geocode results, zone catalogs,
 session tokens) consume a `kvcache.Cache` via their `Options` struct.
-See [CACHING.md](CACHING.md).
+See [caching.md](caching.md).
 
 ```go
 type Options struct {
@@ -208,7 +208,7 @@ func NewSource(opts Options) *Source {
 
 Plugins that scrape an upstream prone to anti-bot, quota or 5xx
 storms should wire a `helpers/circuit` breaker into their HTTP path.
-See [CIRCUIT_BREAKERS.md](CIRCUIT_BREAKERS.md).
+See [circuit_breakers.md](circuit_breakers.md).
 
 The cross-source canonical sentinel for "I've tripped, stop
 scheduling more work":
@@ -256,7 +256,7 @@ defer srv.Close()
 src := myplugin.New(myplugin.Options{BaseURL: srv.URL})
 ```
 
-See [TESTING.md](TESTING.md) for the multi-endpoint + rate-limit
+See [testing.md](testing.md) for the multi-endpoint + rate-limit
 patterns.
 
 ## Versioning your wire format
