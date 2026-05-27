@@ -53,7 +53,7 @@ const SortOrder = "-_score,-date_etablissement_dpe"
 const QFields = "adresse_ban"
 
 // MatchStrategy enumerates the supported lookup modes. Recorded in any
-// downstream payload's method.params for reproducibility (encheridor
+// downstream payload's method.params for reproducibility (a downstream consumer
 // adapter consumes this).
 type MatchStrategy string
 

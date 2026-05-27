@@ -1,7 +1,7 @@
 package ademe
 
 // Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers (encheridor's appraisal, dashboards) can match on
+// downstream consumers (a downstream appraiser, dashboards) can match on
 // them without importing this package's constants.
 const (
 	ConfidenceHigh   = "high"
@@ -16,14 +16,14 @@ const (
 )
 
 // Result is the typed payload returned by Source.Query. Mirrors the
-// shape currently persisted by encheridor's ADEME enricher
-// (resultBlob + dpeBlob + logementBlob + adresseBlob) so the encheridor
+// shape currently persisted by a downstream enricher
+// (resultBlob + dpeBlob + logementBlob + adresseBlob) so the a downstream consumer
 // adapter can re-serialise it 1:1 into its EnrichPayload.Result.
 //
 // Envelope-only fields (schema_version, enricher_version, computed_at,
 // input_hash) are NOT part of the gazetteer payload — those are the
 // framework's responsibility (Result envelope in gazetteer.Result, or
-// in encheridor's enrich.EnrichPayload).
+// in a downstream payload struct).
 type Result struct {
 	// DPE is non-nil when at least one DPE-letter field was populated
 	// on the picked row. Nil-pointer = no DPE letter found.
@@ -58,13 +58,13 @@ type Result struct {
 	// produced this Result. Not part of the wire data (json:"-") —
 	// populated by Source.Query, consumed in-process by callers that
 	// need to log or audit how the answer was derived (e.g.
-	// encheridor's EnrichPayload.Method.Params).
+	// a downstream payload's method params).
 	Evidence Evidence `json:"-"`
 }
 
 // Evidence captures reproducibility metadata about the query that
 // produced a Result. Consumers that need to log or audit how the answer
-// was derived (e.g. encheridor's EnrichPayload.Method.Params) read
+// was derived (e.g. a downstream payload's method params) read
 // these fields. Other callers can ignore them.
 //
 // Sidecar — not part of the wire data. Travels in-process from

@@ -10,9 +10,11 @@
 //	gazetteer refresh   <source>                  (stub for v1)
 //	gazetteer version
 //
-// The binary lives at pkg/gazetteer/cmd/gazetteer/ in the encheridor
-// repo today; it will move with the lib in Phase 7 to its dedicated
-// repository.
+// Install:
+//
+//	go install github.com/bpineau/gazetteer/cmd/gazetteer@latest
+//
+// See doc/CLI.md for end-user documentation of every sub-command.
 package main
 
 import (
