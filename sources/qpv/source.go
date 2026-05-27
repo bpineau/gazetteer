@@ -92,10 +92,24 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	return &Result{
 		HasQPV:     true,
 		QPVCount:   len(e.QPVs),
-		QPVs:       e.QPVs,
+		QPVs:       copyQPVs(e.QPVs),
 		Confidence: ConfidenceHigh,
 		Evidence:   ev,
 	}, nil
+}
+
+// copyQPVs returns a shallow copy of s. The Source's embedded
+// singleton index is shared across all Query calls; without the copy
+// a caller mutating Result.QPVs would corrupt the next call's
+// reading. Cheap (most QPV-hosting communes carry 1-3 entries; the
+// largest tops out around 30).
+func copyQPVs(s []QPV) []QPV {
+	if s == nil {
+		return nil
+	}
+	out := make([]QPV, len(s))
+	copy(out, s)
+	return out
 }
 
 // Query is the atomic helper for callers who don't want the builder.
