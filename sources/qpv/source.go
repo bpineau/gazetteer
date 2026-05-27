@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/communes"
 )
 
 // Name is the canonical Source identifier. Stable; used as the
@@ -76,6 +77,11 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		}
 		idx = loaded
 	}
+
+	// Paris / Lyon / Marseille arrondissements share the parent
+	// commune's QPV list — the ANCT publishes QPVs against the
+	// parent commune INSEE only (75056 / 69123 / 13055).
+	insee = communes.FoldArrondissement(insee)
 
 	ev := Evidence{
 		INSEE:            insee,

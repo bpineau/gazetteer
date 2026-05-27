@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/communes"
 )
 
 // Name is the canonical Source identifier. Stable; used as the
@@ -76,7 +77,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	// Fold Paris / Lyon / Marseille arrondissement INSEE codes onto
 	// their parent commune — the official dataset only carries parent
 	// commune rows (75056 / 69123 / 13055).
-	folded := foldArrondissement(insee)
+	folded := communes.FoldArrondissement(insee)
 
 	ev := Evidence{
 		INSEE:         insee,
@@ -102,29 +103,6 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		Confidence:   ConfidenceHigh,
 		Evidence:     ev,
 	}, nil
-}
-
-// foldArrondissement maps Paris / Lyon / Marseille arrondissement
-// INSEE codes onto their parent commune. The official dataset only
-// publishes one row per parent commune (75056 Paris, 69123 Lyon,
-// 13055 Marseille) — the arrondissement-level codes (75101..75120,
-// 69381..69389, 13201..13216) inherit the same zonage.
-//
-// Returns insee unchanged for every other code.
-func foldArrondissement(insee string) string {
-	if len(insee) != 5 {
-		return insee
-	}
-	switch {
-	case strings.HasPrefix(insee, "751"): // Paris 75101..75120 -> 75056
-		return "75056"
-	case strings.HasPrefix(insee, "6938"): // Lyon 69381..69389 -> 69123
-		return "69123"
-	case strings.HasPrefix(insee, "132"): // Marseille 13201..13216 -> 13055
-		return "13055"
-	default:
-		return insee
-	}
 }
 
 // Query is the atomic helper for callers who don't want the builder.

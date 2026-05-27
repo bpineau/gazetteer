@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/communes"
 )
 
 // Name is the canonical Source identifier. Stable; used as the
@@ -86,6 +87,11 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		}
 		idx = loaded
 	}
+
+	// Paris / Lyon / Marseille arrondissements share their parent's
+	// zone d'emploi; the embedded crosswalk only carries the parent
+	// commune row (75056 / 69123 / 13055).
+	insee = communes.FoldArrondissement(insee)
 
 	ev := Evidence{
 		INSEE:            insee,
