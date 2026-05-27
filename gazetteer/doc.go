@@ -8,8 +8,10 @@
 //   - Result — the framework envelope around a Source's typed payload
 //   - Dossier — the aggregated output of one Client.Collect call
 //   - Builder / Client — configure sources, then run them in parallel
-//   - Cache — pluggable backend for intermediate state (MemCache default)
 //   - Normalizer — canonicalises a free-text address into a Listing
+//   - kvcache.Cache — pluggable persistent KV cache consumed by Sources
+//     that need cross-run memo (e.g. dvf section catalogue,
+//     banx.CachedGeocoder)
 //
 // # Quick start
 //
@@ -19,8 +21,8 @@
 //	client, _ := gazetteer.NewBuilder().With(dvfSrc).With(osmSrc).Build()
 //
 //	d := client.Collect(ctx, listing)
-//	if r, ok := gazetteer.Get[*dvf.Result](d, dvf.Name); ok {
-//	    fmt.Println(r.MedianEurPerM2)
+//	if r, ok := gazetteer.Get[*dvf.Result](d, dvf.Name); ok && r.ValueEURPerM2Cents != nil {
+//	    fmt.Printf("%.0f €/m²\n", float64(*r.ValueEURPerM2Cents)/100)
 //	}
 //
 // # Status interpretation
@@ -32,10 +34,9 @@
 //
 // # Plugins
 //
-// Out-of-tree Source packages (e.g. private antibot scrapers) implement
-// the same Source interface and register their typed payload via
-// gazetteer.Register in init(). Callers wire them with builder.With(...)
-// like any official source.
+// Out-of-tree Source packages implement the same Source interface and
+// register their typed payload via gazetteer.Register in init().
+// Callers wire them with builder.With(...) like any official source.
 //
 // See doc/ in the repository root for long-form documentation:
 // concepts, sources, plugins, circuit_breakers, caching, testing, cli.
