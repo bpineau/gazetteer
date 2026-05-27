@@ -104,7 +104,20 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			wait = t.backoff(attempt)
 		}
 
-		t.resolved.logger.Warn("retrying request",
+		// A single transport-error retry on the first attempt is
+		// noise in the wild (HTTP/2 RST_STREAM, idle-conn close,
+		// TLS hiccup — all common on long-lived public APIs).
+		// Demote it to DEBUG ; the retry succeeds on the second
+		// attempt 9 times out of 10 and a WARN per request would
+		// flood operator dashboards with no actionable signal.
+		// Anything past the first retry — or any non-transport
+		// reason (4xx / 5xx) — stays WARN: those reflect a real
+		// upstream problem the operator should see.
+		level := slog.LevelWarn
+		if attempt == 0 && reason == "transport-error" {
+			level = slog.LevelDebug
+		}
+		t.resolved.logger.Log(ctx, level, "retrying request",
 			slog.String("url", req.URL.String()),
 			slog.Int("attempt", attempt+1),
 			slog.Int("max_attempts", maxAttempts),
