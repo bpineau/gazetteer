@@ -9,6 +9,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/bpineau/gazetteer/gazetteer"
 )
@@ -42,9 +43,10 @@ func runQuery(ctx context.Context, args []string) error {
 type queryFlags struct {
 	common       commonFlags
 	sources      string
-	propertyType string  // "apartment" (default) | "house" | "land" | "commercial"
-	surface      float64 // m²; 0 ⇒ unset
-	rooms        int     // 0 ⇒ unset
+	propertyType string        // "apartment" (default) | "house" | "land" | "commercial"
+	surface      float64       // m²; 0 ⇒ unset
+	rooms        int           // 0 ⇒ unset
+	timeout      time.Duration // overall budget for the Collect; 0 ⇒ no deadline
 	jsonOut      bool
 	dump         bool
 	addr         string
@@ -73,6 +75,8 @@ func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 		"Habitable surface in m² (e.g. 45). Required by DVF, taxe-foncière, encadrement for a meaningful answer.")
 	fs.IntVar(&q.rooms, "rooms", 0,
 		"Room count (1, 2, 3…). Required by carteloyers / encadrement / locservice for a typed rent reference.")
+	fs.DurationVar(&q.timeout, "timeout", 30*time.Second,
+		"Overall budget for the Collect (deadline propagated via ctx). Slow Sources past this point return ctx.DeadlineExceeded → StatusFailedTransient. 0 disables the deadline.")
 	fs.BoolVar(&q.jsonOut, "json", false, "Emit the full Dossier as indented JSON")
 	fs.BoolVar(&q.dump, "dump", false, "Log raw HTTP request/response payloads (sources that honour it)")
 	positional, err := parseInterleaved(fs, args)
@@ -158,6 +162,11 @@ func executeQuery(ctx context.Context, q *queryFlags) (gazetteer.Dossier, error)
 		return gazetteer.Dossier{}, fmt.Errorf("build gazetteer client: %w", err)
 	}
 
+	if q.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, q.timeout)
+		defer cancel()
+	}
 	return client.Collect(ctx, listing), nil
 }
 
@@ -189,6 +198,12 @@ func printDossierSummary(out io.Writer, d gazetteer.Dossier) {
 	fmt.Fprintln(out, "listing:")
 	if l := d.Listing; l.Address != "" {
 		fmt.Fprintf(out, "  address  %s\n", l.Address)
+	}
+	if d.Listing.City != "" {
+		fmt.Fprintf(out, "  city     %s\n", d.Listing.City)
+	}
+	if d.Listing.Zip != "" {
+		fmt.Fprintf(out, "  postcode %s\n", d.Listing.Zip)
 	}
 	if d.Listing.INSEE != "" {
 		fmt.Fprintf(out, "  insee    %s\n", d.Listing.INSEE)
@@ -223,8 +238,37 @@ func printDossierSummary(out io.Writer, d gazetteer.Dossier) {
 		}
 	}
 
+	// Surface the opt-in Sources the default run does not exercise so
+	// the operator sees what's NOT in the table rather than wondering
+	// why osm_transit / bdnb are missing.
+	if optedOut := optedOutSources(d); len(optedOut) > 0 {
+		fmt.Fprintln(out)
+		fmt.Fprintf(out, "opt-in (skipped by default; pass via --source): %s\n",
+			strings.Join(optedOut, ", "))
+	}
+
 	if !d.StartedAt.IsZero() && !d.FinishedAt.IsZero() {
 		fmt.Fprintln(out)
 		fmt.Fprintf(out, "elapsed: %s\n", d.FinishedAt.Sub(d.StartedAt).Round(0))
 	}
+}
+
+// optedOutSources returns the names of every Source the CLI knows but
+// that was NOT exercised in d (i.e. either Default=false in the
+// registry or absent from the user-supplied --source list). Stable
+// alphabetic order so the footer is diff-friendly.
+func optedOutSources(d gazetteer.Dossier) []string {
+	have := make(map[string]struct{}, len(d.Results))
+	for n := range d.Results {
+		have[n] = struct{}{}
+	}
+	all := allSourceNames()
+	var out []string
+	for _, n := range all {
+		if _, ok := have[n]; !ok {
+			out = append(out, n)
+		}
+	}
+	sort.Strings(out)
+	return out
 }

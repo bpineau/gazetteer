@@ -512,9 +512,9 @@ func renderGeorisques(data any) (string, []string) {
 	if len(r.Summary.RedFlags) > 0 {
 		extra = append(extra, "red flags: "+strings.Join(r.Summary.RedFlags, ", "))
 	}
-	if r.ReportURL != "" {
-		extra = append(extra, "report: "+r.ReportURL)
-	}
+	// ReportURL omitted from the default render — it's a 250+-char
+	// deeplink with redundant query params. Callers who need it read
+	// `gazetteer query --json` and pick `dossier.results.georisques.data.report_url`.
 	return headline, extra
 }
 
