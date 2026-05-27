@@ -9,6 +9,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/ademe"
 	"github.com/bpineau/gazetteer/sources/anct"
 	"github.com/bpineau/gazetteer/sources/bdnb"
+	"github.com/bpineau/gazetteer/sources/bpe"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/cartofriches"
 	"github.com/bpineau/gazetteer/sources/chomage"
@@ -108,6 +109,7 @@ var sourceRenderers = map[string]sourceRenderer{
 	ademe.Name:        renderAdeme,
 	anct.Name:         renderAnct,
 	bdnb.Name:         renderBDNB,
+	bpe.Name:          renderBPE,
 	carteloyers.Name:  renderCarteloyers,
 	cartofriches.Name: renderCartofriches,
 	chomage.Name:      renderChomage,
@@ -331,6 +333,26 @@ func renderCartofriches(data any) (string, []string) {
 	}
 	if len(r.ByStatus) > 0 {
 		extra = append(extra, "by status: "+formatMapCounts(r.ByStatus))
+	}
+	return headline, extra
+}
+
+func renderBPE(data any) (string, []string) {
+	r, ok := data.(*bpe.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no facilities indexed", nil
+	}
+	headline := fmt.Sprintf("%d facilities in curated subset", r.TotalFacilities)
+	// Stable label order from AllBuckets so the CLI output is reproducible.
+	parts := []string{}
+	for _, b := range bpe.AllBuckets {
+		if n := r.Get(b); n > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", n, b))
+		}
+	}
+	var extra []string
+	if len(parts) > 0 {
+		extra = append(extra, "by bucket: "+strings.Join(parts, ", "))
 	}
 	return headline, extra
 }

@@ -19,6 +19,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `ademe`          | address / zip                                  | data.gouv.fr `dpe03existant`|
 | `anct`           | INSEE                                          | offline ANCT programme list |
 | `bdnb`           | address + INSEE                                | data.gouv.fr BDNB PostgREST |
+| `bpe`            | INSEE                                          | offline INSEE BPE 2024 subset |
 | `carteloyers`    | INSEE + property_type + rooms                  | offline ANIL / DHUP dataset |
 | `cartofriches`   | INSEE                                          | offline Cerema brownfields  |
 | `chomage`        | INSEE                                          | offline INSEE chômage ZE2020|
@@ -210,6 +211,25 @@ commune.
   / sans projet / reconverti), plus cumulative surface in m².
 - **Backend**: offline aggregate of ~28 000 sites across ~9 100
   communes.
+
+## `sources/bpe`
+
+Curated subset of INSEE's Base Permanente des Équipements (BPE) 2024
+counts: ~25 of the 188 type codes folded into 16 rental-investor
+buckets (poste, grande_surface, supérette, boulangerie, école
+primaire, collège, lycée, structure_sante, médecin_généraliste,
+infirmier, pharmacie, crèche, gare, sport_salle / piscine / terrain).
+
+- **Needs**: INSEE.
+- **Result**: `bpe.Result` carrying `Counts map[Bucket]int` +
+  `TotalFacilities`. Communes with zero curated facility surface as
+  `IsEmpty()` — small rural communes that only carry A129 Mairie fall
+  in this bucket on purpose (a Mairie is not a meaningful tenancy
+  signal).
+- **Backend**: gzipped JSON embedded under `data/`. ~21 700 communes
+  × 16 buckets, ~233 KB on disk.
+- **Property type irrelevant** — equipment density applies to the
+  whole commune.
 
 ## `sources/chomage`
 

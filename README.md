@@ -103,6 +103,7 @@ Commune-level signals for the investor:
 | `qpv`          | Quartiers Prioritaires de la politique de la Ville membership    |
 | `cartofriches` | Cerema brownfield inventory aggregated per commune               |
 | `education`    | Count of open schools per commune (live API)                     |
+| `bpe`          | INSEE BPE — curated commerce / health / services counts          |
 
 Transport:
 

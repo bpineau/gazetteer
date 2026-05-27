@@ -29,7 +29,7 @@ func TestNewDefault_Smoke(t *testing.T) {
 	// contain one entry per Source.
 	d := client.Collect(context.Background(), gazetteer.Listing{})
 	wantSources := []string{
-		"dvf", "ademe", "anct", "bdnb", "georisques", "locservice",
+		"dvf", "ademe", "anct", "bdnb", "bpe", "georisques", "locservice",
 		"carteloyers", "cartofriches", "chomage", "delinquance",
 		"education", "encadrement", "filosofi", "qpv", "taxefonciere",
 		"vacance", "zonageabc", "zonetendue",
