@@ -60,8 +60,8 @@ Building-level facts from the Base de Données Nationale des Bâtiments
   parcel surface. `Evidence` records the address pattern and number of
   candidate rows.
 - **Quota**: BDNB enforces a per-key rolling 10 000-call quota.
-  Operators wire a `helpers/circuit.HTTPFetcher` (see
-  [CIRCUIT_BREAKERS.md](CIRCUIT_BREAKERS.md)) to trip the breaker on
+  Callers wire a `helpers/circuit.HTTPFetcher` (see
+  [circuit_breakers.md](circuit_breakers.md)) to trip the breaker on
   `x-quota-remaining: 0` or HTTP 429.
 
 ## `sources/carteloyers`
@@ -94,7 +94,7 @@ data.gouv.fr Etalab.
   The winning tier is recorded in `Evidence.LevelUsed`.
 - **Section catalog cache**: the per-INSEE cadastral section list is
   cached via a `kvcache.Cache` (`Options.SectionCache`). See
-  [CACHING.md](CACHING.md).
+  [caching.md](caching.md).
 - **Circuit breaker**: 3 consecutive transport errors OR 3 consecutive
   429s trip the breaker. Returns `dvf.ErrCircuitTripped` (matches
   `gazetteer.ErrSourceCircuitTripped`).
@@ -296,4 +296,4 @@ Sources whose Options struct exposes a `BaseURL` field are wired to a
 local `httptest.NewServer` in tests. The Source's `Options.BaseURL`
 or the corresponding package-level `BaseURL` var (when blank) is read
 at Query time, so a single change at the constructor level swaps the
-upstream cleanly. See [TESTING.md](TESTING.md).
+upstream cleanly. See [testing.md](testing.md).

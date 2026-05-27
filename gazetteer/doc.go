@@ -38,5 +38,5 @@
 // like any official source.
 //
 // See doc/ in the repository root for long-form documentation:
-// CONCEPTS, SOURCES, PLUGINS, CIRCUIT_BREAKERS, CACHING, TESTING, CLI.
+// concepts, sources, plugins, circuit_breakers, caching, testing, cli.
 package gazetteer

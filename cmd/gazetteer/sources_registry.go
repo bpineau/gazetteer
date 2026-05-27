@@ -64,8 +64,15 @@ func sourceCatalog() []sourceFactory {
 			},
 		},
 		{
+			// BDNB opt-in only: the public PostgREST endpoint enforces a
+			// rolling 10 000-request budget per API key and routinely
+			// returns HTTP 429 to anonymous traffic, which would burn
+			// the CLI's wall-clock on retries for a result most
+			// interactive callers don't strictly need. Use
+			// `--source bdnb` (or include it explicitly in a CSV list)
+			// when the building-attributes signal matters.
 			Name:    bdnb.Name,
-			Default: true,
+			Default: false,
 			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
 				return bdnb.NewSource(bdnb.Options{Geocoder: d.BAN}), nil
 			},

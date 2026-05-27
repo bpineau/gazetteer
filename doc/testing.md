@@ -156,7 +156,7 @@ func TestMyBackend(t *testing.T) {
 }
 ```
 
-See [CACHING.md](CACHING.md).
+See [caching.md](caching.md).
 
 ## Testing Source registration
 
