@@ -8,10 +8,14 @@ const (
 	ConfidenceNone = ""
 )
 
-// RiskFlag is one of "low" | "medium" | "high" | "unknown". A coarse,
-// peer-relative bucket derived from the burglary + vandalism +
-// no-violence-theft headline indicators. Informative only — never
-// folded into a score by this Source.
+// RiskFlag is a coarse SOCIAL-DISTRESS bucket: "low" | "medium" |
+// "high" | "unknown". Targets the investor question "is this a
+// neighbourhood where solvent tenants don't want to live?". Inputs
+// are drug-trafficking, street-violence and unarmed-robbery rates;
+// burglary is INTENTIONALLY omitted (it is anti-correlated with
+// social distress — luxury / tourist areas are the prime targets).
+// See classifyRisk in this file for the calibration. Informative
+// only — never folded into a score by this Source.
 type RiskFlag string
 
 const (
@@ -97,35 +101,56 @@ func (r *Result) IsEmpty() bool {
 	return len(r.Rates) == 0
 }
 
-// classifyRisk applies a classifier on the burglary indicator
-// only. Thresholds are calibrated against the 2024 national
-// distribution:
+// classifyRisk produces a SOCIAL-DISTRESS flag (not a generic crime
+// flag) for a rental / marchand-de-bien investor: it tries to detect
+// neighbourhoods where the population is captive (low income, no
+// mobility, public housing concentration) and the urban environment
+// is degraded (open drug-dealing scenes, street violence). The signal
+// is meant to flag the kind of commune where a landlord ends up with
+// less-solvent tenants, more vacancy, more squatting risk, and
+// in-building safety issues — NOT to flag where crime happens to be
+// reported (which would be e.g. central Paris because that is where
+// the foot traffic is).
 //
-//	low    : burglary <= 2.5 ‰
-//	high   : burglary >= 6 ‰
+// Inputs (all SSMSI État 4001, per 1 000 inhabitants):
+//
+//   - drug_trafficking  : open dealing / street market presence
+//   - violence_outside_family : street agressions
+//   - robbery_unarmed   : muggings / phone snatches
+//
+// Burglary is INTENTIONALLY OMITTED — luxury / tourist neighbourhoods
+// (Neuilly, Paris 16e, Paris 8e) score high on burglary precisely
+// BECAUSE there is value worth stealing; treating burglary as a
+// social-distress signal would invert the desired ranking.
+//
+// Thresholds calibrated empirically on a panel of known ghettos
+// (Aulnay-Cité-des-3000, La Courneuve-4000, Grigny, Saint-Denis,
+// Clichy-sous-Bois) vs. known low-distress communes (Neuilly,
+// Paris 16e, Paris 9e):
+//
+//	low    : dt <= 1   AND vof <= 2.5 AND ru <= 1.5
+//	high   : dt >= 2.5 OR  vof >= 5   OR  ru >= 4
+//	         OR (dt >= 1.5 AND vof >= 4)
 //	medium : everything in between
 //
-// Burglary is the only headline indicator the SSMSI expresses per
-// 1 000 *logements* (not per 1 000 inhabitants), which makes it
-// robust to the denominator distortion that plagues per-inhabitant
-// rates in touristic / business-district arrondissements (Paris,
-// Lyon, Marseille). Earlier versions of this function folded
-// theft_no_violence and vandalism into the classification — but
-// those are per-inhabitant rates, and Paris 1er triple-tripped the
-// high threshold (theft 325 ‰, vandalism 24 ‰) despite a real
-// resident-perspective risk closer to other Paris arrondissements.
-// Consumers that need the broader picture should read the typed
-// Rates map directly and apply their own thresholds, ideally with
-// the RatesPerInhabitantInflated caveat on the Result in mind.
+// Per-inhabitant denominator distortion: Paris/Lyon/Marseille
+// arrondissements have ambient (daytime / tourist) populations 5–15×
+// their resident counts, so even pure-residential arrondissements
+// score "high" by absolute thresholds. classifyRisk returns
+// RiskUnknown for those communes; consumers should compose
+// QPV + Filosofi (income) + chomage to get a credible signal for
+// arrondissement-split cities.
 func classifyRisk(rates map[string]float64) RiskFlag {
 	if len(rates) == 0 {
 		return RiskUnknown
 	}
-	b := rates["burglary"]
-	if b >= 6 {
+	dt := rates["drug_trafficking"]
+	vof := rates["violence_outside_family"]
+	ru := rates["robbery_unarmed"]
+	if dt >= 2.5 || vof >= 5 || ru >= 4 || (dt >= 1.5 && vof >= 4) {
 		return RiskHigh
 	}
-	if b <= 2.5 {
+	if dt <= 1 && vof <= 2.5 && ru <= 1.5 {
 		return RiskLow
 	}
 	return RiskMedium

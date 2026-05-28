@@ -80,12 +80,12 @@ func TestQuery_InsufficientInputs(t *testing.T) {
 	}
 }
 
-// TestClassifyRisk pins the burglary-only three-bucket logic. The
-// per-inhabitant indicators (theft_no_violence, vandalism) used to
-// also trip RiskHigh, but they are denominator-inflated in tourist
-// arrondissements (Paris 1er triple-tripped on theft=325 ‰ despite
-// a real per-dwelling risk no higher than other Paris arrondissements).
-// classifyRisk now anchors on burglary, which is per 1 000 logements.
+// TestClassifyRisk pins the social-distress three-bucket logic.
+// Inputs are drug-trafficking, street-violence and unarmed-robbery
+// rates (all per 1 000 inhabitants); burglary is intentionally
+// IGNORED because luxury / tourist areas score highest on it (anti-
+// signal). Each scenario name lists the kind of commune the case
+// represents, so a future maintainer can spot a calibration shift.
 func TestClassifyRisk(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -93,14 +93,41 @@ func TestClassifyRisk(t *testing.T) {
 		rates map[string]float64
 		want  RiskFlag
 	}{
-		{"empty", map[string]float64{}, RiskUnknown},
-		{"all-low", map[string]float64{"burglary": 1.0, "theft_no_violence": 4.0, "vandalism": 2.0}, RiskLow},
-		{"medium-burglary", map[string]float64{"burglary": 4.0, "theft_no_violence": 10.0, "vandalism": 7.0}, RiskMedium},
-		{"high-burglary", map[string]float64{"burglary": 7.0, "theft_no_violence": 3.0, "vandalism": 2.0}, RiskHigh},
-		// Vandalism alone no longer trips high — burglary stays low.
-		{"high-vandalism-only-stays-low", map[string]float64{"burglary": 2.0, "theft_no_violence": 5.0, "vandalism": 15.0}, RiskLow},
-		// Theft alone (typical tourist district) no longer trips high — burglary stays medium.
-		{"high-theft-only-stays-medium", map[string]float64{"burglary": 4.0, "theft_no_violence": 100.0, "vandalism": 5.0}, RiskMedium},
+		{
+			"empty",
+			map[string]float64{},
+			RiskUnknown,
+		},
+		{
+			"neuilly-like: low across the board",
+			map[string]float64{"drug_trafficking": 0.57, "violence_outside_family": 1.33, "robbery_unarmed": 0.81, "burglary": 6.51},
+			RiskLow,
+		},
+		{
+			"aulnay-3000: drug_trafficking trips high",
+			map[string]float64{"drug_trafficking": 2.87, "violence_outside_family": 4.19, "robbery_unarmed": 1.82, "burglary": 7.68},
+			RiskHigh,
+		},
+		{
+			"courneuve-4000: street-violence trips high",
+			map[string]float64{"drug_trafficking": 0.98, "violence_outside_family": 7.84, "robbery_unarmed": 4.69, "burglary": 6.49},
+			RiskHigh,
+		},
+		{
+			"mantes-la-jolie commune-level: just under combined thresholds",
+			map[string]float64{"drug_trafficking": 1.47, "violence_outside_family": 4.69, "robbery_unarmed": 1.49, "burglary": 3.55},
+			RiskMedium,
+		},
+		{
+			"argenteuil: combined dt+vof trip high",
+			map[string]float64{"drug_trafficking": 1.59, "violence_outside_family": 4.25, "robbery_unarmed": 1.86, "burglary": 7.11},
+			RiskHigh,
+		},
+		{
+			"burglary-only luxury (Neuilly): stays low",
+			map[string]float64{"drug_trafficking": 0.5, "violence_outside_family": 1.0, "robbery_unarmed": 0.5, "burglary": 8.0},
+			RiskLow,
+		},
 	}
 	for _, c := range cases {
 		if got := classifyRisk(c.rates); got != c.want {
