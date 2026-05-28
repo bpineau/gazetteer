@@ -20,11 +20,14 @@ import (
 	"github.com/bpineau/gazetteer/sources/encadrement"
 	"github.com/bpineau/gazetteer/sources/filosofi"
 	"github.com/bpineau/gazetteer/sources/georisques"
+	"github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/locservice"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/qpv"
+	"github.com/bpineau/gazetteer/sources/rpls"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
+	"github.com/bpineau/gazetteer/sources/vacance_logements"
 	"github.com/bpineau/gazetteer/sources/zonageabc"
 	"github.com/bpineau/gazetteer/sources/zonetendue"
 )
@@ -202,6 +205,27 @@ func sourceCatalog() []sourceFactory {
 			Default: true,
 			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
 				return qpv.NewSource(qpv.Options{}), nil
+			},
+		},
+		{
+			Name:    rpls.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return rpls.NewSource(rpls.Options{}), nil
+			},
+		},
+		{
+			Name:    vacance_logements.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return vacance_logements.NewSource(vacance_logements.Options{}), nil
+			},
+		},
+		{
+			Name:    ips_ecoles.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return ips_ecoles.NewSource(ips_ecoles.Options{}), nil
 			},
 		},
 		{
