@@ -20,14 +20,22 @@ const Name = "delinquance"
 //     covering 14 État 4001 indicators (burglary, vehicle thefts,
 //     violence, sexual violence, vandalism, drugs, fraud).
 //
-// v2 narrows classifyRisk to the burglary indicator only and adds the
-// `RatesPerInhabitantInflated` caveat for Paris/Lyon/Marseille
+// v2 narrowed classifyRisk to the burglary indicator only and added
+// the `RatesPerInhabitantInflated` caveat for Paris/Lyon/Marseille
 // arrondissements. Earlier versions tripped RiskHigh on every Paris
 // arrondissement because theft_no_violence (per-inhabitant) is
 // inflated 5–15× by ambient population in tourist / business
-// districts. Cache invalidation: bump consumes the prior v1
-// classification cache.
-const sourceVersion = 2
+// districts.
+//
+// v3 re-orients the Flag semantically: from generic-crime to
+// social-distress. Burglary turned out to be an anti-signal — luxury
+// /tourist neighbourhoods score highest precisely because they
+// concentrate stealable wealth. classifyRisk now anchors on
+// drug-trafficking + street-violence + unarmed-robbery and suppresses
+// the flag entirely for arrondissement-split cities (where commune-
+// level rates cannot distinguish the Goutte-d'Or from Auteuil).
+// Cache invalidation: bump consumes the prior v2 classifications.
+const sourceVersion = 3
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -97,11 +105,24 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 			Evidence:   ev,
 		}, nil
 	}
+	inflated := hasInflatedPerInhabitantRates(insee)
+	flag := classifyRisk(e.Rates)
+	if inflated {
+		// classifyRisk anchors on per-inhabitant indicators
+		// (drug_trafficking, violence_outside_family, robbery_unarmed)
+		// which are 5–15× inflated for Paris/Lyon/Marseille
+		// arrondissements by ambient (daytime / tourist) population.
+		// The resulting "high" verdict on Paris 1er — a wealthy
+		// neighbourhood that is not a social-distress zone — would be
+		// misleading. Suppress the flag and let consumers compose QPV
+		// + Filosofi + chomage for arrondissement-split cities.
+		flag = RiskUnknown
+	}
 	return &Result{
 		Rates:                      copyRateMap(e.Rates),
 		Population:                 e.Population,
-		Flag:                       classifyRisk(e.Rates),
-		RatesPerInhabitantInflated: hasInflatedPerInhabitantRates(insee),
+		Flag:                       flag,
+		RatesPerInhabitantInflated: inflated,
 		Confidence:                 ConfidenceHigh,
 		Evidence:                   ev,
 	}, nil
