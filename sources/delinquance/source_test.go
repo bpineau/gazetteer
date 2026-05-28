@@ -80,7 +80,12 @@ func TestQuery_InsufficientInputs(t *testing.T) {
 	}
 }
 
-// TestClassifyRisk pins the three-bucket logic.
+// TestClassifyRisk pins the burglary-only three-bucket logic. The
+// per-inhabitant indicators (theft_no_violence, vandalism) used to
+// also trip RiskHigh, but they are denominator-inflated in tourist
+// arrondissements (Paris 1er triple-tripped on theft=325 ‰ despite
+// a real per-dwelling risk no higher than other Paris arrondissements).
+// classifyRisk now anchors on burglary, which is per 1 000 logements.
 func TestClassifyRisk(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -90,13 +95,48 @@ func TestClassifyRisk(t *testing.T) {
 	}{
 		{"empty", map[string]float64{}, RiskUnknown},
 		{"all-low", map[string]float64{"burglary": 1.0, "theft_no_violence": 4.0, "vandalism": 2.0}, RiskLow},
-		{"medium", map[string]float64{"burglary": 4.0, "theft_no_violence": 10.0, "vandalism": 7.0}, RiskMedium},
+		{"medium-burglary", map[string]float64{"burglary": 4.0, "theft_no_violence": 10.0, "vandalism": 7.0}, RiskMedium},
 		{"high-burglary", map[string]float64{"burglary": 7.0, "theft_no_violence": 3.0, "vandalism": 2.0}, RiskHigh},
-		{"high-vandalism", map[string]float64{"burglary": 2.0, "theft_no_violence": 5.0, "vandalism": 15.0}, RiskHigh},
+		// Vandalism alone no longer trips high — burglary stays low.
+		{"high-vandalism-only-stays-low", map[string]float64{"burglary": 2.0, "theft_no_violence": 5.0, "vandalism": 15.0}, RiskLow},
+		// Theft alone (typical tourist district) no longer trips high — burglary stays medium.
+		{"high-theft-only-stays-medium", map[string]float64{"burglary": 4.0, "theft_no_violence": 100.0, "vandalism": 5.0}, RiskMedium},
 	}
 	for _, c := range cases {
 		if got := classifyRisk(c.rates); got != c.want {
 			t.Errorf("%s: classifyRisk = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+// TestHasInflatedPerInhabitantRates checks the heuristic that flags
+// communes where ambient (daytime / tourist) population is much
+// larger than the resident population used as the SSMSI denominator.
+func TestHasInflatedPerInhabitantRates(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		insee string
+		want  bool
+	}{
+		{"75101", true},  // Paris 1er
+		{"75120", true},  // Paris 20e
+		{"75056", false}, // Paris (parent commune, undivided)
+		{"69381", true},  // Lyon 1er
+		{"69389", true},  // Lyon 9e
+		{"69123", false}, // Lyon (parent)
+		{"13201", true},  // Marseille 1er
+		{"13216", true},  // Marseille 16e
+		{"13055", false}, // Marseille (parent)
+		{"75999", false}, // out-of-range Paris suffix
+		{"92012", false}, // Courbevoie — La Défense not yet covered
+		{"95100", false}, // Argenteuil
+		{"15300", false}, // Murat
+		{"", false},      // empty
+		{"abc", false},   // garbage
+	}
+	for _, c := range cases {
+		if got := hasInflatedPerInhabitantRates(c.insee); got != c.want {
+			t.Errorf("hasInflatedPerInhabitantRates(%q) = %v, want %v", c.insee, got, c.want)
 		}
 	}
 }
