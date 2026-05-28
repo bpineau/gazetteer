@@ -19,7 +19,15 @@ const Name = "delinquance"
 //   - v1: initial release. Embeds the SSMSI 2024 commune-level extract
 //     covering 14 État 4001 indicators (burglary, vehicle thefts,
 //     violence, sexual violence, vandalism, drugs, fraud).
-const sourceVersion = 1
+//
+// v2 narrows classifyRisk to the burglary indicator only and adds the
+// `RatesPerInhabitantInflated` caveat for Paris/Lyon/Marseille
+// arrondissements. Earlier versions tripped RiskHigh on every Paris
+// arrondissement because theft_no_violence (per-inhabitant) is
+// inflated 5–15× by ambient population in tourist / business
+// districts. Cache invalidation: bump consumes the prior v1
+// classification cache.
+const sourceVersion = 2
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -90,11 +98,12 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		}, nil
 	}
 	return &Result{
-		Rates:      copyRateMap(e.Rates),
-		Population: e.Population,
-		Flag:       classifyRisk(e.Rates),
-		Confidence: ConfidenceHigh,
-		Evidence:   ev,
+		Rates:                      copyRateMap(e.Rates),
+		Population:                 e.Population,
+		Flag:                       classifyRisk(e.Rates),
+		RatesPerInhabitantInflated: hasInflatedPerInhabitantRates(insee),
+		Confidence:                 ConfidenceHigh,
+		Evidence:                   ev,
 	}, nil
 }
 
