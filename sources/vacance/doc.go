@@ -6,6 +6,12 @@
 // consulted (vacance is a commune-wide metric). Missing communes
 // (secret statistique) surface as IsEmpty()==true.
 //
+// Disambiguation: this Source surfaces the FISCAL vacancy reading
+// (LOVAC — the dataset Bercy uses to assess TLV / THRS). For the
+// DEMOGRAPHIC vacancy rate from the INSEE census base logement, see
+// sources/vacance_logements. The two signals are correlated but
+// distinct.
+//
 // Example — wire the Source, query a Listing, and read the typed
 // payload:
 //
