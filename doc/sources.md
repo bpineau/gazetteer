@@ -31,11 +31,14 @@ The table below summarises each Source. Detailed contracts follow.
 | `encadrement`    | zip or INSEE + property_type + rooms (+ surface)| offline DRIHL JSON          |
 | `filosofi`       | INSEE                                          | offline INSEE Filosofi 2021 |
 | `georisques`     | lat/lon (or address)                           | georisques.gouv.fr report   |
+| `ips_ecoles`     | INSEE (arrondissement-aware)                   | offline DEPP IPS 2024-2025  |
 | `locservice`     | INSEE + property_type + rooms                  | locservice.fr HTML scrape   |
 | `osm_transit`    | lat/lon + offline station catalog              | OSM Overpass (refresh only) |
 | `qpv`            | INSEE                                          | offline ANCT QPV 2024 list  |
+| `rpls`           | INSEE                                          | offline data.gouv SRU 2024  |
 | `taxefonciere`   | INSEE + surface_m2                             | offline DGFiP rates         |
-| `vacance`        | INSEE                                          | offline LOVAC 2025          |
+| `vacance`        | INSEE                                          | offline LOVAC 2025 (fiscal) |
+| `vacance_logements` | INSEE (arrondissement-aware)                | offline INSEE RP 2021       |
 | `zonageabc`      | INSEE                                          | offline arrêté 2025-09-05   |
 | `zonetendue`     | INSEE                                          | offline décret 2013-392     |
 
@@ -235,11 +238,66 @@ Per-commune `taxe foncière` estimate.
 
 ## `sources/vacance`
 
-Per-commune vacancy rate from the LOVAC 2025 dataset.
+Per-commune FISCAL vacancy status from the LOVAC 2025 dataset (TLV
+2013 / THRS perimeter — the dataset Bercy uses to assess the Taxe sur
+les Logements Vacants).
 
 - **Needs**: INSEE.
 - **Result**: vacancy rate %, long-term vacancy split. Missing
   communes (secret statistique) surface as `IsEmpty()`.
+- **Disambiguation**: for the DEMOGRAPHIC vacancy rate from the INSEE
+  census, see `sources/vacance_logements`. Distinct datasets — the two
+  signals are correlated but not interchangeable.
+
+## `sources/vacance_logements`
+
+Per-commune DEMOGRAPHIC vacancy rate from the INSEE Recensement de la
+Population 2021 ("base communale logement").
+
+- **Needs**: INSEE.
+- **Result**: `vacance_logements.Result` with `VacancyRate` (% LOGVAC /
+  LOG), counts of total / vacant / résidences principales /
+  secondaires, and a distribution-relative tier (`tendu` / `normal` /
+  `élevé` / `déprise`).
+- **Backend**: gzipped JSON embedded under `data/`, ~34 955 communes
+  including the per-arrondissement rows for Paris / Lyon / Marseille
+  (the Source does NOT fold arrondissements — Paris 1er vacancy ≠
+  Paris 18e vacancy is a real signal here).
+
+## `sources/rpls`
+
+Per-commune share of social housing (logement locatif social) under
+the loi SRU article 55 framework.
+
+- **Needs**: INSEE. Paris / Lyon / Marseille arrondissements fold to
+  the parent commune (upstream publishes one row per parent commune).
+- **Result**: `rpls.Result` with `LLSRate` (%) and a distribution-
+  relative tier (`rural` / `mixte` / `fort` / `satured`).
+- **Backend**: gzipped JSON embedded under `data/`, ~35 228 communes
+  (data.gouv.fr "Taux de logements sociaux dans les Communes" 2024
+  vintage, frozen 2025-01-01).
+- **Note**: ≈ 64 % of communes report a 0 % rate — these are below
+  the SRU obligation threshold; the answer is real (TierRural,
+  Confidence=high), not missing.
+
+## `sources/ips_ecoles`
+
+Per-commune median Indice de Position Sociale (IPS) over écoles
+primaires, from the DEPP per-establishment dataset.
+
+- **Needs**: INSEE.
+- **Result**: `ips_ecoles.Result` with `IPSMedian`, min / max range,
+  school count, and a distribution-relative tier (`precaire` / `mixte`
+  / `moyen` / `favorise`). Confidence is `high` with ≥ 3 schools,
+  `medium` with 1-2.
+- **Backend**: gzipped JSON embedded under `data/`, ~16 153 communes
+  hosting ≥ 1 école, ~29 990 establishments (rentrée 2024-2025).
+- **PLM granularity**: this is the ONLY commune-level Source in the
+  gazetteer that yields per-arrondissement readings for Paris / Lyon
+  / Marseille — Paris 1er IPS ≈ 130, Paris 16e ≈ 140, Paris 18e ≈ 104,
+  differences crushed by every other commune-keyed Source.
+- **Aggregation**: UNWEIGHTED median (the upstream CSV does not
+  publish per-school effectifs).
 
 ## `sources/anct`
 

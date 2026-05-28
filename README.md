@@ -106,6 +106,9 @@ Commune-level signals for the investor:
 | `cartofriches` | Cerema brownfield inventory aggregated per commune               |
 | `education`    | Count of open schools per commune (live API)                     |
 | `bpe`          | INSEE BPE — curated commerce / health / services counts          |
+| `rpls`         | % social housing (loi SRU) per commune                           |
+| `vacance_logements` | INSEE census demographic vacancy rate (per arrondissement) |
+| `ips_ecoles`   | DEPP median IPS over écoles primaires (per arrondissement)       |
 
 Transport:
 
