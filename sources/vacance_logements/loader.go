@@ -17,13 +17,16 @@ import (
 var embedFS embed.FS
 
 // set binds the embedded INSEE base-logement extract to the datadir/refresh
-// pipeline. The Transform is not yet reconstructed, so the Set is read-only:
-// Open resolves datadir > embed, and refresh reports it as skipped.
+// pipeline. Refresh downloads the upstream INSEE zip and rebuilds the
+// gzipped JSON via transform.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
 	Processed: dataset.File{Name: "vacance_logements_communes.json.gz"},
+	Raw:       []dataset.File{{Name: rawName, URL: rawURL}},
+	Transform: transform,
+	Validate:  validate,
 }
 
 // Entry is one commune's row from the INSEE base logement census.
