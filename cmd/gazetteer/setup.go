@@ -11,6 +11,8 @@ import (
 	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/httpx"
+
+	"github.com/bpineau/gazetteer/sources/iris"
 )
 
 // commonFlags is the per-sub-command flag bundle every "real" command
@@ -67,10 +69,12 @@ func newRuntimeDeps() (*runtimeDeps, error) {
 	}
 	ban := banx.NewBANClient(hc)
 	com := communes.MustDefault()
-	norm := gazetteer.NewBANNormalizer(ban, com)
 	// A failure to resolve the user cache dir is non-fatal: block sources
 	// fall back to their embedded copies when DataDir is empty.
 	dataDir, _ := dataset.ResolveDir("")
+	// The IRIS source doubles as the Normalizer's IRISResolver, so addresses
+	// resolved by the CLI carry their IRIS code.
+	norm := gazetteer.NewBANNormalizer(ban, com).WithIRIS(iris.NewSource(iris.Options{DataDir: dataDir}))
 	return &runtimeDeps{HTTP: hc, BAN: ban, Communes: com, Normalizer: norm, DataDir: dataDir}, nil
 }
 
