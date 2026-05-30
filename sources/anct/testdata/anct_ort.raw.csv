@@ -1,0 +1,4 @@
+Commune,EPCI,Département,Région,Code commune,Statut de la commune,Signée ?,"Si signée, date de signature","Si non signée, date de signature envisagée",Durée (en années),Date de fin estimée,Remarques,Avancement,ACV,PVD,longitude,latitude,Dernière actualisation,Actualisé par
+26 - Valence,Valence Romans Agglo,Drôme,Auvergne-Rhône-Alpes,26362,1. Commune ACV,Signée,2020-02-27,,7,,,,true,false,4.89,44.93,01-01-2024 00:00,X
+01 - Belley,CC Bugey Sud,Ain,Auvergne-Rhône-Alpes,01034,2. Commune PVD,Signée,2022-11-21,,5,,,,false,true,5.68,45.75,01-01-2024 00:00,X
+84 - Lyon,Métropole de Lyon,Rhône,Auvergne-Rhône-Alpes,69123,3. Autre,Non signée,,2026-01-01,5,,,,false,false,4.83,45.75,01-01-2024 00:00,X
