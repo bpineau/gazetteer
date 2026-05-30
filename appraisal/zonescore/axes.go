@@ -11,6 +11,7 @@ import (
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/sources/chomage"
 	"github.com/bpineau/gazetteer/sources/delinquance"
+	"github.com/bpineau/gazetteer/sources/filoiris"
 	"github.com/bpineau/gazetteer/sources/filosofi"
 	"github.com/bpineau/gazetteer/sources/locservice"
 	"github.com/bpineau/gazetteer/sources/nuisances"
@@ -103,24 +104,16 @@ func tensionLabelScore(l string) (float64, bool) {
 }
 
 // scoreSolvabilite — tenant reliability: median income + the social-distress
-// flag (filosofi) and the unemployment gap vs national (chomage).
+// flag (filoiris at IRIS level, else filosofi at commune level) and the
+// unemployment gap vs national (chomage).
 func scoreSolvabilite(d gazetteer.Dossier) axisResult {
 	var subs []*float64
 	var srcs []string
 	reason := "solvabilité locataire"
-	if fi, ok := gazetteer.Get[*filosofi.Result](d, filosofi.Name); ok && !fi.IsEmpty() {
-		var fs []*float64
-		if s, ok := riskFlagScore(string(fi.Flag)); ok {
-			fs = append(fs, new(s))
-		}
-		if fi.MedianEUR > 0 {
-			fs = append(fs, new(lerp(float64(fi.MedianEUR), 14000, 30000)))
-		}
-		if v, ok := mean(fs...); ok {
-			subs = append(subs, new(v))
-			srcs = append(srcs, filosofi.Name)
-			reason += fmt.Sprintf(", revenu médian %d€", fi.MedianEUR)
-		}
+	if v, src, median, ok := incomeSubscore(d); ok {
+		subs = append(subs, new(v))
+		srcs = append(srcs, src)
+		reason += fmt.Sprintf(", revenu médian %d€ (%s)", median, src)
 	}
 	if ch, ok := gazetteer.Get[*chomage.Result](d, chomage.Name); ok && !ch.IsEmpty() {
 		// Below-national unemployment scores high; above scores low.
@@ -133,6 +126,41 @@ func scoreSolvabilite(d gazetteer.Dossier) axisResult {
 		return axisResult{}
 	}
 	return axisResult{value: v, reason: reason, sources: srcs, present: true}
+}
+
+// incomeSubscore returns the income component of solvabilité (0..100), the
+// source it came from and the median used. It prefers the IRIS-level
+// Filosofi reading (filoiris) — sharper where intra-commune income varies
+// most, exactly the dense IDF zones — and falls back to the commune-level
+// reading (filosofi). Both map a risk flag + the median (lerp 14k→30k €)
+// to a score and average them. ok is false when neither source is present.
+func incomeSubscore(d gazetteer.Dossier) (score float64, source string, median int, ok bool) {
+	if fi, ok := gazetteer.Get[*filoiris.Result](d, filoiris.Name); ok && !fi.IsEmpty() {
+		if v, ok := incomeScore(string(fi.Flag), fi.MedianEUR); ok {
+			return v, filoiris.Name, fi.MedianEUR, true
+		}
+	}
+	if fi, ok := gazetteer.Get[*filosofi.Result](d, filosofi.Name); ok && !fi.IsEmpty() {
+		if v, ok := incomeScore(string(fi.Flag), fi.MedianEUR); ok {
+			return v, filosofi.Name, fi.MedianEUR, true
+		}
+	}
+	return 0, "", 0, false
+}
+
+// incomeScore maps a Filosofi risk flag + median revenu disponible to a
+// 0..100 score, averaging whichever signals are present. ok is false only
+// when no signal is present; incomeSubscore's callers gate on IsEmpty
+// (median > 0) first, so in practice the median lerp is always present.
+func incomeScore(flag string, medianEUR int) (float64, bool) {
+	var fs []*float64
+	if s, ok := riskFlagScore(flag); ok {
+		fs = append(fs, new(s))
+	}
+	if medianEUR > 0 {
+		fs = append(fs, new(lerp(float64(medianEUR), 14000, 30000)))
+	}
+	return mean(fs...)
 }
 
 // scoreSecurite — safety from the SSMSI social-distress flag (delinquance).

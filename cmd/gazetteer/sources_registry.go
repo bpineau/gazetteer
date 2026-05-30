@@ -20,6 +20,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/dvf"
 	"github.com/bpineau/gazetteer/sources/education"
 	"github.com/bpineau/gazetteer/sources/encadrement"
+	"github.com/bpineau/gazetteer/sources/filoiris"
 	"github.com/bpineau/gazetteer/sources/filosofi"
 	"github.com/bpineau/gazetteer/sources/georisques"
 	"github.com/bpineau/gazetteer/sources/ips_ecoles"
@@ -178,6 +179,13 @@ func sourceCatalog() []sourceFactory {
 			Default: true,
 			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
 				return filosofi.NewSource(filosofi.Options{DataDir: d.DataDir}), nil
+			},
+		},
+		{
+			Name:    filoiris.Name,
+			Default: true,
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return filoiris.NewSource(filoiris.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{

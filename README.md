@@ -102,7 +102,8 @@ Commune-level signals for the investor:
 
 | Source         | What it provides                                                 |
 |----------------|------------------------------------------------------------------|
-| `filosofi`     | INSEE Filosofi income / poverty statistics by IRIS               |
+| `filosofi`     | INSEE Filosofi income / poverty statistics by commune            |
+| `filoiris`     | INSEE Filosofi income / poverty at IRIS (sub-commune) level      |
 | `chomage`      | INSEE local unemployment rate by zone d'emploi (quarterly)       |
 | `delinquance`  | SSMSI État 4001 — per-commune crime indicators                   |
 | `zonageabc`    | Official A bis / A / B1 / B2 / C tension classification          |

@@ -21,6 +21,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/dvf"
 	"github.com/bpineau/gazetteer/sources/education"
 	"github.com/bpineau/gazetteer/sources/encadrement"
+	"github.com/bpineau/gazetteer/sources/filoiris"
 	"github.com/bpineau/gazetteer/sources/filosofi"
 	"github.com/bpineau/gazetteer/sources/georisques"
 	ipsecoles "github.com/bpineau/gazetteer/sources/ips_ecoles"
@@ -131,6 +132,7 @@ var sourceRenderers = map[string]sourceRenderer{
 	dvf.Name:          renderDVF,
 	education.Name:    renderEducation,
 	encadrement.Name:  renderEncadrement,
+	filoiris.Name:     renderFiloIris,
 	filosofi.Name:     renderFilosofi,
 	georisques.Name:   renderGeorisques,
 	iris.Name:         renderIRIS,
@@ -262,6 +264,24 @@ func renderLocservice(data any) (string, []string) {
 		headline += ")"
 	}
 	return headline, nil
+}
+
+func renderFiloIris(data any) (string, []string) {
+	r, ok := data.(*filoiris.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no IRIS-level income (outside the ≥5000-hab perimeter)", nil
+	}
+	parts := []string{fmt.Sprintf("revenu médian IRIS %d €/an", r.MedianEUR)}
+	if r.PovertyRatePct > 0 {
+		parts = append(parts, fmt.Sprintf("pauvreté %.1f%%", r.PovertyRatePct))
+	}
+	if r.Gini > 0 {
+		parts = append(parts, fmt.Sprintf("Gini %.2f", r.Gini))
+	}
+	if r.Flag != "" {
+		parts = append(parts, "risk="+string(r.Flag))
+	}
+	return strings.Join(parts, ", "), nil
 }
 
 func renderFilosofi(data any) (string, []string) {
