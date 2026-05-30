@@ -164,7 +164,7 @@ func TestSource_ZeroZeroLatLonRejected(t *testing.T) {
 }
 
 func TestSource_NoCatalog_ReturnsErrNoCatalog(t *testing.T) {
-	s := NewSource(Options{}) // no catalog
+	s := NewSource(Options{Catalog: &Catalog{}})
 	_, err := s.Query(context.Background(), gazetteer.Listing{
 		Lat: ptrF64(48.84),
 		Lon: ptrF64(2.28),
@@ -221,7 +221,7 @@ func TestSource_OutOfRange_ReturnsSkippedResult(t *testing.T) {
 }
 
 func TestSource_UpdateCatalog_HotSwap(t *testing.T) {
-	s := NewSource(Options{}) // no catalog
+	s := NewSource(Options{Catalog: &Catalog{}}) // explicit empty: no embedded baseline
 	a := gazetteer.Listing{Lat: ptrF64(48.8407), Lon: ptrF64(2.2880)}
 
 	// Before update: ErrNoCatalog.
@@ -249,7 +249,7 @@ func TestSource_UpdateCatalog_HotSwap(t *testing.T) {
 }
 
 func TestSource_Catalog_AccessorReturnsLive(t *testing.T) {
-	s := NewSource(Options{})
+	s := NewSource(Options{Catalog: &Catalog{}}) // explicit empty: no embedded baseline
 	if got := s.Catalog(); got != nil {
 		t.Errorf("Catalog() = %+v, want nil before UpdateCatalog", got)
 	}
