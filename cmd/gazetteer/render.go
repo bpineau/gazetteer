@@ -10,8 +10,11 @@ import (
 	"github.com/bpineau/gazetteer/sources/anct"
 	"github.com/bpineau/gazetteer/sources/bdnb"
 	"github.com/bpineau/gazetteer/sources/bpe"
+	"github.com/bpineau/gazetteer/sources/cadastre"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/cartofriches"
+	"github.com/bpineau/gazetteer/sources/catnat"
+	"github.com/bpineau/gazetteer/sources/cdsr"
 	"github.com/bpineau/gazetteer/sources/chomage"
 	"github.com/bpineau/gazetteer/sources/delinquance"
 	"github.com/bpineau/gazetteer/sources/dpedist"
@@ -20,11 +23,17 @@ import (
 	"github.com/bpineau/gazetteer/sources/encadrement"
 	"github.com/bpineau/gazetteer/sources/filosofi"
 	"github.com/bpineau/gazetteer/sources/georisques"
+	ipsecoles "github.com/bpineau/gazetteer/sources/ips_ecoles"
+	"github.com/bpineau/gazetteer/sources/iris"
 	"github.com/bpineau/gazetteer/sources/locservice"
+	"github.com/bpineau/gazetteer/sources/nuisances"
+	"github.com/bpineau/gazetteer/sources/oll"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/qpv"
+	"github.com/bpineau/gazetteer/sources/rpls"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
+	vacancelog "github.com/bpineau/gazetteer/sources/vacance_logements"
 	"github.com/bpineau/gazetteer/sources/zonageabc"
 	"github.com/bpineau/gazetteer/sources/zonetendue"
 )
@@ -111,8 +120,11 @@ var sourceRenderers = map[string]sourceRenderer{
 	anct.Name:         renderAnct,
 	bdnb.Name:         renderBDNB,
 	bpe.Name:          renderBPE,
+	cadastre.Name:     renderCadastre,
 	carteloyers.Name:  renderCarteloyers,
 	cartofriches.Name: renderCartofriches,
+	catnat.Name:       renderCatnat,
+	cdsr.Name:         renderCDSR,
 	chomage.Name:      renderChomage,
 	delinquance.Name:  renderDelinquance,
 	dpedist.Name:      renderDPEDist,
@@ -121,11 +133,17 @@ var sourceRenderers = map[string]sourceRenderer{
 	encadrement.Name:  renderEncadrement,
 	filosofi.Name:     renderFilosofi,
 	georisques.Name:   renderGeorisques,
+	iris.Name:         renderIRIS,
+	ipsecoles.Name:    renderIPSEcoles,
 	locservice.Name:   renderLocservice,
+	nuisances.Name:    renderNuisances,
+	oll.Name:          renderOLL,
 	gzosm.Name:        renderOSM,
 	qpv.Name:          renderQPV,
+	rpls.Name:         renderRPLS,
 	taxefonciere.Name: renderTaxeFonciere,
 	vacance.Name:      renderVacance,
+	vacancelog.Name:   renderVacanceLogements,
 	zonageabc.Name:    renderZonageABC,
 	zonetendue.Name:   renderZoneTendue,
 }
@@ -516,6 +534,181 @@ func renderGeorisques(data any) (string, []string) {
 	// deeplink with redundant query params. Callers who need it read
 	// `gazetteer query --json` and pick `dossier.results.georisques.data.report_url`.
 	return headline, extra
+}
+
+func renderIRIS(data any) (string, []string) {
+	r, ok := data.(*iris.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "outside covered IRIS perimeter", nil
+	}
+	headline := "IRIS " + r.CodeIRIS
+	if r.NomIRIS != "" {
+		headline += " — " + r.NomIRIS
+	}
+	if r.TypIRIS != "" {
+		headline += " (" + irisTypeLabel(r.TypIRIS) + ")"
+	}
+	return headline, nil
+}
+
+// irisTypeLabel expands the single-letter INSEE IRIS type code.
+func irisTypeLabel(t string) string {
+	switch t {
+	case "H":
+		return "habitat"
+	case "A":
+		return "activité"
+	case "D":
+		return "divers"
+	case "Z":
+		return "commune non découpée"
+	default:
+		return t
+	}
+}
+
+func renderCatnat(data any) (string, []string) {
+	r, ok := data.(*catnat.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no CatNat decree on record", nil
+	}
+	headline := fmt.Sprintf("%d arrêtés CatNat (%d récents", r.TotalArretes, r.RecentCount)
+	if r.LastEventYear > 0 {
+		headline += fmt.Sprintf(", dernier %d", r.LastEventYear)
+	}
+	if r.Tier != "" {
+		headline += ", " + r.Tier
+	}
+	headline += ")"
+	var extra []string
+	if len(r.ByCategory) > 0 {
+		extra = append(extra, "by category: "+formatMapCounts(r.ByCategory))
+	}
+	return headline, extra
+}
+
+func renderNuisances(data any) (string, []string) {
+	r, ok := data.(*nuisances.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "outside the nuisance grid", nil
+	}
+	headline := fmt.Sprintf("cadre de vie: %s (%d nuisance(s) superposée(s)", r.Tier, r.NuisanceCount)
+	if r.PointNoir {
+		headline += ", point noir environnemental"
+	}
+	headline += ")"
+	return headline, nil
+}
+
+func renderCDSR(data any) (string, []string) {
+	r, ok := data.(*cdsr.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no distressed copro within range", nil
+	}
+	headline := fmt.Sprintf("%d copro(s) en difficulté ≤3 km (plus proche %d m, %d ≤500 m)",
+		r.Within3km, r.NearestM, r.Within500m)
+	var extra []string
+	for _, it := range r.Nearest {
+		label := it.Name
+		if label == "" {
+			label = it.Address
+		}
+		extra = append(extra, fmt.Sprintf("%d m — %s (%s)", it.DistanceM, label, it.Commune))
+	}
+	return headline, extra
+}
+
+func renderOLL(data any) (string, []string) {
+	r, ok := data.(*oll.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no observed-rent cell (Paris intra-muros is out of OLL scope)", nil
+	}
+	headline := fmt.Sprintf("loyer observé %.1f €/m²/mois", r.ObservedMedianEURPerM2)
+	parts := []string{}
+	if r.ObservedQ1EURPerM2 > 0 && r.ObservedQ3EURPerM2 > 0 {
+		parts = append(parts, fmt.Sprintf("IQR %.1f–%.1f", r.ObservedQ1EURPerM2, r.ObservedQ3EURPerM2))
+	}
+	if r.SampleSize > 0 {
+		parts = append(parts, fmt.Sprintf("%d obs", r.SampleSize))
+	}
+	if r.Zone != "" {
+		zone := r.Zone
+		if r.Agglo != "" {
+			zone += " · " + r.Agglo
+		}
+		parts = append(parts, zone)
+	}
+	if r.Confidence != "" {
+		parts = append(parts, "conf="+r.Confidence)
+	}
+	if len(parts) > 0 {
+		headline += " (" + strings.Join(parts, ", ") + ")"
+	}
+	return headline, nil
+}
+
+func renderRPLS(data any) (string, []string) {
+	r, ok := data.(*rpls.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "absent from the SRU inventory", nil
+	}
+	headline := fmt.Sprintf("%.1f%% logements sociaux (SRU)", r.LLSRate)
+	if r.Tier != "" {
+		headline += " — " + string(r.Tier)
+	}
+	return headline, nil
+}
+
+func renderVacanceLogements(data any) (string, []string) {
+	r, ok := data.(*vacancelog.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "absent from the census vacancy dataset", nil
+	}
+	headline := fmt.Sprintf("vacance INSEE %.1f%%", r.VacancyRate)
+	if r.VacantCount > 0 && r.TotalLogements > 0 {
+		headline += fmt.Sprintf(" (%d/%d logements", r.VacantCount, r.TotalLogements)
+		if r.Tier != "" {
+			headline += ", " + string(r.Tier)
+		}
+		headline += ")"
+	} else if r.Tier != "" {
+		headline += " (" + string(r.Tier) + ")"
+	}
+	return headline, nil
+}
+
+func renderIPSEcoles(data any) (string, []string) {
+	r, ok := data.(*ipsecoles.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no école primaire IPS on record", nil
+	}
+	headline := fmt.Sprintf("IPS médian %.0f", r.IPSMedian)
+	if r.SchoolCount > 0 {
+		headline += fmt.Sprintf(" sur %d école(s)", r.SchoolCount)
+	}
+	if r.Tier != "" {
+		headline += " — " + string(r.Tier)
+	}
+	if r.IPSMin > 0 && r.IPSMax > 0 && r.IPSMin != r.IPSMax {
+		headline += fmt.Sprintf(" (band %.0f–%.0f)", r.IPSMin, r.IPSMax)
+	}
+	return headline, nil
+}
+
+func renderCadastre(data any) (string, []string) {
+	r, ok := data.(*cadastre.Result)
+	if !ok || r == nil || r.IsEmpty() || len(r.Parcels) == 0 {
+		return "no parcel at these coordinates", nil
+	}
+	p := r.Parcels[0]
+	headline := fmt.Sprintf("parcelle %s (%d m²)", p.ID, p.ContenanceM2)
+	if r.EmpriseRatio != nil {
+		headline += fmt.Sprintf(", emprise bâtie %.0f%%", *r.EmpriseRatio*100)
+	}
+	if len(r.Parcels) > 1 {
+		headline += fmt.Sprintf(" +%d autre(s)", len(r.Parcels)-1)
+	}
+	return headline, nil
 }
 
 // formatMapCounts renders a small map[string]int as "k1=v1, k2=v2, …"
