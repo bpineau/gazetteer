@@ -25,6 +25,8 @@ func runSources(ctx context.Context, args []string) error {
 		return runSourcesList(ctx, rest)
 	case "doc":
 		return runSourcesDoc(ctx, rest)
+	case "catalog":
+		return runSourcesCatalog(rest)
 	case "-h", "--help", "help":
 		printSourcesUsage(os.Stdout)
 		return nil
@@ -39,6 +41,7 @@ func printSourcesUsage(w *os.File) {
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  gazetteer sources list           List every Source registered with the lib (name + version).")
 	fmt.Fprintln(w, "  gazetteer sources doc <name>     Print a JSON schema example of <name>'s typed Result.")
+	fmt.Fprintln(w, "  gazetteer sources catalog [--json]  Full capability map: inputs, coverage, returns, feeds.")
 }
 
 // runSourcesList prints one line per registered source. The name comes
