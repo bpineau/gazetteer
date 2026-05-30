@@ -33,6 +33,10 @@ func runQuery(ctx context.Context, args []string) error {
 		enc.SetIndent("", "  ")
 		return enc.Encode(dossier)
 	}
+	if q.explain {
+		printDiagnosis(os.Stdout, dossier)
+		return nil
+	}
 	printDossierSummary(os.Stdout, dossier)
 	return nil
 }
@@ -49,6 +53,7 @@ type queryFlags struct {
 	timeout      time.Duration // overall budget for the Collect; 0 ⇒ no deadline
 	jsonOut      bool
 	dump         bool
+	explain      bool   // diagnose per-source why-empty/why-failed (query only)
 	profile      string // ZoneScore weight preset (appraise / compare only)
 	addr         string
 }
@@ -80,6 +85,7 @@ func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 		"Overall budget for the Collect (deadline propagated via ctx). Slow Sources past this point return ctx.DeadlineExceeded → StatusFailedTransient. 0 disables the deadline.")
 	fs.BoolVar(&q.jsonOut, "json", false, "Emit the full Dossier as indented JSON")
 	fs.BoolVar(&q.dump, "dump", false, "Log raw HTTP request/response payloads (sources that honour it)")
+	fs.BoolVar(&q.explain, "explain", false, "Diagnose per source WHY it returned nothing (missing input vs no data for this address)")
 	fs.StringVar(&q.profile, "profile", "",
 		"ZoneScore weight preset for appraise/compare: yield (default) | balanced | patrimoine | transport.")
 	positional, err := parseInterleaved(fs, args)

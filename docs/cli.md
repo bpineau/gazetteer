@@ -56,6 +56,9 @@ $ gazetteer query --json "1 rue de Rivoli, 75001 Paris" | jq .
   `yield` (default, yield-first) | `balanced` | `patrimoine`
   (capital-appreciation / low-hassle) | `transport` (heavily up-weights
   walk-to-station — for a "near a station, not Paris" thesis).
+- `--explain` — (query) diagnose, per source that returned nothing, *why*:
+  a missing required input vs no data for this address. The first move for a
+  mostly-empty Dossier.
 - `--verbose` — DEBUG-level slog output to stderr.
 - `--dump` — log raw HTTP request/response payloads for Sources that
   honour the flag.
