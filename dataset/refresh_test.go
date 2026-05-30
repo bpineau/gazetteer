@@ -106,6 +106,45 @@ func TestRefresh_DownloadTransformPersist(t *testing.T) {
 	_ = rc.Close()
 }
 
+func TestRefresh_IdempotentSkipsPresent(t *testing.T) {
+	t.Parallel()
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		_, _ = io.WriteString(w, "z\n")
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	set := Set{Source: "idem", Version: 1, Processed: File{Name: "idem.csv.gz"},
+		Raw: []File{{Name: "in.csv", URL: srv.URL}}, Transform: upperGzipTransform}
+	c := newTestClient(t)
+
+	// First run builds it.
+	rep, err := Refresh(context.Background(), c, []Set{set}, RefreshOptions{Dir: dir})
+	if err != nil || rep[0].Skipped {
+		t.Fatalf("first run: err=%v skipped=%v", err, rep[0].Skipped)
+	}
+	// Second run is a no-op: present + version-matched manifest → skipped,
+	// no extra download.
+	rep, err = Refresh(context.Background(), c, []Set{set}, RefreshOptions{Dir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rep[0].Skipped || rep[0].Reason != "already present" {
+		t.Errorf("second run: report = %+v, want skipped 'already present'", rep[0])
+	}
+	if hits != 1 {
+		t.Errorf("hits = %d, want 1 (idempotent second run must not re-download)", hits)
+	}
+	// Force rebuilds it.
+	if _, err := Refresh(context.Background(), c, []Set{set}, RefreshOptions{Dir: dir, Force: true}); err != nil {
+		t.Fatal(err)
+	}
+	if hits != 2 {
+		t.Errorf("hits = %d after Force, want 2", hits)
+	}
+}
+
 func TestRefresh_SkipReadOnlySet(t *testing.T) {
 	t.Parallel()
 	set := Set{Source: "ro", Version: 1, Processed: File{Name: "ro.json"}} // no Transform
