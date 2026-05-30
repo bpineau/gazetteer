@@ -15,15 +15,16 @@ import (
 //go:embed data/filosofi_communes.json
 var embedFS embed.FS
 
-// set binds the embedded Filosofi extract to the datadir/refresh
-// pipeline. The Transform is not yet reconstructed, so the Set is
-// read-only: Open resolves datadir > embed, and refresh reports it as
-// skipped.
+// set binds the embedded Filosofi extract to the datadir/refresh pipeline.
+// Refresh downloads the upstream CSV and rebuilds the indexed JSON.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
 	Processed: dataset.File{Name: "filosofi_communes.json"},
+	Raw:       []dataset.File{{Name: rawCSVName, URL: rawCSVURL}},
+	Transform: transform,
+	Validate:  validate,
 }
 
 // Entry carries the per-commune INSEE-Filosofi 2021 indicators.
