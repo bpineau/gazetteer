@@ -36,7 +36,7 @@ func runRefresh(ctx context.Context, args []string) error {
 		list        bool
 	)
 	fs.StringVar(&dataDir, "data-dir", "", "Target datadir (default $GAZETTEER_DATA_DIR or ~/.cache/gazetteer)")
-	fs.BoolVar(&force, "force", false, "Re-download raw inputs even when already present")
+	fs.BoolVar(&force, "force", false, "Rebuild even when the artifact is already present (re-download + re-transform)")
 	fs.BoolVar(&embedUpdate, "go-embed-update", false, "Copy rebuilt artifacts into sources/<name>/data/ for re-commit")
 	fs.BoolVar(&list, "list", false, "Report per-source dataset state and exit")
 	fs.Usage = func() {
@@ -211,17 +211,21 @@ func copyToEmbed(report dataset.Report, dir string) error {
 		return fmt.Errorf("--go-embed-update: %w", err)
 	}
 	for _, r := range report {
-		if r.Err != nil || r.Skipped {
+		if r.Err != nil {
 			continue
 		}
 		if !r.Embedded {
 			// Download-only dataset: it has no embed dir to update. Copying
 			// it into sources/<name>/data would fabricate one the source
 			// never reads.
-			fmt.Fprintf(os.Stdout, "embed-update: %s skipped (download-only, not embedded)\n", r.Processed)
 			continue
 		}
 		src := filepath.Join(dir, r.Processed)
+		if _, ok := fileSize(src); !ok {
+			// Read-only set (no Transform), or nothing produced — nothing to
+			// copy back into the repo.
+			continue
+		}
 		dst := filepath.Join(root, "sources", r.Source, "data", r.Processed)
 		if err := copyFile(src, dst); err != nil {
 			return fmt.Errorf("--go-embed-update: copy %s: %w", r.Processed, err)
