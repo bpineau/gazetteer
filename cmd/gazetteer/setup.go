@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/communes"
@@ -47,6 +48,12 @@ type runtimeDeps struct {
 	BAN        *banx.BANClient
 	Communes   communes.Communes
 	Normalizer gazetteer.Normalizer
+
+	// DataDir is the resolved gazetteer data directory injected into every
+	// block-dataset Source so refreshed artifacts override the embedded
+	// ones. Empty means embedded-only (e.g. when the user cache dir cannot
+	// be resolved).
+	DataDir string
 }
 
 // newRuntimeDeps builds the shared httpx.Client, the BAN client, and
@@ -61,7 +68,10 @@ func newRuntimeDeps() (*runtimeDeps, error) {
 	ban := banx.NewBANClient(hc)
 	com := communes.MustDefault()
 	norm := gazetteer.NewBANNormalizer(ban, com)
-	return &runtimeDeps{HTTP: hc, BAN: ban, Communes: com, Normalizer: norm}, nil
+	// A failure to resolve the user cache dir is non-fatal: block sources
+	// fall back to their embedded copies when DataDir is empty.
+	dataDir, _ := dataset.ResolveDir("")
+	return &runtimeDeps{HTTP: hc, BAN: ban, Communes: com, Normalizer: norm, DataDir: dataDir}, nil
 }
 
 // parseInterleaved runs fs.Parse repeatedly, harvesting positional

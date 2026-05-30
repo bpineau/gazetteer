@@ -119,64 +119,64 @@ func sourceCatalog() []sourceFactory {
 		{
 			Name:    carteloyers.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return carteloyers.NewSource(carteloyers.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return carteloyers.NewSource(carteloyers.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    encadrement.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return encadrement.NewSource(encadrement.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return encadrement.NewSource(encadrement.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    filosofi.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return filosofi.NewSource(filosofi.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return filosofi.NewSource(filosofi.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    taxefonciere.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return taxefonciere.NewSource(taxefonciere.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return taxefonciere.NewSource(taxefonciere.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    vacance.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return vacance.NewSource(vacance.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return vacance.NewSource(vacance.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    anct.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return anct.NewSource(anct.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return anct.NewSource(anct.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    cartofriches.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return cartofriches.NewSource(cartofriches.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return cartofriches.NewSource(cartofriches.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    chomage.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return chomage.NewSource(chomage.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return chomage.NewSource(chomage.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    bpe.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return bpe.NewSource(bpe.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return bpe.NewSource(bpe.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
@@ -189,8 +189,8 @@ func sourceCatalog() []sourceFactory {
 		{
 			Name:    delinquance.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return delinquance.NewSource(delinquance.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return delinquance.NewSource(delinquance.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
@@ -203,43 +203,43 @@ func sourceCatalog() []sourceFactory {
 		{
 			Name:    qpv.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return qpv.NewSource(qpv.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return qpv.NewSource(qpv.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    rpls.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return rpls.NewSource(rpls.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return rpls.NewSource(rpls.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    vacance_logements.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return vacance_logements.NewSource(vacance_logements.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return vacance_logements.NewSource(vacance_logements.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    ips_ecoles.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return ips_ecoles.NewSource(ips_ecoles.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return ips_ecoles.NewSource(ips_ecoles.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    zonageabc.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return zonageabc.NewSource(zonageabc.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return zonageabc.NewSource(zonageabc.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
 			Name:    zonetendue.Name,
 			Default: true,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return zonetendue.NewSource(zonetendue.Options{}), nil
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return zonetendue.NewSource(zonetendue.Options{DataDir: d.DataDir}), nil
 			},
 		},
 	}
