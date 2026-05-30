@@ -26,6 +26,10 @@ func runCompare(ctx context.Context, args []string) error {
 		fmt.Fprintln(os.Stderr, "compare needs at least two addresses (quote each separately)")
 		return errUsage
 	}
+	zopts, err := cf.zonescoreOptions() // validate --profile before the network work
+	if err != nil {
+		return err
+	}
 
 	logger := cf.common.setupLogger()
 	deps, err := newRuntimeDeps()
@@ -75,7 +79,7 @@ func runCompare(ctx context.Context, args []string) error {
 		ctx, cancel = context.WithTimeout(ctx, cf.timeout)
 		defer cancel()
 	}
-	cmp := zonescore.Compare(ctx, client, listings)
+	cmp := zonescore.Compare(ctx, client, listings, zopts...)
 
 	if cf.jsonOut {
 		enc := json.NewEncoder(os.Stdout)

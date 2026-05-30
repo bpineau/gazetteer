@@ -52,6 +52,10 @@ $ gazetteer query --json "1 rue de Rivoli, 75001 Paris" | jq .
   registry — `bdnb` and `osm_transit` are opt-in, see below).
 - `--json` — emit the full Dossier as indented JSON instead of the
   human summary.
+- `--profile` — (appraise / compare only) the ZoneScore weight preset:
+  `yield` (default, yield-first) | `balanced` | `patrimoine`
+  (capital-appreciation / low-hassle) | `transport` (heavily up-weights
+  walk-to-station — for a "near a station, not Paris" thesis).
 - `--verbose` — DEBUG-level slog output to stderr.
 - `--dump` — log raw HTTP request/response payloads for Sources that
   honour the flag.
@@ -96,8 +100,10 @@ $ gazetteer compare --surface 46 --rooms 2 \
 ```
 
 Each address is normalised, its sources collected, and the candidates
-are printed as a ranked table plus the winner's axis breakdown. A
-candidate whose yield is **known** (the rendement axis is present)
+are printed as a ranked table plus the winner's axis breakdown.
+`--profile` swaps the weighting thesis (e.g. `--profile transport` ranks
+by walk-to-station as much as yield). A candidate whose yield is
+**known** (the rendement axis is present)
 always outranks one whose yield is unknown (e.g. DVF found no
 comparables) — a yield-first ranking must not be won by a zone with no
 yield data. `--json` emits the full `Comparison`.
