@@ -97,6 +97,9 @@ func Refresh(ctx context.Context, c *httpx.Client, sets []Set, opts RefreshOptio
 	if err := checkNoCollisions(sets); err != nil {
 		return nil, err
 	}
+	// Make the batch client available to fetch-style Transforms (those that
+	// build their dataset from live API queries rather than static Raw URLs).
+	ctx = WithHTTPClient(ctx, c)
 	dir, err := ResolveDir(opts.Dir)
 	if err != nil {
 		return nil, err

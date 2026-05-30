@@ -107,13 +107,16 @@ func sourceCatalog() []sourceFactory {
 			},
 		},
 		{
-			// OSM transit needs an offline catalog. Opt-in via --source.
-			// When asked but no catalog is wired, Query returns
-			// ErrNoCatalog and the framework records failed_transient.
+			// OSM transit ships an embedded baseline catalog (overridable
+			// from the datadir via `refresh osm_transit`) plus a live
+			// Overpass fallback for points the catalog doesn't cover.
 			Name:    gzosm.Name,
-			Default: false,
-			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
-				return gzosm.NewSource(gzosm.Options{}), nil
+			Default: true,
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return gzosm.NewSource(gzosm.Options{
+					DataDir: d.DataDir,
+					Fetcher: gzosm.NewHTTPOverpassFetcher(d.HTTP, ""),
+				}), nil
 			},
 		},
 		{

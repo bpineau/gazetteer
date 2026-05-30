@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"sync/atomic"
 	"time"
 
+	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
 )
 
@@ -49,32 +51,52 @@ var ErrNoCatalog = errors.New("osm: catalog not loaded")
 // returns ErrNoCatalog until UpdateCatalog is called with a non-empty
 // catalog (typically by a background refresh goroutine).
 type Options struct {
-	// Catalog is the initial station catalog. May be nil — call
-	// UpdateCatalog later to install one. Empty catalogs are accepted
-	// at construction (no error) but every Query returns ErrNoCatalog
-	// until a non-empty catalog is installed.
+	// Catalog overrides the station catalog. When nil, NewSource loads it
+	// via Load(DataDir) — a refreshed copy in the datadir takes precedence
+	// over the embedded baseline. Tests inject a stub here.
 	Catalog *Catalog
+
+	// DataDir is the gazetteer data directory. A refreshed catalog found
+	// there overrides the embedded baseline. Empty means embedded-only.
+	DataDir string
+
+	// Fetcher enables the live Overpass fallback: when the catalog has no
+	// station within range of a query point (a zone the baseline does not
+	// cover, or no catalog at all), the Source queries Overpass live around
+	// that point. Nil disables the fallback (catalog-only).
+	Fetcher OverpassFetcher
 }
 
 // Source implements gazetteer.Source for the OSM transit enricher. Use
 // NewSource to construct. Concurrency-safe: the catalog pointer is
-// updated atomically, so background refresh goroutines can hot-swap it
-// while Query calls are in flight.
+// updated atomically, so a refresh can hot-swap it while Query calls are in
+// flight.
 type Source struct {
 	catalog atomic.Pointer[Catalog]
+	fetcher OverpassFetcher
 }
 
-// NewSource builds an osm Source. Zero-valued Options is fine. The
-// Source registers immediately, even with a nil/empty catalog —
-// Query then returns ErrNoCatalog until UpdateCatalog supplies a real
-// one. This lets the serve process boot without blocking on Overpass.
+// NewSource builds an osm Source. Zero-valued Options is fine: the embedded
+// baseline catalog is loaded automatically. With a Fetcher set, queries the
+// catalog can't answer fall back to a live Overpass lookup.
 func NewSource(opts Options) *Source {
-	s := &Source{}
-	if opts.Catalog != nil && len(opts.Catalog.Stations) > 0 {
-		s.catalog.Store(opts.Catalog)
+	s := &Source{fetcher: opts.Fetcher}
+	cat := opts.Catalog
+	if cat == nil {
+		// Embedded baseline / datadir override. Errors are rare (a corrupt
+		// committed embed); the live fallback covers a missing catalog.
+		cat, _ = Load(opts.DataDir)
+	}
+	if cat != nil && len(cat.Stations) > 0 {
+		s.catalog.Store(cat)
 	}
 	return s
 }
+
+// Datasets implements gazetteer.DatasetProvider, exposing the station
+// catalog to the dataset refresh tooling (rebuilt from a live Overpass
+// refresh — see transform).
+func (s *Source) Datasets() []dataset.Set { return []dataset.Set{set} }
 
 // UpdateCatalog atomically replaces the Source's station catalog.
 // Safe to call from any goroutine while Query is running. A nil or
@@ -135,58 +157,108 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	}
 
 	cat := s.catalog.Load()
-	if cat == nil || len(cat.Stations) == 0 {
-		return nil, ErrNoCatalog
-	}
+	hasCat := cat != nil && len(cat.Stations) > 0
 
-	// emptyEvidence pre-fills the sidecar fields known before the lookup
-	// outcome (auction coords, catalog stats, multiplier, cap).
-	emptyEvidence := func(haversine float64) Evidence {
+	catStations := 0
+	var catFetchedAt time.Time
+	if hasCat {
+		catStations, catFetchedAt = len(cat.Stations), cat.FetchedAt
+	}
+	mkEvidence := func(haversine float64, stations int, fetchedAt time.Time) Evidence {
 		return Evidence{
 			AuctionLat:       lat,
 			AuctionLon:       lon,
 			HaversineMeters:  int(haversine),
 			WalkMultiplier:   WalkSinuosityMultiplier,
 			ProximityCapM:    MaxNearestStationMeters,
-			CatalogFetchedAt: cat.FetchedAt.UTC().Format(time.RFC3339),
-			CatalogStations:  len(cat.Stations),
+			CatalogFetchedAt: fetchedAt.UTC().Format(time.RFC3339),
+			CatalogStations:  stations,
+		}
+	}
+	mkHit := func(st *Station, haversine float64, walkM, stations int, fetchedAt time.Time) *Result {
+		return &Result{
+			NearestTransitName:    st.Name,
+			NearestTransitType:    st.Type,
+			NearestTransitLines:   st.Lines,
+			NearestTransitWalkM:   walkM,
+			NearestTransitWalkMin: WalkMinutes(walkM),
+			Confidence:            ConfidenceHigh,
+			SampleSize:            1,
+			Evidence:              mkEvidence(haversine, stations, fetchedAt),
 		}
 	}
 
-	st, haversine, walkM := cat.NearestStationWithinMeters(lat, lon, MaxNearestStationMeters)
-	if st == nil {
-		// Two sub-cases:
-		//  (a) lat/lon is the (0, 0) sentinel — already caught above.
-		//      NearestStationWithinMeters returns nil for it but we
-		//      don't reach this branch.
-		//  (b) the nearest station is beyond the proximity cap. Out
-		//      of range — return a sentinel Result the adapter maps
-		//      to enrich.ErrPermanentlyOutOfScope.
-		logger.Debug("osm.out_of_range",
-			slog.Float64("lat", lat),
-			slog.Float64("lon", lon),
-			slog.Float64("cap_m", MaxNearestStationMeters),
-		)
-		return &Result{
-			Confidence: ConfidenceLow,
-			SampleSize: 0,
-			Skipped:    true,
-			SkipReason: SkipReasonOutOfRange,
-			Evidence:   emptyEvidence(0),
-		}, nil
+	// 1. Catalog fast path (offline).
+	if hasCat {
+		if st, hav, walk := cat.NearestStationWithinMeters(lat, lon, MaxNearestStationMeters); st != nil {
+			return mkHit(st, hav, walk, catStations, catFetchedAt), nil
+		}
 	}
 
-	out := &Result{
-		NearestTransitName:    st.Name,
-		NearestTransitType:    st.Type,
-		NearestTransitLines:   st.Lines,
-		NearestTransitWalkM:   walkM,
-		NearestTransitWalkMin: WalkMinutes(walkM),
-		Confidence:            ConfidenceHigh,
-		SampleSize:            1,
-		Evidence:              emptyEvidence(haversine),
+	// 2. Live Overpass fallback — covers points the catalog can't answer (a
+	//    zone the baseline doesn't cover, or no catalog at all).
+	if s.fetcher != nil {
+		st, hav, walk, n, err := s.liveNearest(ctx, lat, lon)
+		switch {
+		case err != nil:
+			logger.Debug("osm.live_fallback_failed", slog.String("err", err.Error()))
+			if !hasCat {
+				return nil, ErrNoCatalog // transient: no offline data and live failed
+			}
+		case st != nil:
+			logger.Debug("osm.live_hit", slog.String("station", st.Name))
+			return mkHit(st, hav, walk, n, time.Now()), nil
+		}
 	}
-	return out, nil
+
+	// 3. Nothing within range from either path.
+	if !hasCat && s.fetcher == nil {
+		return nil, ErrNoCatalog
+	}
+	logger.Debug("osm.out_of_range",
+		slog.Float64("lat", lat),
+		slog.Float64("lon", lon),
+		slog.Float64("cap_m", MaxNearestStationMeters),
+	)
+	return &Result{
+		Confidence: ConfidenceLow,
+		SampleSize: 0,
+		Skipped:    true,
+		SkipReason: SkipReasonOutOfRange,
+		Evidence:   mkEvidence(0, catStations, catFetchedAt),
+	}, nil
+}
+
+// liveNearest queries Overpass for transit stations in a small bounding box
+// around (lat, lon) and returns the nearest one within the proximity cap. It
+// reuses the catalog query + parser + nearest-station logic, so a live hit
+// is shaped exactly like a catalog hit (minus route lines, which the cheap
+// per-point query skips).
+func (s *Source) liveNearest(ctx context.Context, lat, lon float64) (st *Station, haversineMeters float64, walkMeters, nStations int, err error) {
+	bbox := pointBBox(lat, lon, MaxNearestStationMeters)
+	body, err := s.fetcher.Query(ctx, FranceTransitOverpassQL(bbox))
+	if err != nil {
+		return nil, 0, 0, 0, err
+	}
+	stations, err := ParseOverpass(body)
+	if err != nil {
+		return nil, 0, 0, 0, err
+	}
+	tmp := &Catalog{Stations: stations}
+	st, hav, walk := tmp.NearestStationWithinMeters(lat, lon, MaxNearestStationMeters)
+	return st, hav, walk, len(stations), nil
+}
+
+// pointBBox returns an Overpass "south,west,north,east" bbox covering a
+// radiusM-metre square around (lat, lon).
+func pointBBox(lat, lon, radiusM float64) string {
+	dLat := radiusM / 111_000.0
+	cosLat := math.Cos(lat * math.Pi / 180)
+	if cosLat < 0.01 {
+		cosLat = 0.01
+	}
+	dLon := radiusM / (111_000.0 * cosLat)
+	return fmt.Sprintf("%.5f,%.5f,%.5f,%.5f", lat-dLat, lon-dLon, lat+dLat, lon+dLon)
 }
 
 // Query is the atomic helper for callers who don't want the builder.
