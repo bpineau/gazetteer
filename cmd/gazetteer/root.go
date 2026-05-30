@@ -14,7 +14,8 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Commands:")
 	fmt.Fprintln(w, "  query      Query configured sources for an address; print per-source summary or JSON.")
-	fmt.Fprintln(w, "  appraise   Run query + synthesise consolidated price / rent / hazard view.")
+	fmt.Fprintln(w, "  appraise   Run query + synthesise consolidated price / rent / hazard + zone score.")
+	fmt.Fprintln(w, "  compare    Rank several addresses best-first by yield-first zone score.")
 	fmt.Fprintln(w, "  normalize  Resolve a free-text address into a canonical Listing via BAN.")
 	fmt.Fprintln(w, "  sources    list | doc <name>  — inspect the registered Source catalogue.")
 	fmt.Fprintln(w, "  refresh    [sources|all]       — download/rebuild datasets into the datadir; --list, --go-embed-update.")
@@ -46,6 +47,8 @@ func run(ctx context.Context, args []string) error {
 		return runQuery(ctx, rest)
 	case "appraise":
 		return runAppraise(ctx, rest)
+	case "compare":
+		return runCompare(ctx, rest)
 	case "sources":
 		return runSources(ctx, rest)
 	case "refresh":
