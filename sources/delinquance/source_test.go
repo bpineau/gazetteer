@@ -11,7 +11,7 @@ import (
 // TestLoad smokes the embedded dataset.
 func TestLoad(t *testing.T) {
 	t.Parallel()
-	idx, err := Load()
+	idx, err := Load("")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

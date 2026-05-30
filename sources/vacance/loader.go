@@ -1,7 +1,6 @@
 package vacance
 
 import (
-	"bytes"
 	"embed"
 	"encoding/csv"
 	"errors"
@@ -10,10 +9,22 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/bpineau/gazetteer/dataset"
 )
 
 //go:embed data/vacance_communes.csv
-var vacanceFS embed.FS
+var embedFS embed.FS
+
+// set binds the embedded extract to the datadir/refresh pipeline. The
+// Transform is not yet reconstructed, so the Set is read-only: Open
+// resolves datadir > embed, and refresh reports it as skipped.
+var set = dataset.Set{
+	Source:    Name,
+	Version:   Version,
+	Embed:     embedFS,
+	Processed: dataset.File{Name: "vacance_communes.csv"},
+}
 
 // Entry captures the LOVAC-derived taux de logements vacants for one
 // commune. All percentages are 0..100 floats.
@@ -34,18 +45,27 @@ var (
 	indexErr   error
 )
 
-// Load returns the singleton index, parsing the embedded CSV on
-// first call.
-func Load() (*Index, error) {
+// Load returns the singleton index, resolving the processed artifact from
+// dir (the datadir) with a fallback to the embedded copy, and parsing it on
+// first call. Subsequent calls are constant-time and ignore dir — the dir
+// from the first call wins for the process lifetime. A dataset that is
+// neither in the datadir nor embedded yields an empty index (graceful
+// degradation), not an error.
+func Load(dir string) (*Index, error) {
 	indexOnce.Do(func() {
-		raw, err := vacanceFS.ReadFile("data/vacance_communes.csv")
-		if err != nil {
-			indexErr = fmt.Errorf("vacance: read vacance_communes: %w", err)
+		rc, err := set.Open(dir)
+		if errors.Is(err, dataset.ErrUnavailable) {
+			indexCache = &Index{}
 			return
 		}
-		idx, err := parseCSV(raw)
 		if err != nil {
-			indexErr = fmt.Errorf("vacance: parse vacance_communes: %w", err)
+			indexErr = fmt.Errorf("vacance: open dataset: %w", err)
+			return
+		}
+		defer func() { _ = rc.Close() }()
+		idx, err := parseIndex(rc)
+		if err != nil {
+			indexErr = err
 			return
 		}
 		indexCache = idx
@@ -76,11 +96,12 @@ func (idx *Index) Count() int {
 	return len(idx.byInsee)
 }
 
-func parseCSV(raw []byte) (*Index, error) {
-	r := csv.NewReader(bytes.NewReader(raw))
-	r.Comma = ';'
-	r.FieldsPerRecord = -1
-	header, err := r.Read()
+// parseIndex parses the semicolon-delimited CSV extract into an Index.
+func parseIndex(r io.Reader) (*Index, error) {
+	cr := csv.NewReader(r)
+	cr.Comma = ';'
+	cr.FieldsPerRecord = -1
+	header, err := cr.Read()
 	if err != nil {
 		return nil, fmt.Errorf("read header: %w", err)
 	}
@@ -96,7 +117,7 @@ func parseCSV(raw []byte) (*Index, error) {
 	}
 	out := make(map[string]Entry, 16_000)
 	for {
-		rec, err := r.Read()
+		rec, err := cr.Read()
 		if errors.Is(err, io.EOF) {
 			break
 		}
