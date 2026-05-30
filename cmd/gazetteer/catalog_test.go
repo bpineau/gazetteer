@@ -66,6 +66,24 @@ func TestSourcesJSONCurrent(t *testing.T) {
 	}
 }
 
+// TestEverySourceImplementsEmptyReporter enforces the uniform-contract promise
+// AGENTS.md makes ("learn one source, know all"): every registered Source's
+// typed Result must implement gazetteer.EmptyReporter (IsEmpty). The framework
+// uses it to record StatusOKEmpty, and every caller (and agent) relies on it —
+// a new source that omits it silently breaks the contract.
+func TestEverySourceImplementsEmptyReporter(t *testing.T) {
+	for _, name := range gazetteer.RegisteredNames() {
+		f := gazetteer.Lookup(name)
+		if f == nil {
+			t.Errorf("registered source %q has no result factory", name)
+			continue
+		}
+		if _, ok := f().(gazetteer.EmptyReporter); !ok {
+			t.Errorf("%s Result does not implement gazetteer.EmptyReporter (IsEmpty() bool) — breaks the uniform contract", name)
+		}
+	}
+}
+
 // TestBuildCatalog smokes the merge: every registered source appears once,
 // name-sorted, with its descriptor wired in.
 func TestBuildCatalog(t *testing.T) {
