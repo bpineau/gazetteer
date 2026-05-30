@@ -131,8 +131,12 @@ empty, the usual cause is a **missing input** or **out-of-coverage** address.
 
 ## Debugging recipes
 
-- **"source X returned empty"** → Does the Listing carry X's required input
-  (cheat-sheet)? Is the address inside X's coverage (catalog `coverage`)? Run
+- **"a mostly-empty Dossier — why?"** → `gazetteer query --explain "<addr>"`.
+  It prints the normalised Listing and, per source that returned nothing, the
+  cause: a **missing required input** ("Listing is missing X, which this source
+  needs") vs **no data for this address** ("inputs present → coverage: …"). This
+  is the first move for any "I got nothing back" question.
+- **"source X returned empty"** → `--explain` answers it; for the raw logs run
   `gazetteer query --verbose --source X "<addr>"`.
 - **"the number looks wrong"** → every Result has an `Evidence` sidecar with
   provenance (which tier/zone/dataset year it used). Inspect it.
