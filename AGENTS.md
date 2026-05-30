@@ -175,6 +175,19 @@ The catalog **completeness test** fails until every registered source has a
 descriptor, so the machine-readable catalog can never silently drift.
 See [docs/plugins.md](docs/plugins.md) for out-of-tree plugins.
 
+## Local quality gate (run once)
+
+```bash
+make hooks   # installs .githooks: pre-commit runs `make precommit`
+```
+
+`make precommit` = `fmt-check vet lint test tidy-check` — the whole gate, fast
+(~seconds with Go's cache), so trivial bugs (bad format, vet/lint, broken build
+or test, untidy go.mod) are caught **before** the commit lands instead of in CI.
+Need the linters first: `make tools`. Bypass a WIP checkpoint with
+`git commit --no-verify`. The hook chains to any global hooks path first, so it
+never disables corporate secret-scanning.
+
 ## Invariants & footguns
 
 - `zonescore.Options.Weights` **replaces** the default weight set wholesale — a

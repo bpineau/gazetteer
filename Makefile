@@ -89,6 +89,20 @@ refresh: build ## Refresh the embedded CSV / JSON datasets shipped by every sour
 .PHONY: check
 check: fmt-check vet lint test ## All-in CI-grade gate: format + vet + lint + test.
 
+.PHONY: tidy-check
+tidy-check: ## Fail if `go mod tidy` would change go.mod / go.sum (no mutation).
+	$(GO) mod tidy -diff
+
+.PHONY: precommit
+precommit: check tidy-check ## The pre-commit gate: check + tidy-check (fast; ~seconds cached).
+
+# ----- Git hooks -----------------------------------------------------
+
+.PHONY: hooks
+hooks: ## Install the repo git hooks (pre-commit runs `make precommit`).
+	git config core.hooksPath .githooks
+	@echo "installed: .githooks (pre-commit → make precommit). Bypass once with: git commit --no-verify"
+
 # ----- Housekeeping --------------------------------------------------
 
 .PHONY: clean
