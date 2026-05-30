@@ -24,6 +24,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/filoiris"
 	"github.com/bpineau/gazetteer/sources/filosofi"
 	"github.com/bpineau/gazetteer/sources/georisques"
+	"github.com/bpineau/gazetteer/sources/gpe"
 	ipsecoles "github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/iris"
 	"github.com/bpineau/gazetteer/sources/locservice"
@@ -136,6 +137,7 @@ var sourceRenderers = map[string]sourceRenderer{
 	filoiris.Name:     renderFiloIris,
 	filosofi.Name:     renderFilosofi,
 	georisques.Name:   renderGeorisques,
+	gpe.Name:          renderGPE,
 	iris.Name:         renderIRIS,
 	ipsecoles.Name:    renderIPSEcoles,
 	locservice.Name:   renderLocservice,
@@ -545,6 +547,18 @@ func renderOSM(data any) (string, []string) {
 		headline += ", lines " + strings.Join(r.NearestTransitLines, ",")
 	}
 	headline += ")"
+	return headline, nil
+}
+
+func renderGPE(data any) (string, []string) {
+	r, ok := data.(*gpe.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no future GPE station within range", nil
+	}
+	headline := fmt.Sprintf("future GPE: %s (%s, %d m)", r.Nearest.Name, r.Nearest.Line, r.Nearest.DistanceM)
+	if r.Within1500m > 0 {
+		headline += fmt.Sprintf(", %d à ≤1.5 km", r.Within1500m)
+	}
 	return headline, nil
 }
 

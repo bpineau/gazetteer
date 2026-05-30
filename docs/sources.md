@@ -41,6 +41,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `ips_ecoles`     | INSEE (arrondissement-aware)                   | offline DEPP IPS 2024-2025  |
 | `locservice`     | INSEE + property_type + rooms                  | locservice.fr HTML scrape   |
 | `osm_transit`    | lat/lon + offline station catalog              | OSM Overpass (refresh only) |
+| `gpe`            | lat/lon                                        | offline Grand Paris Express stations (SGP) |
 | `qpv`            | INSEE                                          | offline ANCT QPV 2024 list  |
 | `rpls`           | INSEE                                          | offline data.gouv SRU 2024  |
 | `taxefonciere`   | INSEE + surface_m2                             | offline DGFiP rates         |
@@ -378,6 +379,24 @@ canonical name `osm_transit`.
 - **Refresh**: out-of-band via `osm.NewCatalogFetcher(...)` and
   `Fetcher.Fetch(ctx, dir)`; the resulting `*Catalog` is what
   `UpdateCatalog` consumes.
+
+## `sources/gpe`
+
+Nearest **future** Grand Paris Express station — the new IDF metro
+(lines 14 ext / 15 / 16 / 17 / 18). Proximity to a coming GPE station is
+a major rental-demand and capital-appreciation driver for the "near a
+station, not Paris" thesis (pairs with the `transport` ZoneScore profile).
+
+- **Needs**: lat/lon.
+- **Result**: nearest station name + line (verbatim SGP label, e.g. `L15`
+  or `L16/L17` at an interchange) + distance, plus station counts within
+  1.5 km / 3 km. Empty beyond 6 km.
+- **No opening year**: deliberately omitted — the calendar shifts and one
+  line label spans sections opening years apart, so a per-station date
+  would be guesswork. It is **informational**, not folded into ZoneScore
+  (future transit must not distort the yield-first-today score).
+- **Backend**: the Société du Grand Paris station catalog (~68 stations)
+  embedded under `data/` (plain JSON, ~10 KB).
 
 ## `sources/taxefonciere`
 

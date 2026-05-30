@@ -23,6 +23,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/filoiris"
 	"github.com/bpineau/gazetteer/sources/filosofi"
 	"github.com/bpineau/gazetteer/sources/georisques"
+	"github.com/bpineau/gazetteer/sources/gpe"
 	"github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/iris"
 	"github.com/bpineau/gazetteer/sources/locservice"
@@ -194,6 +195,13 @@ func sourceCatalog() []sourceFactory {
 			Default: true,
 			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
 				return logiris.NewSource(logiris.Options{DataDir: d.DataDir}), nil
+			},
+		},
+		{
+			Name:    gpe.Name,
+			Default: true,
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return gpe.NewSource(gpe.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{

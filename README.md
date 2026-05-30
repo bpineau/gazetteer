@@ -123,6 +123,7 @@ Transport:
 | Source         | What it provides                                                 |
 |----------------|------------------------------------------------------------------|
 | `osm`          | Walking distance to nearest métro / RER / tram / train station   |
+| `gpe`          | Nearest *future* Grand Paris Express station + line + distance    |
 
 Plus an `appraisal/` layer combining the above into rent and price
 estimates with confidence bands, and `appraisal/zonescore`, a yield-first

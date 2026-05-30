@@ -1,0 +1,493 @@
+{
+ "meta": {
+  "source": "data.smartidf.services — point-de-localisation-des-gares-du-grand-paris-express (Société du Grand Paris)",
+  "downloaded_at": "2026-05-30",
+  "station_count": 69,
+  "note": "Future Grand Paris Express stations (lines 14 ext / 15 / 16 / 17 / 18). line = verbatim SGP label (a single line, or several at an interchange). No opening year: the calendar shifts and one line label spans sections opening years apart."
+ },
+ "stations": [
+  {
+   "code": "GA01",
+   "name": "Le Bourget RER",
+   "line": "L16/L17",
+   "lat": 48.93058045798289,
+   "lon": 2.422115109237472
+  },
+  {
+   "code": "GA02",
+   "name": "Le Blanc-Mesnil",
+   "line": "L16",
+   "lat": 48.94553031004862,
+   "lon": 2.462741944257064
+  },
+  {
+   "code": "GA03",
+   "name": "Aulnay",
+   "line": "L16",
+   "lat": 48.9518377411633,
+   "lon": 2.4878566474745627
+  },
+  {
+   "code": "GA04",
+   "name": "Sevran - Beaudottes",
+   "line": "L16",
+   "lat": 48.94721528907092,
+   "lon": 2.525529362372435
+  },
+  {
+   "code": "GA05",
+   "name": "Sevran - Livry",
+   "line": "L16",
+   "lat": 48.9358461366935,
+   "lon": 2.535317667168086
+  },
+  {
+   "code": "GA06",
+   "name": "Clichy - Montfermeil",
+   "line": "L16",
+   "lat": 48.904653215591196,
+   "lon": 2.5565919170065023
+  },
+  {
+   "code": "GA07",
+   "name": "Chelles",
+   "line": "L16",
+   "lat": 48.8745111251454,
+   "lon": 2.5857726763581432
+  },
+  {
+   "code": "GA08",
+   "name": "Noisy - Champs",
+   "line": "L15/L16",
+   "lat": 48.84345531530839,
+   "lon": 2.580787331604637
+  },
+  {
+   "code": "GA09",
+   "name": "Bry - Villiers - Champigny",
+   "line": "L15",
+   "lat": 48.82398677047637,
+   "lon": 2.526382835628157
+  },
+  {
+   "code": "GA10",
+   "name": "Champigny Centre",
+   "line": "L15",
+   "lat": 48.81619956220093,
+   "lon": 2.5020412919695727
+  },
+  {
+   "code": "GA11",
+   "name": "Saint-Maur - Créteil",
+   "line": "L15",
+   "lat": 48.80670229751401,
+   "lon": 2.47264879160843
+  },
+  {
+   "code": "GA12",
+   "name": "Créteil L'Echat",
+   "line": "L15",
+   "lat": 48.79543637948505,
+   "lon": 2.4498827783388815
+  },
+  {
+   "code": "GA13",
+   "name": "Le Vert de Maisons",
+   "line": "L15",
+   "lat": 48.789268680371926,
+   "lon": 2.433004643741948
+  },
+  {
+   "code": "GA14",
+   "name": "Les Ardoines",
+   "line": "L15",
+   "lat": 48.78230195637225,
+   "lon": 2.4088322237683846
+  },
+  {
+   "code": "GA15",
+   "name": "Vitry Centre",
+   "line": "L15",
+   "lat": 48.789990417480524,
+   "lon": 2.387038531128399
+  },
+  {
+   "code": "GA16",
+   "name": "Villejuif Louis Aragon",
+   "line": "L15",
+   "lat": 48.788467746904445,
+   "lon": 2.3672206932606077
+  },
+  {
+   "code": "GA17",
+   "name": "Villejuif Institut Gustave Roussy",
+   "line": "L15/L14",
+   "lat": 48.793044218146704,
+   "lon": 2.3493659340590063
+  },
+  {
+   "code": "GA18",
+   "name": "Arcueil - Cachan",
+   "line": "L15",
+   "lat": 48.797457760003816,
+   "lon": 2.3283422814145047
+  },
+  {
+   "code": "GA19",
+   "name": "Bagneux",
+   "line": "L15",
+   "lat": 48.80277163560353,
+   "lon": 2.3187058045530953
+  },
+  {
+   "code": "GA20",
+   "name": "Châtillon - Montrouge",
+   "line": "L15",
+   "lat": 48.811218369520546,
+   "lon": 2.3023604046414183
+  },
+  {
+   "code": "GA21",
+   "name": "Fort d'Issy - Vanves - Clamart",
+   "line": "L15",
+   "lat": 48.81406795963954,
+   "lon": 2.2735356251230683
+  },
+  {
+   "code": "GA22",
+   "name": "Issy RER",
+   "line": "L15",
+   "lat": 48.82109590317722,
+   "lon": 2.259940132799728
+  },
+  {
+   "code": "GA23",
+   "name": "Pont de Sèvres",
+   "line": "L15",
+   "lat": 48.82729138334796,
+   "lon": 2.2304798779495556
+  },
+  {
+   "code": "GA24",
+   "name": "Saint-Cloud",
+   "line": "L15",
+   "lat": 48.84409144181293,
+   "lon": 2.21713926922927
+  },
+  {
+   "code": "GA25",
+   "name": "Rueil - Suresnes \"Mont-Valérien\"",
+   "line": "L15",
+   "lat": 48.8724809534261,
+   "lon": 2.2021300102601757
+  },
+  {
+   "code": "GA26",
+   "name": "Nanterre La Boule",
+   "line": "L15",
+   "lat": 48.887772270346645,
+   "lon": 2.2014167751757348
+  },
+  {
+   "code": "GA27",
+   "name": "Nanterre La Folie",
+   "line": "L15",
+   "lat": 48.89823872057046,
+   "lon": 2.2264810193113775
+  },
+  {
+   "code": "GA28",
+   "name": "La Défense",
+   "line": "L15",
+   "lat": 48.890854792161804,
+   "lon": 2.237688709843252
+  },
+  {
+   "code": "GA29",
+   "name": "Bécon-les-Bruyères",
+   "line": "L15",
+   "lat": 48.90532896314685,
+   "lon": 2.267019144400969
+  },
+  {
+   "code": "GA30",
+   "name": "Bois-Colombes",
+   "line": "L15",
+   "lat": 48.914987386561855,
+   "lon": 2.2720135095825587
+  },
+  {
+   "code": "GA31",
+   "name": "Les Agnettes",
+   "line": "L15",
+   "lat": 48.9224665326739,
+   "lon": 2.287632262682482
+  },
+  {
+   "code": "GA32",
+   "name": "Les Grésillons",
+   "line": "L15",
+   "lat": 48.91997329676482,
+   "lon": 2.3130453822409653
+  },
+  {
+   "code": "GA33",
+   "name": "Saint-Denis Pleyel",
+   "line": "L14/L15/L16/L17",
+   "lat": 48.917682776063074,
+   "lon": 2.346560389198723
+  },
+  {
+   "code": "GA34",
+   "name": "La Courneuve \"Six Routes\"",
+   "line": "L16/L17",
+   "lat": 48.92925178722475,
+   "lon": 2.384490757960263
+  },
+  {
+   "code": "GA35",
+   "name": "Le Bourget Aéroport",
+   "line": "L17",
+   "lat": 48.94670230156657,
+   "lon": 2.4364103946201405
+  },
+  {
+   "code": "GA36",
+   "name": "Triangle de Gonesse",
+   "line": "L17",
+   "lat": 48.97869567209093,
+   "lon": 2.476356731356169
+  },
+  {
+   "code": "GA37",
+   "name": "Parc des Expositions",
+   "line": "L17",
+   "lat": 48.97478875397175,
+   "lon": 2.515936611094954
+  },
+  {
+   "code": "GA38",
+   "name": "Aéroport Charles de Gaulle T2",
+   "line": "L17",
+   "lat": 49.00476415290009,
+   "lon": 2.5701582552278035
+  },
+  {
+   "code": "GA39",
+   "name": "Aéroport Charles de Gaulle T4",
+   "line": "L17",
+   "lat": 49.01008009258919,
+   "lon": 2.5711583637890096
+  },
+  {
+   "code": "GA40",
+   "name": "Le Mesnil-Amelot",
+   "line": "L17",
+   "lat": 49.02589155154231,
+   "lon": 2.5955194678958247
+  },
+  {
+   "code": "GA41",
+   "name": "Maison Blanche - Paris XIIIe",
+   "line": "L14",
+   "lat": 48.821423303975116,
+   "lon": 2.3590830775080587
+  },
+  {
+   "code": "GA42",
+   "name": "Kremlin-Bicêtre Hôpital",
+   "line": "L14",
+   "lat": 48.80981003182065,
+   "lon": 2.3497501002833405
+  },
+  {
+   "code": "GA43",
+   "name": "Chevilly \"Trois Communes\"",
+   "line": "L14",
+   "lat": 48.775313612845096,
+   "lon": 2.354364943688198
+  },
+  {
+   "code": "GA44",
+   "name": "M.I.N. Porte de Thiais",
+   "line": "L14",
+   "lat": 48.76021877294793,
+   "lon": 2.3664686037937646
+  },
+  {
+   "code": "GA45",
+   "name": "Pont de Rungis",
+   "line": "L14",
+   "lat": 48.74697870091888,
+   "lon": 2.3728396961471243
+  },
+  {
+   "code": "GA46",
+   "name": "Aéroport d'Orly",
+   "line": "L14/L18",
+   "lat": 48.728004709002676,
+   "lon": 2.362272557455038
+  },
+  {
+   "code": "GA47",
+   "name": "Antonypôle",
+   "line": "L18",
+   "lat": 48.735837512762,
+   "lon": 2.309800492984758
+  },
+  {
+   "code": "GA48",
+   "name": "Massy Opéra",
+   "line": "L18",
+   "lat": 48.73148661710551,
+   "lon": 2.290814418822005
+  },
+  {
+   "code": "GA49",
+   "name": "Massy - Palaiseau",
+   "line": "L18",
+   "lat": 48.725144279073305,
+   "lon": 2.258466492245461
+  },
+  {
+   "code": "GA50",
+   "name": "Palaiseau",
+   "line": "L18",
+   "lat": 48.715364195739205,
+   "lon": 2.200958583207987
+  },
+  {
+   "code": "GA51",
+   "name": "Orsay - Gif",
+   "line": "L18",
+   "lat": 48.71215046782793,
+   "lon": 2.173294535262749
+  },
+  {
+   "code": "GA52",
+   "name": "CEA Saint-Aubin",
+   "line": "L18",
+   "lat": 48.72993425338691,
+   "lon": 2.161383743060809
+  },
+  {
+   "code": "GA53",
+   "name": "Saint-Quentin Est",
+   "line": "L18",
+   "lat": 48.76012989003143,
+   "lon": 2.071833107885106
+  },
+  {
+   "code": "GA55",
+   "name": "Satory",
+   "line": "L18",
+   "lat": 48.78710799746039,
+   "lon": 2.1042215843239176
+  },
+  {
+   "code": "GA56",
+   "name": "Versailles Chantiers",
+   "line": "L18",
+   "lat": 48.79469286732842,
+   "lon": 2.136758835141177
+  },
+  {
+   "code": "GA60",
+   "name": "Pont Cardinet",
+   "line": "L14",
+   "lat": 48.88923108508915,
+   "lon": 2.3153469294141473
+  },
+  {
+   "code": "GA61",
+   "name": "Porte de Clichy",
+   "line": "L14",
+   "lat": 48.89497625011181,
+   "lon": 2.3132160334339837
+  },
+  {
+   "code": "GA62",
+   "name": "Saint-Ouen RER",
+   "line": "L14",
+   "lat": 48.90726993530677,
+   "lon": 2.326603154821043
+  },
+  {
+   "code": "GA63",
+   "name": "Mairie de Saint-Ouen",
+   "line": "L14",
+   "lat": 48.912879491710584,
+   "lon": 2.3349716579991004
+  },
+  {
+   "code": "GA64",
+   "name": "Stade de France",
+   "line": "L15",
+   "lat": 48.918014688780964,
+   "lon": 2.3633803641837283
+  },
+  {
+   "code": "GA65",
+   "name": "Mairie d'Aubervilliers",
+   "line": "L15",
+   "lat": 48.91417199706874,
+   "lon": 2.3817985131886195
+  },
+  {
+   "code": "GA66",
+   "name": "Fort d'Aubervilliers",
+   "line": "L15",
+   "lat": 48.9141633448242,
+   "lon": 2.405437151272412
+  },
+  {
+   "code": "GA67",
+   "name": "Drancy - Bobigny",
+   "line": "L15",
+   "lat": 48.915808577493074,
+   "lon": 2.427072881043244
+  },
+  {
+   "code": "GA68",
+   "name": "Bobigny Pablo Picasso",
+   "line": "L15",
+   "lat": 48.9063086976795,
+   "lon": 2.4500703021073647
+  },
+  {
+   "code": "GA69",
+   "name": "Pont de Bondy",
+   "line": "L15",
+   "lat": 48.90426493242581,
+   "lon": 2.4697311909205366
+  },
+  {
+   "code": "GA70",
+   "name": "Bondy",
+   "line": "L15",
+   "lat": 48.89425907255966,
+   "lon": 2.480198691610315
+  },
+  {
+   "code": "GA71",
+   "name": "Rosny Bois-Perrier",
+   "line": "L15",
+   "lat": 48.88273836821721,
+   "lon": 2.4817418910481175
+  },
+  {
+   "code": "GA73",
+   "name": "Val de Fontenay",
+   "line": "L15",
+   "lat": 48.855918516389075,
+   "lon": 2.4896573144271974
+  },
+  {
+   "code": "GA74",
+   "name": "Nogent - Le Perreux",
+   "line": "L15",
+   "lat": 48.83902252159746,
+   "lon": 2.494724556589584
+  }
+ ]
+}
