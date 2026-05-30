@@ -17,7 +17,7 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "  appraise   Run query + synthesise consolidated price / rent / hazard view.")
 	fmt.Fprintln(w, "  normalize  Resolve a free-text address into a canonical Listing via BAN.")
 	fmt.Fprintln(w, "  sources    list | doc <name>  — inspect the registered Source catalogue.")
-	fmt.Fprintln(w, "  refresh    <source>            — refresh embedded data (stub in v1).")
+	fmt.Fprintln(w, "  refresh    [sources|all]       — download/rebuild datasets into the datadir; --list, --go-embed-update.")
 	fmt.Fprintln(w, "  version    Print the gazetteer build version.")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Run `gazetteer <command> -h` for sub-command flags.")

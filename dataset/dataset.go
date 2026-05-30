@@ -108,26 +108,67 @@ type Set struct {
 // Source's own parse step. sha256 integrity is verified by Refresh and
 // reported by the CLI's --list, not on the hot read path.
 func (s Set) Open(dir string) (io.ReadCloser, error) {
-	if err := s.check(); err != nil {
+	origin, err := s.Resolve(dir)
+	if err != nil {
 		return nil, err
 	}
-	if dir != "" {
-		if p := filepath.Join(dir, s.Processed.Name); isFile(p) {
-			use, err := s.datadirUsable(dir)
-			if err != nil {
-				return nil, err
-			}
-			if use {
-				return os.Open(p) //nolint:gosec // p is datadir-joined from a validated clean basename
-			}
+	switch origin {
+	case OriginDatadir:
+		return os.Open(filepath.Join(dir, s.Processed.Name)) //nolint:gosec // datadir-joined clean basename
+	case OriginEmbed:
+		return s.Embed.Open(path.Join(embedDataDir, s.Processed.Name))
+	default:
+		return nil, fmt.Errorf("%s: %w", s.Source, ErrUnavailable)
+	}
+}
+
+// Origin identifies where Open resolves a Set's processed artifact from.
+type Origin int
+
+const (
+	// OriginNone means the artifact is available neither in the datadir nor
+	// embedded; Open would return ErrUnavailable.
+	OriginNone Origin = iota
+	// OriginDatadir means a validated datadir copy would be used.
+	OriginDatadir
+	// OriginEmbed means the embedded fallback would be used.
+	OriginEmbed
+)
+
+func (o Origin) String() string {
+	switch o {
+	case OriginDatadir:
+		return "datadir"
+	case OriginEmbed:
+		return "embed"
+	default:
+		return "none"
+	}
+}
+
+// Resolve reports which source Open would read from for dir, without
+// opening the artifact. It applies the same datadir-version gate as Open
+// and is the basis for the CLI's `refresh --list`.
+func (s Set) Resolve(dir string) (Origin, error) {
+	if err := s.check(); err != nil {
+		return OriginNone, err
+	}
+	if dir != "" && isFile(filepath.Join(dir, s.Processed.Name)) {
+		use, err := s.datadirUsable(dir)
+		if err != nil {
+			return OriginNone, err
+		}
+		if use {
+			return OriginDatadir, nil
 		}
 	}
 	if s.Embed != nil {
 		if f, err := s.Embed.Open(path.Join(embedDataDir, s.Processed.Name)); err == nil {
-			return f, nil
+			_ = f.Close()
+			return OriginEmbed, nil
 		}
 	}
-	return nil, fmt.Errorf("%s: %w", s.Source, ErrUnavailable)
+	return OriginNone, nil
 }
 
 // datadirUsable reports whether the datadir processed file should be used,

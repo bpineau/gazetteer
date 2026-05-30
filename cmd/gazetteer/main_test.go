@@ -72,10 +72,16 @@ func TestSmoke_BuildAndVersion(t *testing.T) {
 			stdoutHas: "loyer_med_eur_per_m2_cc",
 		},
 		{
-			name:      "refresh_stub_returns_not_implemented",
-			args:      []string{"refresh", "dvf"},
+			name:      "refresh_list_reports_dataset_sources",
+			args:      []string{"refresh", "--list"},
 			wantExit:  0,
-			stdoutHas: "not implemented",
+			stdoutHas: "delinquance",
+		},
+		{
+			name:      "refresh_rejects_non_dataset_source",
+			args:      []string{"refresh", "dvf"},
+			wantExit:  1,
+			stderrHas: "unknown dataset source",
 		},
 		{
 			name:      "normalize_without_addr_prints_usage",
