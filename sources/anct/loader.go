@@ -15,14 +15,21 @@ import (
 //go:embed data/anct_programmes.json
 var embedFS embed.FS
 
-// set binds the embedded extract to the datadir/refresh pipeline. The
-// Transform is not yet reconstructed, so the Set is read-only: Open
-// resolves datadir > embed, and refresh reports it as skipped.
+// set binds the embedded extract to the datadir/refresh pipeline. Refresh
+// downloads the three upstream programme lists (ACV, PVD, ORT) and rebuilds
+// the merged per-commune JSON via transform.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
 	Processed: dataset.File{Name: "anct_programmes.json"},
+	Raw: []dataset.File{
+		{Name: rawACVName, URL: rawACVURL},
+		{Name: rawPVDName, URL: rawPVDURL},
+		{Name: rawORTName, URL: rawORTURL},
+	},
+	Transform: transform,
+	Validate:  validate,
 }
 
 // Entry is one commune's row from the merged ACV / PVD / ORT extract.

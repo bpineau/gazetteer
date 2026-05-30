@@ -15,14 +15,17 @@ import (
 //go:embed data/qpv_communes.json
 var embedFS embed.FS
 
-// set binds the embedded extract to the datadir/refresh pipeline. The
-// Transform is not yet reconstructed, so the Set is read-only: Open
-// resolves datadir > embed, and refresh reports it as skipped.
+// set binds the embedded extract to the datadir/refresh pipeline. Refresh
+// downloads the upstream ANCT QPV 2024 list and rebuilds the indexed JSON
+// via transform.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
 	Processed: dataset.File{Name: "qpv_communes.json"},
+	Raw:       []dataset.File{{Name: rawName, URL: rawURL}},
+	Transform: transform,
+	Validate:  validate,
 }
 
 // Entry is one commune's row.

@@ -16,14 +16,16 @@ import (
 var embedFS embed.FS
 
 // set binds the embedded Cartofriches extract to the datadir/refresh
-// pipeline. The Transform is not yet reconstructed, so the Set is
-// read-only: Open resolves datadir > embed, and refresh reports it as
-// skipped.
+// pipeline. Refresh downloads the Cerema friches-standard CSV (one row per
+// referenced site) and rebuilds the per-commune aggregate via transform.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
 	Processed: dataset.File{Name: "cartofriches_communes.json"},
+	Raw:       []dataset.File{{Name: rawName, URL: rawURL}},
+	Transform: transform,
+	Validate:  validate,
 }
 
 // Entry is one commune's aggregate row.
