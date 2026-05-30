@@ -167,7 +167,7 @@ them to produce a useful answer:
 --verbose --dump                                  (debug)
 ```
 
-See [doc/cli.md](doc/cli.md) for the full reference.
+See [docs/cli.md](docs/cli.md) for the full reference.
 
 ## Datasets & cache
 
@@ -202,7 +202,7 @@ _, err := dataset.Refresh(ctx, httpClient, sets, dataset.RefreshOptions{}) // id
 Maintainers re-embed a refreshed dataset with `gazetteer refresh
 --go-embed-update` (rebuilds into the datadir, then copies the artifact back
 into `sources/<name>/data/` for re-commit). See
-[doc/datasets.md](doc/datasets.md) for the full model and how to make an
+[docs/datasets.md](docs/datasets.md) for the full model and how to make an
 out-of-tree Source refreshable.
 
 ## Concepts

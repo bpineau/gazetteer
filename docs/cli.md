@@ -41,7 +41,7 @@ $ gazetteer query --json "1 rue de Rivoli, 75001 Paris" | jq .
 ```
 
 - `--property-type apartment|house|land|commercial` — drives Source
-  eligibility (DVF, encadrement, MeilleursAgents). Default: `apartment`.
+  eligibility (DVF, encadrement, taxe-foncière). Default: `apartment`.
 - `--surface <m²>` — habitable surface. Required by DVF, taxe-foncière
   and encadrement to produce a useful answer; ADEME also uses it to
   pick the right dwelling when an address carries several DPE rows.
