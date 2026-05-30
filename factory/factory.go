@@ -128,7 +128,11 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 	_ = ctx // reserved for future ctx-scoped configuration
 	hc := opts.HTTPClient
 	if hc == nil {
-		built, err := httpx.New(httpx.Options{})
+		// Grant the data.gouv.fr DVF + cadastre endpoints a higher per-host
+		// rate than the polite default: DVF fans out one call per cadastral
+		// section, so the default 2 req/s serializes a dense-commune lookup
+		// into 20 s+.
+		built, err := httpx.New(httpx.Options{PerHost: dvf.HostRateLimits()})
 		if err != nil {
 			return nil, fmt.Errorf("factory: httpx: %w", err)
 		}

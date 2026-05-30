@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 	"github.com/bpineau/gazetteer/helpers/circuit"
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/fallback"
+	"github.com/bpineau/gazetteer/helpers/geodist"
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 	"github.com/bpineau/gazetteer/helpers/httpx"
 	"github.com/bpineau/gazetteer/helpers/kvcache"
 	"github.com/bpineau/gazetteer/helpers/kvcache/memcache"
@@ -73,6 +76,49 @@ const MaxConsecutiveTransportErrors = 3
 // upstream throttling change) does not burn the maintenance run on
 // retry-backoff. Sporadic 429s reset on the next 2xx.
 const MaxConsecutive429 = 3
+
+// maxSectionConcurrency bounds how many per-section GetMutations calls run
+// at once within a single commune fan-out. The per-host token-bucket rate
+// limiter is the real throttle; this just caps in-flight goroutines (and
+// sockets) so a dense commune (~50 sections) doesn't open 50 at once.
+const maxSectionConcurrency = 8
+
+// sectionPrefilterMarginMeters is added to the address_radius disk when
+// prefiltering sections by their bounding box, so a mutation geocoded just
+// outside its section's box (geocoding noise) is never dropped before the
+// precise per-mutation haversine cut runs.
+const sectionPrefilterMarginMeters = 150.0
+
+// dvfAPIHost / cadastreHost are the live endpoints the Source calls. Exposed
+// indirectly through HostRateLimits so callers can grant them a higher
+// per-host rate than the polite httpx default (2 req/s) — both data.gouv.fr
+// APIs comfortably serve ~10 req/s, and the per-section fan-out is otherwise
+// throttle-bound on dense communes.
+const (
+	dvfAPIHost   = "dvf-api.data.gouv.fr"
+	cadastreHost = "cadastre.data.gouv.fr"
+
+	// hostRateLimit is the per-host requests/second granted to the DVF and
+	// cadastre endpoints. The DVF API documents headroom well above this.
+	hostRateLimit = 10.0
+	hostBurst     = 10
+)
+
+// HostRateLimits returns the recommended httpx per-host overrides for the
+// live endpoints this Source calls. Wire it into httpx.Options.PerHost when
+// constructing the shared client:
+//
+//	hc, _ := httpx.New(httpx.Options{PerHost: dvf.HostRateLimits()})
+//
+// Without it the default 2 req/s serializes the per-section fan-out and a
+// single dense-commune lookup can take 20 s+.
+func HostRateLimits() map[string]httpx.HostOptions {
+	rl, burst := hostRateLimit, hostBurst
+	return map[string]httpx.HostOptions{
+		dvfAPIHost:   {RateLimit: &rl, Burst: &burst},
+		cadastreHost: {RateLimit: &rl, Burst: &burst},
+	}
+}
 
 // Options configures a dvf Source.
 //
@@ -381,37 +427,142 @@ func (s *Source) fetchMutationsForCommunes(ctx context.Context, communesINSEE []
 	var all []Mutation
 	totalSecs := 0
 	for _, insee := range communesINSEE {
-		if err := ctx.Err(); err != nil {
-			return all, totalSecs
-		}
-		if s.opts.CircuitTripped != nil && s.opts.CircuitTripped.Load() {
+		if ctx.Err() != nil || s.circuitTripped() {
 			return all, totalSecs
 		}
 		secs := s.resolveSections(ctx, insee)
 		totalSecs += len(secs)
-		for _, sec := range secs {
-			if err := ctx.Err(); err != nil {
-				return all, totalSecs
-			}
-			if s.opts.CircuitTripped != nil && s.opts.CircuitTripped.Load() {
-				return all, totalSecs
+		all = append(all, s.fetchSections(ctx, insee, secs)...)
+	}
+	return all, totalSecs
+}
+
+// fetchSections fetches the given sections of one commune concurrently
+// (bounded by maxSectionConcurrency) and returns their pooled mutations.
+// Order is not preserved — every downstream consumer (FilterMutations,
+// quantiles) is order-independent. Per-section failures are swallowed
+// (warn-logged) so one bad section never sinks the fan-out; a tripped
+// circuit or cancelled ctx stops launching further fetches.
+func (s *Source) fetchSections(ctx context.Context, insee string, secs []string) []Mutation {
+	var (
+		mu  sync.Mutex
+		all []Mutation
+		wg  sync.WaitGroup
+		sem = make(chan struct{}, maxSectionConcurrency)
+	)
+	for _, sec := range secs {
+		if ctx.Err() != nil || s.circuitTripped() {
+			break
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(sec string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			if ctx.Err() != nil || s.circuitTripped() {
+				return
 			}
 			r, err := s.api.GetMutations(ctx, insee, sec)
 			if err != nil {
 				if errors.Is(err, ErrSectionNotFound) {
-					continue
+					return
 				}
 				s.logger().Warn("dvf.mutations_fetch_failed",
 					slog.String("insee", insee),
 					slog.String("section", sec),
 					slog.Any("err", err),
 				)
-				continue
+				return
 			}
+			mu.Lock()
 			all = append(all, r.Data...)
+			mu.Unlock()
+		}(sec)
+	}
+	wg.Wait()
+	return all
+}
+
+// circuitTripped reports whether the process-local DVF breaker is open.
+func (s *Source) circuitTripped() bool {
+	return s.opts.CircuitTripped != nil && s.opts.CircuitTripped.Load()
+}
+
+// fetchAddressRadiusMutations collects the mutations the address_radius tier
+// post-filters. It prefilters the primary commune's cadastral sections to the
+// few whose bounding box falls within the disk (radius + margin) around the
+// point, then fetches only those — turning a ~50-section Paris-arrondissement
+// fan-out into a handful of calls. If the prefilter is unavailable (cadastre
+// fetch failed, or no section qualifies), it falls back to the full commune
+// fan-out so the tier never silently loses coverage.
+//
+// Returns the pooled mutations and the number of sections actually queried
+// (for Evidence.SectionsQueried).
+func (s *Source) fetchAddressRadiusMutations(ctx context.Context, communesINSEE []string, lat, lon float64) ([]Mutation, int) {
+	if len(communesINSEE) == 0 {
+		return nil, 0
+	}
+	insee := communesINSEE[0]
+	secs := s.sectionsNearPoint(ctx, insee, lat, lon, DVFAddressRadiusMeters+sectionPrefilterMarginMeters)
+	if len(secs) == 0 {
+		// Prefilter unavailable — preserve the original full-commune behavior.
+		return s.fetchMutationsForCommunes(ctx, communesINSEE[:1])
+	}
+	return s.fetchSections(ctx, insee, secs), len(secs)
+}
+
+// sectionsNearPoint returns the DVF section codes for `insee` whose cadastral
+// bounding box lies within radiusM of (lat, lon). Returns nil — signalling
+// "prefilter unavailable, fall back" — when the cadastre geometry can't be
+// fetched or yields no codes. The bbox test is conservative (a box never
+// underestimates its geometry's extent), so a section is dropped only when no
+// point inside it can possibly be within the radius.
+func (s *Source) sectionsNearPoint(ctx context.Context, insee string, lat, lon, radiusM float64) []string {
+	geos, err := FetchCadastreSectionGeos(ctx, s.api.http, insee)
+	if err != nil {
+		if !errors.Is(err, ErrCadastreCommuneNotFound) {
+			s.logger().Warn("dvf.section_geo_fetch_failed",
+				slog.String("insee", insee),
+				slog.Any("err", err),
+			)
+		}
+		return nil
+	}
+	out := make([]string, 0, len(geos))
+	for _, g := range geos {
+		// An empty (inverted-infinity) box means the section's geometry was
+		// absent or unparseable: its extent is UNKNOWN, so keep it rather than
+		// risk dropping a section that could hold an in-disk mutation. Keeping
+		// it is safe (the precise per-mutation haversine cut runs downstream);
+		// dropping it would silently lose coverage.
+		if bboxEmpty(g.Box) || pointToBBoxMeters(lat, lon, g.Box) <= radiusM {
+			out = append(out, g.Code)
 		}
 	}
-	return all, totalSecs
+	return out
+}
+
+// bboxEmpty reports whether b is the inverted-infinity box emptyBBox returns
+// for a geometry with no vertices (Min > Max on either axis).
+func bboxEmpty(b geopoly.BBox) bool {
+	return b.MinLat > b.MaxLat || b.MinLon > b.MaxLon
+}
+
+// pointToBBoxMeters approximates the great-circle distance from (lat, lon) to
+// the nearest point of box b by clamping the point to the box on each axis
+// independently. A point inside the box clamps to itself → distance 0.
+//
+// The independent-axis clamp is a tight lower bound for the small boxes at
+// mid-latitudes this package deals with (a cadastral section at 42–51 °N: the
+// overestimate is sub-metre, dwarfed by sectionPrefilterMarginMeters). It is
+// NOT a general primitive: near the poles the great-circle nearest point on a
+// meridian edge bows poleward and the clamp can overestimate substantially.
+// Callers must pass a non-empty box (see bboxEmpty) — an inverted box yields
+// NaN here.
+func pointToBBoxMeters(lat, lon float64, b geopoly.BBox) float64 {
+	cLat := math.Max(b.MinLat, math.Min(lat, b.MaxLat))
+	cLon := math.Max(b.MinLon, math.Min(lon, b.MaxLon))
+	return geodist.MetersBetween(lat, lon, cLat, cLon)
 }
 
 // resolveSections returns the cadastral section codes (DVF-formatted)

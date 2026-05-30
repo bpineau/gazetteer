@@ -89,7 +89,9 @@ type Evidence struct {
 	FilteredMutationsCount int `json:"filtered_mutations_count"`
 
 	// SectionsQueried is the cumulative number of cadastral sections
-	// the winning tier fanned out over.
+	// the winning tier fanned out over. For the address_radius tier this is
+	// the prefiltered subset near the point (those whose bounding box falls
+	// within the disk), not the commune's full section count.
 	SectionsQueried int `json:"sections_queried"`
 
 	// RadiusM is the disk radius (in metres) the `address_radius`
