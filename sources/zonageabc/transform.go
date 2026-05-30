@@ -1,7 +1,6 @@
 package zonageabc
 
 import (
-	"bufio"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -43,7 +42,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	}
 	defer func() { _ = rc.Close() }()
 
-	cr := csv.NewReader(bomReader(rc))
+	cr := csv.NewReader(dataset.BOMReader(rc))
 	cr.Comma = ';'
 	cr.FieldsPerRecord = -1
 
@@ -132,13 +131,4 @@ var frenchMonths = map[string]int{
 	"janvier": 1, "février": 2, "fevrier": 2, "mars": 3, "avril": 4,
 	"mai": 5, "juin": 6, "juillet": 7, "août": 8, "aout": 8,
 	"septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12, "decembre": 12,
-}
-
-// bomReader strips a leading UTF-8 BOM if present.
-func bomReader(r io.Reader) io.Reader {
-	br := bufio.NewReader(r)
-	if b, err := br.Peek(3); err == nil && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF {
-		_, _ = br.Discard(3)
-	}
-	return br
 }
