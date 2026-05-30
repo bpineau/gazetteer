@@ -1,0 +1,4 @@
+{"type":"FeatureCollection","features":[
+ {"type":"Feature","properties":{"com_code":"93048","com_name":"Montreuil","Zone":307},
+  "geometry":{"type":"Polygon","coordinates":[[[2.400,48.850],[2.450,48.850],[2.450,48.880],[2.400,48.880],[2.400,48.850]]]}}
+]}

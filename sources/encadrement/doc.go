@@ -1,13 +1,19 @@
 // Package encadrement is a gazetteer.Source for the French zoned
-// rent caps ("encadrement des loyers") in force in Paris, Plaine
-// Commune and Lyon / Villeurbanne.
+// rent caps ("encadrement des loyers") in force in Paris, the two
+// Seine-Saint-Denis EPTs (Plaine Commune, Est Ensemble) and
+// Lyon / Villeurbanne.
 //
 // The Source matches the listing to a zone:
 //
 //   - Paris by zip (75001..75020, 75116)
 //   - Lyon / Villeurbanne by INSEE (69381..69389, 69266)
-//   - Plaine Commune currently returns ConfidenceNone (no INSEE → zone
-//     map yet)
+//   - Plaine Commune & Est Ensemble (18 communes du 93) by
+//     point-in-polygon over an embedded zonage: the listing's
+//     coordinates pick the exact sub-communal zone, with an
+//     INSEE-commune fallback when coordinates are absent (a single-zone
+//     commune resolves at medium confidence; a multi-zone one — like
+//     Saint-Denis or Montreuil — collapses across its zones at low
+//     confidence)
 //
 // then collapses the cells matching (pieces, non-meublé, non-maison)
 // by median of LoyerRefMaxEURPerM2HC. The *Result satisfies

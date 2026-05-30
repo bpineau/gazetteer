@@ -1,0 +1,6 @@
+{"type":"FeatureCollection","features":[
+ {"type":"Feature","properties":{"INSEE_COM":"93066","NOM_COM":"Saint-Denis","Zone":"311"},
+  "geometry":{"type":"MultiPolygon","coordinates":[[[[2.00,48.90],[2.10,48.90],[2.10,49.00],[2.00,49.00],[2.00,48.90]]]]}},
+ {"type":"Feature","properties":{"INSEE_COM":"93066","NOM_COM":"Saint-Denis","Zone":"312"},
+  "geometry":{"type":"MultiPolygon","coordinates":[[[[2.10,48.90],[2.20,48.90],[2.20,49.00],[2.10,49.00],[2.10,48.90]]]]}}
+]}

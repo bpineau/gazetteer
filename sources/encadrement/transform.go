@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 
@@ -30,9 +31,24 @@ const (
 	rawPlaineCommuneName = "encadrement_plaine_commune.raw.json"
 	rawPlaineCommuneURL  = "https://static.data.gouv.fr/resources/encadrement-des-loyers-de-plaine-commune/20220608-122406/encadrements-plaine-commune.json"
 
+	rawEstEnsembleName = "encadrement_est_ensemble.raw.json"
+	rawEstEnsembleURL  = "https://static.data.gouv.fr/resources/encadrement-des-loyers-de-est-ensemble/20230601-202658/encadrements-est-ensemble-2023.json"
+
+	// Zonage géographique (GeoJSON, un feature par commune portant sa zone).
+	// Used to resolve a coordinate to its sub-communal rent-control zone.
+	rawPlaineCommuneZonesName = "encadrement_plaine_commune_zones.raw.geojson"
+	rawPlaineCommuneZonesURL  = "https://static.data.gouv.fr/resources/encadrement-des-loyers-de-plaine-commune/20220608-122433/quartier-plaine-commune-geodata.json"
+
+	rawEstEnsembleZonesName = "encadrement_est_ensemble_zones.raw.geojson"
+	rawEstEnsembleZonesURL  = "https://static.data.gouv.fr/resources/encadrement-des-loyers-de-est-ensemble/20220608-121232/quartier-est-ensemble-geodata.json"
+
 	rawLyonName = "encadrement_lyon_villeurbanne.raw.geojson"
 	rawLyonURL  = "https://download.data.grandlyon.com/wfs/grandlyon?SERVICE=WFS&VERSION=2.0.0&request=GetFeature&typename=metropole-de-lyon:car_care.carencadrmtloyer_2025_2026&outputFormat=application/json&SRSNAME=EPSG:4326"
 )
+
+// zoneCoordDecimals rounds zonage coordinates to ~11 cm — far finer than any
+// rent-control boundary, and enough to keep the embedded geometry compact.
+const zoneCoordDecimals = 6
 
 // parisYear pins the published vintage kept from the Paris export, which
 // carries every year since 2019. The committed snapshot keeps only the
@@ -107,48 +123,59 @@ func transformParis(_ context.Context, raw dataset.RawSet, dst io.Writer) error 
 	return json.NewEncoder(dst).Encode(out)
 }
 
-// transformPlaineCommune rebuilds encadrement_plaine_commune.json from the
-// data.gouv.fr flat JSON array. The upstream uses French-formatted decimal
-// strings (prix_min/med/max) and a "4 et plus" piece label.
+// eptBaremeExportRow is the upstream array shape shared by the two
+// Seine-Saint-Denis EPT barèmes (Plaine Commune, Est Ensemble): the same
+// columns, French-formatted decimal strings (prix_min/med/max) and a
+// "4 et plus" piece label. nombre_de_piece is a JSON number for the closed
+// buckets (1/2/3) but the string "4 et plus" for the open-ended one, so it
+// decodes through a permissive scalar.
+type eptBaremeExportRow struct {
+	Zone        int        `json:"zone"`
+	NombrePiece scalarText `json:"nombre_de_piece"`
+	Annee       string     `json:"annee_de_construction"`
+	PrixMin     scalarText `json:"prix_min"`
+	PrixMed     scalarText `json:"prix_med"`
+	PrixMax     scalarText `json:"prix_max"`
+	Maison      bool       `json:"maison"`
+	Meuble      bool       `json:"meuble"`
+}
+
+// transformPlaineCommune / transformEstEnsemble rebuild the embedded EPT barème
+// from the data.gouv.fr flat JSON array. Both EPTs publish the identical schema,
+// so they share transformEPTBareme.
 func transformPlaineCommune(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
-	rc, err := raw.Open(rawPlaineCommuneName)
+	return transformEPTBareme(raw, rawPlaineCommuneName, dst)
+}
+
+func transformEstEnsemble(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
+	return transformEPTBareme(raw, rawEstEnsembleName, dst)
+}
+
+func transformEPTBareme(raw dataset.RawSet, rawName string, dst io.Writer) error {
+	rc, err := raw.Open(rawName)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = rc.Close() }()
 
-	// pcExportRow is the upstream array shape. nombre_de_piece is a JSON
-	// number for the closed buckets (1/2/3) but the string "4 et plus" for
-	// the open-ended one, so it decodes through a permissive scalar.
-	type pcExportRow struct {
-		Zone        int        `json:"zone"`
-		NombrePiece scalarText `json:"nombre_de_piece"`
-		Annee       string     `json:"annee_de_construction"`
-		PrixMin     scalarText `json:"prix_min"`
-		PrixMed     scalarText `json:"prix_med"`
-		PrixMax     scalarText `json:"prix_max"`
-		Maison      bool       `json:"maison"`
-		Meuble      bool       `json:"meuble"`
-	}
-
-	var in []pcExportRow
+	var in []eptBaremeExportRow
 	if err := json.NewDecoder(dataset.BOMReader(rc)).Decode(&in); err != nil {
-		return fmt.Errorf("encadrement: decode plaine commune: %w", err)
+		return fmt.Errorf("encadrement: decode %s: %w", rawName, err)
 	}
 
-	out := make([]plaineCommuneRow, 0, len(in))
+	out := make([]eptBaremeRow, 0, len(in))
 	for _, r := range in {
 		piece, openEnded, err := parsePiece(string(r.NombrePiece), pcOpenEndedPiece)
 		if err != nil {
-			return fmt.Errorf("encadrement: plaine commune piece %q: %w", r.NombrePiece, err)
+			return fmt.Errorf("encadrement: %s piece %q: %w", rawName, r.NombrePiece, err)
 		}
 		ref, ok1 := parseFrenchFloat(string(r.PrixMed))
 		mn, ok2 := parseFrenchFloat(string(r.PrixMin))
 		mx, ok3 := parseFrenchFloat(string(r.PrixMax))
 		if !ok1 || !ok2 || !ok3 {
-			return fmt.Errorf("encadrement: plaine commune zone %d: bad price cell (med=%q min=%q max=%q)", r.Zone, r.PrixMed, r.PrixMin, r.PrixMax)
+			return fmt.Errorf("encadrement: %s zone %d: bad price cell (med=%q min=%q max=%q)", rawName, r.Zone, r.PrixMed, r.PrixMin, r.PrixMax)
 		}
-		out = append(out, plaineCommuneRow{
+		out = append(out, eptBaremeRow{
 			Zone:           r.Zone,
 			Piece:          piece,
 			PieceOpenEnded: openEnded,
@@ -161,9 +188,141 @@ func transformPlaineCommune(_ context.Context, raw dataset.RawSet, dst io.Writer
 		})
 	}
 	if len(out) == 0 {
-		return errors.New("encadrement: plaine commune transform produced no rows")
+		return fmt.Errorf("encadrement: %s transform produced no rows", rawName)
 	}
 	return json.NewEncoder(dst).Encode(out)
+}
+
+// zoneGeoSpec describes the per-EPT GeoJSON property keys used to extract a
+// feature's zone identity; the two EPTs name these columns differently.
+type zoneGeoSpec struct {
+	ept        string
+	rawName    string
+	zoneKey    string
+	inseeKey   string
+	communeKey string
+}
+
+var (
+	plaineCommuneZoneSpec = zoneGeoSpec{
+		ept: ZoneSourcePlaineCommune, rawName: rawPlaineCommuneZonesName,
+		zoneKey: "Zone", inseeKey: "INSEE_COM", communeKey: "NOM_COM",
+	}
+	estEnsembleZoneSpec = zoneGeoSpec{
+		ept: ZoneSourceEstEnsemble, rawName: rawEstEnsembleZonesName,
+		zoneKey: "Zone", inseeKey: "com_code", communeKey: "com_name",
+	}
+)
+
+func transformPlaineCommuneZones(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
+	return transformZones(raw, plaineCommuneZoneSpec, dst)
+}
+
+func transformEstEnsembleZones(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
+	return transformZones(raw, estEnsembleZoneSpec, dst)
+}
+
+// transformZones compacts an EPT zonage GeoJSON into the embedded zone artifact:
+// one zoneRow per feature carrying only (ept, zone, insee, commune) and the
+// boundary geometry, with every other upstream property dropped and coordinates
+// rounded to zoneCoordDecimals.
+func transformZones(raw dataset.RawSet, spec zoneGeoSpec, dst io.Writer) error {
+	rc, err := raw.Open(spec.rawName)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rc.Close() }()
+
+	var fc struct {
+		Features []struct {
+			Properties map[string]json.RawMessage `json:"properties"`
+			Geometry   struct {
+				Type        string          `json:"type"`
+				Coordinates json.RawMessage `json:"coordinates"`
+			} `json:"geometry"`
+		} `json:"features"`
+	}
+	if err := json.NewDecoder(dataset.BOMReader(rc)).Decode(&fc); err != nil {
+		return fmt.Errorf("encadrement: decode %s: %w", spec.rawName, err)
+	}
+
+	out := make([]zoneRow, 0, len(fc.Features))
+	for i, f := range fc.Features {
+		zone := scalarString(f.Properties[spec.zoneKey])
+		insee := scalarString(f.Properties[spec.inseeKey])
+		commune := scalarString(f.Properties[spec.communeKey])
+		if zone == "" || insee == "" {
+			return fmt.Errorf("encadrement: %s feature %d: missing zone/insee (zone=%q insee=%q)", spec.rawName, i, zone, insee)
+		}
+		polys, err := decodeGeometry(f.Geometry.Type, f.Geometry.Coordinates)
+		if err != nil {
+			return fmt.Errorf("encadrement: %s feature %d (%s): %w", spec.rawName, i, commune, err)
+		}
+		out = append(out, zoneRow{EPT: spec.ept, Zone: zone, INSEE: insee, Commune: commune, Polygons: polys})
+	}
+	if len(out) == 0 {
+		return fmt.Errorf("encadrement: %s transform produced no zones", spec.rawName)
+	}
+	return json.NewEncoder(dst).Encode(out)
+}
+
+// decodeGeometry normalises a GeoJSON Polygon or MultiPolygon into the
+// [polygon][ring][vertex][lon,lat] shape, rounding coordinates. Vertices may
+// carry a third (altitude) ordinate upstream; only lon/lat are kept.
+func decodeGeometry(typ string, coords json.RawMessage) ([][][][2]float64, error) {
+	switch typ {
+	case "Polygon":
+		var p [][][]float64
+		if err := json.Unmarshal(coords, &p); err != nil {
+			return nil, fmt.Errorf("polygon coords: %w", err)
+		}
+		return [][][][2]float64{roundRings(p)}, nil
+	case "MultiPolygon":
+		var mp [][][][]float64
+		if err := json.Unmarshal(coords, &mp); err != nil {
+			return nil, fmt.Errorf("multipolygon coords: %w", err)
+		}
+		out := make([][][][2]float64, 0, len(mp))
+		for _, p := range mp {
+			out = append(out, roundRings(p))
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("unsupported geometry type %q", typ)
+	}
+}
+
+func roundRings(rings [][][]float64) [][][2]float64 {
+	out := make([][][2]float64, 0, len(rings))
+	for _, ring := range rings {
+		rr := make([][2]float64, 0, len(ring))
+		for _, v := range ring {
+			if len(v) < 2 {
+				continue
+			}
+			rr = append(rr, [2]float64{roundTo(v[0], zoneCoordDecimals), roundTo(v[1], zoneCoordDecimals)})
+		}
+		out = append(out, rr)
+	}
+	return out
+}
+
+func roundTo(f float64, decimals int) float64 {
+	p := math.Pow(10, float64(decimals))
+	return math.Round(f*p) / p
+}
+
+// scalarString coerces a JSON property value (string or number) to its trimmed
+// textual form, returning "" for an absent or unparseable value.
+func scalarString(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var s scalarText
+	if err := s.UnmarshalJSON(raw); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(s))
 }
 
 // transformLyon rebuilds encadrement_lyon_villeurbanne.json from the
@@ -390,12 +549,39 @@ func validateParis(r io.Reader) error {
 }
 
 func validatePlaineCommune(r io.Reader) error {
-	var rows []plaineCommuneRow
+	return validateEPTBareme(r, "plaine commune")
+}
+
+func validateEstEnsemble(r io.Reader) error {
+	return validateEPTBareme(r, "est ensemble")
+}
+
+func validateEPTBareme(r io.Reader, label string) error {
+	var rows []eptBaremeRow
 	if err := json.NewDecoder(r).Decode(&rows); err != nil {
-		return fmt.Errorf("encadrement: validate plaine commune: %w", err)
+		return fmt.Errorf("encadrement: validate %s: %w", label, err)
 	}
 	if len(rows) == 0 {
-		return errors.New("encadrement: validated plaine commune artifact is empty")
+		return fmt.Errorf("encadrement: validated %s artifact is empty", label)
+	}
+	return nil
+}
+
+// validateZones gates a freshly-built zonage artifact: it must parse as a
+// non-empty zoneRow array and every zone must carry an EPT, a zone id and at
+// least one polygon.
+func validateZones(r io.Reader) error {
+	var rows []zoneRow
+	if err := json.NewDecoder(r).Decode(&rows); err != nil {
+		return fmt.Errorf("encadrement: validate zones: %w", err)
+	}
+	if len(rows) == 0 {
+		return errors.New("encadrement: validated zones artifact is empty")
+	}
+	for _, z := range rows {
+		if z.EPT == "" || z.Zone == "" || len(z.Polygons) == 0 {
+			return fmt.Errorf("encadrement: zone %q/%q has no geometry", z.EPT, z.Zone)
+		}
 	}
 	return nil
 }

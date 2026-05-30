@@ -7,6 +7,9 @@ import (
 	"io"
 	"os"
 	"testing"
+
+	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
 // fixtureRawSet serves a single named file from testdata, implementing
@@ -62,7 +65,7 @@ func TestTransformPlaineCommune_Golden(t *testing.T) {
 		t.Fatalf("validatePlaineCommune: %v", err)
 	}
 
-	var rows []plaineCommuneRow
+	var rows []eptBaremeRow
 	if err := json.Unmarshal(buf.Bytes(), &rows); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -71,7 +74,7 @@ func TestTransformPlaineCommune_Golden(t *testing.T) {
 	}
 	// Row 0: a non-open-ended meublé apartment cell; French "23,4" → 23.4.
 	r0 := rows[0]
-	want0 := plaineCommuneRow{
+	want0 := eptBaremeRow{
 		Zone: 310, Piece: 1, PieceOpenEnded: false, Epoque: "avant 1946",
 		Meuble: true, Maison: false, RefEURPerM2: 23.4, MinEURPerM2: 16.4, MaxEURPerM2: 28.1,
 	}
@@ -85,6 +88,100 @@ func TestTransformPlaineCommune_Golden(t *testing.T) {
 	}
 	if r1.RefEURPerM2 != 14.6 {
 		t.Errorf("row[1] ref = %v, want 14.6", r1.RefEURPerM2)
+	}
+}
+
+func TestTransformEstEnsemble_Golden(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	if err := transformEstEnsemble(context.Background(), fixtureRawSet{"testdata/est_ensemble_sample.json"}, &buf); err != nil {
+		t.Fatalf("transformEstEnsemble: %v", err)
+	}
+	if err := validateEstEnsemble(bytes.NewReader(buf.Bytes())); err != nil {
+		t.Fatalf("validateEstEnsemble: %v", err)
+	}
+	var rows []eptBaremeRow
+	if err := json.Unmarshal(buf.Bytes(), &rows); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("rows = %d, want 3", len(rows))
+	}
+	// Row 0: French "24,1" → 24.1, non-open-ended.
+	want0 := eptBaremeRow{
+		Zone: 307, Piece: 1, PieceOpenEnded: false, Epoque: "avant 1946",
+		Meuble: false, Maison: false, RefEURPerM2: 24.1, MinEURPerM2: 16.9, MaxEURPerM2: 28.9,
+	}
+	if rows[0] != want0 {
+		t.Errorf("row[0] = %+v, want %+v", rows[0], want0)
+	}
+	// Row 1: "4 et plus" → Piece=4 / open-ended.
+	if rows[1].Piece != 4 || !rows[1].PieceOpenEnded {
+		t.Errorf("row[1] piece/open-ended = %d/%v, want 4/true", rows[1].Piece, rows[1].PieceOpenEnded)
+	}
+}
+
+func TestTransformZones_Golden(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name         string
+		transform    func(context.Context, dataset.RawSet, io.Writer) error
+		fixture      string
+		wantEPT      string
+		wantZone     string
+		wantINSEE    string
+		inLon, inLat float64 // a point known to fall inside the first feature
+	}{
+		{
+			name: "plaine_commune", transform: transformPlaineCommuneZones,
+			fixture: "testdata/plaine_commune_zones_sample.json",
+			wantEPT: ZoneSourcePlaineCommune, wantZone: "311", wantINSEE: "93066",
+			inLon: 2.05, inLat: 48.95,
+		},
+		{
+			name: "est_ensemble", transform: transformEstEnsembleZones,
+			fixture: "testdata/est_ensemble_zones_sample.json",
+			wantEPT: ZoneSourceEstEnsemble, wantZone: "307", wantINSEE: "93048",
+			inLon: 2.42, inLat: 48.86,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := c.transform(context.Background(), fixtureRawSet{c.fixture}, &buf); err != nil {
+				t.Fatalf("transform: %v", err)
+			}
+			if err := validateZones(bytes.NewReader(buf.Bytes())); err != nil {
+				t.Fatalf("validateZones: %v", err)
+			}
+			var rows []zoneRow
+			if err := json.Unmarshal(buf.Bytes(), &rows); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			r0 := rows[0]
+			if r0.EPT != c.wantEPT || r0.Zone != c.wantZone || r0.INSEE != c.wantINSEE {
+				t.Errorf("row[0] identity = ept %q zone %q insee %q, want %q/%q/%q",
+					r0.EPT, r0.Zone, r0.INSEE, c.wantEPT, c.wantZone, c.wantINSEE)
+			}
+			// The transformed geometry must cover the known interior point.
+			idx := &Index{
+				inseeEPT: map[string]string{}, inseeCommune: map[string]string{},
+				inseeZones: map[string][]string{},
+			}
+			for _, z := range rows {
+				idx.addZone(z)
+			}
+			p := geopoly.Point{Lon: c.inLon, Lat: c.inLat}
+			covered := false
+			for _, za := range idx.zones {
+				if za.mp.Covers(p) {
+					covered = true
+				}
+			}
+			if !covered {
+				t.Errorf("interior point %v not covered by any transformed polygon", p)
+			}
+		})
 	}
 }
 

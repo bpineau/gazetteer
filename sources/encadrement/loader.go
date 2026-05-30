@@ -6,19 +6,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
-//go:embed data/encadrement_paris.json data/encadrement_plaine_commune.json data/encadrement_lyon_villeurbanne.json
+//go:embed data/encadrement_paris.json data/encadrement_plaine_commune.json data/encadrement_lyon_villeurbanne.json data/encadrement_est_ensemble.json data/encadrement_plaine_commune_zones.json data/encadrement_est_ensemble_zones.json
 var embedFS embed.FS
 
-// This Source ships three embedded zone extracts (Paris, Plaine Commune,
-// Lyon/Villeurbanne); each is its own dataset.Set so the datadir override
-// and the refresh tooling operate per file. Each has its own raw upstream
-// and Transform that rebuilds its committed JSON array (see transform.go).
+// This Source ships, as independent dataset.Sets, the barème extracts (Paris,
+// Plaine Commune, Est Ensemble, Lyon/Villeurbanne) plus the Seine-Saint-Denis
+// zonage geometry (Plaine Commune, Est Ensemble). Each is its own Set so the
+// datadir override and the refresh tooling operate per file; each has its own
+// raw upstream and Transform that rebuilds its committed artifact (transform.go).
 var (
 	setParis = dataset.Set{
 		Source:    Name,
@@ -38,6 +41,33 @@ var (
 		Transform: transformPlaineCommune,
 		Validate:  validatePlaineCommune,
 	}
+	setEstEnsemble = dataset.Set{
+		Source:    Name,
+		Version:   Version,
+		Embed:     embedFS,
+		Processed: dataset.File{Name: "encadrement_est_ensemble.json"},
+		Raw:       []dataset.File{{Name: rawEstEnsembleName, URL: rawEstEnsembleURL}},
+		Transform: transformEstEnsemble,
+		Validate:  validateEstEnsemble,
+	}
+	setPlaineCommuneZones = dataset.Set{
+		Source:    Name,
+		Version:   Version,
+		Embed:     embedFS,
+		Processed: dataset.File{Name: "encadrement_plaine_commune_zones.json"},
+		Raw:       []dataset.File{{Name: rawPlaineCommuneZonesName, URL: rawPlaineCommuneZonesURL}},
+		Transform: transformPlaineCommuneZones,
+		Validate:  validateZones,
+	}
+	setEstEnsembleZones = dataset.Set{
+		Source:    Name,
+		Version:   Version,
+		Embed:     embedFS,
+		Processed: dataset.File{Name: "encadrement_est_ensemble_zones.json"},
+		Raw:       []dataset.File{{Name: rawEstEnsembleZonesName, URL: rawEstEnsembleZonesURL}},
+		Transform: transformEstEnsembleZones,
+		Validate:  validateZones,
+	}
 	setLyon = dataset.Set{
 		Source:    Name,
 		Version:   Version,
@@ -55,12 +85,12 @@ var (
 // Lyon IRIS × ...) into a single lookup table.
 type Entry struct {
 	// ZoneSource is the dataset name ("paris" | "plaine_commune" |
-	// "lyon_villeurbanne").
+	// "est_ensemble" | "lyon_villeurbanne").
 	ZoneSource string
 
 	// ZoneID identifies the geographic cell inside the source — for
-	// Paris it's the code_grand_quartier (7-digit), Plaine Commune the
-	// "zone" number, Lyon the IRIS code.
+	// Paris it's the code_grand_quartier (7-digit), Plaine Commune /
+	// Est Ensemble the "zone" number, Lyon the IRIS code.
 	ZoneID string
 
 	// Arrondissement is the 2-digit Paris arrondissement (01-20)
@@ -109,12 +139,43 @@ type Index struct {
 	// byPlaineCommuneZone groups Plaine Commune entries by zone string.
 	byPlaineCommuneZone map[string][]Entry
 
+	// byEstEnsembleZone groups Est Ensemble entries by zone string.
+	byEstEnsembleZone map[string][]Entry
+
 	// byLyonIRIS groups Lyon / Villeurbanne entries by IRIS code.
 	byLyonIRIS map[string][]Entry
 
 	// byLyonInsee groups Lyon / Villeurbanne entries by commune INSEE
 	// (used when the auction lacks an IRIS code).
 	byLyonInsee map[string][]Entry
+
+	// zones holds the embedded zonage geometry for the Seine-Saint-Denis EPTs
+	// (Plaine Commune, Est Ensemble), used to resolve a coordinate to its zone.
+	zones []zoneArea
+
+	// inseeEPT maps each EPT commune INSEE to its EPT (zone_source) — the
+	// membership test for the Seine-Saint-Denis resolution branch.
+	inseeEPT map[string]string
+
+	// inseeCommune maps each EPT commune INSEE to its human-readable name.
+	inseeCommune map[string]string
+
+	// inseeZones maps each EPT commune INSEE to the distinct zones (sorted)
+	// covering it. A single-zone commune resolves without coordinates; a
+	// multi-zone one (Saint-Denis, Montreuil) needs the point-in-polygon path.
+	inseeZones map[string][]string
+}
+
+// zoneArea is one resolvable zone polygon: its EPT, zone id and commune
+// identity, the boundary geometry, and a precomputed bounding box used to
+// reject non-candidates before the O(n) point-in-polygon test.
+type zoneArea struct {
+	ept     string
+	zone    string
+	insee   string
+	commune string
+	bbox    geopoly.BBox
+	mp      geopoly.MultiPolygon
 }
 
 var (
@@ -235,6 +296,104 @@ func (idx *Index) CountLyon() int {
 	return n
 }
 
+// LookupEstEnsembleZone returns every cell published for the given Est Ensemble
+// zone (stringified, e.g. "307"). Empty slice when the zone is unknown.
+func (idx *Index) LookupEstEnsembleZone(zone string) []Entry {
+	if idx == nil {
+		return nil
+	}
+	return idx.byEstEnsembleZone[zone]
+}
+
+// CountEstEnsemble returns the total Est Ensemble cell count.
+func (idx *Index) CountEstEnsemble() int {
+	if idx == nil {
+		return 0
+	}
+	n := 0
+	for _, v := range idx.byEstEnsembleZone {
+		n += len(v)
+	}
+	return n
+}
+
+// lookupEPTZone returns the barème cells for a (EPT, zone) pair. Zone numbers
+// are not unique across EPTs, so the EPT must scope the lookup.
+func (idx *Index) lookupEPTZone(ept, zone string) []Entry {
+	switch ept {
+	case ZoneSourcePlaineCommune:
+		return idx.byPlaineCommuneZone[zone]
+	case ZoneSourceEstEnsemble:
+		return idx.byEstEnsembleZone[zone]
+	default:
+		return nil
+	}
+}
+
+// ept93Match is the outcome of resolving a Seine-Saint-Denis listing to its
+// rent-control zone(s).
+type ept93Match struct {
+	ept     string   // ZoneSourcePlaineCommune | ZoneSourceEstEnsemble
+	zones   []string // exactly one (precise / single-zone) or every commune zone
+	commune string   // human-readable label
+	conf    string   // ConfidenceMedium (resolved) | ConfidenceLow (ambiguous)
+}
+
+// resolve93 resolves a listing in the Plaine Commune / Est Ensemble perimeter to
+// its zone(s). ok is false when the INSEE is not an EPT commune.
+//
+//   - With usable coordinates: point-in-polygon over the listing's own commune
+//     picks the exact zone (Medium). Candidates are scoped to the listing's
+//     INSEE, so a coordinate that drifts into a neighbouring commune cannot
+//     silently override the stated commune.
+//   - Without coordinates, or when the point falls outside the commune's
+//     polygons (a geocoding sliver near a boundary): a single-zone commune
+//     resolves to that zone (Medium); a multi-zone commune (Saint-Denis,
+//     Montreuil) is ambiguous and collapses across all its zones (Low).
+func (idx *Index) resolve93(insee string, lat, lon *float64) (ept93Match, bool) {
+	ept := idx.inseeEPT[insee]
+	if ept == "" {
+		return ept93Match{}, false
+	}
+	commune := idx.inseeCommune[insee]
+
+	// (0,0) is the "unset coords" sentinel: a real listing never sits on Null
+	// Island, and every EPT commune is far from it, so this never rejects a
+	// genuine coordinate here.
+	if lat != nil && lon != nil && !(*lat == 0 && *lon == 0) {
+		p := geopoly.Point{Lon: *lon, Lat: *lat}
+		for _, za := range idx.zones {
+			if za.insee != insee || !za.bbox.Contains(p) {
+				continue
+			}
+			if za.mp.Covers(p) {
+				return ept93Match{
+					ept:     ept,
+					zones:   []string{za.zone},
+					commune: firstNonEmpty(za.commune, commune),
+					conf:    ConfidenceMedium,
+				}, true
+			}
+		}
+	}
+
+	switch zones := idx.inseeZones[insee]; len(zones) {
+	case 0:
+		return ept93Match{}, false
+	case 1:
+		return ept93Match{ept: ept, zones: zones, commune: commune, conf: ConfidenceMedium}, true
+	default:
+		return ept93Match{ept: ept, zones: zones, commune: commune, conf: ConfidenceLow}, true
+	}
+}
+
+func firstNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
+}
+
 // Raw JSON shapes ------------------------------------------------------
 
 type parisRow struct {
@@ -251,7 +410,10 @@ type parisRow struct {
 	MaxEURPerM2       float64 `json:"max_eur_m2"`
 }
 
-type plaineCommuneRow struct {
+// eptBaremeRow is the processed per-cell shape shared by the two
+// Seine-Saint-Denis EPT barèmes (Plaine Commune, Est Ensemble) — identical
+// schema, so one row type and one transform serve both.
+type eptBaremeRow struct {
 	Zone           int     `json:"zone"`
 	Piece          int     `json:"piece"`
 	PieceOpenEnded bool    `json:"piece_open_ended"`
@@ -261,6 +423,20 @@ type plaineCommuneRow struct {
 	RefEURPerM2    float64 `json:"ref_eur_m2"`
 	MinEURPerM2    float64 `json:"min_eur_m2"`
 	MaxEURPerM2    float64 `json:"max_eur_m2"`
+}
+
+// zoneRow is one feature of an embedded EPT zonage artifact: a geographic
+// rent-control zone, the commune it belongs to, and its boundary geometry.
+// Polygons is [polygon][ring][vertex][lon,lat], evaluated under geopoly's
+// even-odd rule (conventionally ring 0 is the outer boundary and further rings
+// are holes, but some upstream features pack several disjoint regions into one
+// Polygon's rings — geopoly unions those; see geopoly.Polygon).
+type zoneRow struct {
+	EPT      string           `json:"ept"`
+	Zone     string           `json:"zone"`
+	INSEE    string           `json:"insee"`
+	Commune  string           `json:"commune"`
+	Polygons [][][][2]float64 `json:"polygons"`
 }
 
 type lyonRow struct {
@@ -280,8 +456,12 @@ func parseAll(dir string) (*Index, error) {
 	idx := &Index{
 		byArrondissement:    map[string][]Entry{},
 		byPlaineCommuneZone: map[string][]Entry{},
+		byEstEnsembleZone:   map[string][]Entry{},
 		byLyonIRIS:          map[string][]Entry{},
 		byLyonInsee:         map[string][]Entry{},
+		inseeEPT:            map[string]string{},
+		inseeCommune:        map[string]string{},
+		inseeZones:          map[string][]string{},
 	}
 
 	// Paris.
@@ -319,7 +499,7 @@ func parseAll(dir string) (*Index, error) {
 	if err != nil {
 		return nil, fmt.Errorf("encadrement: read plaine commune: %w", err)
 	}
-	var pc []plaineCommuneRow
+	var pc []eptBaremeRow
 	if err := unmarshalRows(raw, &pc); err != nil {
 		return nil, fmt.Errorf("encadrement: parse plaine commune: %w", err)
 	}
@@ -376,7 +556,98 @@ func parseAll(dir string) (*Index, error) {
 		}
 	}
 
+	// Est Ensemble (same processed barème schema as Plaine Commune).
+	raw, err = readSet(setEstEnsemble, dir)
+	if err != nil {
+		return nil, fmt.Errorf("encadrement: read est ensemble: %w", err)
+	}
+	var ee []eptBaremeRow
+	if err := unmarshalRows(raw, &ee); err != nil {
+		return nil, fmt.Errorf("encadrement: parse est ensemble: %w", err)
+	}
+	for _, r := range ee {
+		zone := fmt.Sprintf("%d", r.Zone)
+		idx.byEstEnsembleZone[zone] = append(idx.byEstEnsembleZone[zone], Entry{
+			ZoneSource:            ZoneSourceEstEnsemble,
+			ZoneID:                zone,
+			Piece:                 r.Piece,
+			PieceOpenEnded:        r.PieceOpenEnded,
+			Epoque:                r.Epoque,
+			Meuble:                r.Meuble,
+			Maison:                r.Maison,
+			LoyerRefEURPerM2HC:    r.RefEURPerM2,
+			LoyerRefMinEURPerM2HC: r.MinEURPerM2,
+			LoyerRefMaxEURPerM2HC: r.MaxEURPerM2,
+		})
+	}
+
+	// Seine-Saint-Denis zonage geometry (Plaine Commune + Est Ensemble).
+	for _, zs := range []dataset.Set{setPlaineCommuneZones, setEstEnsembleZones} {
+		raw, err = readSet(zs, dir)
+		if err != nil {
+			return nil, fmt.Errorf("encadrement: read %s: %w", zs.Processed.Name, err)
+		}
+		var rows []zoneRow
+		if err := unmarshalRows(raw, &rows); err != nil {
+			return nil, fmt.Errorf("encadrement: parse %s: %w", zs.Processed.Name, err)
+		}
+		for _, z := range rows {
+			idx.addZone(z)
+		}
+	}
+	idx.finalizeZones()
+
 	return idx, nil
+}
+
+// addZone materialises one zonage feature into a geopoly geometry and records
+// its EPT/commune membership in the lookup maps.
+func (idx *Index) addZone(z zoneRow) {
+	mp := make(geopoly.MultiPolygon, 0, len(z.Polygons))
+	for _, poly := range z.Polygons {
+		gp := make(geopoly.Polygon, 0, len(poly))
+		for _, ring := range poly {
+			gr := make(geopoly.Ring, 0, len(ring))
+			for _, v := range ring {
+				gr = append(gr, geopoly.Point{Lon: v[0], Lat: v[1]})
+			}
+			gp = append(gp, gr)
+		}
+		mp = append(mp, gp)
+	}
+	idx.zones = append(idx.zones, zoneArea{
+		ept: z.EPT, zone: z.Zone, insee: z.INSEE, commune: z.Commune,
+		bbox: mp.Bound(), mp: mp,
+	})
+	if z.INSEE != "" {
+		if idx.inseeEPT[z.INSEE] == "" {
+			idx.inseeEPT[z.INSEE] = z.EPT
+		}
+		if z.Commune != "" {
+			idx.inseeCommune[z.INSEE] = z.Commune
+		}
+	}
+}
+
+// finalizeZones derives the per-commune distinct-zone lists from the loaded
+// geometry, so resolve93 can tell single-zone communes (resolvable without
+// coordinates) from multi-zone ones.
+func (idx *Index) finalizeZones() {
+	tmp := map[string]map[string]struct{}{}
+	for _, za := range idx.zones {
+		if tmp[za.insee] == nil {
+			tmp[za.insee] = map[string]struct{}{}
+		}
+		tmp[za.insee][za.zone] = struct{}{}
+	}
+	for insee, set := range tmp {
+		zs := make([]string, 0, len(set))
+		for z := range set {
+			zs = append(zs, z)
+		}
+		sort.Strings(zs)
+		idx.inseeZones[insee] = zs
+	}
 }
 
 // parisArrondissement extracts the 2-digit Paris arrondissement from a
