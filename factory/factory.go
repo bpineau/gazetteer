@@ -48,6 +48,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/georisques"
 	"github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/locservice"
+	"github.com/bpineau/gazetteer/sources/nuisances"
 	"github.com/bpineau/gazetteer/sources/oll"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/qpv"
@@ -163,6 +164,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(cartofriches.NewSource(cartofriches.Options{DataDir: dataDir})).
 		With(cdsr.NewSource(cdsr.Options{DataDir: dataDir})).
 		With(catnat.NewSource(catnat.Options{DataDir: dataDir})).
+		With(nuisances.NewSource(nuisances.Options{DataDir: dataDir})).
 		With(chomage.NewSource(chomage.Options{DataDir: dataDir})).
 		With(delinquance.NewSource(delinquance.Options{DataDir: dataDir})).
 		With(dpedist.NewSource(dpedist.Options{})).
