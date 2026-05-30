@@ -50,6 +50,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/iris"
 	"github.com/bpineau/gazetteer/sources/locservice"
+	"github.com/bpineau/gazetteer/sources/logiris"
 	"github.com/bpineau/gazetteer/sources/lovac"
 	"github.com/bpineau/gazetteer/sources/nuisances"
 	"github.com/bpineau/gazetteer/sources/oll"
@@ -93,8 +94,8 @@ type Options struct {
 // NewDefault builds a *gazetteer.Client wired with every stable
 // in-tree Source: dvf, ademe, anct, bdnb, bpe, cadastre, carteloyers,
 // cartofriches, cdsr, georisques, ips_ecoles, locservice, chomage,
-// delinquance, dpedist, education, encadrement, filosofi, filoiris, qpv,
-// rpls, taxefonciere, lovac, vacance, zonageabc, zonetendue,
+// delinquance, dpedist, education, encadrement, filosofi, filoiris, logiris,
+// qpv, rpls, taxefonciere, lovac, vacance, zonageabc, zonetendue,
 // osm_transit.
 //
 // osm_transit ships an embedded baseline station catalog (overridable
@@ -183,6 +184,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(encadrement.NewSource(encadrement.Options{DataDir: dataDir})).
 		With(filosofi.NewSource(filosofi.Options{DataDir: dataDir})).
 		With(filoiris.NewSource(filoiris.Options{DataDir: dataDir})).
+		With(logiris.NewSource(logiris.Options{DataDir: dataDir})).
 		With(qpv.NewSource(qpv.Options{DataDir: dataDir})).
 		With(rpls.NewSource(rpls.Options{DataDir: dataDir})).
 		With(taxefonciere.NewSource(taxefonciere.Options{DataDir: dataDir})).

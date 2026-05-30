@@ -14,6 +14,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/filoiris"
 	"github.com/bpineau/gazetteer/sources/filosofi"
 	"github.com/bpineau/gazetteer/sources/locservice"
+	"github.com/bpineau/gazetteer/sources/logiris"
 	"github.com/bpineau/gazetteer/sources/nuisances"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
@@ -61,8 +62,10 @@ func priceRentSources(p appraisal.PriceConsolidated, r appraisal.RentConsolidate
 	return sortedKeys(set)
 }
 
-// scoreTension — lettability: rental tension (locservice) and the inverse of the
-// vacancy rate (vacance).
+// scoreTension — lettability: rental tension (locservice), the inverse of the
+// vacancy rate and the rental-market depth. Vacancy + renter share come from
+// the IRIS-level census housing (logiris) when available, else the
+// commune-level vacancy (vacance).
 func scoreTension(d gazetteer.Dossier) axisResult {
 	var subs []*float64
 	var srcs []string
@@ -74,7 +77,23 @@ func scoreTension(d gazetteer.Dossier) axisResult {
 			reason += fmt.Sprintf(" %s", ls.TensionLabel)
 		}
 	}
-	if vl, ok := gazetteer.Get[*vacance.Result](d, vacance.Name); ok && !vl.IsEmpty() {
+	// Vacancy + rental-market depth. Prefer the IRIS-level census housing
+	// reading (logiris) — sharper where neighbourhoods diverge within a
+	// commune — over the commune-level vacancy (vacance). A low vacancy AND
+	// a high renter share both mark a deep, tight rental market.
+	if li, ok := gazetteer.Get[*logiris.Result](d, logiris.Name); ok && !li.IsEmpty() {
+		// Combine vacancy + rental-market depth into ONE subscore, so logiris
+		// and the commune fallback each weigh the same in the axis mean.
+		housing := []*float64{new(lerp(li.VacancyRatePct, 12, 0))} // low vacancy → high
+		if li.RenterSharePct > 0 {                                 // 0 = suppressed; skip
+			housing = append(housing, new(lerp(li.RenterSharePct, 15, 70))) // deep rental market → high
+		}
+		if hv, ok := mean(housing...); ok {
+			subs = append(subs, new(hv))
+			srcs = append(srcs, logiris.Name)
+			reason += fmt.Sprintf(", vacance IRIS %.1f%%, locataires %.0f%%", li.VacancyRatePct, li.RenterSharePct)
+		}
+	} else if vl, ok := gazetteer.Get[*vacance.Result](d, vacance.Name); ok && !vl.IsEmpty() {
 		subs = append(subs, new(lerp(vl.VacancyRate, 12, 0))) // low vacancy → high score
 		srcs = append(srcs, vacance.Name)
 		reason += fmt.Sprintf(", vacance %.1f%%", vl.VacancyRate)
