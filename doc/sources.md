@@ -36,6 +36,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `encadrement`    | zip/INSEE + property_type + rooms (+ lat/lon for 93)| offline barème + zonage |
 | `filosofi`       | INSEE                                          | offline INSEE Filosofi 2021 |
 | `filoiris`       | `Listing.IRIS`                                 | offline INSEE Filosofi 2021 IRIS |
+| `logiris`        | `Listing.IRIS`                                 | offline INSEE RP 2021 logement IRIS (IDF) |
 | `georisques`     | lat/lon (or address)                           | georisques.gouv.fr report   |
 | `ips_ecoles`     | INSEE (arrondissement-aware)                   | offline DEPP IPS 2024-2025  |
 | `locservice`     | INSEE + property_type + rooms                  | locservice.fr HTML scrape   |
@@ -318,6 +319,23 @@ IRIS.
 - **Backend**: gzipped JSON embedded under `data/` (~14 490 IRIS, ~133 KB).
 - **Appraisal**: `appraisal/zonescore`'s solvabilité axis prefers this
   IRIS-level reading over the commune-level `filosofi`.
+
+## `sources/logiris`
+
+Per-**IRIS** census housing structure from INSEE RP 2021 (base-ic-logement):
+the share of renters, the share of social housing, and the vacancy rate of
+the *neighbourhood*. A high renter share + low vacancy marks a deep, tight,
+easy-to-let rental market — and these diverge sharply across the IRIS of a
+single dense commune.
+
+- **Needs**: `Listing.IRIS`. **Île-de-France only** (the embedded artifact is
+  IDF-scoped, matching the `iris` resolver; the national base is ~49 000 IRIS).
+  IRIS below 50 dwellings are dropped (suppression-prone / statistically thin).
+- **Result**: `RenterSharePct`, `SocialHousingSharePct`, `VacancyRatePct`,
+  dwelling count.
+- **Backend**: gzipped JSON embedded under `data/` (~5 100 IDF IRIS, ~66 KB).
+- **Appraisal**: `appraisal/zonescore`'s tension axis prefers this IRIS-level
+  vacancy + rental-market depth over the commune-level `vacance`.
 
 ## `sources/georisques`
 

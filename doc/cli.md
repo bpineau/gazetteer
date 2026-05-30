@@ -145,6 +145,7 @@ georisques      v1
 ips_ecoles      v1
 iris            v1
 locservice      v1
+logiris         v1
 lovac           v1
 nuisances       v1
 oll             v1
