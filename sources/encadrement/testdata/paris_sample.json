@@ -1,0 +1,72 @@
+[
+ {
+  "annee": "2025",
+  "id_zone": 5,
+  "id_quartier": 38,
+  "nom_quartier": "Porte-Saint-Denis",
+  "piece": 2,
+  "epoque": "1946-1970",
+  "meuble_txt": "non meublé",
+  "ref": 27.4,
+  "max": 32.9,
+  "min": 19.2,
+  "ville": "PARIS",
+  "code_grand_quartier": 7511038
+ },
+ {
+  "annee": "2025",
+  "id_zone": 11,
+  "id_quartier": 77,
+  "nom_quartier": "Belleville",
+  "piece": 1,
+  "epoque": "1971-1990",
+  "meuble_txt": "non meublé",
+  "ref": 27.8,
+  "max": 33.4,
+  "min": 19.5,
+  "ville": "PARIS",
+  "code_grand_quartier": 7512077
+ },
+ {
+  "annee": "2025",
+  "id_zone": 3,
+  "id_quartier": 64,
+  "nom_quartier": "Chaillot",
+  "piece": 4,
+  "epoque": "1971-1990",
+  "meuble_txt": "non meublé",
+  "ref": 26.7,
+  "max": 32.0,
+  "min": 18.7,
+  "ville": "PARIS",
+  "code_grand_quartier": 7511664
+ },
+ {
+  "annee": "2024",
+  "id_zone": 10,
+  "id_quartier": 67,
+  "nom_quartier": "Batignolles",
+  "piece": 1,
+  "epoque": "1946-1970",
+  "meuble_txt": "non meublé",
+  "ref": 26.1,
+  "max": 31.3,
+  "min": 18.3,
+  "ville": "PARIS",
+  "code_grand_quartier": 7511767
+ },
+ {
+  "annee": "2024",
+  "id_zone": 9,
+  "id_quartier": 69,
+  "nom_quartier": "Grandes-Carrières",
+  "piece": 4,
+  "epoque": "1946-1970",
+  "meuble_txt": "meublé",
+  "ref": 21.1,
+  "max": 25.3,
+  "min": 14.8,
+  "ville": "PARIS",
+  "code_grand_quartier": 7511869
+ }
+]

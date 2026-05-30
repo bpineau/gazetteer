@@ -16,13 +16,20 @@ import (
 var embedFS embed.FS
 
 // set binds the embedded chômage extract to the datadir/refresh pipeline.
-// The Transform is not yet reconstructed, so the Set is read-only: Open
-// resolves datadir > embed, and refresh reports it as skipped.
+// Refresh downloads the two INSEE inputs (the per-ZE quarterly rates xlsx
+// and the commune appartenance ZIP) and rebuilds the processed artifact via
+// transform; Open resolves datadir > embed.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
 	Processed: dataset.File{Name: "chomage_zones_emploi.json"},
+	Raw: []dataset.File{
+		{Name: ratesRawName, URL: ratesURL},
+		{Name: appartRawName, URL: appartURL},
+	},
+	Transform: transform,
+	Validate:  validate,
 }
 
 // ZoneEntry carries one zone d'emploi's metadata + recent quarterly
