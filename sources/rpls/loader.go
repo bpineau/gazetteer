@@ -16,14 +16,17 @@ import (
 //go:embed data/rpls_communes.json.gz
 var embedFS embed.FS
 
-// set binds the embedded extract to the datadir/refresh pipeline. The
-// Transform is not yet reconstructed, so the Set is read-only: Open
-// resolves datadir > embed, and refresh reports it as skipped.
+// set binds the embedded SRU extract to the datadir/refresh pipeline.
+// Refresh downloads the upstream data.gouv CSV and rebuilds the gzipped
+// JSON via transform.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
 	Processed: dataset.File{Name: "rpls_communes.json.gz"},
+	Raw:       []dataset.File{{Name: rawName, URL: rawURL}},
+	Transform: transform,
+	Validate:  validate,
 }
 
 // Entry is one commune's row from the SRU dataset.

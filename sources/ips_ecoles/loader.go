@@ -16,14 +16,19 @@ import (
 //go:embed data/ips_ecoles_communes.json.gz
 var embedFS embed.FS
 
-// set binds the embedded extract to the datadir/refresh pipeline. The
-// Transform is not yet reconstructed, so the Set is read-only: Open
-// resolves datadir > embed, and refresh reports it as skipped.
+// set binds the embedded extract to the datadir/refresh pipeline. Open
+// resolves datadir > embed; Refresh downloads the DEPP CSV (rawCSVName) and
+// rebuilds the gzipped per-commune artifact via transform, gated by validate.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
 	Processed: dataset.File{Name: "ips_ecoles_communes.json.gz"},
+	Raw: []dataset.File{
+		{Name: rawCSVName, URL: rawCSVURL},
+	},
+	Transform: transform,
+	Validate:  validate,
 }
 
 // Entry is one commune's row from the DEPP IPS dataset.
