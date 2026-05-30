@@ -203,6 +203,17 @@ the repo. A build-failing test keeps both in sync with the registry.
 $ gazetteer sources catalog --json | jq '.[] | select(.name=="filoiris")'
 ```
 
+### `sources dimensions`
+
+The sources grouped by the investor-evaluation **dimension** they inform
+(price, rents, demand, solvency, fiscalité, transport, hazards, …) — discovery
+by intent, the inverse of the by-source `catalog`. Every source belongs to
+exactly one dimension (a test enforces it).
+
+```bash
+$ gazetteer sources dimensions
+```
+
 ### `refresh [<source>|all]`
 
 Download each Source's real upstream file(s) and rebuild its dataset
