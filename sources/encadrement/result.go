@@ -1,10 +1,11 @@
 // Package encadrement ports the rental enricher's zone-encadrement
-// lookup (Paris, Plaine Commune, Lyon / Villeurbanne) into a standalone
-// gazetteer Source. Given a Listing the Source resolves the
-// arrondissement / IRIS / zone for the property and returns the legal
+// lookup (Paris, Plaine Commune, Est Ensemble, Lyon / Villeurbanne) into
+// a standalone gazetteer Source. Given a Listing the Source resolves the
+// arrondissement / zone / IRIS for the property and returns the legal
 // loyer de référence (and majoré cap) per m² month HC.
 //
-// The Source is fully offline: embedded JSON tables ship under `data/`.
+// The Source is fully offline: embedded JSON tables (barèmes) and
+// GeoJSON-derived zonage geometry ship under `data/`.
 package encadrement
 
 import (
@@ -19,15 +20,20 @@ import (
 // without importing this package's constants.
 const (
 	ConfidenceMedium = "medium"
-	ConfidenceNone   = ""
+	// ConfidenceLow flags a resolved-but-ambiguous reading: a multi-zone EPT
+	// commune (Saint-Denis, Montreuil) queried without coordinates, collapsed
+	// across all its zones.
+	ConfidenceLow  = "low"
+	ConfidenceNone = ""
 )
 
-// ZoneSource enumerates the three published zones encadrées this Source
-// covers. Surfaced verbatim in Result.ZoneSource so the UI can label
-// the section correctly.
+// ZoneSource enumerates the published zones encadrées this Source covers.
+// Surfaced verbatim in Result.ZoneSource so the UI can label the section
+// correctly.
 const (
 	ZoneSourceParis            = "paris"
 	ZoneSourcePlaineCommune    = "plaine_commune"
+	ZoneSourceEstEnsemble      = "est_ensemble"
 	ZoneSourceLyonVilleurbanne = "lyon_villeurbanne"
 )
 
@@ -50,7 +56,7 @@ type Result struct {
 	// "Villeurbanne"). Empty when no match.
 	Zone string `json:"zone,omitempty"`
 
-	// ZoneSource is one of "paris" | "plaine_commune" |
+	// ZoneSource is one of "paris" | "plaine_commune" | "est_ensemble" |
 	// "lyon_villeurbanne". Empty when no match.
 	ZoneSource string `json:"zone_source,omitempty"`
 
@@ -92,6 +98,12 @@ type Evidence struct {
 	// (zone, piece, non-meublé, non-maison) filter. Drives the
 	// median collapse.
 	NbCellsMatched int `json:"nb_cells_matched,omitempty"`
+
+	// ZoneID is the resolved zone identifier inside the source — the Plaine
+	// Commune / Est Ensemble zone number (e.g. "311"). For the ambiguous
+	// commune-fallback path it is the "+"-joined set of the commune's zones
+	// (e.g. "311+312"). Empty outside the Seine-Saint-Denis EPTs.
+	ZoneID string `json:"zone_id,omitempty"`
 }
 
 // IsEmpty satisfies gazetteer.EmptyReporter. Returns true when the
@@ -147,6 +159,8 @@ func mapEncConfidence(s string) appraisal.Confidence {
 	switch s {
 	case ConfidenceMedium:
 		return appraisal.ConfidenceMedium
+	case ConfidenceLow:
+		return appraisal.ConfidenceLow
 	default:
 		return appraisal.ConfidenceLow
 	}
@@ -162,15 +176,24 @@ func nonEmptyZoneSource(s string) string {
 // bracketFor builds the regulated-zone identifier exposed via
 // RentEstimate.Bracket. Empty when neither ZoneSource nor Zone is set
 // (the result is empty / IsEmpty would also be true).
+//
+// It keys on the stable Evidence.ZoneID when present (the Seine-Saint-Denis
+// EPTs set it — e.g. "encadrement_plaine_commune_311"), falling back to the
+// human Zone label for Paris / Lyon, so the Bracket stays a grep-stable token
+// rather than a free-text label.
 func bracketFor(r *Result) string {
 	if r == nil || (r.ZoneSource == "" && r.Zone == "") {
 		return ""
 	}
-	if r.ZoneSource == "" {
-		return "encadrement_" + r.Zone
+	zone := r.Zone
+	if r.Evidence.ZoneID != "" {
+		zone = r.Evidence.ZoneID
 	}
-	if r.Zone == "" {
+	if r.ZoneSource == "" {
+		return "encadrement_" + zone
+	}
+	if zone == "" {
 		return "encadrement_" + r.ZoneSource
 	}
-	return "encadrement_" + r.ZoneSource + "_" + r.Zone
+	return "encadrement_" + r.ZoneSource + "_" + zone
 }

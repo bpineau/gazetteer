@@ -28,7 +28,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `dpedist`        | INSEE                                          | data.ademe.fr values_agg API|
 | `dvf`            | INSEE or address + property_type (+ surface)   | data.gouv.fr Etalab DVF     |
 | `education`      | INSEE                                          | data.education.gouv.fr API  |
-| `encadrement`    | zip or INSEE + property_type + rooms (+ surface)| offline DRIHL JSON          |
+| `encadrement`    | zip/INSEE + property_type + rooms (+ lat/lon for 93)| offline barème + zonage |
 | `filosofi`       | INSEE                                          | offline INSEE Filosofi 2021 |
 | `georisques`     | lat/lon (or address)                           | georisques.gouv.fr report   |
 | `ips_ecoles`     | INSEE (arrondissement-aware)                   | offline DEPP IPS 2024-2025  |
@@ -159,19 +159,29 @@ since July 2021.
 
 ## `sources/encadrement`
 
-Zoned rent caps (encadrement des loyers) for Paris, Plaine Commune
-and Lyon / Villeurbanne.
+Zoned rent caps (encadrement des loyers) for Paris, the two
+Seine-Saint-Denis EPTs (Plaine Commune, Est Ensemble) and
+Lyon / Villeurbanne.
 
-- **Needs**: zip OR INSEE + property type + rooms + surface_m2.
+- **Needs**: zip OR INSEE + property type + rooms; coordinates
+  (lat/lon) for the precise Seine-Saint-Denis zone.
 - **Result**: a regulated rent value with low/medium/high ceilings;
   satisfies `appraisal.RentEstimator` with `Bracket` populated when a
   legal cap applies.
 - **Zone identification**:
-  - Paris by zip: 75001..75020, 75116
-  - Lyon / Villeurbanne by INSEE: 69381..69389, 69266
-  - Plaine Commune currently returns `ConfidenceNone` (no INSEE → zone
-    map yet).
+  - Paris by zip: 75001..75020, 75116 (arrondissement-median).
+  - Lyon / Villeurbanne by INSEE: 69381..69389, 69266.
+  - Plaine Commune (9 communes) & Est Ensemble (9 communes) by
+    point-in-polygon over an embedded zonage GeoJSON: the listing's
+    coordinates resolve the exact sub-communal zone. Without
+    coordinates it falls back to the commune — single-zone communes
+    resolve at `ConfidenceMedium`; the two multi-zone communes
+    (Saint-Denis, Montreuil) collapse across their zones at
+    `ConfidenceLow`. `Evidence.ZoneID` records the resolved zone(s).
 - **Eligibility**: residential only.
+- **Vintages**: Paris 2025, Lyon 2025-2026, Plaine Commune 2022, Est
+  Ensemble 2023 (zonage 2022). Zone numbers are not unique across EPTs,
+  so lookups are scoped by `(zone_source, zone)`.
 
 ## `sources/filosofi`
 

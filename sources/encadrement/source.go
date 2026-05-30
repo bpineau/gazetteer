@@ -17,10 +17,15 @@ const Name = "encadrement"
 
 // sourceVersion bumps when the Source's internal logic changes.
 //
-// v1 matches Paris arrondissements via zip (75001..75020, 75116) and
-// Lyon / Villeurbanne via INSEE (69381..69389, 69266). Plaine Commune
-// returns ConfidenceNone (no commune→zone map yet).
-const sourceVersion = 1
+// v1 matched Paris arrondissements via zip (75001..75020, 75116) and
+// Lyon / Villeurbanne via INSEE (69381..69389, 69266); Plaine Commune
+// returned ConfidenceNone (no commune→zone map yet).
+//
+// v2 resolves the Seine-Saint-Denis EPTs (Plaine Commune, Est Ensemble) to
+// their sub-communal zone by point-in-polygon over an embedded zonage, with an
+// INSEE-commune fallback. Adds the est_ensemble barème + both EPT geometries as
+// embedded datasets.
+const sourceVersion = 2
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -56,9 +61,14 @@ func (s *Source) Name() string { return Name }
 // Version implements gazetteer.Source.
 func (s *Source) Version() int { return sourceVersion }
 
-// Datasets implements gazetteer.DatasetProvider, exposing the three
-// embedded zone extracts to the dataset refresh tooling.
-func (s *Source) Datasets() []dataset.Set { return []dataset.Set{setParis, setPlaineCommune, setLyon} }
+// Datasets implements gazetteer.DatasetProvider, exposing the embedded barème
+// extracts and the Seine-Saint-Denis zonage geometries to the refresh tooling.
+func (s *Source) Datasets() []dataset.Set {
+	return []dataset.Set{
+		setParis, setPlaineCommune, setEstEnsemble, setLyon,
+		setPlaineCommuneZones, setEstEnsembleZones,
+	}
+}
 
 // Query implements gazetteer.Source. Pipeline:
 //
@@ -66,8 +76,10 @@ func (s *Source) Datasets() []dataset.Set { return []dataset.Set{setParis, setPl
 //     gazetteer.ErrUnsupportedPropertyType.
 //  2. Try Paris (zip 75001..75020, 75116).
 //  3. Otherwise try Lyon / Villeurbanne (INSEE 69381..69389, 69266).
-//  4. Plaine Commune is not resolvable from INSEE alone — we currently
-//     return a no-match result there.
+//  4. Otherwise try the Seine-Saint-Denis EPTs (Plaine Commune, Est
+//     Ensemble): point-in-polygon on the embedded zonage resolves the
+//     sub-communal zone from the listing's coordinates, with an
+//     INSEE-commune fallback (see resolve93).
 //  5. On a match, collapse the cells matching (piece, non-meublé,
 //     non-maison) by median of LoyerRefMaxEURPerM2HC.
 //
@@ -108,7 +120,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 			Zip:            zip,
 			Arrondissement: arr,
 			Piece:          clampPiece(rooms),
-		}), nil
+		}, ConfidenceMedium), nil
 	}
 
 	// Lyon / Villeurbanne — try INSEE.
@@ -117,12 +129,26 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 			return collapse(entries, lyonZoneLabel(insee), ZoneSourceLyonVilleurbanne, rooms, Evidence{
 				INSEE: insee,
 				Piece: clampPiece(rooms),
-			}), nil
+			}, ConfidenceMedium), nil
 		}
 	}
 
-	// Plaine Commune — needs a commune→zone map we don't have. Surface
-	// a none-confidence result so the caller can record the absence.
+	// Seine-Saint-Denis EPTs (Plaine Commune, Est Ensemble): resolve the
+	// sub-communal zone by geometry when coordinates are present, else by
+	// commune membership.
+	if m, ok := idx.resolve93(insee, l.Lat, l.Lon); ok {
+		var entries []Entry
+		for _, z := range m.zones {
+			entries = append(entries, idx.lookupEPTZone(m.ept, z)...)
+		}
+		return collapse(entries, m.commune, m.ept, rooms, Evidence{
+			Zip:    zip,
+			INSEE:  insee,
+			ZoneID: strings.Join(m.zones, "+"),
+		}, m.conf), nil
+	}
+
+	// Outside every shipped zone: a none-confidence result records the absence.
 	return &Result{
 		Confidence: ConfidenceNone,
 		Evidence: Evidence{
@@ -165,8 +191,10 @@ func normalizePropertyType(t string) string {
 
 // collapse picks the cap value for a piece bucket out of the entries
 // published for its zone. We pick the median ref-majoré across the
-// matching piece-bucket non-meublé non-maison cells.
-func collapse(entries []Entry, label, zoneSource string, rooms int, ev Evidence) *Result {
+// matching piece-bucket non-meublé non-maison cells. conf is the confidence
+// stamped on a successful match (a no-cell match always degrades to
+// ConfidenceNone).
+func collapse(entries []Entry, label, zoneSource string, rooms int, ev Evidence, conf string) *Result {
 	piece := clampPiece(rooms)
 	var majs, refs []float64
 	for _, e := range entries {
@@ -201,7 +229,7 @@ func collapse(entries []Entry, label, zoneSource string, rooms int, ev Evidence)
 		LoyerRefEURPerM2HC:    ref,
 		Zone:                  label,
 		ZoneSource:            zoneSource,
-		Confidence:            ConfidenceMedium,
+		Confidence:            conf,
 		Evidence:              ev,
 	}
 }
