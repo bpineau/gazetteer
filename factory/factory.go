@@ -46,6 +46,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/georisques"
 	"github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/locservice"
+	gzosm "github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/qpv"
 	"github.com/bpineau/gazetteer/sources/rpls"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
@@ -58,8 +59,7 @@ import (
 // Options tunes the defaults wired by NewDefault.
 //
 // The zero value is valid and produces a Client identical to the one
-// the gazetteer CLI uses, minus the OSM transit source (which needs an
-// offline catalog NewDefault does not currently install).
+// the gazetteer CLI uses.
 type Options struct {
 	// HTTPClient overrides the default httpx.Client. When nil, the
 	// factory builds one with httpx.New(httpx.Options{}).
@@ -88,12 +88,12 @@ type Options struct {
 // in-tree Source: dvf, ademe, anct, bdnb, bpe, cadastre, georisques,
 // ips_ecoles, locservice, carteloyers, cartofriches, chomage,
 // delinquance, dpedist, education, encadrement, filosofi, qpv, rpls,
-// taxefonciere, vacance, vacance_logements, zonageabc, zonetendue.
+// taxefonciere, vacance, vacance_logements, zonageabc, zonetendue,
+// osm_transit.
 //
-// The OSM transit Source is NOT included by default — it requires
-// an offline station catalog the factory does not load. Callers that
-// need OSM should add it to the returned Client by reconstructing
-// a Builder, or call BuilderDefault and append before .Build().
+// osm_transit ships an embedded baseline station catalog (overridable
+// from the datadir) and a live Overpass fallback for points the catalog
+// does not cover, so it works out of the box.
 //
 // On any wiring failure (httpx, BAN, communes, Source construction)
 // NewDefault returns a non-nil error and a nil *Client.
@@ -170,7 +170,8 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(vacance_logements.NewSource(vacance_logements.Options{DataDir: dataDir})).
 		With(ips_ecoles.NewSource(ips_ecoles.Options{DataDir: dataDir})).
 		With(zonageabc.NewSource(zonageabc.Options{DataDir: dataDir})).
-		With(zonetendue.NewSource(zonetendue.Options{DataDir: dataDir}))
+		With(zonetendue.NewSource(zonetendue.Options{DataDir: dataDir})).
+		With(gzosm.NewSource(gzosm.Options{DataDir: dataDir, Fetcher: gzosm.NewHTTPOverpassFetcher(hc, "")}))
 	return b, nil
 }
 
