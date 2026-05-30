@@ -1,0 +1,64 @@
+[
+ {
+  "residence_et_adresse": "Résidence La Bruyère- 211 avenue Galliéni",
+  "nom_copropriete": "Résidence La Bruyère",
+  "adresse_copropriete": "211 avenue Galliéni",
+  "adresse_geo": "211 avenue Galliéni",
+  "departement": 93,
+  "commune": "BONDY",
+  "numero_label": "16535CDSR9314001",
+  "numero_iris": "1775",
+  "code_postal": "93140",
+  "nombre_de_lots": 176,
+  "date_vote_label": "2016-11-16",
+  "date_fin_label": "2021-11-16",
+  "montant_affecte_fin_2018": 2571204,
+  "enveloppe_previsionnelle": 2600000,
+  "travaux_renovation_thermique": [
+   "isolation des façades",
+   "isolation des toitures",
+   "remplacement des menuiseries extérieures",
+   "VMC",
+   "remplacement du chauffage par le sol"
+  ],
+  "typologie_travaux_programmes_dans_le_cadre_du_label_et_relevant_de_la_renovation_thermique": "isolation thermique des façades et des toitures terrrasses, remplacement des menuiseries extérieures, VMC, remplacement du chauffage par le sol",
+  "latitude": "48.907676",
+  "longitude": "2.491884",
+  "geolocalisation": {
+   "lon": 2.491884,
+   "lat": 48.907676
+  }
+ },
+ {
+  "residence_et_adresse": "69 avenue du Président Wilson",
+  "nom_copropriete": null,
+  "adresse_copropriete": "69 avenue du Président Wilson",
+  "adresse_geo": "69 avenue du Président Wilson",
+  "departement": 93,
+  "commune": "LA PLAINE SAINT-DENIS",
+  "numero_label": "17451CDSR9321001",
+  "numero_iris": "1883",
+  "code_postal": "93210",
+  "nombre_de_lots": 52,
+  "date_vote_label": "2017-10-18",
+  "date_fin_label": "2022-10-18",
+  "montant_affecte_fin_2018": 0,
+  "enveloppe_previsionnelle": 330000,
+  "travaux_renovation_thermique": [
+   "ravalement / Isolation Technique par l'Exterieur (ITE)",
+   "isolation des toitures",
+   "étanchéité des toitures",
+   "isolation des planchers bas",
+   "remplacement des menuiseries extérieures",
+   "VMC",
+   "modernisation des installations de chauffage"
+  ],
+  "typologie_travaux_programmes_dans_le_cadre_du_label_et_relevant_de_la_renovation_thermique": "ravalement ITE, isolation et étanchéité des toitures, isolation des planchers bas, remplacementd es menuiserires extérieures, VMC et modernisation des installations de chauffage",
+  "latitude": "48.904455",
+  "longitude": "2.358159",
+  "geolocalisation": {
+   "lon": 2.358159,
+   "lat": 48.904455
+  }
+ }
+]
