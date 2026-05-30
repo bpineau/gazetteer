@@ -12,7 +12,7 @@ import (
 // TestLoad smokes the embedded datasets.
 func TestLoad(t *testing.T) {
 	t.Parallel()
-	idx, err := Load()
+	idx, err := Load("")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestQuery_V2HappyPath(t *testing.T) {
 // should still resolve via the V2 dept median.
 func TestQuery_V2DeptFallback(t *testing.T) {
 	t.Parallel()
-	idx, err := Load()
+	idx, err := Load("")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestQuery_V2DeptFallback(t *testing.T) {
 // INSEE where even the dept lookup misses.
 func TestQuery_NoneFound(t *testing.T) {
 	t.Parallel()
-	idx, err := Load()
+	idx, err := Load("")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

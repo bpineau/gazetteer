@@ -3,13 +3,42 @@ package encadrement
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
+
+	"github.com/bpineau/gazetteer/dataset"
 )
 
 //go:embed data/encadrement_paris.json data/encadrement_plaine_commune.json data/encadrement_lyon_villeurbanne.json
-var encadrementFS embed.FS
+var embedFS embed.FS
+
+// This Source ships three embedded zone extracts (Paris, Plaine Commune,
+// Lyon/Villeurbanne); each is its own dataset.Set so the datadir override
+// and the refresh tooling operate per file. Read-only until each Transform
+// is reconstructed.
+var (
+	setParis = dataset.Set{
+		Source:    Name,
+		Version:   Version,
+		Embed:     embedFS,
+		Processed: dataset.File{Name: "encadrement_paris.json"},
+	}
+	setPlaineCommune = dataset.Set{
+		Source:    Name,
+		Version:   Version,
+		Embed:     embedFS,
+		Processed: dataset.File{Name: "encadrement_plaine_commune.json"},
+	}
+	setLyon = dataset.Set{
+		Source:    Name,
+		Version:   Version,
+		Embed:     embedFS,
+		Processed: dataset.File{Name: "encadrement_lyon_villeurbanne.json"},
+	}
+)
 
 // Entry is the canonical per-cell shape across all zones encadrées.
 // The flat representation absorbs the per-zone JSON quirks (Paris
@@ -85,13 +114,40 @@ var (
 	indexErr   error
 )
 
-// Load returns the singleton lookup index, parsing the embedded JSON
-// files on first call. Subsequent calls hit the cache.
-func Load() (*Index, error) {
+// Load returns the singleton lookup index, resolving each zone artifact
+// from dir (the datadir) with a fallback to the embedded copies and parsing
+// them on first call. The dir from the first call wins for the process
+// lifetime. A missing (non-embedded) zone contributes no entries rather
+// than failing the whole index.
+func Load(dir string) (*Index, error) {
 	indexOnce.Do(func() {
-		indexCache, indexErr = parseAll()
+		indexCache, indexErr = parseAll(dir)
 	})
 	return indexCache, indexErr
+}
+
+// readSet returns the bytes of a zone artifact, or nil when it is neither
+// in the datadir nor embedded (graceful: that zone simply contributes no
+// rows).
+func readSet(s dataset.Set, dir string) ([]byte, error) {
+	rc, err := s.Open(dir)
+	if errors.Is(err, dataset.ErrUnavailable) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rc.Close() }()
+	return io.ReadAll(rc)
+}
+
+// unmarshalRows decodes a JSON array into dst, treating empty input (an
+// absent zone) as zero rows rather than a parse error.
+func unmarshalRows(raw []byte, dst any) error {
+	if len(raw) == 0 {
+		return nil
+	}
+	return json.Unmarshal(raw, dst)
 }
 
 // LookupParis returns every cell published for the given arrondissement.
@@ -211,7 +267,7 @@ type lyonRow struct {
 	MaxEURPerM2 *float64 `json:"max_eur_m2"`
 }
 
-func parseAll() (*Index, error) {
+func parseAll(dir string) (*Index, error) {
 	idx := &Index{
 		byArrondissement:    map[string][]Entry{},
 		byPlaineCommuneZone: map[string][]Entry{},
@@ -220,12 +276,12 @@ func parseAll() (*Index, error) {
 	}
 
 	// Paris.
-	raw, err := encadrementFS.ReadFile("data/encadrement_paris.json")
+	raw, err := readSet(setParis, dir)
 	if err != nil {
 		return nil, fmt.Errorf("encadrement: read paris: %w", err)
 	}
 	var paris []parisRow
-	if err := json.Unmarshal(raw, &paris); err != nil {
+	if err := unmarshalRows(raw, &paris); err != nil {
 		return nil, fmt.Errorf("encadrement: parse paris: %w", err)
 	}
 	for _, r := range paris {
@@ -250,12 +306,12 @@ func parseAll() (*Index, error) {
 	}
 
 	// Plaine Commune.
-	raw, err = encadrementFS.ReadFile("data/encadrement_plaine_commune.json")
+	raw, err = readSet(setPlaineCommune, dir)
 	if err != nil {
 		return nil, fmt.Errorf("encadrement: read plaine commune: %w", err)
 	}
 	var pc []plaineCommuneRow
-	if err := json.Unmarshal(raw, &pc); err != nil {
+	if err := unmarshalRows(raw, &pc); err != nil {
 		return nil, fmt.Errorf("encadrement: parse plaine commune: %w", err)
 	}
 	for _, r := range pc {
@@ -276,12 +332,12 @@ func parseAll() (*Index, error) {
 	}
 
 	// Lyon / Villeurbanne.
-	raw, err = encadrementFS.ReadFile("data/encadrement_lyon_villeurbanne.json")
+	raw, err = readSet(setLyon, dir)
 	if err != nil {
 		return nil, fmt.Errorf("encadrement: read lyon: %w", err)
 	}
 	var lyon []lyonRow
-	if err := json.Unmarshal(raw, &lyon); err != nil {
+	if err := unmarshalRows(raw, &lyon); err != nil {
 		return nil, fmt.Errorf("encadrement: parse lyon: %w", err)
 	}
 	for _, r := range lyon {
