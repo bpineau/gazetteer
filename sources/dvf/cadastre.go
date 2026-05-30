@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 	"github.com/bpineau/gazetteer/helpers/httpx"
 )
 
@@ -47,12 +49,27 @@ type cadastreFeatureCollection struct {
 
 type cadastreFeature struct {
 	Properties cadastreSectionProps `json:"properties"`
+	Geometry   cadastreGeometry     `json:"geometry"`
 }
 
 type cadastreSectionProps struct {
 	Commune string `json:"commune"`
 	Prefixe string `json:"prefixe"`
 	Code    string `json:"code"`
+}
+
+// cadastreGeometry holds only the raw GeoJSON coordinates; we never need
+// the (Multi)Polygon structure, just every vertex to derive a bounding box.
+type cadastreGeometry struct {
+	Coordinates json.RawMessage `json:"coordinates"`
+}
+
+// SectionGeo pairs a DVF section code with the bounding box of its cadastral
+// geometry. The box lets a caller cheaply prefilter the commune's sections to
+// those near a point before fetching their (much heavier) mutations.
+type SectionGeo struct {
+	Code string
+	Box  geopoly.BBox
 }
 
 // FetchCadastreSections returns the list of cadastral section codes for
@@ -111,6 +128,110 @@ func FetchCadastreSections(ctx context.Context, http *httpx.Client, insee string
 		out = append(out, dvfCode)
 	}
 	return out, nil
+}
+
+// FetchCadastreSectionGeos is FetchCadastreSections plus each section's
+// bounding box, parsed from the same cadastre-etalab GeoJSON. Sections whose
+// geometry is empty/unparseable are returned with their (inverted-infinity)
+// zero box — callers should treat that as "everywhere" or skip it, never as a
+// tight box at (0,0). On a 404, returns ErrCadastreCommuneNotFound.
+//
+// Used by the DVF address_radius tier to fetch only the handful of sections
+// whose box falls within the disk radius, instead of every section in a dense
+// commune (a Paris arrondissement has ~50).
+func FetchCadastreSectionGeos(ctx context.Context, http *httpx.Client, insee string) ([]SectionGeo, error) {
+	if http == nil {
+		return nil, errors.New("dvf: nil http client")
+	}
+	if insee == "" {
+		return nil, errors.New("dvf: empty insee")
+	}
+	u := fmt.Sprintf("%s/%s/geojson/sections",
+		CadastreSectionsBaseURL,
+		url.PathEscape(insee),
+	)
+	body, _, err := http.GetBytes(ctx, u, nil)
+	if err != nil {
+		if herr, ok := errors.AsType[*httpx.ErrHTTP](err); ok && herr.Status == 404 {
+			return nil, ErrCadastreCommuneNotFound
+		}
+		return nil, fmt.Errorf("dvf: cadastre GET %s: %w", insee, err)
+	}
+	var fc cadastreFeatureCollection
+	if err := json.Unmarshal(body, &fc); err != nil {
+		return nil, fmt.Errorf("dvf: cadastre decode %s: %w", insee, err)
+	}
+	// Union boxes by section code: a section is occasionally split across
+	// several features near commune borders.
+	idx := make(map[string]int, len(fc.Features))
+	out := make([]SectionGeo, 0, len(fc.Features))
+	for _, f := range fc.Features {
+		if f.Properties.Commune != insee {
+			continue
+		}
+		dvfCode := dvfSectionCode(f.Properties.Prefixe, f.Properties.Code)
+		if dvfCode == "" {
+			continue
+		}
+		box := emptyBBox()
+		accumulateBBox(f.Geometry.Coordinates, &box)
+		if i, ok := idx[dvfCode]; ok {
+			out[i].Box = unionBBox(out[i].Box, box)
+			continue
+		}
+		idx[dvfCode] = len(out)
+		out = append(out, SectionGeo{Code: dvfCode, Box: box})
+	}
+	return out, nil
+}
+
+// emptyBBox is the inverted-infinity box: every Min is +Inf, every Max -Inf,
+// so accumulateBBox widens it on the first vertex and Contains stays false
+// until then.
+func emptyBBox() geopoly.BBox {
+	return geopoly.BBox{
+		MinLon: math.Inf(1), MinLat: math.Inf(1),
+		MaxLon: math.Inf(-1), MaxLat: math.Inf(-1),
+	}
+}
+
+// unionBBox returns the smallest box covering both inputs.
+func unionBBox(a, b geopoly.BBox) geopoly.BBox {
+	return geopoly.BBox{
+		MinLon: math.Min(a.MinLon, b.MinLon),
+		MinLat: math.Min(a.MinLat, b.MinLat),
+		MaxLon: math.Max(a.MaxLon, b.MaxLon),
+		MaxLat: math.Max(a.MaxLat, b.MaxLat),
+	}
+}
+
+// accumulateBBox walks a GeoJSON coordinates value of any nesting depth
+// (Polygon = 3 levels, MultiPolygon = 4) and widens b to include every
+// [lon, lat] vertex. It distinguishes a leaf coordinate pair from a nested
+// array by trying to decode a flat []float64 first: a pair like [2.35, 48.86]
+// decodes cleanly, whereas [[...],[...]] does not and falls through to the
+// array branch.
+func accumulateBBox(raw json.RawMessage, b *geopoly.BBox) {
+	if len(raw) == 0 {
+		return
+	}
+	var pair []float64
+	if err := json.Unmarshal(raw, &pair); err == nil {
+		if len(pair) >= 2 {
+			lon, lat := pair[0], pair[1]
+			b.MinLon = math.Min(b.MinLon, lon)
+			b.MinLat = math.Min(b.MinLat, lat)
+			b.MaxLon = math.Max(b.MaxLon, lon)
+			b.MaxLat = math.Max(b.MaxLat, lat)
+		}
+		return
+	}
+	var arr []json.RawMessage
+	if err := json.Unmarshal(raw, &arr); err == nil {
+		for _, e := range arr {
+			accumulateBBox(e, b)
+		}
+	}
 }
 
 // dvfSectionCode formats a (prefixe, code) pair as the 5-char string the

@@ -12,6 +12,7 @@ import (
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/httpx"
 
+	"github.com/bpineau/gazetteer/sources/dvf"
 	"github.com/bpineau/gazetteer/sources/iris"
 )
 
@@ -63,7 +64,10 @@ type runtimeDeps struct {
 // be wired into gazetteer.Builder.WithNormalizer (or called directly
 // via Normalizer.Normalize).
 func newRuntimeDeps() (*runtimeDeps, error) {
-	hc, err := httpx.New(httpx.Options{})
+	// Grant the data.gouv.fr DVF + cadastre endpoints a higher per-host rate
+	// than the polite default: DVF fans out one call per cadastral section,
+	// so the default 2 req/s serializes a dense-commune lookup into 20 s+.
+	hc, err := httpx.New(httpx.Options{PerHost: dvf.HostRateLimits()})
 	if err != nil {
 		return nil, fmt.Errorf("httpx: %w", err)
 	}
