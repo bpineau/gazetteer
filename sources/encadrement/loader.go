@@ -17,26 +17,35 @@ var embedFS embed.FS
 
 // This Source ships three embedded zone extracts (Paris, Plaine Commune,
 // Lyon/Villeurbanne); each is its own dataset.Set so the datadir override
-// and the refresh tooling operate per file. Read-only until each Transform
-// is reconstructed.
+// and the refresh tooling operate per file. Each has its own raw upstream
+// and Transform that rebuilds its committed JSON array (see transform.go).
 var (
 	setParis = dataset.Set{
 		Source:    Name,
 		Version:   Version,
 		Embed:     embedFS,
 		Processed: dataset.File{Name: "encadrement_paris.json"},
+		Raw:       []dataset.File{{Name: rawParisName, URL: rawParisURL}},
+		Transform: transformParis,
+		Validate:  validateParis,
 	}
 	setPlaineCommune = dataset.Set{
 		Source:    Name,
 		Version:   Version,
 		Embed:     embedFS,
 		Processed: dataset.File{Name: "encadrement_plaine_commune.json"},
+		Raw:       []dataset.File{{Name: rawPlaineCommuneName, URL: rawPlaineCommuneURL}},
+		Transform: transformPlaineCommune,
+		Validate:  validatePlaineCommune,
 	}
 	setLyon = dataset.Set{
 		Source:    Name,
 		Version:   Version,
 		Embed:     embedFS,
 		Processed: dataset.File{Name: "encadrement_lyon_villeurbanne.json"},
+		Raw:       []dataset.File{{Name: rawLyonName, URL: rawLyonURL}},
+		Transform: transformLyon,
+		Validate:  validateLyon,
 	}
 )
 
