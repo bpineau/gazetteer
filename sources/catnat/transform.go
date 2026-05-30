@@ -100,7 +100,7 @@ func aggregate(csvBytes []byte) (processed, error) {
 	maxYear := 0
 	for {
 		rec, err := r.Read()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

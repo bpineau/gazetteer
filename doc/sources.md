@@ -26,6 +26,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `chomage`        | INSEE                                          | offline INSEE chômage ZE2020|
 | `delinquance`    | INSEE                                          | offline SSMSI État 4001     |
 | `catnat`         | INSEE                                          | offline GASPAR CatNat agg.   |
+| `nuisances`      | lat/lon                                        | offline IDF 500m nuisance grid|
 | `cdsr`           | lat/lon                                        | offline IDF CDSR snapshot    |
 | `oll`            | INSEE (+ rooms)                                | offline OLL observed rents   |
 | `dpedist`        | INSEE                                          | data.ademe.fr values_agg API|
@@ -204,6 +205,23 @@ modelled hazard, `catnat` reports the realised sinistralité.
   decrees are the cracking-risk signal the zoning often misses.
 - **Refresh**: from the Géorisques GASPAR ZIP export; the per-commune aggregate
   is gzip-embedded (~220 KB).
+
+## `sources/nuisances`
+
+Île-de-France cumulative environmental-nuisance grid (Institut Paris Région /
+Bruitparif, 500 m cells): how many nuisances (road/rail/air-traffic noise + air
+pollution) overlap the listing's cell — a cadre-de-vie signal that drives
+property decotes.
+
+- **Needs**: lat/lon.
+- **Result**: nuisance count (0–4), a "point noir environnemental" flag, and an
+  exposure tier (calme / modéré / exposé / très exposé). `IsEmpty`
+  (StatusOKEmpty) outside the IDF grid; a resolved count-0 cell is reported (a
+  real "calm here" reading, not empty).
+- **Resolution**: nearest 500 m cell centre within `MaxCellMeters` (400 m), via
+  a spatial-hash grid index over ~49 000 cells.
+- **Refresh**: from the region's Opendatasoft portal; the grid is
+  gzip-embedded (~760 KB).
 
 ## `sources/cdsr`
 

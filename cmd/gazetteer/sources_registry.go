@@ -24,6 +24,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/georisques"
 	"github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/locservice"
+	"github.com/bpineau/gazetteer/sources/nuisances"
 	"github.com/bpineau/gazetteer/sources/oll"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/qpv"
@@ -148,6 +149,13 @@ func sourceCatalog() []sourceFactory {
 			Default: true,
 			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
 				return catnat.NewSource(catnat.Options{DataDir: d.DataDir}), nil
+			},
+		},
+		{
+			Name:    nuisances.Name,
+			Default: true,
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return nuisances.NewSource(nuisances.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
