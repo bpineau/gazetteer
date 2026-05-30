@@ -156,16 +156,18 @@ func (s *Source) makeTryLevel(communesINSEE []string, tc *tierContext, levelName
 //   - When auctionLat/Lon is nil, returns SampleSize=0 with LevelUsed
 //     "address_radius" and no error so SkipOn fires cleanly and the
 //     ladder falls through to the commune tier.
-//   - Otherwise fetches the primary commune's mutations (same fan-out
-//     as the commune tier), then post-filters by HaversineKm ≤
+//   - Otherwise fetches the mutations of the primary commune's sections
+//     that fall near the point (cf. fetchAddressRadiusMutations — a
+//     bounding-box prefilter), then post-filters by HaversineKm ≤
 //     DVFAddressRadiusMeters / 1000.
 //   - When the tier wins (i.e. clears MinSampleSizeAddressRadius),
-//     emits a Debug telemetry line including the commune-tier p50 for
-//     comparison so the operator can spot tier-vs-tier divergence in
-//     the logs without re-fetching.
+//     emits a Debug telemetry line including the pre-radius p50 for
+//     comparison so the operator can spot disk-vs-neighbourhood
+//     divergence in the logs without re-fetching.
 //
-// The commune-tier p50 is computed from the SAME mutation pool the
-// radius post-filter operates on (no extra API fan-out).
+// The comparison p50 is computed from the SAME (prefiltered-section)
+// mutation pool the radius post-filter operates on — a superset of the
+// disk, not the whole commune — so it needs no extra API fan-out.
 func (s *Source) makeTryAddressRadius(communesINSEE []string, tc *tierContext) func(ctx context.Context, in fallback.Input) (fallback.Output, error) {
 	return func(ctx context.Context, _ fallback.Input) (fallback.Output, error) {
 		if err := ctx.Err(); err != nil {
@@ -180,13 +182,13 @@ func (s *Source) makeTryAddressRadius(communesINSEE []string, tc *tierContext) f
 			}, nil
 		}
 
-		muts, secCount := s.fetchMutationsForCommunes(ctx, communesINSEE)
+		muts, secCount := s.fetchAddressRadiusMutations(ctx, communesINSEE, *tc.auctionLat, *tc.auctionLon)
 		communeFiltered := FilterMutations(muts, tc.target, tc.cutoff)
 
-		// Pre-compute the commune-tier median from the same pool, for
-		// telemetry. Cheap (single Quartiles call); avoids a second
-		// fan-out just to label the log line.
-		_, communeP50, _ := PerM2Quartiles(communeFiltered)
+		// Pre-compute the pre-radius median from the same (prefiltered)
+		// pool, for telemetry. Cheap (single Quartiles call); avoids a
+		// second fan-out just to label the log line.
+		_, preRadiusP50, _ := PerM2Quartiles(communeFiltered)
 
 		radiusKm := DVFAddressRadiusMeters / 1000.0
 		filtered := make([]Mutation, 0, len(communeFiltered))
@@ -223,7 +225,7 @@ func (s *Source) makeTryAddressRadius(communesINSEE []string, tc *tierContext) f
 				slog.Float64("p25", p25),
 				slog.Float64("p50", p50),
 				slog.Float64("p75", p75),
-				slog.Float64("commune_p50_for_comparison", communeP50),
+				slog.Float64("pre_radius_p50_for_comparison", preRadiusP50),
 			)
 		}
 
