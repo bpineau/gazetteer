@@ -14,7 +14,8 @@ consolidates a few dimensions and composites them into a score — a sample
 high-level API, not the goal. Most callers want the underlying `Result`s.
 
 > **AI coding agents:** read [AGENTS.md](AGENTS.md) first (also linked as
-> `CLAUDE.md`), then run `gazetteer sources catalog --json`.
+> `CLAUDE.md`), then run `gazetteer sources catalog --json`. Run `make hooks`
+> once to install the pre-commit gate (`make precommit`).
 
 ## Status
 

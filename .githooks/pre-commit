@@ -1,0 +1,31 @@
+#!/bin/sh
+# gazetteer pre-commit gate — catch the trivial bugs before they land.
+#
+# Runs `make precommit` (fmt-check + vet + lint + test + tidy-check). The full
+# suite is fast (~seconds with Go's build/test cache), so the whole gate runs
+# on every commit. Install once with `make hooks`.
+#
+# Bypass a single commit (e.g. a WIP checkpoint) with: git commit --no-verify
+set -e
+
+# Chain to a globally-configured hooks path first (e.g. corporate
+# secret-scanning), so installing this repo gate never silently disables it.
+global_hooks="$(git config --global core.hooksPath 2>/dev/null || true)"
+if [ -n "$global_hooks" ] && [ "$global_hooks" != ".githooks" ] && [ -x "$global_hooks/pre-commit" ]; then
+	"$global_hooks/pre-commit" "$@"
+fi
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root" || exit 1
+
+if ! command -v make >/dev/null 2>&1; then
+	echo "pre-commit: 'make' not found — skipping the gate (run 'make precommit' manually)." >&2
+	exit 0
+fi
+
+if ! make precommit; then
+	echo >&2
+	echo "✖ pre-commit gate failed — fix the above, then re-commit." >&2
+	echo "  (need the linters? 'make tools'. Bypass once: 'git commit --no-verify'.)" >&2
+	exit 1
+fi
