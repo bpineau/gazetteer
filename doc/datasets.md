@@ -113,9 +113,18 @@ out-of-tree plugins.)
 
 ## Status
 
-The framework (datadir override, refresh engine, CLI, manifests) is complete
-and every block source is on the datadir-aware read path. Per-source
-`Transform`s are added incrementally — each needs its real upstream URL and a
-golden test validating it against the committed artifact. Until a source has
-one, its Set is read-only (the datadir can still be populated by hand or by an
-out-of-tree tool, and hand-placed files are honoured).
+The framework (datadir override, refresh engine, CLI, manifests) is complete,
+every block source is on the datadir-aware read path, and **every in-tree
+block source is refreshable** — each declares its real upstream `Raw` URL(s)
+and a `Transform`, with an offline golden test. The transforms were validated
+end-to-end against the live upstream: each reproduces (or knowingly
+supersedes, when the upstream has a newer vintage) its committed artifact.
+
+`gazetteer refresh --list` shows `refreshable: yes` for all 22 artifacts
+across the 16 block sources. The upstream resource URLs and dataset vintages
+are pinned in each source's `transform.go`; bump them (and re-commit the
+embedded data via `--go-embed-update`) when a new edition ships.
+
+Reading an xlsx upstream (`chomage`) pulls in `github.com/xuri/excelize/v2`;
+every other transform uses only the standard library plus the project HTTP
+helper.
