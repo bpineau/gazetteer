@@ -1,0 +1,7 @@
+﻿Code Commune;Département;Région;code_region;Taux de logements sociaux (%);geom;centroid;code_departement;Nom Commune;epci;code_epci
+01001;Ain;AURA;84;7.0;{};{};01;L'Abergement-Clémenciat;200000172;01
+01004;Ain;AURA;84;30.0;{};{};01;Ambérieu-en-Bugey;240100883;01
+01002;Ain;AURA;84;0,0;{};{};01;L'Abergement-de-Varey;240100610;01
+75056;Paris;IDF;11;35.0;{};{};75;Paris;200054781;75
+;Ain;AURA;84;9.0;{};{};01;Blank INSEE skip;x;01
+01099;Ain;AURA;84;;{};{};01;Blank rate skip;x;01
