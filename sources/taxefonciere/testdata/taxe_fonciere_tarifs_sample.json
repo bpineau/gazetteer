@@ -1,0 +1,19 @@
+[
+  {"nom_de_la_commune": "HENINEL", "departement": "62", "code_commune": 426, "nature_locaux": "M", "categorie": "4", "vl_au_m2": 2.67},
+  {"nom_de_la_commune": "HENINEL", "departement": "62", "code_commune": 426, "nature_locaux": "M", "categorie": "5M", "vl_au_m2": 2.44},
+  {"nom_de_la_commune": "HENINEL", "departement": "62", "code_commune": 426, "nature_locaux": "M", "categorie": "8", "vl_au_m2": 1.37},
+  {"nom_de_la_commune": "HENINEL", "departement": "62", "code_commune": 426, "nature_locaux": "A", "categorie": "6", "vl_au_m2": 2.74},
+
+  {"nom_de_la_commune": "ATHIES", "departement": "62", "code_commune": 428, "nature_locaux": "M", "categorie": "4", "vl_au_m2": 2.0},
+  {"nom_de_la_commune": "ATHIES", "departement": "62", "code_commune": 428, "nature_locaux": "M", "categorie": "5", "vl_au_m2": 3.0},
+  {"nom_de_la_commune": "ATHIES", "departement": "62", "code_commune": 428, "nature_locaux": "A", "categorie": "6", "vl_au_m2": 4.0},
+
+  {"nom_de_la_commune": "SINGLE", "departement": "1", "code_commune": 4, "nature_locaux": "M", "categorie": "5", "vl_au_m2": 2.13},
+
+  {"nom_de_la_commune": "AJACCIO-LIKE", "departement": "2A", "code_commune": 8, "nature_locaux": "A", "categorie": "5", "vl_au_m2": 2.29},
+  {"nom_de_la_commune": "AJACCIO-LIKE", "departement": "2A", "code_commune": 8, "nature_locaux": "M", "categorie": "6", "vl_au_m2": 2.74},
+
+  {"nom_de_la_commune": "DOM-LIKE", "departement": "971", "code_commune": 101, "nature_locaux": "A", "categorie": "5", "vl_au_m2": 3.5},
+
+  {"nom_de_la_commune": "DROPME", "departement": "62", "code_commune": 999, "nature_locaux": "M", "categorie": "5", "vl_au_m2": null}
+]
