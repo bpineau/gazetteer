@@ -16,7 +16,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/nuisances"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
-	"github.com/bpineau/gazetteer/sources/vacance_logements"
+	"github.com/bpineau/gazetteer/sources/vacance"
 )
 
 // scoreRendement — the dominant axis: gross yield from the consolidated price
@@ -61,7 +61,7 @@ func priceRentSources(p appraisal.PriceConsolidated, r appraisal.RentConsolidate
 }
 
 // scoreTension — lettability: rental tension (locservice) and the inverse of the
-// vacancy rate (vacance_logements).
+// vacancy rate (vacance).
 func scoreTension(d gazetteer.Dossier) axisResult {
 	var subs []*float64
 	var srcs []string
@@ -73,9 +73,9 @@ func scoreTension(d gazetteer.Dossier) axisResult {
 			reason += fmt.Sprintf(" %s", ls.TensionLabel)
 		}
 	}
-	if vl, ok := gazetteer.Get[*vacance_logements.Result](d, vacance_logements.Name); ok && !vl.IsEmpty() {
+	if vl, ok := gazetteer.Get[*vacance.Result](d, vacance.Name); ok && !vl.IsEmpty() {
 		subs = append(subs, new(lerp(vl.VacancyRate, 12, 0))) // low vacancy → high score
-		srcs = append(srcs, vacance_logements.Name)
+		srcs = append(srcs, vacance.Name)
 		reason += fmt.Sprintf(", vacance %.1f%%", vl.VacancyRate)
 	}
 	v, ok := mean(subs...)

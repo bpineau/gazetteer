@@ -1,53 +1,96 @@
 package vacance
 
 import (
+	"archive/zip"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
 
-// rawCSVName is the datadir filename for the upstream raw input.
-const rawCSVName = "vacance.raw.csv"
+// rawName is the datadir filename for the upstream raw input. INSEE ships
+// the "base communale logement" as a zip; the Transform unzips it in
+// memory and reads the data CSV member (see transform).
+const rawName = "vacance.raw.zip"
 
-// rawCSVURL is the LOVAC "Logements vacants du parc privé — Communes" CSV on
-// data.gouv.fr (dataset slug logements-vacants-du-parc-prive-par-commune-
-// departement-region-france). data.gouv mints a dated static path per
-// vintage; bump this (and the year-suffixed column constants below) when a
-// new LOVAC edition ships.
-const rawCSVURL = "https://static.data.gouv.fr/resources/logements-vacants-du-parc-prive-lovac-par-commune-departement-region-et-france/20250528-090420/lovac-opendata-communes.csv"
+// rawURL is INSEE's "base-cc-logement-2021_csv.zip" (Recensement de la
+// Population 2021 — base communale logement, file 8202349 on insee.fr).
+// The zip carries two members: the per-commune data CSV
+// (base-cc-logement-2021.CSV) and a meta_*.CSV variable dictionary. Bump
+// this URL — and dataYear / the P21_ column constants — when INSEE
+// publishes a fresh census vintage.
+const rawURL = "https://www.insee.fr/fr/statistiques/fichier/8202349/base-cc-logement-2021_csv.zip"
 
-// Upstream column names. LOVAC carries the vacancy stock at the current
-// vintage (…_25) but the total private park only at the prior year (…_24);
-// the headline rate is therefore vacant_25 / total_24.
+// metaSource is the provenance string recorded in the rebuilt artifact. It
+// is kept byte-identical to the committed embedded blob.
+const metaSource = "INSEE Recensement de la Population 2021 — base communale logement (file 8202349)"
+
+// metaNote documents the derivation, mirroring the committed blob.
+const metaNote = "Demographic vacancy rate = P21_LOGVAC / P21_LOG. Distinct from the " +
+	"gazetteer/vacance source, which carries the LOVAC fiscal status (Taxe " +
+	"sur les Logements Vacants 2013). Paris/Lyon/Marseille publish per-" +
+	"arrondissement rows in this dataset."
+
+// dataYear is the census vintage of the upstream resource. The CSV does not
+// carry it inline; keep it in sync with rawURL / the P21_ columns.
+const dataYear = 2021
+
+// Upstream column headers (INSEE RP 2021 base logement). Values are
+// statistically-weighted floats; the Transform rounds the counts to the
+// nearest integer (matching the published artifact).
 const (
-	colINSEE      = "CODGEO_25"
-	colVacant     = "pp_vacant_25"
-	colVacantLong = "pp_vacant_plus_2ans_25"
-	colTotal      = "pp_total_24"
+	colINSEE = "CODGEO"
+	colLog   = "P21_LOG"     // total logements
+	colVac   = "P21_LOGVAC"  // logements vacants
+	colRP    = "P21_RP"      // résidences principales
+	colRSec  = "P21_RSECOCC" // résidences secondaires + logements occasionnels
 )
 
-// outHeader is the compact schema the source parses (see loader.go).
-var outHeader = []string{"INSEE_C", "taux_vacance_25_pct", "taux_vacance_long_25_pct"}
+// metaCSVPrefix marks the variable-dictionary member of the upstream zip,
+// which must be skipped in favour of the per-commune data CSV.
+const metaCSVPrefix = "meta_"
 
-// transform rebuilds the processed vacance CSV from the upstream LOVAC
-// communal file. For every commune whose total private park (pp_total_24) is
-// a positive number it emits the headline and long-term vacancy rates
-// (count / total × 100); suppressed counts ("s", for fewer than 11
-// dwellings) yield an empty rate cell, but the commune row is still written.
+// transform rebuilds the processed vacance artifact from the
+// upstream INSEE zip. It locates the data CSV member (the non-"meta_" .CSV),
+// keeps every 5-digit-INSEE row with a positive total logement count,
+// rounds the weighted counts to integers and derives the vacancy rate
+// (P21_LOGVAC / P21_LOG, percent, two decimals). Output is gzipped JSON, as
+// the committed artifact is .json.gz.
 func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
-	rc, err := raw.Open(rawCSVName)
+	rc, err := raw.Open(rawName)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = rc.Close() }()
 
-	cr := csv.NewReader(rc)
+	blob, err := io.ReadAll(rc)
+	if err != nil {
+		return fmt.Errorf("vacance: read raw zip: %w", err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(blob), int64(len(blob)))
+	if err != nil {
+		return fmt.Errorf("vacance: open raw zip: %w", err)
+	}
+	member, err := dataCSVMember(zr)
+	if err != nil {
+		return err
+	}
+	mrc, err := member.Open()
+	if err != nil {
+		return fmt.Errorf("vacance: open zip member %q: %w", member.Name, err)
+	}
+	defer func() { _ = mrc.Close() }()
+
+	cr := csv.NewReader(dataset.BOMReader(mrc))
 	cr.Comma = ';'
 	cr.FieldsPerRecord = -1
 
@@ -55,56 +98,76 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("vacance: read header: %w", err)
 	}
-	iInsee := indexOf(header, colINSEE)
-	iVac := indexOf(header, colVacant)
-	iVacLong := indexOf(header, colVacantLong)
-	iTotal := indexOf(header, colTotal)
-	if iInsee < 0 || iVac < 0 || iVacLong < 0 || iTotal < 0 {
-		return fmt.Errorf("vacance: upstream missing required columns: %v", header)
+	insee := indexOf(header, colINSEE)
+	logC := indexOf(header, colLog)
+	vacC := indexOf(header, colVac)
+	rpC := indexOf(header, colRP)
+	rsecC := indexOf(header, colRSec)
+	if insee < 0 || logC < 0 || vacC < 0 || rpC < 0 || rsecC < 0 {
+		return fmt.Errorf("vacance: header missing required columns: %v", header)
 	}
 
-	w := csv.NewWriter(dst)
-	w.Comma = ';'
-	if err := w.Write(outHeader); err != nil {
-		return err
+	idx := Index{
+		Meta: Meta{
+			Source:   metaSource,
+			DataYear: dataYear,
+			Note:     metaNote,
+		},
+		Communes: map[string]Entry{},
 	}
-	n := 0
 	for {
 		rec, err := cr.Read()
-		if errors.Is(err, io.EOF) {
+		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			return fmt.Errorf("vacance: read row: %w", err)
 		}
-		insee := strings.TrimSpace(rec[iInsee])
-		if insee == "" {
+		code := strings.TrimSpace(rec[insee])
+		if len(code) != 5 {
+			continue // national/department aggregates, or blanks
+		}
+		log, ok := parseCount(rec[logC])
+		if !ok || log <= 0 {
+			continue // suppressed or empty — cannot compute a rate
+		}
+		vac, ok := parseCount(rec[vacC])
+		if !ok {
 			continue
 		}
-		total, ok := parseCount(rec[iTotal])
-		if !ok || total <= 0 {
-			continue // no usable denominator → commune excluded
+		rp, ok := parseCount(rec[rpC])
+		if !ok {
+			continue
 		}
-		if err := w.Write([]string{
-			insee,
-			rate(rec[iVac], total),
-			rate(rec[iVacLong], total),
-		}); err != nil {
-			return err
+		rsec, ok := parseCount(rec[rsecC])
+		if !ok {
+			continue
 		}
-		n++
+		idx.Communes[code] = Entry{
+			// Round half-to-even, matching Python's round() used to build
+			// the committed blob (INSEE weighting yields .5 half-cases).
+			Log:            int(math.RoundToEven(log)),
+			Vac:            int(math.RoundToEven(vac)),
+			RP:             int(math.RoundToEven(rp)),
+			RSec:           int(math.RoundToEven(rsec)),
+			VacancyRatePct: round2(vac / log * 100.0),
+		}
 	}
-	w.Flush()
-	if err := w.Error(); err != nil {
-		return err
+	if len(idx.Communes) == 0 {
+		return errors.New("vacance: transform produced no communes")
 	}
-	if n == 0 {
-		return errors.New("vacance: transform produced no rows")
+	idx.Meta.RowCountCommunes = len(idx.Communes)
+
+	zw := gzip.NewWriter(dst)
+	if err := json.NewEncoder(zw).Encode(idx); err != nil {
+		_ = zw.Close()
+		return fmt.Errorf("vacance: encode json: %w", err)
 	}
-	return nil
+	return zw.Close()
 }
 
-// validate gates publication: the rebuilt CSV must parse and be non-empty.
+// validate gates publication: the rebuilt (gzipped) artifact must gunzip,
+// parse and be non-empty.
 func validate(r io.Reader) error {
 	idx, err := parseIndex(r)
 	if err != nil {
@@ -116,37 +179,22 @@ func validate(r io.Reader) error {
 	return nil
 }
 
-// rate renders count/total × 100 as a percentage with the same formatting as
-// the published artifact: rounded half-to-even to two decimals, then trimmed
-// to the shortest form that keeps at least one decimal (e.g. "6.29", "9.5",
-// "0.0"). A suppressed or empty count yields "".
-func rate(countCell string, total float64) string {
-	count, ok := parseCount(countCell)
-	if !ok {
-		return ""
+// dataCSVMember returns the per-commune data CSV of the upstream zip: the
+// .CSV member whose basename does not carry the "meta_" variable-dictionary
+// prefix.
+func dataCSVMember(zr *zip.Reader) (*zip.File, error) {
+	for _, f := range zr.File {
+		base := f.Name
+		if i := strings.LastIndexByte(base, '/'); i >= 0 {
+			base = base[i+1:]
+		}
+		if !strings.EqualFold(strings.TrimSpace(base), "") &&
+			strings.HasSuffix(strings.ToLower(base), ".csv") &&
+			!strings.HasPrefix(strings.ToLower(base), metaCSVPrefix) {
+			return f, nil
+		}
 	}
-	// strconv 'f' with precision 2 rounds half-to-even on the exact float,
-	// matching the Python round(…, 2) used to build the committed file.
-	s := strconv.FormatFloat(100*count/total, 'f', 2, 64)
-	s = strings.TrimRight(s, "0")
-	if strings.HasSuffix(s, ".") {
-		s += "0"
-	}
-	return s
-}
-
-// parseCount parses an integer-ish count. ok is false for empty cells and
-// the LOVAC "s" statistical-secrecy marker (and any other non-numeric).
-func parseCount(s string) (float64, bool) {
-	s = strings.TrimSpace(s)
-	if s == "" || s == "s" || s == "NA" || s == "ND" {
-		return 0, false
-	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0, false
-	}
-	return f, true
+	return nil, errors.New("vacance: data CSV not found in raw zip")
 }
 
 // indexOf returns the index of the column whose trimmed header equals name,
@@ -158,4 +206,25 @@ func indexOf(header []string, name string) int {
 		}
 	}
 	return -1
+}
+
+// parseCount parses an INSEE weighted count cell (a plain float such as
+// "372.387493855914"). ok is false for an empty/non-numeric cell.
+func parseCount(s string) (float64, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, false
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, false
+	}
+	return f, true
+}
+
+// round2 rounds to two decimals (the VacancyRatePct rule). It rounds
+// half-to-even, matching Python's round(x, 2) used to build the committed
+// blob (e.g. 3.125 → 3.12, not 3.13).
+func round2(x float64) float64 {
+	return math.RoundToEven(x*100) / 100
 }

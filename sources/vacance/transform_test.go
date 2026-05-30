@@ -3,12 +3,13 @@ package vacance
 import (
 	"bytes"
 	"context"
-	"encoding/csv"
 	"io"
 	"os"
 	"testing"
 )
 
+// fixtureRawSet serves a single named file from testdata, implementing
+// dataset.RawSet for the transform under test.
 type fixtureRawSet struct{ path string }
 
 func (f fixtureRawSet) Open(string) (io.ReadCloser, error) { return os.Open(f.path) }
@@ -16,41 +17,62 @@ func (f fixtureRawSet) Open(string) (io.ReadCloser, error) { return os.Open(f.pa
 func TestTransform_Golden(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	if err := transform(context.Background(), fixtureRawSet{"testdata/lovac_sample.csv"}, &buf); err != nil {
+	if err := transform(context.Background(), fixtureRawSet{"testdata/vacance_sample.zip"}, &buf); err != nil {
 		t.Fatalf("transform: %v", err)
 	}
+
+	// The rebuilt bytes must validate (gunzip + parse + non-empty) and parse.
 	if err := validate(bytes.NewReader(buf.Bytes())); err != nil {
 		t.Fatalf("validate: %v", err)
 	}
-
-	// Parse the produced CSV directly so we can assert the empty-rate rows
-	// (which parseIndex would skip) are still written.
-	cr := csv.NewReader(bytes.NewReader(buf.Bytes()))
-	cr.Comma = ';'
-	recs, err := cr.ReadAll()
+	idx, err := parseIndex(bytes.NewReader(buf.Bytes()))
 	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
-	got := map[string][2]string{}
-	for _, r := range recs[1:] {
-		got[r[0]] = [2]string{r[1], r[2]}
+		t.Fatalf("parseIndex: %v", err)
 	}
 
-	want := map[string][2]string{
-		"01004": {"6.3", "3.36"},   // trailing zero trimmed (6.30→6.3)
-		"70122": {"0.94", "14.38"}, // half-even on exact 14.375 → 14.38
-		"99001": {"", ""},          // suppressed counts, kept (total>0)
-		"99003": {"", ""},          // empty counts, kept (total>0)
+	// Golden values are the rounded counts + 2-decimal vacancy rate, taken
+	// from the committed embedded blob. The 3-digit aggregate row and the
+	// zero-LOG row must be dropped.
+	want := map[string]Entry{
+		"01001": {Log: 372, Vac: 17, RP: 341, RSec: 14, VacancyRatePct: 4.68},
+		"01002": {Log: 175, Vac: 14, RP: 116, RSec: 45, VacancyRatePct: 8.15},
+		"75056": {Log: 1396753, Vac: 132393, RP: 1128251, RSec: 136109, VacancyRatePct: 9.48},
+		"13201": {Log: 24116, Vac: 1672, RP: 21208, RSec: 1236, VacancyRatePct: 6.93},
 	}
-	if len(got) != len(want) {
-		t.Fatalf("rows = %d (%v), want %d", len(got), got, len(want))
+	if idx.Count() != len(want) {
+		t.Fatalf("count = %d, want %d (aggregate + zero-LOG rows must be skipped)", idx.Count(), len(want))
 	}
 	for insee, w := range want {
-		if got[insee] != w {
-			t.Errorf("%s = %v, want %v", insee, got[insee], w)
+		got, ok := idx.Lookup(insee)
+		if !ok || got != w {
+			t.Errorf("%s: got (%+v, %v), want %+v", insee, got, ok, w)
 		}
 	}
-	if _, ok := got["99002"]; ok {
-		t.Error("99002 (zero total) must be dropped")
+	if _, ok := idx.Lookup("01999"); ok {
+		t.Errorf("zero-LOG commune 01999 must be skipped")
+	}
+
+	// Meta is derived: count + static provenance/year.
+	if idx.Meta.RowCountCommunes != len(want) {
+		t.Errorf("RowCountCommunes = %d, want %d", idx.Meta.RowCountCommunes, len(want))
+	}
+	if idx.Meta.DataYear != dataYear {
+		t.Errorf("DataYear = %d, want %d", idx.Meta.DataYear, dataYear)
+	}
+	if idx.Meta.Source != metaSource {
+		t.Errorf("Source = %q, want %q", idx.Meta.Source, metaSource)
+	}
+}
+
+func TestRound2(t *testing.T) {
+	t.Parallel()
+	cases := map[float64]float64{
+		17.4456416337286 / 372.387493855914 * 100: 4.68,
+		132392.854022185 / 1396753.13579177 * 100: 9.48,
+	}
+	for in, want := range cases {
+		if got := round2(in); got != want {
+			t.Errorf("round2(%v) = %v, want %v", in, got, want)
+		}
 	}
 }
