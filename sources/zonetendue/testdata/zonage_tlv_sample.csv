@@ -1,0 +1,5 @@
+﻿CODGEO25;DEP;LIBGEO;Code EPCI;Libellé EPCI;Zonage TLV 2013;Zonage TLV 2023;Zonage TLV post décret 22/12/2025
+01030;01;Foo;CC X;200069193;TLV;1. Zone tendue;1. Zone tendue
+01045;01;Bar;CC Y;240100883;Non TLV;2. Zone touristique et tendue;2. Zone touristique et tendue
+01999;01;NonTendue;CC Z;200042497;Non TLV;3. Non tendue;3. Non tendue
+75056;75;Paris;Métropole;200054781;TLV;1. Zone tendue;1. Zone tendue
