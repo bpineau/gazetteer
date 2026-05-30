@@ -24,15 +24,25 @@ type typologyFile struct {
 	set dataset.Set
 }
 
-func newSet(name string) dataset.Set {
-	return dataset.Set{Source: Name, Version: Version, Embed: embedFS, Processed: dataset.File{Name: name}}
+// newSet builds the refreshable Set for one typology: its embedded processed
+// CSV, the upstream raw it is rebuilt from, and the shared transform.
+func newSet(processed, rawName, rawURL string) dataset.Set {
+	return dataset.Set{
+		Source:    Name,
+		Version:   Version,
+		Embed:     embedFS,
+		Processed: dataset.File{Name: processed},
+		Raw:       []dataset.File{{Name: rawName, URL: rawURL}},
+		Transform: makeTransform(rawName),
+		Validate:  validate,
+	}
 }
 
 var fileSets = []typologyFile{
-	{TypologyApartment, newSet("carte_loyers_appartement.csv")},
-	{TypologyHouse, newSet("carte_loyers_maison.csv")},
-	{TypologyApt12, newSet("carte_loyers_app12.csv")},
-	{TypologyApt3, newSet("carte_loyers_app3.csv")},
+	{TypologyApartment, newSet("carte_loyers_appartement.csv", "carte_loyers.raw.appartement.csv", urlAppartement)},
+	{TypologyHouse, newSet("carte_loyers_maison.csv", "carte_loyers.raw.maison.csv", urlMaison)},
+	{TypologyApt12, newSet("carte_loyers_app12.csv", "carte_loyers.raw.app12.csv", urlApt12)},
+	{TypologyApt3, newSet("carte_loyers_app3.csv", "carte_loyers.raw.app3.csv", urlApt3)},
 }
 
 // Row captures one INSEE × typology observation. Loyers are in
