@@ -26,6 +26,7 @@ import (
 	ipsecoles "github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/iris"
 	"github.com/bpineau/gazetteer/sources/locservice"
+	"github.com/bpineau/gazetteer/sources/lovac"
 	"github.com/bpineau/gazetteer/sources/nuisances"
 	"github.com/bpineau/gazetteer/sources/oll"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
@@ -33,7 +34,6 @@ import (
 	"github.com/bpineau/gazetteer/sources/rpls"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
-	vacancelog "github.com/bpineau/gazetteer/sources/vacance_logements"
 	"github.com/bpineau/gazetteer/sources/zonageabc"
 	"github.com/bpineau/gazetteer/sources/zonetendue"
 )
@@ -136,6 +136,7 @@ var sourceRenderers = map[string]sourceRenderer{
 	iris.Name:         renderIRIS,
 	ipsecoles.Name:    renderIPSEcoles,
 	locservice.Name:   renderLocservice,
+	lovac.Name:        renderLovac,
 	nuisances.Name:    renderNuisances,
 	oll.Name:          renderOLL,
 	gzosm.Name:        renderOSM,
@@ -143,7 +144,6 @@ var sourceRenderers = map[string]sourceRenderer{
 	rpls.Name:         renderRPLS,
 	taxefonciere.Name: renderTaxeFonciere,
 	vacance.Name:      renderVacance,
-	vacancelog.Name:   renderVacanceLogements,
 	zonageabc.Name:    renderZonageABC,
 	zonetendue.Name:   renderZoneTendue,
 }
@@ -282,8 +282,8 @@ func renderFilosofi(data any) (string, []string) {
 	return strings.Join(parts, ", "), nil
 }
 
-func renderVacance(data any) (string, []string) {
-	r, ok := data.(*vacance.Result)
+func renderLovac(data any) (string, []string) {
+	r, ok := data.(*lovac.Result)
 	if !ok || r == nil || r.IsEmpty() {
 		return "absent from LOVAC", nil
 	}
@@ -659,8 +659,8 @@ func renderRPLS(data any) (string, []string) {
 	return headline, nil
 }
 
-func renderVacanceLogements(data any) (string, []string) {
-	r, ok := data.(*vacancelog.Result)
+func renderVacance(data any) (string, []string) {
+	r, ok := data.(*vacance.Result)
 	if !ok || r == nil || r.IsEmpty() {
 		return "absent from the census vacancy dataset", nil
 	}

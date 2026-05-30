@@ -12,17 +12,31 @@ import (
 
 // Name is the canonical Source identifier. Stable; used as the
 // gazetteer.Dossier results key and the registry key.
+//
+// IMPORTANT — disambiguation: `vacance` (no suffix) is the FISCAL
+// source (TLV-2013 zone classification). `vacance` is the
+// DEMOGRAPHIC vacancy-rate source (INSEE census base logement). The
+// two are correlated but not interchangeable.
 const Name = "vacance"
 
 // sourceVersion bumps when the Source's internal logic changes.
 //
-// v1 exposes the per-commune LOVAC 2025 vacance rate and long-term
-// split.
+// History:
+//   - v1: initial release. Embeds the INSEE RP 2021 base communale
+//     logement at commune+arrondissement granularity.
 const sourceVersion = 1
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
 const Version = sourceVersion
+
+// Tier-classification thresholds (in %). See doc.go for the calibration
+// rationale.
+const (
+	thresholdNormal  = 4.0
+	thresholdEleve   = 8.0
+	thresholdDeprise = 15.0
+)
 
 // Options configures a vacance Source.
 type Options struct {
@@ -36,13 +50,15 @@ type Options struct {
 	DataDir string
 }
 
-// Source implements gazetteer.Source for the LOVAC commune vacancy
-// dataset using an embedded CSV. Use NewSource to construct.
+// Source implements gazetteer.Source for the per-commune demographic
+// vacancy rate using an embedded gzipped JSON. Use NewSource to
+// construct.
 type Source struct {
 	opts Options
 }
 
-// NewSource builds a vacance Source. Zero-valued Options is fine.
+// NewSource builds a vacance Source. Zero-valued Options is
+// fine.
 func NewSource(opts Options) *Source {
 	return &Source{opts: opts}
 }
@@ -60,15 +76,17 @@ func (s *Source) Datasets() []dataset.Set { return []dataset.Set{set} }
 // Query implements gazetteer.Source. Pipeline:
 //
 //  1. Require Listing.INSEE (5-digit). Without it the Source emits
-//     gazetteer.ErrInsufficientInputs — the wrapper is responsible
-//     for resolving INSEE from (zip, city).
-//  2. Look up the commune in the embedded LOVAC index.
-//  3. Return (*Result, nil). Missing communes (secret statistique)
-//     surface as IsEmpty().
+//     gazetteer.ErrInsufficientInputs.
+//  2. Look up the commune in the embedded index. Paris / Lyon /
+//     Marseille arrondissements are NOT folded — the upstream
+//     publishes one row per arrondissement.
+//  3. Return (*Result, nil). Communes absent from the dataset surface
+//     as IsEmpty() == true.
 //
-// Property type is irrelevant for this source — the vacance rate
-// applies to the whole commune.
+// Property type is irrelevant — the vacancy rate is a commune-wide
+// attribute.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
+	_ = ctx
 	insee := strings.TrimSpace(l.INSEE)
 	if insee == "" {
 		return nil, fmt.Errorf("vacance: %w: listing.INSEE required", gazetteer.ErrInsufficientInputs)
@@ -83,20 +101,43 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		idx = loaded
 	}
 
-	ev := Evidence{INSEE: insee}
+	ev := Evidence{
+		INSEE:            insee,
+		DataYear:         idx.Meta.DataYear,
+		RowCountCommunes: idx.Count(),
+	}
 	e, ok := idx.Lookup(insee)
 	if !ok {
 		return &Result{
+			Tier:       TierUnknown,
 			Confidence: ConfidenceNone,
 			Evidence:   ev,
 		}, nil
 	}
 	return &Result{
-		VacancePct:     e.VacancePct,
-		VacanceLongPct: e.VacanceLongPct,
-		Confidence:     ConfidenceHigh,
-		Evidence:       ev,
+		VacancyRate:           e.VacancyRatePct,
+		VacantCount:           e.Vac,
+		TotalLogements:        e.Log,
+		ResidencesPrincipales: e.RP,
+		ResidencesSecondaires: e.RSec,
+		Tier:                  classify(e.VacancyRatePct),
+		Confidence:            ConfidenceHigh,
+		Evidence:              ev,
 	}, nil
+}
+
+// classify maps a rate to a Tier. See doc.go for thresholds.
+func classify(rate float64) Tier {
+	switch {
+	case rate < thresholdNormal:
+		return TierTendu
+	case rate < thresholdEleve:
+		return TierNormal
+	case rate < thresholdDeprise:
+		return TierEleve
+	default:
+		return TierDeprise
+	}
 }
 
 // Query is the atomic helper for callers who don't want the builder.

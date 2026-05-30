@@ -25,6 +25,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/iris"
 	"github.com/bpineau/gazetteer/sources/locservice"
+	"github.com/bpineau/gazetteer/sources/lovac"
 	"github.com/bpineau/gazetteer/sources/nuisances"
 	"github.com/bpineau/gazetteer/sources/oll"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
@@ -32,7 +33,6 @@ import (
 	"github.com/bpineau/gazetteer/sources/rpls"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
-	"github.com/bpineau/gazetteer/sources/vacance_logements"
 	"github.com/bpineau/gazetteer/sources/zonageabc"
 	"github.com/bpineau/gazetteer/sources/zonetendue"
 )
@@ -188,10 +188,10 @@ func sourceCatalog() []sourceFactory {
 			},
 		},
 		{
-			Name:    vacance.Name,
+			Name:    lovac.Name,
 			Default: true,
 			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
-				return vacance.NewSource(vacance.Options{DataDir: d.DataDir}), nil
+				return lovac.NewSource(lovac.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
@@ -258,10 +258,10 @@ func sourceCatalog() []sourceFactory {
 			},
 		},
 		{
-			Name:    vacance_logements.Name,
+			Name:    vacance.Name,
 			Default: true,
 			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
-				return vacance_logements.NewSource(vacance_logements.Options{DataDir: d.DataDir}), nil
+				return vacance.NewSource(vacance.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{

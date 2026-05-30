@@ -42,8 +42,8 @@ The table below summarises each Source. Detailed contracts follow.
 | `qpv`            | INSEE                                          | offline ANCT QPV 2024 list  |
 | `rpls`           | INSEE                                          | offline data.gouv SRU 2024  |
 | `taxefonciere`   | INSEE + surface_m2                             | offline DGFiP rates         |
-| `vacance`        | INSEE                                          | offline LOVAC 2025 (fiscal) |
-| `vacance_logements` | INSEE (arrondissement-aware)                | offline INSEE RP 2021       |
+| `lovac`          | INSEE                                          | offline LOVAC 2025 (fiscal) |
+| `vacance`        | INSEE (arrondissement-aware)                   | offline INSEE RP 2021       |
 | `zonageabc`      | INSEE                                          | offline arrêté 2025-09-05   |
 | `zonetendue`     | INSEE                                          | offline décret 2013-392     |
 
@@ -353,7 +353,7 @@ Per-commune `taxe foncière` estimate.
   path applied, and whether the lookup hit the commune or fell back to
   the department.
 
-## `sources/vacance`
+## `sources/lovac`
 
 Per-commune FISCAL vacancy status from the LOVAC 2025 dataset (TLV
 2013 / THRS perimeter — the dataset Bercy uses to assess the Taxe sur
@@ -363,16 +363,16 @@ les Logements Vacants).
 - **Result**: vacancy rate %, long-term vacancy split. Missing
   communes (secret statistique) surface as `IsEmpty()`.
 - **Disambiguation**: for the DEMOGRAPHIC vacancy rate from the INSEE
-  census, see `sources/vacance_logements`. Distinct datasets — the two
-  signals are correlated but not interchangeable.
+  census, see `sources/vacance`. Distinct datasets — the two signals
+  are correlated but not interchangeable.
 
-## `sources/vacance_logements`
+## `sources/vacance`
 
 Per-commune DEMOGRAPHIC vacancy rate from the INSEE Recensement de la
 Population 2021 ("base communale logement").
 
 - **Needs**: INSEE.
-- **Result**: `vacance_logements.Result` with `VacancyRate` (% LOGVAC /
+- **Result**: `vacance.Result` with `VacancyRate` (% LOGVAC /
   LOG), counts of total / vacant / résidences principales /
   secondaires, and a distribution-relative tier (`tendu` / `normal` /
   `élevé` / `déprise`).
@@ -380,6 +380,8 @@ Population 2021 ("base communale logement").
   including the per-arrondissement rows for Paris / Lyon / Marseille
   (the Source does NOT fold arrondissements — Paris 1er vacancy ≠
   Paris 18e vacancy is a real signal here).
+- **Disambiguation**: for the FISCAL LOVAC vacancy status, see
+  `sources/lovac`.
 
 ## `sources/rpls`
 

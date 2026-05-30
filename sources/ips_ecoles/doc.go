@@ -25,7 +25,7 @@
 // and Marseille (13201..13216). The Source does NOT fold
 // arrondissements — this is a load-bearing feature: among the
 // commune-level signals in the gazetteer (rpls, chomage, filosofi,
-// delinquance, qpv, vacance_logements, ips_ecoles), THIS is the only
+// delinquance, qpv, vacance, ips_ecoles), THIS is the only
 // one that yields a real PER-ARRONDISSEMENT reading for the three big
 // PLM cities. Paris 1er IPS ≈ 130 ; Paris 18e IPS ≈ 104 ; Paris 16e
 // IPS ≈ 140 — these differences are crushed by every commune-key-

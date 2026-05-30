@@ -13,7 +13,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/nuisances"
 	"github.com/bpineau/gazetteer/sources/oll"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
-	"github.com/bpineau/gazetteer/sources/vacance_logements"
+	"github.com/bpineau/gazetteer/sources/vacance"
 )
 
 func okResult(name string, data any) gazetteer.Result {
@@ -141,7 +141,7 @@ func TestCompute_HighConfidence(t *testing.T) {
 	d := dossier(
 		okResult(dvf.Name, &dvf.Result{ValueEURPerM2Cents: new(int64(400000)), SampleSize: 10}),
 		okResult(oll.Name, &oll.Result{ObservedMedianEURPerM2: 18, SampleSize: 100, Confidence: "high"}),
-		okResult(vacance_logements.Name, &vacance_logements.Result{VacancyRate: 5, Confidence: "high"}),
+		okResult(vacance.Name, &vacance.Result{VacancyRate: 5, Confidence: "high"}),
 		okResult(filosofi.Name, &filosofi.Result{MedianEUR: 22000, Flag: filosofi.RiskLow, Confidence: "high"}),
 		okResult(delinquance.Name, &delinquance.Result{Flag: delinquance.RiskLow, Population: 1000, Confidence: "high", Rates: map[string]float64{"x": 1}}),
 		okResult(taxefonciere.Name, &taxefonciere.Result{TauxTFPBApplied: 30, Confidence: "high"}),

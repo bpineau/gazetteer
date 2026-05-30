@@ -1,35 +1,35 @@
-// Package vacance ports the rental enricher's commune vacancy-rate
-// lookup into a standalone gazetteer Source. Given a Listing the
-// Source resolves the commune INSEE and returns the LOVAC-derived
-// taux de logements vacants + taux de vacance longue (≥ 2 ans).
-//
-// The Source is fully offline: the vacance CSV ships embedded under
-// `data/`.
 package vacance
 
-// Confidence values returned in Result.Confidence. Stable strings so
-// downstream consumers can match on them without importing this
-// package's constants.
-const (
-	ConfidenceHigh = "high"
-	ConfidenceNone = ""
-)
-
-// Result is the typed payload returned by Source.Query. Exposes the
-// commune-level vacancy + long-term vacancy split.
+// Result is the typed payload returned by Source.Query.
 type Result struct {
-	// VacancePct is the taux de logements vacants 2025 in the parc
-	// privé (%). Zero when the commune was filtered out at LOVAC
-	// ingestion (small commune with masked statistics — "secret
-	// statistique").
-	VacancePct float64 `json:"vacance_pct"`
+	// VacancyRate is the share of LOGVAC over LOG in the commune,
+	// expressed as a percentage in [0, 100].
+	VacancyRate float64 `json:"vacancy_rate"`
 
-	// VacanceLongPct is the taux de logements vacants > 2 ans 2025
-	// (%). Zero when the upstream did not publish a long-term split.
-	VacanceLongPct float64 `json:"vacance_long_pct,omitempty"`
+	// VacantCount is P21_LOGVAC — the number of vacant logements
+	// observed in the census.
+	VacantCount int `json:"vacant_count,omitempty"`
 
-	// Confidence is "high" when a row was found (LOVAC is a direct
-	// observation, not an estimate), ConfidenceNone otherwise.
+	// TotalLogements is P21_LOG — the total number of logements in the
+	// commune, all categories combined.
+	TotalLogements int `json:"total_logements,omitempty"`
+
+	// ResidencesPrincipales is P21_RP, exposed for callers that want to
+	// cross-reference with other commune-level signals.
+	ResidencesPrincipales int `json:"residences_principales,omitempty"`
+
+	// ResidencesSecondaires is P21_RSECOCC (résidences secondaires +
+	// logements occasionnels), useful to distinguish a touristic
+	// "vacance" peak from a structural one.
+	ResidencesSecondaires int `json:"residences_secondaires,omitempty"`
+
+	// Tier is the distribution-relative bucket (tendu / normal / élevé
+	// / déprise). TierUnknown when the commune is missing from the
+	// dataset.
+	Tier Tier `json:"tier,omitempty"`
+
+	// Confidence is "high" when the commune was located in the dataset,
+	// ConfidenceNone otherwise.
 	Confidence string `json:"confidence"`
 
 	// Evidence captures reproducibility metadata about the query that
@@ -45,16 +45,25 @@ type Result struct {
 // Sidecar — not part of the wire data. Travels in-process from
 // Source.Query to the adapter.
 type Evidence struct {
-	// INSEE is the 5-digit commune code the Source filtered on.
+	// INSEE is the 5-digit commune code the Source filtered on. The
+	// vacance source does NOT fold arrondissements — Paris,
+	// Lyon and Marseille arrondissements carry their own rows.
 	INSEE string `json:"insee"`
+
+	// DataYear is the census vintage of the upstream dataset.
+	DataYear int `json:"data_year,omitempty"`
+
+	// RowCountCommunes is the total number of communes (incl.
+	// arrondissements) in the embedded dataset.
+	RowCountCommunes int `json:"row_count_communes,omitempty"`
 }
 
 // IsEmpty satisfies gazetteer.EmptyReporter. Returns true when the
-// commune was filtered out at LOVAC ingestion — the framework
+// commune was missing from the embedded crosswalk — the framework
 // records Status == StatusOKEmpty in this case.
 func (r *Result) IsEmpty() bool {
 	if r == nil {
 		return true
 	}
-	return r.VacancePct <= 0
+	return r.Confidence == ConfidenceNone
 }
