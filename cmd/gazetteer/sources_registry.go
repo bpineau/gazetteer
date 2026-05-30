@@ -12,6 +12,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/cadastre"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/cartofriches"
+	"github.com/bpineau/gazetteer/sources/cdsr"
 	"github.com/bpineau/gazetteer/sources/chomage"
 	"github.com/bpineau/gazetteer/sources/delinquance"
 	"github.com/bpineau/gazetteer/sources/dpedist"
@@ -124,6 +125,13 @@ func sourceCatalog() []sourceFactory {
 			Default: true,
 			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
 				return carteloyers.NewSource(carteloyers.Options{DataDir: d.DataDir}), nil
+			},
+		},
+		{
+			Name:    cdsr.Name,
+			Default: true,
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return cdsr.NewSource(cdsr.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
