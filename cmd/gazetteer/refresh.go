@@ -214,6 +214,13 @@ func copyToEmbed(report dataset.Report, dir string) error {
 		if r.Err != nil || r.Skipped {
 			continue
 		}
+		if !r.Embedded {
+			// Download-only dataset: it has no embed dir to update. Copying
+			// it into sources/<name>/data would fabricate one the source
+			// never reads.
+			fmt.Fprintf(os.Stdout, "embed-update: %s skipped (download-only, not embedded)\n", r.Processed)
+			continue
+		}
 		src := filepath.Join(dir, r.Processed)
 		dst := filepath.Join(root, "sources", r.Source, "data", r.Processed)
 		if err := copyFile(src, dst); err != nil {

@@ -135,10 +135,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		com = communes.MustDefault()
 	}
 
-	dataDir, err := resolveDataDir(opts.DataDir)
-	if err != nil {
-		return nil, fmt.Errorf("factory: datadir: %w", err)
-	}
+	dataDir := resolveDataDir(opts.DataDir)
 
 	dvfSrc, err := dvf.NewSource(dvf.Options{HTTP: hc, Geocoder: ban, Communes: com})
 	if err != nil {
@@ -181,9 +178,18 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 // The sentinel "-" disables the datadir (embedded-only loading); any other
 // value defers to dataset.ResolveDir (explicit > $GAZETTEER_DATA_DIR >
 // os.UserCacheDir()/gazetteer).
-func resolveDataDir(explicit string) (string, error) {
+//
+// An unresolvable user cache dir is not fatal: the datadir is only an
+// optional override of the embedded data, so a resolution failure degrades
+// to embedded-only ("") rather than sinking the whole Client — matching the
+// CLI's behaviour.
+func resolveDataDir(explicit string) string {
 	if explicit == "-" {
-		return "", nil
+		return ""
 	}
-	return dataset.ResolveDir(explicit)
+	dir, err := dataset.ResolveDir(explicit)
+	if err != nil {
+		return ""
+	}
+	return dir
 }
