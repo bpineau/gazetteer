@@ -137,6 +137,15 @@ data.gouv.fr Etalab.
 - **Section catalog cache**: the per-INSEE cadastral section list is
   cached via a `kvcache.Cache` (`Options.SectionCache`). See
   [caching.md](caching.md).
+- **Performance**: DVF fetches mutations one HTTP call per cadastral
+  section. The `address_radius` tier **spatially prefilters** the
+  commune's sections (via their cadastre bounding boxes) to the handful
+  whose box falls within the disk, instead of all ~50 in a dense
+  arrondissement; the surviving sections are then fetched concurrently.
+  Wire `dvf.HostRateLimits()` into `httpx.Options.PerHost` so the
+  data.gouv.fr DVF + cadastre hosts get 10 req/s instead of the polite
+  2 req/s default — the `factory` and the CLI do this for you. Together
+  these take a dense-arrondissement lookup from ~24 s to ~2 s.
 - **Circuit breaker**: 3 consecutive transport errors OR 3 consecutive
   429s trip the breaker. Returns `dvf.ErrCircuitTripped` (matches
   `gazetteer.ErrSourceCircuitTripped`).
@@ -546,8 +555,14 @@ A Source's typed `Result` MAY implement:
 - `appraisal.RentEstimator`  — contributes to `appraisal.RentValue`
 - `appraisal.HazardReporter` — contributes to `appraisal.HazardProfile`
 
-Today: `dvf` → PriceEstimator; `carteloyers` + `encadrement` →
-RentEstimator; `georisques` → HazardReporter.
+Today: `dvf` → PriceEstimator; `carteloyers` + `encadrement` + `oll` →
+RentEstimator; `georisques` + `catnat` → HazardReporter.
+
+On top of these, `appraisal/zonescore` is a terminal consumer that folds
+the whole `Dossier` into a single yield-first 0–100 zone score with a
+per-axis breakdown (rendement, tension, solvabilité, sécurité, fiscalité,
+accès). `zonescore.Compute` scores one address; `zonescore.Compare`
+ranks several. The CLI surfaces them via `appraise` and `compare`.
 
 ### Tests via `Options.BaseURL`
 

@@ -65,9 +65,10 @@ if err != nil { log.Fatal(err) }
 client, _ := b.With(myPlugin).Build()
 ```
 
-`factory.NewDefault` does not currently wire the OSM transit source
-(it needs an offline station catalog); add it explicitly via the
-Builder path when needed.
+`factory.NewDefault` wires every stable Source, including `osm_transit`
+(it ships an embedded station catalog with a live Overpass fallback, so
+no setup is needed). Only `bdnb` is left out of the default set — add it
+via the Builder path when you have an API key and quota to spend.
 
 ## Sources shipped
 
