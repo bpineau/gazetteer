@@ -144,6 +144,7 @@ georisques      v1
 ips_ecoles      v1
 iris            v1
 locservice      v1
+lovac           v1
 nuisances       v1
 oll             v1
 osm_transit     v3
@@ -151,7 +152,6 @@ qpv             v1
 rpls            v1
 taxefonciere    v1
 vacance         v1
-vacance_logements  v1
 zonageabc       v1
 zonetendue      v1
 ```

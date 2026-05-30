@@ -1,44 +1,61 @@
 package vacance
 
 import (
+	"compress/gzip"
 	"embed"
-	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
 
-//go:embed data/vacance_communes.csv
+//go:embed data/vacance_communes.json.gz
 var embedFS embed.FS
 
-// set binds the embedded extract to the datadir/refresh pipeline. Refresh
-// downloads the upstream LOVAC communal CSV and rebuilds the compact CSV.
+// set binds the embedded INSEE base-logement extract to the datadir/refresh
+// pipeline. Refresh downloads the upstream INSEE zip and rebuilds the
+// gzipped JSON via transform.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
-	Processed: dataset.File{Name: "vacance_communes.csv"},
-	Raw:       []dataset.File{{Name: rawCSVName, URL: rawCSVURL}},
+	Processed: dataset.File{Name: "vacance_communes.json.gz"},
+	Raw:       []dataset.File{{Name: rawName, URL: rawURL}},
 	Transform: transform,
 	Validate:  validate,
 }
 
-// Entry captures the LOVAC-derived taux de logements vacants for one
-// commune. All percentages are 0..100 floats.
+// Entry is one commune's row from the INSEE base logement census.
 type Entry struct {
-	InseeCode      string
-	VacancePct     float64 // taux de logements vacants 2025 (parc privé)
-	VacanceLongPct float64 // taux de logements vacants > 2 ans 2025
+	// Log is P21_LOG — total logements.
+	Log int `json:"log"`
+	// Vac is P21_LOGVAC — vacant logements.
+	Vac int `json:"vac"`
+	// RP is P21_RP — résidences principales.
+	RP int `json:"rp"`
+	// RSec is P21_RSECOCC — résidences secondaires + logements occasionnels.
+	RSec int `json:"rsec"`
+	// VacancyRatePct is the pre-computed VAC/LOG ratio (percent),
+	// rounded to two decimals.
+	VacancyRatePct float64 `json:"vacancy_rate_pct"`
+}
+
+// Meta carries the manifest metadata for the embedded extract.
+type Meta struct {
+	Source           string `json:"source"`
+	DataYear         int    `json:"data_year"`
+	RowCountCommunes int    `json:"row_count_communes"`
+	Note             string `json:"note,omitempty"`
 }
 
 // Index is the per-INSEE lookup index.
 type Index struct {
-	byInsee map[string]Entry
+	Meta     Meta             `json:"meta"`
+	Communes map[string]Entry `json:"communes"`
 }
 
 var (
@@ -75,9 +92,27 @@ func Load(dir string) (*Index, error) {
 	return indexCache, indexErr
 }
 
-// Lookup returns the vacance entry for the given INSEE. The `ok` flag
-// is false when the commune was filtered out at LOVAC ingestion (small
-// commune with masked statistics — "secret statistique" rule).
+// parseIndex decodes the gzipped JSON extract into an Index.
+func parseIndex(r io.Reader) (*Index, error) {
+	zr, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, fmt.Errorf("vacance: gunzip: %w", err)
+	}
+	defer func() { _ = zr.Close() }()
+	body, err := io.ReadAll(zr)
+	if err != nil {
+		return nil, fmt.Errorf("vacance: read gunzipped body: %w", err)
+	}
+	var idx Index
+	if err := json.Unmarshal(body, &idx); err != nil {
+		return nil, fmt.Errorf("vacance: parse json: %w", err)
+	}
+	return &idx, nil
+}
+
+// Lookup returns the entry for the given INSEE. `ok` is false when the
+// commune is absent (rare — a handful of communes dropped from the
+// census between vintages).
 func (idx *Index) Lookup(insee string) (Entry, bool) {
 	if idx == nil {
 		return Entry{}, false
@@ -86,72 +121,14 @@ func (idx *Index) Lookup(insee string) (Entry, bool) {
 	if insee == "" {
 		return Entry{}, false
 	}
-	e, ok := idx.byInsee[insee]
+	e, ok := idx.Communes[insee]
 	return e, ok
 }
 
-// Count returns the number of communes with usable observations.
+// Count returns the number of communes in the loaded extract.
 func (idx *Index) Count() int {
 	if idx == nil {
 		return 0
 	}
-	return len(idx.byInsee)
-}
-
-// parseIndex parses the semicolon-delimited CSV extract into an Index.
-func parseIndex(r io.Reader) (*Index, error) {
-	cr := csv.NewReader(r)
-	cr.Comma = ';'
-	cr.FieldsPerRecord = -1
-	header, err := cr.Read()
-	if err != nil {
-		return nil, fmt.Errorf("read header: %w", err)
-	}
-	col := map[string]int{}
-	for i, name := range header {
-		col[strings.TrimSpace(name)] = i
-	}
-	required := []string{"INSEE_C", "taux_vacance_25_pct", "taux_vacance_long_25_pct"}
-	for _, name := range required {
-		if _, ok := col[name]; !ok {
-			return nil, fmt.Errorf("missing column %q in header %v", name, header)
-		}
-	}
-	out := make(map[string]Entry, 16_000)
-	for {
-		rec, err := cr.Read()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("read row: %w", err)
-		}
-		insee := strings.TrimSpace(rec[col["INSEE_C"]])
-		if insee == "" {
-			continue
-		}
-		rateStr := strings.TrimSpace(rec[col["taux_vacance_25_pct"]])
-		if rateStr == "" {
-			// Pre-processed file may keep the row for the long-term
-			// number even if the headline rate is masked. We skip
-			// those — the headline rate is what the score uses.
-			continue
-		}
-		rate, err := strconv.ParseFloat(rateStr, 64)
-		if err != nil {
-			continue
-		}
-		longRate := 0.0
-		if s := strings.TrimSpace(rec[col["taux_vacance_long_25_pct"]]); s != "" {
-			if v, err := strconv.ParseFloat(s, 64); err == nil {
-				longRate = v
-			}
-		}
-		out[insee] = Entry{
-			InseeCode:      insee,
-			VacancePct:     rate,
-			VacanceLongPct: longRate,
-		}
-	}
-	return &Index{byInsee: out}, nil
+	return len(idx.Communes)
 }

@@ -95,7 +95,7 @@ Market data:
 | `carteloyers`  | National rent observatory tiers                                  |
 | `oll`          | Observed market rents by zone (Observatoires Locaux des Loyers)  |
 | `encadrement`  | Rent control caps (Paris, Plaine Commune + Est Ensemble 93, Lyon) |
-| `vacance`      | Vacancy taxation status by commune                               |
+| `lovac`        | Vacancy rate per commune from the LOVAC fiscal file              |
 | `taxefonciere` | Property tax ratios by commune                                   |
 
 Commune-level signals for the investor:
@@ -113,7 +113,7 @@ Commune-level signals for the investor:
 | `education`    | Count of open schools per commune (live API)                     |
 | `bpe`          | INSEE BPE — curated commerce / health / services counts          |
 | `rpls`         | % social housing (loi SRU) per commune                           |
-| `vacance_logements` | INSEE census demographic vacancy rate (per arrondissement) |
+| `vacance`      | INSEE census demographic vacancy rate (per arrondissement)       |
 | `ips_ecoles`   | DEPP median IPS over écoles primaires (per arrondissement)       |
 
 Transport:

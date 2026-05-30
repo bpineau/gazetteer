@@ -1,4 +1,4 @@
-package vacance_logements
+package vacance
 
 import (
 	"context"
