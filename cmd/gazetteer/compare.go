@@ -108,6 +108,8 @@ func parseCompareFlags(args []string) (*queryFlags, []string, error) {
 	fs.IntVar(&q.rooms, "rooms", 0, "Room count (1, 2, 3…).")
 	fs.DurationVar(&q.timeout, "timeout", 30*time.Second, "Overall budget for the collects (0 disables).")
 	fs.BoolVar(&q.jsonOut, "json", false, "Emit the full Comparison as indented JSON")
+	fs.StringVar(&q.profile, "profile", "",
+		"ZoneScore weight preset: yield (default) | balanced | patrimoine | transport.")
 	positional, err := parseInterleaved(fs, args)
 	if err != nil {
 		return nil, nil, errUsage
