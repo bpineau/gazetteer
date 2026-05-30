@@ -78,6 +78,7 @@ Building / energy / risk:
 | `ademe`        | DPE (energy performance certificates) at the address             |
 | `bdnb`         | Base de Données Nationale des Bâtiments — building age, type     |
 | `cadastre`     | Cadastral parcel id, contenance, viewer link (+ opt-in bâti)     |
+| `iris`         | INSEE IRIS code/name/type at the address (also resolves `Listing.IRIS`) |
 | `dpedist`      | DPE class distribution per commune (passoire share F+G)          |
 | `georisques`   | Natural and technological hazards (flood, soil, industrial)      |
 | `catnat`       | Per-commune history of recognised natural-disaster decrees        |

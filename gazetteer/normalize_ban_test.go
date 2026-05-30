@@ -119,6 +119,50 @@ func TestBANNormalizer_PopulatesCityFromCommunes(t *testing.T) {
 	}
 }
 
+type stubIRIS struct {
+	code           string
+	ok             bool
+	gotLat, gotLon float64
+}
+
+func (s *stubIRIS) ResolveIRIS(lat, lon float64) (string, bool) {
+	s.gotLat, s.gotLon = lat, lon
+	return s.code, s.ok
+}
+
+func TestBANNormalizer_PopulatesIRIS(t *testing.T) {
+	g := &stubGeocoder{res: banx.GeocodeResult{Lat: 48.9355, Lon: 2.3590, CityCode: "93066"}}
+	ir := &stubIRIS{code: "930660802", ok: true}
+	n := NewBANNormalizer(g, nil).WithIRIS(ir)
+	got, err := n.Normalize(context.Background(), "x")
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	if got.IRIS != "930660802" {
+		t.Errorf("IRIS = %q, want 930660802", got.IRIS)
+	}
+	if ir.gotLat != 48.9355 || ir.gotLon != 2.3590 {
+		t.Errorf("resolver got (%v,%v), want the geocoded coords", ir.gotLat, ir.gotLon)
+	}
+}
+
+func TestBANNormalizer_IRISMissLeavesEmpty(t *testing.T) {
+	g := &stubGeocoder{res: banx.GeocodeResult{Lat: 1, Lon: 1, CityCode: "00000"}}
+	n := NewBANNormalizer(g, nil).WithIRIS(&stubIRIS{ok: false})
+	got, _ := n.Normalize(context.Background(), "x")
+	if got.IRIS != "" {
+		t.Errorf("IRIS = %q, want empty on resolver miss", got.IRIS)
+	}
+}
+
+func TestBANNormalizer_NoIRISResolverLeavesEmpty(t *testing.T) {
+	g := &stubGeocoder{res: banx.GeocodeResult{Lat: 48.9, Lon: 2.3, CityCode: "93066"}}
+	got, _ := NewBANNormalizer(g, nil).Normalize(context.Background(), "x") // no WithIRIS
+	if got.IRIS != "" {
+		t.Errorf("IRIS = %q, want empty when no resolver wired", got.IRIS)
+	}
+}
+
 func TestBANNormalizer_NilCommunesLeavesCityEmpty(t *testing.T) {
 	g := &stubGeocoder{
 		res: banx.GeocodeResult{CityCode: "75102", PostCode: "75002"},

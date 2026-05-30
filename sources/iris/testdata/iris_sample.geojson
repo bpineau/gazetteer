@@ -1,0 +1,6 @@
+{"type":"FeatureCollection","features":[
+ {"type":"Feature","properties":{"code_iris":"930660903","nom_iris":"Test A","typ_iris":"H"},
+  "geometry":{"type":"Polygon","coordinates":[[[2.00,48.90],[2.10,48.90],[2.10,49.00],[2.00,49.00],[2.00,48.90]]]}},
+ {"type":"Feature","properties":{"code_iris":"751041401","nom_iris":"Test B","typ_iris":"A"},
+  "geometry":{"type":"MultiPolygon","coordinates":[[[[2.30,48.85],[2.35,48.85],[2.35,48.88],[2.30,48.88],[2.30,48.85]]]]}}
+]}

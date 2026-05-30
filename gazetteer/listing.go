@@ -16,6 +16,12 @@ type Listing struct {
 	Lat     *float64 `json:"lat,omitempty"`
 	Lon     *float64 `json:"lon,omitempty"`
 
+	// IRIS is the 9-digit INSEE IRIS code (sub-commune statistical zone, e.g.
+	// "751104201"), populated by a Normalizer that has an IRISResolver. Empty
+	// when unresolved (outside the resolver's coverage, or no resolver wired).
+	// Sources keyed at IRIS granularity read it; commune-level sources ignore it.
+	IRIS string `json:"iris,omitempty"`
+
 	PropertyType PropertyType `json:"property_type,omitempty"`
 	SurfaceM2    *float64     `json:"surface_m2,omitempty"`
 	Rooms        *int         `json:"rooms,omitempty"`

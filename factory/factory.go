@@ -47,6 +47,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/filosofi"
 	"github.com/bpineau/gazetteer/sources/georisques"
 	"github.com/bpineau/gazetteer/sources/ips_ecoles"
+	"github.com/bpineau/gazetteer/sources/iris"
 	"github.com/bpineau/gazetteer/sources/locservice"
 	"github.com/bpineau/gazetteer/sources/nuisances"
 	"github.com/bpineau/gazetteer/sources/oll"
@@ -146,10 +147,14 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		return nil, fmt.Errorf("factory: dvf: %w", err)
 	}
 
+	// The IRIS source doubles as the Normalizer's IRISResolver, so build it once
+	// and use it for both roles.
+	irisSrc := iris.NewSource(iris.Options{DataDir: dataDir})
+
 	b := gazetteer.NewBuilder().
 		WithHTTPClient(hc.HTTPClient())
 	if !opts.SkipNormalizer {
-		b = b.WithNormalizer(gazetteer.NewBANNormalizer(ban, com))
+		b = b.WithNormalizer(gazetteer.NewBANNormalizer(ban, com).WithIRIS(irisSrc))
 	}
 	b = b.With(dvfSrc).
 		With(ademe.NewSource(ademe.Options{Geocoder: ban})).
@@ -165,6 +170,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(cdsr.NewSource(cdsr.Options{DataDir: dataDir})).
 		With(catnat.NewSource(catnat.Options{DataDir: dataDir})).
 		With(nuisances.NewSource(nuisances.Options{DataDir: dataDir})).
+		With(irisSrc).
 		With(chomage.NewSource(chomage.Options{DataDir: dataDir})).
 		With(delinquance.NewSource(delinquance.Options{DataDir: dataDir})).
 		With(dpedist.NewSource(dpedist.Options{})).
