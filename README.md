@@ -80,6 +80,7 @@ Building / energy / risk:
 | `cadastre`     | Cadastral parcel id, contenance, viewer link (+ opt-in bâti)     |
 | `dpedist`      | DPE class distribution per commune (passoire share F+G)          |
 | `georisques`   | Natural and technological hazards (flood, soil, industrial)      |
+| `catnat`       | Per-commune history of recognised natural-disaster decrees        |
 | `cdsr`         | Nearby region-flagged distressed condominiums (IDF copro risk)   |
 
 Market data:

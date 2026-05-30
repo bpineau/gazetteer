@@ -25,6 +25,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `cartofriches`   | INSEE                                          | offline Cerema brownfields  |
 | `chomage`        | INSEE                                          | offline INSEE chômage ZE2020|
 | `delinquance`    | INSEE                                          | offline SSMSI État 4001     |
+| `catnat`         | INSEE                                          | offline GASPAR CatNat agg.   |
 | `cdsr`           | lat/lon                                        | offline IDF CDSR snapshot    |
 | `oll`            | INSEE (+ rooms)                                | offline OLL observed rents   |
 | `dpedist`        | INSEE                                          | data.ademe.fr values_agg API|
@@ -184,6 +185,25 @@ Lyon / Villeurbanne.
 - **Vintages**: Paris 2025, Lyon 2025-2026, Plaine Commune 2022, Est
   Ensemble 2023 (zonage 2022). Zone numbers are not unique across EPTs,
   so lookups are scoped by `(zone_source, zone)`.
+
+## `sources/catnat`
+
+Per-commune history of recognised natural-disaster decrees ("arrêtés de
+catastrophe naturelle", GASPAR, 1982→present). Where `georisques` reports the
+modelled hazard, `catnat` reports the realised sinistralité.
+
+- **Needs**: INSEE (a PLM arrondissement folds to its mother commune — decrees
+  are issued at commune level).
+- **Result**: total decree count, recent-window count (last 10 years vs the
+  dataset vintage), per-category breakdown (inondation / sécheresse /
+  mouvement_terrain / tempête), latest event year, and a frequency tier.
+  Satisfies `appraisal.HazardReporter`, so the confirmed categories flow into
+  `appraisal.HazardProfile` alongside `georisques`. `IsEmpty` (StatusOKEmpty)
+  for a commune with no recorded decree.
+- **Coverage**: national (~34 700 communes). The sécheresse (clay-shrinkage)
+  decrees are the cracking-risk signal the zoning often misses.
+- **Refresh**: from the Géorisques GASPAR ZIP export; the per-commune aggregate
+  is gzip-embedded (~220 KB).
 
 ## `sources/cdsr`
 
