@@ -148,6 +148,7 @@ encadrement     v2
 filoiris        v1
 filosofi        v1
 georisques      v1
+gpe             v1
 ips_ecoles      v1
 iris            v1
 locservice      v1
