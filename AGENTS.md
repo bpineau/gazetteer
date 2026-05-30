@@ -55,7 +55,10 @@ field mean (units!)". The answers, easiest first:
 
 1. **`gazetteer sources catalog --json`** (or `docs/sources.json`) — every
    source's summary, required inputs, coverage, the dimension it covers, and its
-   `result_schema` (field names). Start here to pick a source.
+   `result_schema` (field names). Start here to pick a source. Browsing by
+   intent ("which source gives rental-demand data?") →
+   **`gazetteer sources dimensions`** groups them by investor-evaluation
+   dimension (price, rents, demand, solvency, taxes, transport, hazards, …).
 2. **`go doc github.com/bpineau/gazetteer/sources/<name> Result`** — the
    authoritative field-by-field meaning **with units**. Every `Result` field
    carries a godoc comment (e.g. DVF prices are `…Cents` integers, OLL rent is
