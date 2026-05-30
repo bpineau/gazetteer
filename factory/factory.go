@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/communes"
@@ -73,6 +74,14 @@ type Options struct {
 	// the caller plans to install a custom Normalizer via the
 	// Builder path returned by BuilderDefault.
 	SkipNormalizer bool
+
+	// DataDir is the gazetteer data directory injected into every
+	// block-dataset Source, so a refreshed copy of a processed artifact
+	// found there overrides the embedded one. Empty resolves via
+	// dataset.ResolveDir (explicit > $GAZETTEER_DATA_DIR >
+	// os.UserCacheDir()/gazetteer). Set "-" to disable the datadir and
+	// force embedded-only loading.
+	DataDir string
 }
 
 // NewDefault builds a *gazetteer.Client wired with every stable
@@ -126,6 +135,11 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		com = communes.MustDefault()
 	}
 
+	dataDir, err := resolveDataDir(opts.DataDir)
+	if err != nil {
+		return nil, fmt.Errorf("factory: datadir: %w", err)
+	}
+
 	dvfSrc, err := dvf.NewSource(dvf.Options{HTTP: hc, Geocoder: ban, Communes: com})
 	if err != nil {
 		return nil, fmt.Errorf("factory: dvf: %w", err)
@@ -144,21 +158,32 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(cadastre.NewSource(cadastre.Options{Geocoder: ban})).
 		With(georisques.NewSource(georisques.Options{Geocoder: ban})).
 		With(locservice.NewSource(locservice.Options{Geocoder: ban})).
-		With(carteloyers.NewSource(carteloyers.Options{})).
-		With(cartofriches.NewSource(cartofriches.Options{})).
-		With(chomage.NewSource(chomage.Options{})).
-		With(delinquance.NewSource(delinquance.Options{})).
+		With(carteloyers.NewSource(carteloyers.Options{DataDir: dataDir})).
+		With(cartofriches.NewSource(cartofriches.Options{DataDir: dataDir})).
+		With(chomage.NewSource(chomage.Options{DataDir: dataDir})).
+		With(delinquance.NewSource(delinquance.Options{DataDir: dataDir})).
 		With(dpedist.NewSource(dpedist.Options{})).
 		With(education.NewSource(education.Options{})).
-		With(encadrement.NewSource(encadrement.Options{})).
-		With(filosofi.NewSource(filosofi.Options{})).
-		With(qpv.NewSource(qpv.Options{})).
-		With(rpls.NewSource(rpls.Options{})).
-		With(taxefonciere.NewSource(taxefonciere.Options{})).
-		With(vacance.NewSource(vacance.Options{})).
-		With(vacance_logements.NewSource(vacance_logements.Options{})).
-		With(ips_ecoles.NewSource(ips_ecoles.Options{})).
-		With(zonageabc.NewSource(zonageabc.Options{})).
-		With(zonetendue.NewSource(zonetendue.Options{}))
+		With(encadrement.NewSource(encadrement.Options{DataDir: dataDir})).
+		With(filosofi.NewSource(filosofi.Options{DataDir: dataDir})).
+		With(qpv.NewSource(qpv.Options{DataDir: dataDir})).
+		With(rpls.NewSource(rpls.Options{DataDir: dataDir})).
+		With(taxefonciere.NewSource(taxefonciere.Options{DataDir: dataDir})).
+		With(vacance.NewSource(vacance.Options{DataDir: dataDir})).
+		With(vacance_logements.NewSource(vacance_logements.Options{DataDir: dataDir})).
+		With(ips_ecoles.NewSource(ips_ecoles.Options{DataDir: dataDir})).
+		With(zonageabc.NewSource(zonageabc.Options{DataDir: dataDir})).
+		With(zonetendue.NewSource(zonetendue.Options{DataDir: dataDir}))
 	return b, nil
+}
+
+// resolveDataDir maps factory Options.DataDir onto a concrete directory.
+// The sentinel "-" disables the datadir (embedded-only loading); any other
+// value defers to dataset.ResolveDir (explicit > $GAZETTEER_DATA_DIR >
+// os.UserCacheDir()/gazetteer).
+func resolveDataDir(explicit string) (string, error) {
+	if explicit == "-" {
+		return "", nil
+	}
+	return dataset.ResolveDir(explicit)
 }
