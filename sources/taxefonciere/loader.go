@@ -16,20 +16,26 @@ var embedFS embed.FS
 
 // This Source ships two embedded artifacts (V1 legacy ratios + V2 DGFiP
 // voted rates); each is its own dataset.Set so the datadir override and the
-// refresh tooling operate per file. Both are read-only until their
-// Transform is reconstructed.
+// refresh tooling operate per file. Both are refreshable from their
+// data.economie.gouv.fr Opendatasoft exports (see transform.go).
 var (
 	setV1 = dataset.Set{
 		Source:    Name,
 		Version:   Version,
 		Embed:     embedFS,
 		Processed: dataset.File{Name: "taxe_fonciere_ratios.json"},
+		Raw:       []dataset.File{{Name: rawV1Name, URL: rawV1URL}},
+		Transform: transformV1,
+		Validate:  validateV1,
 	}
 	setV2 = dataset.Set{
 		Source:    Name,
 		Version:   Version,
 		Embed:     embedFS,
 		Processed: dataset.File{Name: "fiscalite_locale.json"},
+		Raw:       []dataset.File{{Name: rawV2Name, URL: rawV2URL}},
+		Transform: transformV2,
+		Validate:  validateV2,
 	}
 )
 

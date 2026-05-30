@@ -1,0 +1,10 @@
+[
+  {"exercice": "2025", "dep": "12", "com": "003", "insee_com": "12003", "taux_global_tfb": 38.64, "taux_plein_teom": null},
+  {"exercice": "2025", "dep": "12", "com": "007", "insee_com": "12007", "taux_global_tfb": 37.2, "taux_plein_teom": 12.0},
+  {"exercice": "2025", "dep": "13", "com": "055", "insee_com": "13055", "taux_global_tfb": 47.87, "taux_plein_teom": 18.1},
+  {"exercice": "2025", "dep": "13", "com": "046", "insee_com": "13046", "taux_global_tfb": 46.56, "taux_plein_teom": 14.0},
+  {"exercice": "2025", "dep": "11", "com": "360", "insee_com": "11360", "taux_global_tfb": 101.13, "taux_plein_teom": 17.1},
+  {"exercice": "2025", "dep": "33", "com": "000", "insee_com": "33000", "taux_global_tfb": 40.0, "taux_plein_teom": 0.0},
+  {"exercice": "2025", "dep": "97", "com": "411", "insee_com": "97411", "taux_global_tfb": 30.0, "taux_plein_teom": 9.0},
+  {"exercice": "2025", "dep": "", "com": "", "insee_com": "", "taux_global_tfb": 99.0, "taux_plein_teom": 9.0}
+]
