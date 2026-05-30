@@ -13,6 +13,8 @@ godoc found via `go doc github.com/bpineau/gazetteer/...`.
 
 | Document                                | Audience                              |
 |-----------------------------------------|---------------------------------------|
+| [../AGENTS.md](../AGENTS.md)            | **AI coding agents** + fast human onboarding (read first) |
+| [sources.json](sources.json)            | Machine-readable capability map of every source |
 | [concepts.md](concepts.md)              | New users — mental model of the API   |
 | [sources.md](sources.md)                | What each Source provides             |
 | [datasets.md](datasets.md)              | Offline datasets + `refresh` / datadir|

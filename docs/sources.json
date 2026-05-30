@@ -1,0 +1,546 @@
+[
+  {
+    "name": "ademe",
+    "version": 2,
+    "default": true,
+    "summary": "DPE (energy performance certificate) at the address — class, GES, dwelling attrs.",
+    "inputs": [
+      "address",
+      "surface (disambiguates multiple DPE)"
+    ],
+    "coverage": "national (live API)",
+    "result_schema": {
+      "confidence": "",
+      "sample_size": 0
+    }
+  },
+  {
+    "name": "anct",
+    "version": 1,
+    "default": true,
+    "summary": "ANCT programmes — Action Cœur de Ville / Petites Villes de Demain / ORT (Denormandie).",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "result_schema": {
+      "acv": false,
+      "pvd": false,
+      "ort": false,
+      "denormandie_eligible": false,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "bdnb",
+    "version": 2,
+    "default": false,
+    "summary": "Base de Données Nationale des Bâtiments — building age, type, dwelling count (opt-in).",
+    "inputs": [
+      "address"
+    ],
+    "coverage": "national (per-key quota; opt-in)",
+    "result_schema": {
+      "confidence": "",
+      "sample_size": 0
+    }
+  },
+  {
+    "name": "bpe",
+    "version": 1,
+    "default": true,
+    "summary": "INSEE BPE — curated commerce / health / services facility counts per commune.",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "result_schema": {
+      "total_facilities": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "cadastre",
+    "version": 1,
+    "default": true,
+    "summary": "Cadastral parcel id + contenance + viewer link (optional bâti emprise).",
+    "inputs": [
+      "lat/lon"
+    ],
+    "coverage": "national (live API)",
+    "result_schema": {
+      "parcels": null
+    }
+  },
+  {
+    "name": "carteloyers",
+    "version": 1,
+    "default": true,
+    "summary": "National rent-observatory reference tiers (médiane €/m²/month CC + IC band).",
+    "inputs": [
+      "INSEE",
+      "rooms"
+    ],
+    "coverage": "national",
+    "feeds": [
+      "appraisal.RentValue"
+    ],
+    "result_schema": {
+      "loyer_med_eur_per_m2_cc": 0,
+      "loyer_low_eur_per_m2_cc": 0,
+      "loyer_high_eur_per_m2_cc": 0,
+      "nb_observations": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "cartofriches",
+    "version": 1,
+    "default": true,
+    "summary": "Cerema brownfield (friches) inventory aggregated per commune.",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "result_schema": {
+      "site_count": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "catnat",
+    "version": 1,
+    "default": true,
+    "summary": "Per-commune history of recognised natural-disaster (CatNat) decrees + recent-frequency tier.",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "feeds": [
+      "appraisal.HazardProfile"
+    ],
+    "result_schema": {
+      "total_arretes": 0,
+      "recent_count": 0
+    }
+  },
+  {
+    "name": "cdsr",
+    "version": 1,
+    "default": true,
+    "summary": "Nearby region-flagged distressed condominiums (IDF copro-difficulty signal).",
+    "inputs": [
+      "lat/lon"
+    ],
+    "coverage": "Île-de-France",
+    "result_schema": {
+      "nearest_m": 0,
+      "within_500m": 0,
+      "within_3km": 0
+    }
+  },
+  {
+    "name": "chomage",
+    "version": 1,
+    "default": true,
+    "summary": "INSEE local unemployment rate by zone d'emploi vs national (quarterly).",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "feeds": [
+      "zonescore: solvabilité (employment)"
+    ],
+    "result_schema": {
+      "rate_pct": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "delinquance",
+    "version": 3,
+    "default": true,
+    "summary": "SSMSI État 4001 per-commune crime indicators + a coarse risk flag.",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "feeds": [
+      "zonescore: sécurité"
+    ],
+    "result_schema": {
+      "confidence": ""
+    }
+  },
+  {
+    "name": "dpedist",
+    "version": 1,
+    "default": true,
+    "summary": "DPE class distribution per commune (passoire F+G share, efficient A+B share).",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "result_schema": {
+      "nb_total": 0,
+      "passoire_share_pct": 0,
+      "efficient_share_pct": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "dvf",
+    "version": 4,
+    "default": true,
+    "summary": "Demandes de Valeurs Foncières — historical transaction price €/m² (median + quartiles).",
+    "inputs": [
+      "property_type",
+      "INSEE or address",
+      "surface (for €-total)"
+    ],
+    "coverage": "national",
+    "feeds": [
+      "appraisal.PricePerM2",
+      "zonescore: rendement (price)"
+    ],
+    "result_schema": {
+      "value_eur_per_m2_centimes": null,
+      "sample_size": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "education",
+    "version": 1,
+    "default": true,
+    "summary": "Count of open schools (école/collège/lycée) per commune.",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national (live API)",
+    "result_schema": {
+      "nb_ecole": 0,
+      "nb_college": 0,
+      "nb_lycee": 0,
+      "nb_total": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "encadrement",
+    "version": 2,
+    "default": true,
+    "summary": "Legal rent-control caps (loyer de référence + majoré).",
+    "inputs": [
+      "zip or INSEE",
+      "property_type",
+      "rooms",
+      "lat/lon (for 93)"
+    ],
+    "coverage": "Paris + Plaine Commune \u0026 Est Ensemble (93) + Lyon/Villeurbanne",
+    "feeds": [
+      "appraisal.RentValue"
+    ],
+    "result_schema": {
+      "loyer_ref_maj_eur_per_m2_hc": 0,
+      "loyer_ref_eur_per_m2_hc": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "filoiris",
+    "version": 1,
+    "default": true,
+    "summary": "INSEE Filosofi income at IRIS (sub-commune) level — median + taux de pauvreté + Gini.",
+    "inputs": [
+      "Listing.IRIS"
+    ],
+    "coverage": "Île-de-France (IRIS of communes ≥5000 hab)",
+    "feeds": [
+      "zonescore: solvabilité (IRIS income, preferred over filosofi)"
+    ],
+    "result_schema": {
+      "median_eur": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "filosofi",
+    "version": 1,
+    "default": true,
+    "summary": "INSEE Filosofi income — median revenu disponible + minima-sociaux %, by commune.",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "feeds": [
+      "zonescore: solvabilité (commune income)"
+    ],
+    "result_schema": {
+      "median_eur": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "georisques",
+    "version": 1,
+    "default": true,
+    "summary": "Natural + technological hazards (flood, soil, industrial) at the coordinates.",
+    "inputs": [
+      "lat/lon"
+    ],
+    "coverage": "national (live API)",
+    "feeds": [
+      "appraisal.HazardProfile"
+    ],
+    "result_schema": {
+      "summary": {
+        "naturels_present_count": 0,
+        "technos_present_count": 0,
+        "red_flags": null
+      },
+      "confidence": ""
+    }
+  },
+  {
+    "name": "gpe",
+    "version": 1,
+    "default": true,
+    "summary": "Nearest FUTURE Grand Paris Express station + line + distance (informational, not scored).",
+    "inputs": [
+      "lat/lon"
+    ],
+    "coverage": "Île-de-France",
+    "result_schema": {
+      "within_1500m": 0,
+      "within_3000m": 0
+    }
+  },
+  {
+    "name": "ips_ecoles",
+    "version": 1,
+    "default": true,
+    "summary": "DEPP median IPS (social index) over a commune's écoles primaires + heterogeneity band.",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "result_schema": {
+      "ips_median": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "iris",
+    "version": 1,
+    "default": true,
+    "summary": "INSEE IRIS code/name/type at the address; also resolves Listing.IRIS for downstream sources.",
+    "inputs": [
+      "lat/lon"
+    ],
+    "coverage": "Île-de-France",
+    "result_schema": {}
+  },
+  {
+    "name": "locservice",
+    "version": 1,
+    "default": true,
+    "summary": "Rental-market tension (supply tightness + tenant-budget scores, tension label).",
+    "inputs": [
+      "address or INSEE"
+    ],
+    "coverage": "national",
+    "feeds": [
+      "zonescore: tension (rental tension)"
+    ],
+    "result_schema": {
+      "tension_label": "",
+      "tension_score": null,
+      "score_scale": "",
+      "sample_size": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "logiris",
+    "version": 1,
+    "default": true,
+    "summary": "INSEE census housing structure at IRIS — renter share, social-housing share, vacancy.",
+    "inputs": [
+      "Listing.IRIS"
+    ],
+    "coverage": "Île-de-France",
+    "feeds": [
+      "zonescore: tension (IRIS vacancy + renter depth, preferred over vacance)"
+    ],
+    "result_schema": {
+      "renter_share_pct": 0,
+      "vacancy_rate_pct": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "lovac",
+    "version": 1,
+    "default": true,
+    "summary": "Per-commune fiscal vacancy rate from the LOVAC file (TLV perimeter).",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "result_schema": {
+      "vacance_pct": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "nuisances",
+    "version": 1,
+    "default": true,
+    "summary": "IDF cumulative environmental-nuisance grid (noise + air, 500 m cells), tier + point-noir.",
+    "inputs": [
+      "lat/lon"
+    ],
+    "coverage": "Île-de-France",
+    "feeds": [
+      "zonescore: accès (livability)"
+    ],
+    "result_schema": {
+      "nuisance_count": 0,
+      "point_noir": false
+    }
+  },
+  {
+    "name": "oll",
+    "version": 1,
+    "default": true,
+    "summary": "Observed market rents (Observatoires Locaux des Loyers), median €/m²/month by zone × rooms.",
+    "inputs": [
+      "INSEE",
+      "rooms"
+    ],
+    "coverage": "17 agglomérations (Paris intra-muros excluded)",
+    "feeds": [
+      "appraisal.RentValue",
+      "zonescore: rendement (rent)"
+    ],
+    "result_schema": {
+      "observed_median_eur_per_m2": 0,
+      "sample_size": 0
+    }
+  },
+  {
+    "name": "osm_transit",
+    "version": 3,
+    "default": true,
+    "summary": "Walking distance to the nearest métro / RER / tram / Transilien station.",
+    "inputs": [
+      "lat/lon"
+    ],
+    "coverage": "national (embedded catalog + live Overpass fallback)",
+    "feeds": [
+      "zonescore: accès (transit walk)"
+    ],
+    "result_schema": {
+      "nearest_transit_name": "",
+      "nearest_transit_type": "",
+      "nearest_transit_walk_m": 0,
+      "nearest_transit_walk_min": 0,
+      "confidence": "",
+      "sample_size": 0
+    }
+  },
+  {
+    "name": "qpv",
+    "version": 1,
+    "default": true,
+    "summary": "Quartiers Prioritaires de la politique de la Ville membership for the commune.",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "result_schema": {
+      "has_qpv": false,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "rpls",
+    "version": 1,
+    "default": true,
+    "summary": "Share of logements locatifs sociaux (loi SRU) per commune.",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "result_schema": {
+      "lls_rate": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "taxefonciere",
+    "version": 1,
+    "default": true,
+    "summary": "Estimated annual taxe foncière (DGFiP voted TFPB/TEOM rates × valeur locative proxy × surface).",
+    "inputs": [
+      "INSEE",
+      "surface"
+    ],
+    "coverage": "national",
+    "feeds": [
+      "zonescore: fiscalité"
+    ],
+    "result_schema": {
+      "estimated_eur_per_year": 0,
+      "vl_eur_per_m2": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "vacance",
+    "version": 1,
+    "default": true,
+    "summary": "INSEE census demographic vacancy rate per commune/arrondissement.",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "feeds": [
+      "zonescore: tension (commune vacancy, fallback for logiris)"
+    ],
+    "result_schema": {
+      "vacancy_rate": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "zonageabc",
+    "version": 1,
+    "default": true,
+    "summary": "Official A bis / A / B1 / B2 / C tension zoning (Pinel/PTZ).",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "result_schema": {
+      "tension_score": 0,
+      "confidence": ""
+    }
+  },
+  {
+    "name": "zonetendue",
+    "version": 1,
+    "default": true,
+    "summary": "\"Zone tendue\" + TLV-2013 + tendue-touristique fiscal flags.",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "result_schema": {
+      "tier": "",
+      "is_tendue": false,
+      "confidence": ""
+    }
+  }
+]
