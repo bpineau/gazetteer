@@ -36,6 +36,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/cadastre"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/cartofriches"
+	"github.com/bpineau/gazetteer/sources/cdsr"
 	"github.com/bpineau/gazetteer/sources/chomage"
 	"github.com/bpineau/gazetteer/sources/delinquance"
 	"github.com/bpineau/gazetteer/sources/dpedist"
@@ -85,8 +86,8 @@ type Options struct {
 }
 
 // NewDefault builds a *gazetteer.Client wired with every stable
-// in-tree Source: dvf, ademe, anct, bdnb, bpe, cadastre, georisques,
-// ips_ecoles, locservice, carteloyers, cartofriches, chomage,
+// in-tree Source: dvf, ademe, anct, bdnb, bpe, cadastre, carteloyers,
+// cartofriches, cdsr, georisques, ips_ecoles, locservice, chomage,
 // delinquance, dpedist, education, encadrement, filosofi, qpv, rpls,
 // taxefonciere, vacance, vacance_logements, zonageabc, zonetendue,
 // osm_transit.
@@ -157,6 +158,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(locservice.NewSource(locservice.Options{Geocoder: ban})).
 		With(carteloyers.NewSource(carteloyers.Options{DataDir: dataDir})).
 		With(cartofriches.NewSource(cartofriches.Options{DataDir: dataDir})).
+		With(cdsr.NewSource(cdsr.Options{DataDir: dataDir})).
 		With(chomage.NewSource(chomage.Options{DataDir: dataDir})).
 		With(delinquance.NewSource(delinquance.Options{DataDir: dataDir})).
 		With(dpedist.NewSource(dpedist.Options{})).

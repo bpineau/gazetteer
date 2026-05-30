@@ -25,6 +25,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `cartofriches`   | INSEE                                          | offline Cerema brownfields  |
 | `chomage`        | INSEE                                          | offline INSEE chômage ZE2020|
 | `delinquance`    | INSEE                                          | offline SSMSI État 4001     |
+| `cdsr`           | lat/lon                                        | offline IDF CDSR snapshot    |
 | `dpedist`        | INSEE                                          | data.ademe.fr values_agg API|
 | `dvf`            | INSEE or address + property_type (+ surface)   | data.gouv.fr Etalab DVF     |
 | `education`      | INSEE                                          | data.education.gouv.fr API  |
@@ -182,6 +183,21 @@ Lyon / Villeurbanne.
 - **Vintages**: Paris 2025, Lyon 2025-2026, Plaine Commune 2022, Est
   Ensemble 2023 (zonage 2022). Zone numbers are not unique across EPTs,
   so lookups are scoped by `(zone_source, zone)`.
+
+## `sources/cdsr`
+
+Proximity to Île-de-France condominiums labelled "en difficulté soutenue par
+la Région" (CDSR) — a small, curated, high-precision copro-risk red-flag.
+
+- **Needs**: lat/lon (the Source is purely spatial — no name matching).
+- **Result**: nearest labelled copro within `MaxNearestMeters` (3 km), counts
+  within 500 m and 3 km, and the nearby copros (name, address, commune, lot
+  count, label year, distance). `IsEmpty` (StatusOKEmpty) when none is in
+  range — the common, reassuring case.
+- **Coverage**: IDF only, intentionally sparse (the most severe,
+  region-intervened cases). Not gated on property type — a distressed copro
+  nearby is a neighbourhood signal for any property.
+- **Refresh**: from the region's Opendatasoft portal (`exports/json`).
 
 ## `sources/filosofi`
 
