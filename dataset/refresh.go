@@ -27,8 +27,11 @@ type RefreshOptions struct {
 	// $GAZETTEER_DATA_DIR > DefaultDir).
 	Dir string
 
-	// Force re-downloads every raw input even when a copy is already
-	// present, and always rebuilds the processed artifact.
+	// Force rebuilds every selected Set even when its processed artifact is
+	// already present and current in the datadir, re-downloading each raw
+	// input. When false (the default), a Set whose processed artifact is
+	// already current is skipped untouched — Refresh is idempotent, so it is
+	// cheap to call on every start (only the first run does work).
 	Force bool
 
 	// MaxRawBytes overrides the per-raw download ceiling. 0 uses
@@ -77,6 +80,11 @@ type SetResult struct {
 // the processed artifact, validates it, and persists raw + processed +
 // manifest into the datadir. It reuses the supplied httpx client for all
 // downloads (retries, rate-limiting, atomic streaming, sha256).
+//
+// Refresh is idempotent: by default a Set whose processed artifact is
+// already present and current in the datadir is skipped without touching the
+// network or disk, so callers can invoke it on every start and only pay for
+// the first run. Set RefreshOptions.Force to rebuild regardless.
 //
 // A single Set's failure never aborts the batch: every Set is attempted,
 // its outcome is recorded in the returned Report, and the returned error is
@@ -134,6 +142,19 @@ func refreshOne(ctx context.Context, c *httpx.Client, s Set, dir string, opts Re
 		res.Skipped, res.Reason = true, "read-only set (no Transform)"
 		opts.emit(Event{Source: s.Source, Phase: "skip", File: s.Processed.Name, Err: errors.New(res.Reason)})
 		return res
+	}
+
+	// Idempotency fast-path: when not forcing, a processed artifact already
+	// present and current in the datadir (a version-matched manifest entry,
+	// or a deliberately hand-placed file — i.e. Resolve would read it from
+	// the datadir) needs no work. This makes calling Refresh on every start
+	// cheap: only the first run downloads and builds.
+	if !opts.Force {
+		if origin, err := s.Resolve(dir); err == nil && origin == OriginDatadir {
+			res.Skipped, res.Reason = true, "already present"
+			opts.emit(Event{Source: s.Source, Phase: "skip", File: s.Processed.Name})
+			return res
+		}
 	}
 
 	maxBytes := opts.MaxRawBytes
