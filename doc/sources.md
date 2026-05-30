@@ -215,10 +215,13 @@ signal, complementing `encadrement` (legal cap) and `carteloyers` (model).
 - **Resolution**: INSEE → OLL zone (embedded commune→zone map) → the cell for
   the rooms bucket. Zone numbers join the rent table via
   `Zone_calcul = "L<agglo>.4."+zeropad2(zone)`.
-- **Scope (v1)**: the Paris-region perimeter "agglomération parisienne hors
-  Paris" (OLL code L7502 = petite/grande couronne), vintage 2024. Extensible to
-  more OLL agglomerations. Appartements only.
-- **Refresh**: from the observatory's per-agglo ZIP archive (ISO-8859-1 CSVs).
+- **Scope**: 17 major French agglomerations (Paris petite/grande couronne, Lyon,
+  Lille, Toulouse, Bordeaux, Nantes, Strasbourg, Montpellier, Grenoble, Rennes,
+  Nice, Clermont, Nancy, Tours, La Rochelle, Besançon, La Réunion), vintage
+  2024–2025. Paris intra-muros excluded (encadrement serves it). Appartements
+  only. Curated in `aggloSpecs`; extensible to more perimeters.
+- **Refresh**: one per-agglo ZIP archive each (heterogeneous CSV encodings and
+  column names; a malformed agglo is skipped, the rest still build).
 
 ## `sources/filosofi`
 
