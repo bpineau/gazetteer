@@ -41,6 +41,11 @@ func validateProcessed(name string, r io.Reader) error {
 		if len(v) == 0 {
 			return errors.New("json: empty document")
 		}
+		// Reject trailing content after the top-level value (a truncated or
+		// double-written transform output).
+		if err := dec.Decode(&json.RawMessage{}); !errors.Is(err, io.EOF) {
+			return errors.New("json: trailing data after top-level value")
+		}
 		return nil
 	case strings.HasSuffix(name, ".csv"):
 		cr := csv.NewReader(r)

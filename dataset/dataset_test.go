@@ -79,6 +79,22 @@ func TestOpen_VersionGate(t *testing.T) {
 	}
 }
 
+func TestOpen_CorruptManifestFallsBackToEmbed(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "foo.json"), `{"v":"datadir"}`)
+	// A garbage manifest must not sink the dataset: Open degrades to embed.
+	mustWrite(t, filepath.Join(dir, "foo.manifest.json"), `{ this is not json`)
+	s := Set{Source: "foo", Version: 1, Embed: embedFor("foo.json", `{"v":"embed"}`), Processed: File{Name: "foo.json"}}
+	if got := openString(t, s, dir); got != `{"v":"embed"}` {
+		t.Errorf("corrupt manifest: body = %q, want embed fallback", got)
+	}
+	// And Resolve reports embed, not an error.
+	if origin, err := s.Resolve(dir); err != nil || origin != OriginEmbed {
+		t.Errorf("Resolve = (%v, %v), want (embed, nil)", origin, err)
+	}
+}
+
 func TestOpen_Unavailable(t *testing.T) {
 	t.Parallel()
 	// No embed, nothing in datadir.

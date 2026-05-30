@@ -112,14 +112,20 @@ func (s Set) Open(dir string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	switch origin {
-	case OriginDatadir:
-		return os.Open(filepath.Join(dir, s.Processed.Name)) //nolint:gosec // datadir-joined clean basename
-	case OriginEmbed:
-		return s.Embed.Open(path.Join(embedDataDir, s.Processed.Name))
-	default:
-		return nil, fmt.Errorf("%s: %w", s.Source, ErrUnavailable)
+	if origin == OriginDatadir {
+		if f, err := os.Open(filepath.Join(dir, s.Processed.Name)); err == nil { //nolint:gosec // datadir-joined clean basename
+			return f, nil
+		}
+		// The datadir copy was selected but is unreadable (races a delete,
+		// permissions, …). Degrade to the embedded copy rather than fail:
+		// a transient datadir problem must never sink an embedded dataset.
 	}
+	if s.Embed != nil {
+		if f, err := s.Embed.Open(path.Join(embedDataDir, s.Processed.Name)); err == nil {
+			return f, nil
+		}
+	}
+	return nil, fmt.Errorf("%s: %w", s.Source, ErrUnavailable)
 }
 
 // Origin identifies where Open resolves a Set's processed artifact from.
@@ -153,14 +159,8 @@ func (s Set) Resolve(dir string) (Origin, error) {
 	if err := s.check(); err != nil {
 		return OriginNone, err
 	}
-	if dir != "" && isFile(filepath.Join(dir, s.Processed.Name)) {
-		use, err := s.datadirUsable(dir)
-		if err != nil {
-			return OriginNone, err
-		}
-		if use {
-			return OriginDatadir, nil
-		}
+	if dir != "" && isFile(filepath.Join(dir, s.Processed.Name)) && s.datadirUsable(dir) {
+		return OriginDatadir, nil
 	}
 	if s.Embed != nil {
 		if f, err := s.Embed.Open(path.Join(embedDataDir, s.Processed.Name)); err == nil {
@@ -173,18 +173,23 @@ func (s Set) Resolve(dir string) (Origin, error) {
 
 // datadirUsable reports whether the datadir processed file should be used,
 // given the manifest gate described on Open.
-func (s Set) datadirUsable(dir string) (bool, error) {
+//
+// A manifest that cannot be read or parsed is treated as "do not trust the
+// datadir copy" → false, so the caller degrades to the embedded copy rather
+// than failing. (A corrupt manifest must never sink an otherwise-fine
+// dataset; `refresh` rewrites it.)
+func (s Set) datadirUsable(dir string) bool {
 	m, err := readManifest(dir, s.Source)
 	if err != nil {
-		return false, err
+		return false
 	}
 	entry, ok := m.entry(s.Processed.Name)
 	if !ok {
 		// No manifest, or the file is not tracked: a hand-placed file the
 		// operator dropped in deliberately. Honour it.
-		return true, nil
+		return true
 	}
-	return entry.SourceVersion == s.Version, nil
+	return entry.SourceVersion == s.Version
 }
 
 // check validates the Set's invariants. It is cheap and called on every

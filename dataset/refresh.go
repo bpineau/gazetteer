@@ -67,6 +67,7 @@ type SetResult struct {
 	Raw       []httpx.DownloadResult // one per raw input, in declaration order
 	SHA256    string                 // of the processed artifact (when (re)built)
 	Bytes     int64                  // of the processed artifact
+	Embedded  bool                   // the owning Set ships an embedded fallback
 	Skipped   bool                   // no Transform, or already current and !Force
 	Reason    string                 // why it was skipped, when Skipped
 	Err       error
@@ -84,6 +85,9 @@ type SetResult struct {
 func Refresh(ctx context.Context, c *httpx.Client, sets []Set, opts RefreshOptions) (Report, error) {
 	if c == nil {
 		return nil, errors.New("dataset: Refresh requires a non-nil httpx client")
+	}
+	if err := checkNoCollisions(sets); err != nil {
+		return nil, err
 	}
 	dir, err := ResolveDir(opts.Dir)
 	if err != nil {
@@ -105,8 +109,23 @@ func Refresh(ctx context.Context, c *httpx.Client, sets []Set, opts RefreshOptio
 	return report, errors.Join(errs...)
 }
 
+// checkNoCollisions rejects a batch in which two Sets would write the same
+// flat-datadir processed filename — they would clobber each other (and the
+// per-source manifests could not even tell them apart). Names are expected
+// to be globally unique (source-prefixed by convention).
+func checkNoCollisions(sets []Set) error {
+	seen := make(map[string]string, len(sets))
+	for _, s := range sets {
+		if prev, ok := seen[s.Processed.Name]; ok {
+			return fmt.Errorf("dataset: processed file %q declared by both %q and %q", s.Processed.Name, prev, s.Source)
+		}
+		seen[s.Processed.Name] = s.Source
+	}
+	return nil
+}
+
 func refreshOne(ctx context.Context, c *httpx.Client, s Set, dir string, opts RefreshOptions) SetResult {
-	res := SetResult{Source: s.Source, Processed: s.Processed.Name}
+	res := SetResult{Source: s.Source, Processed: s.Processed.Name, Embedded: s.Embed != nil}
 	if err := s.check(); err != nil {
 		res.Err = err
 		return res
