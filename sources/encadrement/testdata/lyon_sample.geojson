@@ -1,0 +1,565 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "codeiris": 692660101,
+    "zonage": 4,
+    "valeurs": {
+     "1": {
+      "1946-1970": {
+       "meuble": {
+        "loyer_reference": 17.6,
+        "majoration_unitaire": 2,
+        "loyer_reference_majore": 21.1,
+        "loyer_reference_minore": 12.3
+       },
+       "non meuble": {
+        "loyer_reference": 15.6,
+        "loyer_reference_majore": 18.7,
+        "loyer_reference_minore": 10.9
+       }
+      },
+      "1971-1990": {
+       "meuble": {
+        "loyer_reference": 17.5,
+        "majoration_unitaire": 2,
+        "loyer_reference_majore": 21,
+        "loyer_reference_minore": 12.3
+       },
+       "non meuble": {
+        "loyer_reference": 15.5,
+        "loyer_reference_majore": 18.6,
+        "loyer_reference_minore": 10.9
+       }
+      },
+      "1991-2005": {
+       "meuble": {
+        "loyer_reference": 19.9,
+        "majoration_unitaire": 2.3,
+        "loyer_reference_majore": 23.9,
+        "loyer_reference_minore": 13.9
+       },
+       "non meuble": {
+        "loyer_reference": 17.6,
+        "loyer_reference_majore": 21.1,
+        "loyer_reference_minore": 12.3
+       }
+      },
+      "avant 1946": {
+       "meuble": {
+        "loyer_reference": 18.1,
+        "majoration_unitaire": 2.1,
+        "loyer_reference_majore": 21.7,
+        "loyer_reference_minore": 12.7
+       },
+       "non meuble": {
+        "loyer_reference": 16,
+        "loyer_reference_majore": 19.2,
+        "loyer_reference_minore": 11.2
+       }
+      },
+      "après 2005": {
+       "meuble": {
+        "loyer_reference": 17.6,
+        "majoration_unitaire": 2,
+        "loyer_reference_majore": 21.1,
+        "loyer_reference_minore": 12.3
+       },
+       "non meuble": {
+        "loyer_reference": 15.6,
+        "loyer_reference_majore": 18.7,
+        "loyer_reference_minore": 10.9
+       }
+      }
+     },
+     "2": {
+      "1946-1970": {
+       "meuble": {
+        "loyer_reference": 14.9,
+        "majoration_unitaire": 1.7000000000000002,
+        "loyer_reference_majore": 17.9,
+        "loyer_reference_minore": 10.4
+       },
+       "non meuble": {
+        "loyer_reference": 13.2,
+        "loyer_reference_majore": 15.8,
+        "loyer_reference_minore": 9.2
+       }
+      },
+      "1971-1990": {
+       "meuble": {
+        "loyer_reference": 14.6,
+        "majoration_unitaire": 1.7000000000000002,
+        "loyer_reference_majore": 17.5,
+        "loyer_reference_minore": 10.2
+       },
+       "non meuble": {
+        "loyer_reference": 12.9,
+        "loyer_reference_majore": 15.5,
+        "loyer_reference_minore": 9
+       }
+      },
+      "1991-2005": {
+       "meuble": {
+        "loyer_reference": 15.7,
+        "majoration_unitaire": 1.8,
+        "loyer_reference_majore": 18.8,
+        "loyer_reference_minore": 11
+       },
+       "non meuble": {
+        "loyer_reference": 13.9,
+        "loyer_reference_majore": 16.7,
+        "loyer_reference_minore": 9.7
+       }
+      },
+      "avant 1946": {
+       "meuble": {
+        "loyer_reference": 15.1,
+        "majoration_unitaire": 1.7000000000000002,
+        "loyer_reference_majore": 18.1,
+        "loyer_reference_minore": 10.6
+       },
+       "non meuble": {
+        "loyer_reference": 13.4,
+        "loyer_reference_majore": 16.1,
+        "loyer_reference_minore": 9.4
+       }
+      },
+      "après 2005": {
+       "meuble": {
+        "loyer_reference": 16.4,
+        "majoration_unitaire": 1.9,
+        "loyer_reference_majore": 19.7,
+        "loyer_reference_minore": 11.5
+       },
+       "non meuble": {
+        "loyer_reference": 14.5,
+        "loyer_reference_majore": 17.4,
+        "loyer_reference_minore": 10.2
+       }
+      }
+     },
+     "3": {
+      "1946-1970": {
+       "meuble": {
+        "loyer_reference": 12.3,
+        "majoration_unitaire": 1.4,
+        "loyer_reference_majore": 14.8,
+        "loyer_reference_minore": 8.6
+       },
+       "non meuble": {
+        "loyer_reference": 10.9,
+        "loyer_reference_majore": 13.1,
+        "loyer_reference_minore": 7.6
+       }
+      },
+      "1971-1990": {
+       "meuble": {
+        "loyer_reference": 12.2,
+        "majoration_unitaire": 1.4,
+        "loyer_reference_majore": 14.6,
+        "loyer_reference_minore": 8.5
+       },
+       "non meuble": {
+        "loyer_reference": 10.8,
+        "loyer_reference_majore": 13,
+        "loyer_reference_minore": 7.6
+       }
+      },
+      "1991-2005": {
+       "meuble": {
+        "loyer_reference": 13.4,
+        "majoration_unitaire": 1.5,
+        "loyer_reference_majore": 16.1,
+        "loyer_reference_minore": 9.4
+       },
+       "non meuble": {
+        "loyer_reference": 11.9,
+        "loyer_reference_majore": 14.3,
+        "loyer_reference_minore": 8.3
+       }
+      },
+      "avant 1946": {
+       "meuble": {
+        "loyer_reference": 13.1,
+        "majoration_unitaire": 1.5,
+        "loyer_reference_majore": 15.7,
+        "loyer_reference_minore": 9.2
+       },
+       "non meuble": {
+        "loyer_reference": 11.6,
+        "loyer_reference_majore": 13.9,
+        "loyer_reference_minore": 8.1
+       }
+      },
+      "après 2005": {
+       "meuble": {
+        "loyer_reference": 14.2,
+        "majoration_unitaire": 1.6,
+        "loyer_reference_majore": 17,
+        "loyer_reference_minore": 9.9
+       },
+       "non meuble": {
+        "loyer_reference": 12.6,
+        "loyer_reference_majore": 15.1,
+        "loyer_reference_minore": 8.8
+       }
+      }
+     },
+     "4 et plus": {
+      "1946-1970": {
+       "meuble": {
+        "loyer_reference": 11.3,
+        "majoration_unitaire": 1.3,
+        "loyer_reference_majore": 13.6,
+        "loyer_reference_minore": 7.9
+       },
+       "non meuble": {
+        "loyer_reference": 10,
+        "loyer_reference_majore": 12,
+        "loyer_reference_minore": 7
+       }
+      },
+      "1971-1990": {
+       "meuble": {
+        "loyer_reference": 12.1,
+        "majoration_unitaire": 1.4,
+        "loyer_reference_majore": 14.5,
+        "loyer_reference_minore": 8.5
+       },
+       "non meuble": {
+        "loyer_reference": 10.7,
+        "loyer_reference_majore": 12.8,
+        "loyer_reference_minore": 7.5
+       }
+      },
+      "1991-2005": {
+       "meuble": {
+        "loyer_reference": 13,
+        "majoration_unitaire": 1.5,
+        "loyer_reference_majore": 15.6,
+        "loyer_reference_minore": 9.1
+       },
+       "non meuble": {
+        "loyer_reference": 11.5,
+        "loyer_reference_majore": 13.8,
+        "loyer_reference_minore": 8.1
+       }
+      },
+      "avant 1946": {
+       "meuble": {
+        "loyer_reference": 12.9,
+        "majoration_unitaire": 1.5,
+        "loyer_reference_majore": 15.5,
+        "loyer_reference_minore": 9
+       },
+       "non meuble": {
+        "loyer_reference": 11.4,
+        "loyer_reference_majore": 13.7,
+        "loyer_reference_minore": 8
+       }
+      },
+      "après 2005": {
+       "meuble": {
+        "loyer_reference": 12.9,
+        "majoration_unitaire": 1.5,
+        "loyer_reference_majore": 15.5,
+        "loyer_reference_minore": 9
+       },
+       "non meuble": {
+        "loyer_reference": 11.4,
+        "loyer_reference_majore": 13.7,
+        "loyer_reference_minore": 8
+       }
+      }
+     }
+    },
+    "commune": "Villeurbanne",
+    "insee": "69266",
+    "gid": 1299
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "codeiris": 693810101,
+    "zonage": 1,
+    "valeurs": {
+     "1": {
+      "1946-1970": {
+       "meuble": {
+        "loyer_reference": 19.7,
+        "majoration_unitaire": 2.3,
+        "loyer_reference_majore": 23.6,
+        "loyer_reference_minore": 13.8
+       },
+       "non meuble": {
+        "loyer_reference": 17.4,
+        "loyer_reference_majore": 20.9,
+        "loyer_reference_minore": 12.2
+       }
+      },
+      "1971-1990": {
+       "meuble": {
+        "loyer_reference": 21.6,
+        "majoration_unitaire": 2.5,
+        "loyer_reference_majore": 25.9,
+        "loyer_reference_minore": 15.1
+       },
+       "non meuble": {
+        "loyer_reference": 19.1,
+        "loyer_reference_majore": 22.9,
+        "loyer_reference_minore": 13.4
+       }
+      },
+      "1991-2005": {
+       "meuble": {
+        "loyer_reference": 21.4,
+        "majoration_unitaire": 2.5,
+        "loyer_reference_majore": 25.7,
+        "loyer_reference_minore": 15
+       },
+       "non meuble": {
+        "loyer_reference": 18.9,
+        "loyer_reference_majore": 22.7,
+        "loyer_reference_minore": 13.2
+       }
+      },
+      "avant 1946": {
+       "meuble": {
+        "loyer_reference": 19.8,
+        "majoration_unitaire": 2.3,
+        "loyer_reference_majore": 23.8,
+        "loyer_reference_minore": 13.9
+       },
+       "non meuble": {
+        "loyer_reference": 17.5,
+        "loyer_reference_majore": 21,
+        "loyer_reference_minore": 12.3
+       }
+      },
+      "après 2005": {
+       "meuble": {
+        "loyer_reference": 21.6,
+        "majoration_unitaire": 2.5,
+        "loyer_reference_majore": 25.9,
+        "loyer_reference_minore": 15.1
+       },
+       "non meuble": {
+        "loyer_reference": 19.1,
+        "loyer_reference_majore": 22.9,
+        "loyer_reference_minore": 13.4
+       }
+      }
+     },
+     "2": {
+      "1946-1970": {
+       "meuble": {
+        "loyer_reference": 15.4,
+        "majoration_unitaire": 1.8,
+        "loyer_reference_majore": 18.5,
+        "loyer_reference_minore": 10.8
+       },
+       "non meuble": {
+        "loyer_reference": 13.6,
+        "loyer_reference_majore": 16.3,
+        "loyer_reference_minore": 9.5
+       }
+      },
+      "1971-1990": {
+       "meuble": {
+        "loyer_reference": 16.7,
+        "majoration_unitaire": 1.9,
+        "loyer_reference_majore": 20,
+        "loyer_reference_minore": 11.7
+       },
+       "non meuble": {
+        "loyer_reference": 14.8,
+        "loyer_reference_majore": 17.8,
+        "loyer_reference_minore": 10.4
+       }
+      },
+      "1991-2005": {
+       "meuble": {
+        "loyer_reference": 17.4,
+        "majoration_unitaire": 2,
+        "loyer_reference_majore": 20.9,
+        "loyer_reference_minore": 12.2
+       },
+       "non meuble": {
+        "loyer_reference": 15.4,
+        "loyer_reference_majore": 18.5,
+        "loyer_reference_minore": 10.8
+       }
+      },
+      "avant 1946": {
+       "meuble": {
+        "loyer_reference": 17,
+        "majoration_unitaire": 2,
+        "loyer_reference_majore": 20.4,
+        "loyer_reference_minore": 11.9
+       },
+       "non meuble": {
+        "loyer_reference": 15,
+        "loyer_reference_majore": 18,
+        "loyer_reference_minore": 10.5
+       }
+      },
+      "après 2005": {
+       "meuble": {
+        "loyer_reference": 17.9,
+        "majoration_unitaire": 2.1,
+        "loyer_reference_majore": 21.5,
+        "loyer_reference_minore": 12.5
+       },
+       "non meuble": {
+        "loyer_reference": 15.8,
+        "loyer_reference_majore": 19,
+        "loyer_reference_minore": 11.1
+       }
+      }
+     },
+     "3": {
+      "1946-1970": {
+       "meuble": {
+        "loyer_reference": 14.2,
+        "majoration_unitaire": 1.6,
+        "loyer_reference_majore": 17,
+        "loyer_reference_minore": 9.9
+       },
+       "non meuble": {
+        "loyer_reference": 12.6,
+        "loyer_reference_majore": 15.1,
+        "loyer_reference_minore": 8.8
+       }
+      },
+      "1971-1990": {
+       "meuble": {
+        "loyer_reference": 15.4,
+        "majoration_unitaire": 1.8,
+        "loyer_reference_majore": 18.5,
+        "loyer_reference_minore": 10.8
+       },
+       "non meuble": {
+        "loyer_reference": 13.6,
+        "loyer_reference_majore": 16.3,
+        "loyer_reference_minore": 9.5
+       }
+      },
+      "1991-2005": {
+       "meuble": {
+        "loyer_reference": 15.3,
+        "majoration_unitaire": 1.8,
+        "loyer_reference_majore": 18.4,
+        "loyer_reference_minore": 10.7
+       },
+       "non meuble": {
+        "loyer_reference": 13.5,
+        "loyer_reference_majore": 16.2,
+        "loyer_reference_minore": 9.5
+       }
+      },
+      "avant 1946": {
+       "meuble": {
+        "loyer_reference": 14.9,
+        "majoration_unitaire": 1.7000000000000002,
+        "loyer_reference_majore": 17.9,
+        "loyer_reference_minore": 10.4
+       },
+       "non meuble": {
+        "loyer_reference": 13.2,
+        "loyer_reference_majore": 15.8,
+        "loyer_reference_minore": 9.2
+       }
+      },
+      "après 2005": {
+       "meuble": {
+        "loyer_reference": 15.4,
+        "majoration_unitaire": 1.8,
+        "loyer_reference_majore": 18.5,
+        "loyer_reference_minore": 10.8
+       },
+       "non meuble": {
+        "loyer_reference": 13.6,
+        "loyer_reference_majore": 16.3,
+        "loyer_reference_minore": 9.5
+       }
+      }
+     },
+     "4 et plus": {
+      "1946-1970": {
+       "meuble": {
+        "loyer_reference": 13.3,
+        "majoration_unitaire": 1.5,
+        "loyer_reference_majore": 16,
+        "loyer_reference_minore": 9.3
+       },
+       "non meuble": {
+        "loyer_reference": 11.8,
+        "loyer_reference_majore": 14.2,
+        "loyer_reference_minore": 8.3
+       }
+      },
+      "1971-1990": {
+       "meuble": {
+        "loyer_reference": 13.7,
+        "majoration_unitaire": 1.6,
+        "loyer_reference_majore": 16.4,
+        "loyer_reference_minore": 9.6
+       },
+       "non meuble": {
+        "loyer_reference": 12.1,
+        "loyer_reference_majore": 14.5,
+        "loyer_reference_minore": 8.5
+       }
+      },
+      "1991-2005": {
+       "meuble": {
+        "loyer_reference": 14.8,
+        "majoration_unitaire": 1.7000000000000002,
+        "loyer_reference_majore": 17.8,
+        "loyer_reference_minore": 10.4
+       },
+       "non meuble": {
+        "loyer_reference": 13.1,
+        "loyer_reference_majore": 15.7,
+        "loyer_reference_minore": 9.2
+       }
+      },
+      "avant 1946": {
+       "meuble": {
+        "loyer_reference": 13.9,
+        "majoration_unitaire": 1.6,
+        "loyer_reference_majore": 16.7,
+        "loyer_reference_minore": 9.7
+       },
+       "non meuble": {
+        "loyer_reference": 12.3,
+        "loyer_reference_majore": 14.8,
+        "loyer_reference_minore": 8.6
+       }
+      },
+      "après 2005": {
+       "meuble": {
+        "loyer_reference": 14.8,
+        "majoration_unitaire": 1.7000000000000002,
+        "loyer_reference_majore": 17.8,
+        "loyer_reference_minore": 10.4
+       },
+       "non meuble": {
+        "loyer_reference": 13.1,
+        "loyer_reference_majore": 15.7,
+        "loyer_reference_minore": 9.2
+       }
+      }
+     }
+    },
+    "commune": "Lyon 1er Arrondissement",
+    "insee": "69381",
+    "gid": 1347
+   }
+  }
+ ]
+}
