@@ -16,14 +16,16 @@ import (
 //go:embed data/vacance_communes.csv
 var embedFS embed.FS
 
-// set binds the embedded extract to the datadir/refresh pipeline. The
-// Transform is not yet reconstructed, so the Set is read-only: Open
-// resolves datadir > embed, and refresh reports it as skipped.
+// set binds the embedded extract to the datadir/refresh pipeline. Refresh
+// downloads the upstream LOVAC communal CSV and rebuilds the compact CSV.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
 	Processed: dataset.File{Name: "vacance_communes.csv"},
+	Raw:       []dataset.File{{Name: rawCSVName, URL: rawCSVURL}},
+	Transform: transform,
+	Validate:  validate,
 }
 
 // Entry captures the LOVAC-derived taux de logements vacants for one
