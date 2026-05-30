@@ -88,7 +88,7 @@ Market data:
 | `dvf`          | Demandes de Valeurs Foncières — historical transaction prices    |
 | `locservice`   | Rental market reference data (tension, médiane €/m²)             |
 | `carteloyers`  | National rent observatory tiers                                  |
-| `encadrement`  | Rent control zones (Paris, Lille, Lyon, etc.)                    |
+| `encadrement`  | Rent control caps (Paris, Plaine Commune + Est Ensemble 93, Lyon) |
 | `vacance`      | Vacancy taxation status by commune                               |
 | `taxefonciere` | Property tax ratios by commune                                   |
 
