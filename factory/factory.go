@@ -47,6 +47,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/georisques"
 	"github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/locservice"
+	"github.com/bpineau/gazetteer/sources/oll"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/qpv"
 	"github.com/bpineau/gazetteer/sources/rpls"
@@ -156,6 +157,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(cadastre.NewSource(cadastre.Options{Geocoder: ban})).
 		With(georisques.NewSource(georisques.Options{Geocoder: ban})).
 		With(locservice.NewSource(locservice.Options{Geocoder: ban})).
+		With(oll.NewSource(oll.Options{DataDir: dataDir})).
 		With(carteloyers.NewSource(carteloyers.Options{DataDir: dataDir})).
 		With(cartofriches.NewSource(cartofriches.Options{DataDir: dataDir})).
 		With(cdsr.NewSource(cdsr.Options{DataDir: dataDir})).

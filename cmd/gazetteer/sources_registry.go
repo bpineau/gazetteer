@@ -23,6 +23,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/georisques"
 	"github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/locservice"
+	"github.com/bpineau/gazetteer/sources/oll"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/qpv"
 	"github.com/bpineau/gazetteer/sources/rpls"
@@ -125,6 +126,13 @@ func sourceCatalog() []sourceFactory {
 			Default: true,
 			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
 				return carteloyers.NewSource(carteloyers.Options{DataDir: d.DataDir}), nil
+			},
+		},
+		{
+			Name:    oll.Name,
+			Default: true,
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return oll.NewSource(oll.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{
