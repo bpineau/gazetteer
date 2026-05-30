@@ -9,14 +9,22 @@ import (
 	"testing"
 )
 
-type fixtureRawSet struct{ path string }
+// fixtureRawSet serves a single ZIP for one agglo's raw name and reports the
+// others absent, so the tolerant transform yields exactly that agglo.
+type fixtureRawSet struct{ name, path string }
 
-func (f fixtureRawSet) Open(string) (io.ReadCloser, error) { return os.Open(f.path) }
+func (f fixtureRawSet) Open(name string) (io.ReadCloser, error) {
+	if name != f.name {
+		return nil, os.ErrNotExist
+	}
+	return os.Open(f.path)
+}
 
 func TestTransform_Golden(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	if err := transform(context.Background(), fixtureRawSet{"testdata/oll_l7502_sample.zip"}, &buf); err != nil {
+	fx := fixtureRawSet{name: aggloSpecs[0].rawName(), path: "testdata/oll_l7502_sample.zip"}
+	if err := transform(context.Background(), fx, &buf); err != nil {
 		t.Fatalf("transform: %v", err)
 	}
 	if err := validate(bytes.NewReader(buf.Bytes())); err != nil {

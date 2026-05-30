@@ -11,19 +11,29 @@ import (
 	"github.com/bpineau/gazetteer/dataset"
 )
 
-//go:embed data/oll_idf.json
+//go:embed data/oll.json
 var embedFS embed.FS
 
-// set binds the embedded snapshot to its upstream per-agglo archive so the
-// datadir override and refresh tooling operate on it.
+// set binds the embedded snapshot to its upstream per-agglo archives (one raw
+// per OLL agglomeration) so the datadir override and refresh tooling operate on
+// it.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
-	Processed: dataset.File{Name: "oll_idf.json"},
-	Raw:       []dataset.File{{Name: rawL7502Name, URL: rawL7502URL}},
+	Processed: dataset.File{Name: "oll.json"},
+	Raw:       aggloRawFiles(),
 	Transform: transform,
 	Validate:  validate,
+}
+
+// aggloRawFiles lists one raw archive per configured agglomeration.
+func aggloRawFiles() []dataset.File {
+	out := make([]dataset.File, 0, len(aggloSpecs))
+	for _, s := range aggloSpecs {
+		out = append(out, dataset.File{Name: s.rawName(), URL: s.url()})
+	}
+	return out
 }
 
 // processed is the embedded artifact: one entry per OLL agglomeration covered.

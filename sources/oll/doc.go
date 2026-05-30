@@ -4,11 +4,13 @@
 // national model), OLL publishes rents actually observed in the field, so it is
 // the most representative "what does this let for?" signal.
 //
-// Scope (v1): the Paris-region observatory perimeter "agglomération parisienne
-// hors Paris" (OLL code L7502) — the petite/grande-couronne communes around
-// Paris, which is the priority zone for a banlieue investor. The design is
-// extensible: more OLL agglomerations are added by listing their per-agglo
-// archive in the transform.
+// Scope: the major French agglomerations covered by the OLL network — the Paris
+// petite/grande couronne ("agglomération parisienne hors Paris", L7502), Lyon,
+// Lille, Toulouse, Bordeaux, Nantes, Strasbourg, Montpellier, Grenoble, Rennes,
+// Nice, Clermont-Ferrand, Nancy, Tours, La Rochelle, Besançon and La Réunion.
+// Paris intra-muros is intentionally excluded (its finer OLL zone layout doesn't
+// fit the join, and encadrement serves Paris rents). The set is curated in
+// aggloSpecs; extend it (and re-run refresh) to cover more perimeters.
 //
 // Resolution: the listing's INSEE commune maps to an OLL zone (the observatory
 // splits its perimeter into a handful of geographic zones), then the Source
