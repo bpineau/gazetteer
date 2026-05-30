@@ -5,12 +5,21 @@ first; it is written to be ingested in one shot. Deeper references live in
 [`docs/`](docs/). Everything here is kept honest by tests — if a fact below is
 wrong, that's a bug.
 
-## What this is
+## What this is — the data is the product
 
-`gazetteer` is a Go library that, given a French address, compiles geographic
-and real-estate data from ~30 sources and synthesises it into a yield-first
-"is this a good rental-investment zone?" score. There is also a CLI
-(`cmd/gazetteer`) that is the fastest way to explore it.
+`gazetteer` is a Go library that, given a French address, brings back **rich,
+typed, well-extracted data across every dimension that matters when an investor
+evaluates a property** — price, rents, rental demand, tenant solvency, taxes,
+safety, transport, hazards, building quality, the social/regulatory context, and
+more. Each dimension comes from a dedicated `Source` as a **fully-typed `Result`
+with documented, unit-bearing fields**. That typed data *is* the point.
+
+An optional, thin convenience layer sits on top — `appraisal.*` consolidates a
+few dimensions (price/rent/hazard) and `appraisal/zonescore` composites them
+into a 0–100 score. Treat it as a sample high-level API, not the goal: most
+callers want the underlying Results, not the score.
+
+A CLI (`cmd/gazetteer`) is the fastest way to explore the data.
 
 ## 30-second mental model
 
@@ -18,24 +27,47 @@ and real-estate data from ~30 sources and synthesises it into a yield-first
 Listing (address + property attrs)
    │  client.Normalize()  → fills INSEE, Lat/Lon, IRIS from free text
    ▼
-Sources run in parallel (each is independent, offline or live HTTP)
+Sources run in parallel (each independent, offline or live HTTP)
    ▼
-Dossier  = map[name]Result   (one typed Result per source)
-   ▼
-appraisal.PricePerM2 / RentValue / HazardProfile   (consolidation)
-   ▼
-appraisal/zonescore.Compute  → 0–100 score, 6 weighted axes, --profile presets
+Dossier  = map[name]Result   ← THE PRODUCT: one typed Result per dimension
+   ▼ (optional convenience layer)
+appraisal.PricePerM2 / RentValue / HazardProfile  ·  zonescore.Compute → score
 ```
 
 ```go
 client, _ := factory.NewDefault(ctx)               // wires every stable source
 listing, _ := client.Normalize(ctx, "12 rue X, 93100 Montreuil")
 dossier := client.Collect(ctx, listing)            // runs all sources in parallel
+
+// Pull the typed data you care about — this is the main use of the lib:
 if r, ok := gazetteer.Get[*dvf.Result](dossier, dvf.Name); ok && !r.IsEmpty() {
-    // r is *dvf.Result — fully typed
+    // r is *dvf.Result; every field is documented with its unit (see godoc)
 }
-score := zonescore.Compute(dossier)                // the decision tool
+
+// Optional: the convenience synthesis layer on top.
+score := zonescore.Compute(dossier)
 ```
+
+## The data is the point — discovering Result types + field meanings
+
+Most of your work here is "which source gives dimension X, and what does each
+field mean (units!)". The answers, easiest first:
+
+1. **`gazetteer sources catalog --json`** (or `docs/sources.json`) — every
+   source's summary, required inputs, coverage, the dimension it covers, and its
+   `result_schema` (field names). Start here to pick a source.
+2. **`go doc github.com/bpineau/gazetteer/sources/<name> Result`** — the
+   authoritative field-by-field meaning **with units**. Every `Result` field
+   carries a godoc comment (e.g. DVF prices are `…Cents` integers, OLL rent is
+   `€/m²/month`, shares are `%`). This is the canonical data dictionary.
+3. **`gazetteer sources doc <name>`** — the Result's JSON shape (field names +
+   zero values) for a quick wire-format glance.
+4. [docs/sources.md](docs/sources.md) — prose: what each source provides and the
+   key Result fields.
+
+Convention you can rely on: **units live in the field name or its godoc** — cents
+vs euros, €/m² vs €/m²/month, % , metres, counts. When in doubt, read the field's
+godoc; never guess a unit.
 
 ## The uniform Source contract — learn one, know all
 
@@ -108,17 +140,19 @@ empty, the usual cause is a **missing input** or **out-of-coverage** address.
   education, ademe, cadastre). Offline sources are instant. DVF is the usual
   culprit; it's already optimised (section prefilter + `dvf.HostRateLimits()`).
 
-## The decision layer (appraisal + zonescore)
+## Optional convenience layer (appraisal + zonescore)
 
-- `appraisal.PricePerM2`, `RentValue`, `HazardProfile` consolidate across sources
-  (a source opts in by implementing `appraisal.PriceEstimator` / `RentEstimator`
-  / `HazardReporter`).
+Sits on top of the Dossier; **skip it if you just want the data**. A sample
+high-level API, not the project's purpose.
+
+- `appraisal.PricePerM2`, `RentValue`, `HazardProfile` consolidate a few
+  dimensions across sources (a source opts in by implementing
+  `appraisal.PriceEstimator` / `RentEstimator` / `HazardReporter`).
 - `appraisal/zonescore.Compute(dossier, opts…)` → a 0–100 score over 6 axes
-  (rendement, tension, solvabilité, sécurité, fiscalité, accès).
-  `zonescore.Compare(...)` ranks several addresses.
-- **Weight presets**: `zonescore.Personas` (`yield` default / `balanced` /
-  `patrimoine` / `transport`), selectable via the CLI `--profile`. The catalog's
-  `feeds` field says which source drives which axis.
+  (rendement, tension, solvabilité, sécurité, fiscalité, accès);
+  `zonescore.Compare(...)` ranks several addresses; weight presets via
+  `zonescore.Personas` / the CLI `--profile`. The catalog's `feeds` field says
+  which source drives which axis.
 
 ## Adding a new Source (checklist)
 

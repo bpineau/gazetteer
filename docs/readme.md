@@ -1,10 +1,13 @@
 # gazetteer — documentation
 
-`gazetteer` is a Go library that compiles geographic and real-estate
-data about French addresses from a configurable set of upstream sources.
-Given a free-text address (or a fully populated `Listing`), it queries
-every configured `Source` in parallel and returns a typed `Dossier`
-aggregating every result.
+`gazetteer` brings back rich, typed, well-extracted data about a French address
+across every dimension that matters when evaluating a property as an investment
+(price, rents, demand, solvency, taxes, safety, transport, hazards, building
+quality, social/regulatory context, …). Each dimension is a `Source` returning a
+fully-typed `Result`; `Client.Collect` runs them in parallel into a `Dossier`.
+**That typed data is the point** — the `appraisal`/`zonescore` score on top is an
+optional convenience layer. For the per-source data dictionary see
+[sources.md](sources.md) and the per-source `go doc`.
 
 This directory hosts the long-form reference docs that complement the
 godoc found via `go doc github.com/bpineau/gazetteer/...`.
