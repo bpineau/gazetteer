@@ -22,8 +22,12 @@ the seven types below covers ~95 % of day-to-day use.
    and collects them into a `Dossier`.
 
 `appraisal.PricePerM2`, `appraisal.RentValue` and `appraisal.HazardProfile`
-then run secondary synthesis over the Dossier — see the appraisal
-godoc.
+then run secondary synthesis over the Dossier — see the appraisal godoc.
+On top of those, `appraisal/zonescore` folds the whole Dossier into a single
+yield-first 0–100 zone score with an explainable per-axis breakdown and
+selectable weight presets; `zonescore.Compute` scores one address and
+`zonescore.Compare` ranks several. The CLI surfaces both via `appraise` and
+`compare`.
 
 ## Types
 

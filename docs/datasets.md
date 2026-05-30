@@ -120,10 +120,11 @@ and a `Transform`, with an offline golden test. The transforms were validated
 end-to-end against the live upstream: each reproduces (or knowingly
 supersedes, when the upstream has a newer vintage) its committed artifact.
 
-`gazetteer refresh --list` shows `refreshable: yes` for all 22 artifacts
-across the 16 block sources. The upstream resource URLs and dataset vintages
-are pinned in each source's `transform.go`; bump them (and re-commit the
-embedded data via `--go-embed-update`) when a new edition ships.
+`gazetteer refresh --list` shows `refreshable: yes` for every block-dataset
+artifact (~33 artifacts across ~24 block sources, and growing). The upstream
+resource URLs and dataset vintages are pinned in each source's `transform.go`;
+bump them (and re-commit the embedded data via `--go-embed-update`) when a new
+edition ships.
 
 Reading an xlsx upstream (`chomage`) pulls in `github.com/xuri/excelize/v2`;
 every other transform uses only the standard library plus the project HTTP
