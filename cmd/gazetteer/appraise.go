@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/bpineau/gazetteer/appraisal"
+	"github.com/bpineau/gazetteer/appraisal/zonescore"
 	"github.com/bpineau/gazetteer/gazetteer"
 )
 
@@ -29,20 +30,23 @@ func runAppraise(ctx context.Context, args []string) error {
 	price := appraisal.PricePerM2(dossier)
 	rent := appraisal.RentValue(dossier)
 	hazard := appraisal.HazardProfile(dossier)
+	score := zonescore.Compute(dossier)
 
 	if q.jsonOut {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(appraisalEnvelope{
-			Dossier: dossier,
-			Price:   price,
-			Rent:    rent,
-			Hazard:  hazard,
+			Dossier:   dossier,
+			Price:     price,
+			Rent:      rent,
+			Hazard:    hazard,
+			ZoneScore: score,
 		})
 	}
 	printDossierSummary(os.Stdout, dossier)
 	fmt.Fprintln(os.Stdout)
 	printAppraisal(os.Stdout, price, rent, hazard)
+	printZoneScore(os.Stdout, score)
 	return nil
 }
 
@@ -50,10 +54,11 @@ func runAppraise(ctx context.Context, args []string) error {
 // raw Dossier alongside the three synthesised views. Field names are
 // snake_case for parity with the rest of the lib's JSON.
 type appraisalEnvelope struct {
-	Dossier gazetteer.Dossier            `json:"dossier"`
-	Price   appraisal.PriceConsolidated  `json:"price"`
-	Rent    appraisal.RentConsolidated   `json:"rent"`
-	Hazard  appraisal.HazardConsolidated `json:"hazard"`
+	Dossier   gazetteer.Dossier            `json:"dossier"`
+	Price     appraisal.PriceConsolidated  `json:"price"`
+	Rent      appraisal.RentConsolidated   `json:"rent"`
+	Hazard    appraisal.HazardConsolidated `json:"hazard"`
+	ZoneScore zonescore.Score              `json:"zone_score"`
 }
 
 // printAppraisal renders the consolidated price / rent / hazard
@@ -116,5 +121,19 @@ func printAppraisal(out io.Writer, p appraisal.PriceConsolidated, r appraisal.Re
 	}
 	if len(h.IndustrialRisks) > 0 {
 		fmt.Fprintf(out, "    industrial     %s\n", strings.Join(h.IndustrialRisks, ", "))
+	}
+}
+
+// printZoneScore renders the yield-first composite zone score and its
+// explainable per-axis breakdown.
+func printZoneScore(out io.Writer, s zonescore.Score) {
+	fmt.Fprintln(out, "  zone_score (yield-first):")
+	fmt.Fprintf(out, "    composite      %.1f / 100  (confidence=%s)\n", s.Composite, s.Confidence.String())
+	for _, a := range s.Axes {
+		if !a.Present {
+			fmt.Fprintf(out, "      %-12s (n/a)        weight=%.2f\n", a.Name, a.Weight)
+			continue
+		}
+		fmt.Fprintf(out, "      %-12s %5.1f        weight=%.2f  %s\n", a.Name, a.Value, a.Weight, a.Reason)
 	}
 }
