@@ -140,7 +140,8 @@ Sub-commands:
 gazetteer sources list                  # list every registered Source + version
 gazetteer sources doc <name>            # print a Source's typed Result skeleton
 gazetteer query     [flags] <addr>      # run every Source against an address
-gazetteer appraise  [flags] <addr>      # query + consolidated price/rent/hazard view
+gazetteer appraise  [flags] <addr>      # query + consolidated price/rent/hazard + zone score
+gazetteer compare   [flags] <a1> <a2>…  # rank addresses best-first by yield-first zone score
 gazetteer normalize [--json] <addr>     # resolve a free-text address to a Listing
 gazetteer refresh   [sources|all]       # download/rebuild datasets into the datadir
 gazetteer version                       # build version
