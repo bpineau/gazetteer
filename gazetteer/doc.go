@@ -1,6 +1,12 @@
 // Package gazetteer is a generic Go library that compiles geographic and
 // real-estate data about French addresses from multiple sources.
 //
+// New here? The fastest start is factory.NewDefault(ctx), which wires every
+// stable source in one call (the Quick start below shows the manual Builder
+// path for when you need to customise). AI coding agents should read AGENTS.md
+// at the repo root first — it is the token-dense, one-shot orientation guide,
+// and `gazetteer sources catalog --json` dumps every source's capabilities.
+//
 // # Concepts
 //
 //   - Listing — the universal input (address + coords + property attrs)
