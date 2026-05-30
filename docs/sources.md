@@ -1,5 +1,11 @@
 # Sources reference
 
+The Sources are what this library exists to provide: each returns a fully-typed
+`Result` for one dimension of a property's investment evaluation. **This page +
+the per-source `go doc` are the data dictionary** — for field-by-field meanings
+and units, read `go doc github.com/bpineau/gazetteer/sources/<name> Result`, or
+`gazetteer sources catalog --json` for the machine-readable map.
+
 Every shipped Source lives under `sources/<name>/` and exposes the
 canonical pattern:
 

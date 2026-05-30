@@ -1,9 +1,20 @@
 # gazetteer
 
-A Go library that compiles geographic and real-estate data about French
-addresses from multiple sources. Given a free-text address (or a fully
-populated `Listing`), it queries a configurable set of sources in parallel
-and returns a typed `Dossier` aggregating every result.
+A Go library that, given a French address, brings back **rich, typed,
+well-extracted data across every dimension that matters when evaluating a
+property as an investment** — price, rents, rental demand, tenant solvency,
+taxes, safety, transport, hazards, building quality, the social and regulatory
+context, and more. Each dimension comes from a dedicated `Source` as a
+fully-typed `Result` with documented, unit-bearing fields; a `Client.Collect`
+runs them in parallel and returns a typed `Dossier`. **That typed data is the
+point.**
+
+An optional, thin convenience layer (`appraisal` + `appraisal/zonescore`)
+consolidates a few dimensions and composites them into a score — a sample
+high-level API, not the goal. Most callers want the underlying `Result`s.
+
+> **AI coding agents:** read [AGENTS.md](AGENTS.md) first (also linked as
+> `CLAUDE.md`), then run `gazetteer sources catalog --json`.
 
 ## Status
 
@@ -125,14 +136,17 @@ Transport:
 | `osm`          | Walking distance to nearest métro / RER / tram / train station   |
 | `gpe`          | Nearest *future* Grand Paris Express station + line + distance    |
 
-Plus an `appraisal/` layer combining the above into rent and price
-estimates with confidence bands, and `appraisal/zonescore`, a yield-first
-composite zone score (0–100) with an explainable per-axis breakdown
-(rendement, tension, solvabilité, sécurité, fiscalité, accès) and
-selectable weight presets (`yield` / `balanced` / `patrimoine` /
-`transport`, via the CLI `--profile`). The IRIS-level income (`filoiris`)
-and housing (`logiris`) sources sharpen the solvabilité and tension axes
-where neighbourhoods diverge within a commune.
+### Optional convenience layer
+
+On top of the typed `Dossier` (the main product) sits a thin, *optional*
+high-level API — skip it if you just want the data. `appraisal/` consolidates a
+few dimensions into rent and price estimates with confidence bands, and
+`appraisal/zonescore` composites them into a 0–100 score with an explainable
+per-axis breakdown (rendement, tension, solvabilité, sécurité, fiscalité, accès)
+and selectable weight presets (`yield` / `balanced` / `patrimoine` /
+`transport`, via the CLI `--profile`). The IRIS-level income (`filoiris`) and
+housing (`logiris`) sources sharpen the solvabilité and tension axes where
+neighbourhoods diverge within a commune.
 
 ## CLI
 
