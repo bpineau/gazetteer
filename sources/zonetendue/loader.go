@@ -15,14 +15,16 @@ import (
 //go:embed data/zonage_tlv_communes.json
 var embedFS embed.FS
 
-// set binds the embedded extract to the datadir/refresh pipeline. The
-// Transform is not yet reconstructed, so the Set is read-only: Open
-// resolves datadir > embed, and refresh reports it as skipped.
+// set binds the embedded extract to the datadir/refresh pipeline. Refresh
+// downloads the upstream CSV and rebuilds the indexed JSON via transform.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
 	Processed: dataset.File{Name: "zonage_tlv_communes.json"},
+	Raw:       []dataset.File{{Name: rawCSVName, URL: rawCSVURL}},
+	Transform: transform,
+	Validate:  validate,
 }
 
 // Entry stores the per-commune TLV + zone-tendue flags.
