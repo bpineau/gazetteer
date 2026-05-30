@@ -21,13 +21,11 @@ the seven types below covers ~95 % of day-to-day use.
 3. The framework wraps each (payload, error) into a `Result` envelope
    and collects them into a `Dossier`.
 
-`appraisal.PricePerM2`, `appraisal.RentValue` and `appraisal.HazardProfile`
-then run secondary synthesis over the Dossier — see the appraisal godoc.
-On top of those, `appraisal/zonescore` folds the whole Dossier into a single
-yield-first 0–100 zone score with an explainable per-axis breakdown and
-selectable weight presets; `zonescore.Compute` scores one address and
-`zonescore.Compare` ranks several. The CLI surfaces both via `appraise` and
-`compare`.
+The `Dossier` of typed `Result`s is the product. An **optional** convenience
+layer sits on top: `appraisal.PricePerM2`, `appraisal.RentValue` and
+`appraisal.HazardProfile` run secondary synthesis over the Dossier, and
+`appraisal/zonescore` folds it into a 0–100 score (`Compute` / `Compare`,
+surfaced via the CLI `appraise` / `compare`). Skip it if you just want the data.
 
 ## Types
 

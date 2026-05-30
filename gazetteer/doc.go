@@ -1,5 +1,11 @@
-// Package gazetteer is a generic Go library that compiles geographic and
-// real-estate data about French addresses from multiple sources.
+// Package gazetteer brings back rich, typed, well-extracted data about a French
+// address across every dimension that matters when evaluating a property as an
+// investment (price, rents, demand, solvency, taxes, safety, transport,
+// hazards, building quality, social/regulatory context, …). Each dimension is a
+// Source returning a fully-typed Result with documented, unit-bearing fields —
+// that typed data is the point. An optional appraisal/zonescore layer
+// consolidates a few dimensions into a score, but most callers want the
+// underlying Results.
 //
 // New here? The fastest start is factory.NewDefault(ctx), which wires every
 // stable source in one call (the Quick start below shows the manual Builder
