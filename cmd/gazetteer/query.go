@@ -49,6 +49,7 @@ type queryFlags struct {
 	timeout      time.Duration // overall budget for the Collect; 0 ⇒ no deadline
 	jsonOut      bool
 	dump         bool
+	profile      string // ZoneScore weight preset (appraise / compare only)
 	addr         string
 }
 
@@ -79,6 +80,8 @@ func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 		"Overall budget for the Collect (deadline propagated via ctx). Slow Sources past this point return ctx.DeadlineExceeded → StatusFailedTransient. 0 disables the deadline.")
 	fs.BoolVar(&q.jsonOut, "json", false, "Emit the full Dossier as indented JSON")
 	fs.BoolVar(&q.dump, "dump", false, "Log raw HTTP request/response payloads (sources that honour it)")
+	fs.StringVar(&q.profile, "profile", "",
+		"ZoneScore weight preset for appraise/compare: yield (default) | balanced | patrimoine | transport.")
 	positional, err := parseInterleaved(fs, args)
 	if err != nil {
 		return nil, errUsage

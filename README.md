@@ -127,7 +127,11 @@ Transport:
 Plus an `appraisal/` layer combining the above into rent and price
 estimates with confidence bands, and `appraisal/zonescore`, a yield-first
 composite zone score (0–100) with an explainable per-axis breakdown
-(rendement, tension, solvabilité, sécurité, fiscalité, accès).
+(rendement, tension, solvabilité, sécurité, fiscalité, accès) and
+selectable weight presets (`yield` / `balanced` / `patrimoine` /
+`transport`, via the CLI `--profile`). The IRIS-level income (`filoiris`)
+and housing (`logiris`) sources sharpen the solvabilité and tension axes
+where neighbourhoods diverge within a commune.
 
 ## CLI
 
