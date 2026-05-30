@@ -122,7 +122,9 @@ Transport:
 | `osm`          | Walking distance to nearest métro / RER / tram / train station   |
 
 Plus an `appraisal/` layer combining the above into rent and price
-estimates with confidence bands.
+estimates with confidence bands, and `appraisal/zonescore`, a yield-first
+composite zone score (0–100) with an explainable per-axis breakdown
+(rendement, tension, solvabilité, sécurité, fiscalité, accès).
 
 ## CLI
 
