@@ -25,6 +25,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `cartofriches`   | INSEE                                          | offline Cerema brownfields  |
 | `chomage`        | INSEE                                          | offline INSEE chômage ZE2020|
 | `delinquance`    | INSEE                                          | offline SSMSI État 4001     |
+| `iris`           | lat/lon (or pre-resolved Listing.IRIS)         | offline IDF IRIS contours     |
 | `catnat`         | INSEE                                          | offline GASPAR CatNat agg.   |
 | `nuisances`      | lat/lon                                        | offline IDF 500m nuisance grid|
 | `cdsr`           | lat/lon                                        | offline IDF CDSR snapshot    |
@@ -205,6 +206,25 @@ modelled hazard, `catnat` reports the realised sinistralité.
   decrees are the cracking-risk signal the zoning often misses.
 - **Refresh**: from the Géorisques GASPAR ZIP export; the per-commune aggregate
   is gzip-embedded (~220 KB).
+
+## `sources/iris`
+
+Resolves a coordinate to its INSEE IRIS — the sub-commune statistical zone
+(≈ 2 000 inhabitants), the finest official mesh for census/income data.
+
+- **Needs**: lat/lon (or a pre-resolved `Listing.IRIS`, which it reuses).
+- **Result**: `code_iris` (9-digit), `nom_iris`, `typ_iris` (H/A/D/Z).
+- **Dual role**: the Source also implements `gazetteer.IRISResolver`. The
+  factory (and CLI) wire it into the BANNormalizer via `WithIRIS`, so every
+  normalized address carries `Listing.IRIS` — the hook for future IRIS-keyed
+  sources. The Source's own Query reuses a pre-resolved `Listing.IRIS` to avoid
+  a second point-in-polygon pass.
+- **Resolution**: point-in-polygon over the embedded IRIS contours
+  (`helpers/geopoly` + bbox pre-filter).
+- **Scope (v1)**: Île-de-France (~5 300 IRIS), gzip-embedded (~1.3 MB). Outside
+  it → StatusOKEmpty. National coverage would exceed the embed budget
+  (download-only datadir, future work).
+- **Refresh**: from the region's Opendatasoft IRIS-contours GeoJSON.
 
 ## `sources/nuisances`
 
