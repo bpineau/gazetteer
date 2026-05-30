@@ -12,71 +12,133 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
 
-// Raw input (datadir basename) and upstream URL. The Paris-region observatory
-// publishes one ZIP archive per agglomeration perimeter; L7502 is "agglomération
-// parisienne hors Paris" (the petite/grande couronne). The archive bundles the
-// observed-rent table (Base_OP_<year>_L7502.csv) and the commune→zone map
-// (L7502Zonage<year>.csv), both ISO-8859-1, ";"-separated.
-const (
-	rawL7502Name = "oll_l7502.raw.zip"
-	rawL7502URL  = "https://www.observatoires-des-loyers.org/datagouv/2024/Base_OP_2024_L7502.zip"
+// aggloSpec is one OLL observatory perimeter the Source ingests. Each publishes
+// a per-agglo ZIP at the observatory site bundling the observed-rent table
+// (Base_OP_<year>_<code>.csv) and the commune→zone map (<code>Zonage<year>.csv),
+// ";"-separated, in a per-agglo-varying encoding (UTF-8 or ISO-8859-1) and with
+// per-agglo-varying column names — handled by decodeText and firstCol.
+type aggloSpec struct {
+	code string
+	name string
+	year int
+}
 
-	aggloCode = "L7502"
-	aggloYear = 2024
+func (s aggloSpec) rawName() string {
+	return "oll_" + strings.ToLower(s.code) + ".raw.zip"
+}
 
-	// aggloDisplayName is the human-readable perimeter label. The CSV's
-	// "agglomeration" column carries the bare code (L7502) for this dataset, so
-	// we pin a friendly name here.
-	aggloDisplayName = "Agglomération parisienne hors Paris"
-)
+func (s aggloSpec) url() string {
+	return fmt.Sprintf("https://www.observatoires-des-loyers.org/datagouv/%d/Base_OP_%d_%s.zip", s.year, s.year, s.code)
+}
 
-// transform rebuilds oll_idf.json from the L7502 archive: the commune→zone map
-// joined to the observed median rents per (zone, rooms) bucket.
+// aggloSpecs is the curated set of OLL agglomerations ingested into the embedded
+// snapshot. Each was verified to use the join convention this transform relies
+// on (the zonage Zone matches the last segment of the rents' Zone_calcul code);
+// agglomerations with an incompatible multi-level zone layout (e.g. Paris
+// intra-muros L7501) are deliberately excluded — Paris rents are served by
+// encadrement. Extend this list (and re-run `refresh --go-embed-update`) to
+// cover more perimeters.
+var aggloSpecs = []aggloSpec{
+	{"L7502", "Agglomération parisienne hors Paris", 2024},
+	{"L6900", "Agglomération de Lyon", 2024},
+	{"L5900", "Agglomération de Lille", 2024},
+	{"L3100", "Agglomération de Toulouse", 2025},
+	{"L3300", "Agglomération de Bordeaux", 2024},
+	{"L4400", "Agglomération de Nantes", 2024},
+	{"L6700", "Eurométropole de Strasbourg", 2024},
+	{"L3400", "Agglomération de Montpellier", 2025},
+	{"L3800", "Agglomération de Grenoble", 2024},
+	{"L3500", "Agglomération de Rennes", 2024},
+	{"L0600", "Département des Alpes-Maritimes", 2024},
+	{"L6300", "Agglomération de Clermont-Ferrand", 2024},
+	{"L5400", "Agglomération de Nancy", 2024},
+	{"L3700", "Agglomération de Tours", 2024},
+	{"L1700", "Agglomération de La Rochelle", 2024},
+	{"L2500", "Agglomération de Besançon", 2024},
+	{"L6400", "Pays Basque et Sud Landes", 2024},
+	{"L9740", "Île de La Réunion", 2024},
+}
+
+// transform rebuilds the embedded snapshot: for each configured agglomeration it
+// joins the commune→zone map to the observed median rents per (zone, rooms)
+// bucket.
+//
+// Each agglo is an INDEPENDENT upstream archive, and the per-agglo CSV layouts
+// are heterogeneous (column names, encodings, a few malformed headers). So a
+// single agglo that is absent or unparseable is skipped rather than failing the
+// whole rebuild — one bad archive must not sink the national snapshot. The
+// build still fails loudly if it ends up with no agglos at all (a systematic
+// breakage). Per-agglo correctness is covered by the offline golden test on
+// parseAgglo.
 func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
-	rc, err := raw.Open(rawL7502Name)
-	if err != nil {
-		return err
+	var out processed
+	for _, spec := range aggloSpecs {
+		rc, err := raw.Open(spec.rawName())
+		if err != nil {
+			continue // raw not present for this agglo
+		}
+		buf, err := io.ReadAll(rc)
+		_ = rc.Close()
+		if err != nil {
+			continue
+		}
+		a, err := parseAgglo(spec, buf)
+		if err != nil || a == nil {
+			continue // unparseable / incompatible layout — skip this agglo
+		}
+		out.Agglos = append(out.Agglos, *a)
 	}
-	defer func() { _ = rc.Close() }()
+	if len(out.Agglos) == 0 {
+		return errors.New("oll: transform produced no agglos")
+	}
+	return json.NewEncoder(dst).Encode(out)
+}
 
-	buf, err := io.ReadAll(rc)
+// parseAgglo builds one aggloData from its ZIP archive bytes. It prunes the rent
+// cells to those whose zone exists in the commune→zone map, so an un-joinable
+// cell is never emitted; an agglo left with no joinable rents (an incompatible
+// zone layout) returns (nil, nil) and is skipped.
+func parseAgglo(spec aggloSpec, zipBytes []byte) (*aggloData, error) {
+	zr, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
 	if err != nil {
-		return fmt.Errorf("oll: read archive: %w", err)
+		return nil, fmt.Errorf("open zip: %w", err)
 	}
-	zr, err := zip.NewReader(bytes.NewReader(buf), int64(len(buf)))
-	if err != nil {
-		return fmt.Errorf("oll: open zip: %w", err)
-	}
-
 	zonesCSV, err := readZipMember(zr, "zonage")
 	if err != nil {
-		return fmt.Errorf("oll: zonage member: %w", err)
+		return nil, fmt.Errorf("zonage member: %w", err)
 	}
 	rentsCSV, err := readZipMember(zr, "base_op")
 	if err != nil {
-		return fmt.Errorf("oll: rents member: %w", err)
+		return nil, fmt.Errorf("rents member: %w", err)
 	}
-
 	zones, err := parseZonage(zonesCSV)
 	if err != nil {
-		return fmt.Errorf("oll: parse zonage: %w", err)
+		return nil, fmt.Errorf("parse zonage: %w", err)
 	}
 	rents, err := parseRents(rentsCSV)
 	if err != nil {
-		return fmt.Errorf("oll: parse rents: %w", err)
-	}
-	if len(zones) == 0 || len(rents) == 0 {
-		return fmt.Errorf("oll: empty transform (zones=%d rents=%d)", len(zones), len(rents))
+		return nil, fmt.Errorf("parse rents: %w", err)
 	}
 
-	out := processed{Agglos: []aggloData{{
-		Code: aggloCode, Name: aggloDisplayName, Year: aggloYear, Zones: zones, Rents: rents,
-	}}}
-	return json.NewEncoder(dst).Encode(out)
+	zoneSet := make(map[string]bool, len(zones))
+	for _, z := range zones {
+		zoneSet[z.Zone] = true
+	}
+	pruned := make([]rentRow, 0, len(rents))
+	for _, r := range rents {
+		if zoneSet[r.Zone] {
+			pruned = append(pruned, r)
+		}
+	}
+	if len(zones) == 0 || len(pruned) == 0 {
+		return nil, nil // incompatible / empty — skip this agglo
+	}
+	return &aggloData{Code: spec.code, Name: spec.name, Year: spec.year, Zones: zones, Rents: pruned}, nil
 }
 
 // readZipMember returns the decoded (ISO-8859-1 → UTF-8) contents of the unique
@@ -112,7 +174,7 @@ func readZipMember(zr *zip.Reader, nameSubstr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return decodeLatin1(b), nil
+	return decodeText(b), nil
 }
 
 // parseZonage reads the commune→zone map (cols Commune;Lib_com;Iris;Zone;Lib_zone),
@@ -123,9 +185,12 @@ func parseZonage(text string) ([]zoneRow, error) {
 		return nil, err
 	}
 	col := headerIndex(recs[0])
-	ci, czone, clib := hcol(col, "commune"), hcol(col, "zone"), hcol(col, "lib_zone")
+	// The INSEE column is named differently across agglos: "Commune", "INSEE",
+	// "CODE_INSEE", "code_commune".
+	ci := firstCol(col, "commune", "insee", "code_insee", "code_commune")
+	czone, clib := hcol(col, "zone"), hcol(col, "lib_zone")
 	if ci < 0 || czone < 0 {
-		return nil, fmt.Errorf("zonage missing Commune/Zone columns")
+		return nil, fmt.Errorf("zonage missing INSEE/Zone columns (have %v)", recs[0])
 	}
 	seen := map[string]bool{}
 	var out []zoneRow
@@ -235,6 +300,16 @@ func hcol(m map[string]int, name string) int {
 	return -1
 }
 
+// firstCol returns the index of the first of names present in the header, or -1.
+func firstCol(m map[string]int, names ...string) int {
+	for _, n := range names {
+		if i := hcol(m, n); i >= 0 {
+			return i
+		}
+	}
+	return -1
+}
+
 // field returns the i-th field of r, or "" when out of range.
 func field(r []string, i int) string {
 	if i < 0 || i >= len(r) {
@@ -243,13 +318,17 @@ func field(r []string, i int) string {
 	return strings.TrimSpace(r[i])
 }
 
-// decodeLatin1 converts ISO-8859-1 bytes to a UTF-8 string (each byte is its
-// own code point). The upstream is cp1252-ish, which differs only in 0x80–0x9F;
-// none of those bytes appear in the fields the transform retains (zone codes,
-// "Appart NP", numeric €/m², and the ASCII "Zone N" labels), so plain Latin-1 is
-// exact here. Revisit (charmap.Windows1252) if a future agglo keeps accented
-// free-text columns.
-func decodeLatin1(b []byte) string {
+// decodeText decodes a CSV member to a UTF-8 string. The per-agglo archives are
+// not uniformly encoded: some are UTF-8 (occasionally BOM-prefixed), others
+// ISO-8859-1. It strips a UTF-8 BOM, then keeps valid UTF-8 as-is and otherwise
+// falls back to ISO-8859-1 (each byte its own code point). The fields the
+// transform retains are ASCII, so this only matters for header detection and
+// free-text labels.
+func decodeText(b []byte) string {
+	b = bytes.TrimPrefix(b, []byte{0xEF, 0xBB, 0xBF})
+	if utf8.Valid(b) {
+		return string(b)
+	}
 	rs := make([]rune, len(b))
 	for i, c := range b {
 		rs[i] = rune(c)
