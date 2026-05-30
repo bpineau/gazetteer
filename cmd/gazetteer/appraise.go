@@ -13,12 +13,32 @@ import (
 	"github.com/bpineau/gazetteer/gazetteer"
 )
 
+// zonescoreOptions resolves the --profile flag to a zonescore.Options slice
+// (empty when unset → default yield-first weights). An unknown profile name
+// is a usage error listing the valid presets.
+func (q *queryFlags) zonescoreOptions() ([]zonescore.Options, error) {
+	if q.profile == "" {
+		return nil, nil
+	}
+	w, ok := zonescore.WeightsForProfile(q.profile)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "gazetteer: unknown --profile %q (valid: %s)\n",
+			q.profile, strings.Join(zonescore.ProfileNames(), ", "))
+		return nil, errUsage
+	}
+	return []zonescore.Options{{Weights: w}}, nil
+}
+
 // runAppraise implements `gazetteer appraise [--source ...] [--json]
 // [--verbose] [--dump] <addr>`. Reuses the query pipeline (normalize +
 // Collect) and then folds the Dossier through the three appraisal
 // synthesisers: PricePerM2, RentValue, HazardProfile.
 func runAppraise(ctx context.Context, args []string) error {
 	q, err := parseQueryFlags("appraise", args)
+	if err != nil {
+		return err
+	}
+	zopts, err := q.zonescoreOptions() // validate --profile before the network work
 	if err != nil {
 		return err
 	}
@@ -30,7 +50,7 @@ func runAppraise(ctx context.Context, args []string) error {
 	price := appraisal.PricePerM2(dossier)
 	rent := appraisal.RentValue(dossier)
 	hazard := appraisal.HazardProfile(dossier)
-	score := zonescore.Compute(dossier)
+	score := zonescore.Compute(dossier, zopts...)
 
 	if q.jsonOut {
 		enc := json.NewEncoder(os.Stdout)
