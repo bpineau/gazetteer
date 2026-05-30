@@ -1,18 +1,39 @@
 package carteloyers
 
 import (
-	"bytes"
 	"embed"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/bpineau/gazetteer/dataset"
 )
 
 //go:embed data/carte_loyers_appartement.csv data/carte_loyers_maison.csv data/carte_loyers_app12.csv data/carte_loyers_app3.csv
-var carteLoyersFS embed.FS
+var embedFS embed.FS
+
+// typologyFile binds one INRAE typology to its embedded CSV. Each file is
+// an independent dataset.Set so the datadir override and refresh tooling
+// operate per typology. Read-only until each Transform is reconstructed.
+type typologyFile struct {
+	typ Typology
+	set dataset.Set
+}
+
+func newSet(name string) dataset.Set {
+	return dataset.Set{Source: Name, Version: Version, Embed: embedFS, Processed: dataset.File{Name: name}}
+}
+
+var fileSets = []typologyFile{
+	{TypologyApartment, newSet("carte_loyers_appartement.csv")},
+	{TypologyHouse, newSet("carte_loyers_maison.csv")},
+	{TypologyApt12, newSet("carte_loyers_app12.csv")},
+	{TypologyApt3, newSet("carte_loyers_app3.csv")},
+}
 
 // Row captures one INSEE × typology observation. Loyers are in
 // EUR/m²/month, charges comprises (CC).
@@ -37,15 +58,17 @@ var (
 	indexErr   error
 )
 
-// Load returns the singleton lookup index, parsing the four embedded
-// CSV files on first call. Subsequent calls hit the cache.
+// Load returns the singleton lookup index, resolving each typology CSV
+// from dir (the datadir) with a fallback to the embedded copies and
+// parsing them on first call. The dir from the first call wins for the
+// process lifetime. A missing (non-embedded) typology contributes an empty
+// table rather than failing the whole index.
 //
-// Errors are sticky : if the first call fails, every subsequent call
-// returns the same error (the embedded files cannot change between
-// calls so re-parsing buys nothing).
-func Load() (*Index, error) {
+// Errors are sticky: if the first call fails, every subsequent call returns
+// the same error.
+func Load(dir string) (*Index, error) {
 	indexOnce.Do(func() {
-		indexCache, indexErr = parseAll()
+		indexCache, indexErr = parseAll(dir)
 	})
 	return indexCache, indexErr
 }
@@ -78,32 +101,36 @@ func (idx *Index) Count(typ Typology) int {
 	return len(idx.byTypology[typ])
 }
 
-func parseAll() (*Index, error) {
+func parseAll(dir string) (*Index, error) {
 	idx := &Index{
 		byTypology: map[Typology]map[string]Row{},
 	}
-	files := map[Typology]string{
-		TypologyApartment: "data/carte_loyers_appartement.csv",
-		TypologyHouse:     "data/carte_loyers_maison.csv",
-		TypologyApt12:     "data/carte_loyers_app12.csv",
-		TypologyApt3:      "data/carte_loyers_app3.csv",
-	}
-	for typ, path := range files {
-		raw, err := carteLoyersFS.ReadFile(path)
+	for _, f := range fileSets {
+		rows, err := loadTypology(f.set, dir)
 		if err != nil {
-			return nil, fmt.Errorf("carteloyers: read embedded %s: %w", path, err)
+			return nil, fmt.Errorf("carteloyers: %s: %w", f.set.Processed.Name, err)
 		}
-		rows, err := parseCSV(raw)
-		if err != nil {
-			return nil, fmt.Errorf("carteloyers: parse %s: %w", path, err)
-		}
-		idx.byTypology[typ] = rows
+		idx.byTypology[f.typ] = rows
 	}
 	return idx, nil
 }
 
-func parseCSV(raw []byte) (map[string]Row, error) {
-	r := csv.NewReader(bytes.NewReader(raw))
+// loadTypology resolves and parses one typology CSV. A missing
+// (non-embedded) file yields an empty table rather than an error.
+func loadTypology(s dataset.Set, dir string) (map[string]Row, error) {
+	rc, err := s.Open(dir)
+	if errors.Is(err, dataset.ErrUnavailable) {
+		return map[string]Row{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rc.Close() }()
+	return parseCSV(rc)
+}
+
+func parseCSV(src io.Reader) (map[string]Row, error) {
+	r := csv.NewReader(src)
 	r.Comma = ';'
 	// header
 	header, err := r.Read()

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
 )
 
@@ -29,6 +30,11 @@ type Options struct {
 	// Index overrides the lazily-loaded singleton. Tests inject a stub
 	// here; production callers leave it nil.
 	Index *Index
+
+	// DataDir is the gazetteer data directory. When set, refreshed copies
+	// of the processed artifacts found there take precedence over the
+	// embedded ones. Empty means "embedded only". Wired by the factory.
+	DataDir string
 }
 
 // Source implements gazetteer.Source for the taxe foncière estimator
@@ -48,6 +54,10 @@ func (s *Source) Name() string { return Name }
 
 // Version implements gazetteer.Source.
 func (s *Source) Version() int { return sourceVersion }
+
+// Datasets implements gazetteer.DatasetProvider, exposing both embedded
+// extracts (V1 ratios + V2 voted rates) to the dataset refresh tooling.
+func (s *Source) Datasets() []dataset.Set { return []dataset.Set{setV1, setV2} }
 
 // Query implements gazetteer.Source. Pipeline:
 //
@@ -79,7 +89,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 
 	idx := s.opts.Index
 	if idx == nil {
-		loaded, err := Load()
+		loaded, err := Load(s.opts.DataDir)
 		if err != nil {
 			return nil, fmt.Errorf("taxefonciere: %w: load dataset: %w", gazetteer.ErrUpstreamPermanent, err)
 		}

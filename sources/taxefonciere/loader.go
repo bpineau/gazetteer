@@ -3,13 +3,35 @@ package taxefonciere
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/bpineau/gazetteer/dataset"
 )
 
 //go:embed data/taxe_fonciere_ratios.json data/fiscalite_locale.json
-var taxeFonciereFS embed.FS
+var embedFS embed.FS
+
+// This Source ships two embedded artifacts (V1 legacy ratios + V2 DGFiP
+// voted rates); each is its own dataset.Set so the datadir override and the
+// refresh tooling operate per file. Both are read-only until their
+// Transform is reconstructed.
+var (
+	setV1 = dataset.Set{
+		Source:    Name,
+		Version:   Version,
+		Embed:     embedFS,
+		Processed: dataset.File{Name: "taxe_fonciere_ratios.json"},
+	}
+	setV2 = dataset.Set{
+		Source:    Name,
+		Version:   Version,
+		Embed:     embedFS,
+		Processed: dataset.File{Name: "fiscalite_locale.json"},
+	}
+)
 
 // V1Index carries the per-commune and dept-fallback "valeur locative
 // cadastrale" ratios sourced from the DGFiP "Tarifs des locaux
@@ -68,16 +90,19 @@ var (
 	indexErr   error
 )
 
-// Load returns the singleton lookup index, parsing both embedded JSON
-// files on first call.
-func Load() (*Index, error) {
+// Load returns the singleton lookup index, resolving both processed
+// artifacts from dir (the datadir) with a fallback to the embedded copies
+// and parsing them on first call. The dir from the first call wins for the
+// process lifetime. A missing (non-embedded) artifact yields an empty
+// sub-index rather than an error.
+func Load(dir string) (*Index, error) {
 	indexOnce.Do(func() {
-		v1, err := loadV1()
+		v1, err := loadV1(dir)
 		if err != nil {
 			indexErr = err
 			return
 		}
-		v2, err := loadV2()
+		v2, err := loadV2(dir)
 		if err != nil {
 			indexErr = err
 			return
@@ -87,27 +112,44 @@ func Load() (*Index, error) {
 	return indexCache, indexErr
 }
 
-func loadV1() (*V1Index, error) {
-	raw, err := taxeFonciereFS.ReadFile("data/taxe_fonciere_ratios.json")
-	if err != nil {
-		return nil, fmt.Errorf("taxefonciere: read taxe_fonciere_ratios: %w", err)
+func loadV1(dir string) (*V1Index, error) {
+	rc, err := setV1.Open(dir)
+	if errors.Is(err, dataset.ErrUnavailable) {
+		return &V1Index{}, nil
 	}
+	if err != nil {
+		return nil, fmt.Errorf("taxefonciere: open taxe_fonciere_ratios: %w", err)
+	}
+	defer func() { _ = rc.Close() }()
 	var idx V1Index
-	if err := json.Unmarshal(raw, &idx); err != nil {
+	if err := json.NewDecoder(rc).Decode(&idx); err != nil {
 		return nil, fmt.Errorf("taxefonciere: parse taxe_fonciere_ratios: %w", err)
 	}
 	return &idx, nil
 }
 
-func loadV2() (*V2Index, error) {
-	raw, err := taxeFonciereFS.ReadFile("data/fiscalite_locale.json")
-	if err != nil {
-		return nil, fmt.Errorf("taxefonciere: read fiscalite_locale: %w", err)
+func loadV2(dir string) (*V2Index, error) {
+	rc, err := setV2.Open(dir)
+	if errors.Is(err, dataset.ErrUnavailable) {
+		idx := &V2Index{}
+		applyV2Defaults(idx)
+		return idx, nil
 	}
+	if err != nil {
+		return nil, fmt.Errorf("taxefonciere: open fiscalite_locale: %w", err)
+	}
+	defer func() { _ = rc.Close() }()
 	var idx V2Index
-	if err := json.Unmarshal(raw, &idx); err != nil {
+	if err := json.NewDecoder(rc).Decode(&idx); err != nil {
 		return nil, fmt.Errorf("taxefonciere: parse fiscalite_locale: %w", err)
 	}
+	applyV2Defaults(&idx)
+	return &idx, nil
+}
+
+// applyV2Defaults backstops the VLC tariff + abattement when the upstream
+// extract omits them, keeping the V2 estimator usable.
+func applyV2Defaults(idx *V2Index) {
 	if idx.Meta.VLCTariffEURPerM2 <= 0 {
 		// Default backstop: 90 €/m²/an matches the national median
 		// VLC moyenne cited in the DGFiP "Tarifs des locaux
@@ -117,7 +159,6 @@ func loadV2() (*V2Index, error) {
 	if idx.Meta.VLCAbattement <= 0 {
 		idx.Meta.VLCAbattement = 0.5 // CGI art. 1388.
 	}
-	return &idx, nil
 }
 
 // LookupV1 returns the V1 EUR/m² ratio for the commune (or dept

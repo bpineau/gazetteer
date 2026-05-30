@@ -12,7 +12,7 @@ import (
 // covers a meaningful chunk of communes.
 func TestLoad(t *testing.T) {
 	t.Parallel()
-	idx, err := Load()
+	idx, err := Load("")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestLoad(t *testing.T) {
 // sanity range.
 func TestLookup_KnownCommune(t *testing.T) {
 	t.Parallel()
-	idx, err := Load()
+	idx, err := Load("")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestQuery_HappyPath(t *testing.T) {
 // as a no-op happy-path check.
 func TestQuery_FallbackToGeneric(t *testing.T) {
 	t.Parallel()
-	idx, err := Load()
+	idx, err := Load("")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

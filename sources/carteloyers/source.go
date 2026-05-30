@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
 )
 
@@ -30,6 +31,11 @@ type Options struct {
 	// Index overrides the lazily-loaded singleton. Tests inject a
 	// stub here; production callers leave it nil.
 	Index *Index
+
+	// DataDir is the gazetteer data directory. When set, refreshed copies
+	// of the processed artifacts found there take precedence over the
+	// embedded ones. Empty means "embedded only". Wired by the factory.
+	DataDir string
 }
 
 // Source implements gazetteer.Source for the ANIL / DHUP carte des
@@ -48,6 +54,16 @@ func (s *Source) Name() string { return Name }
 
 // Version implements gazetteer.Source.
 func (s *Source) Version() int { return sourceVersion }
+
+// Datasets implements gazetteer.DatasetProvider, exposing the four embedded
+// typology extracts to the dataset refresh tooling.
+func (s *Source) Datasets() []dataset.Set {
+	out := make([]dataset.Set, len(fileSets))
+	for i, f := range fileSets {
+		out[i] = f.set
+	}
+	return out
+}
 
 // Query implements gazetteer.Source. Pipeline:
 //
@@ -76,7 +92,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 
 	idx := s.opts.Index
 	if idx == nil {
-		loaded, err := Load()
+		loaded, err := Load(s.opts.DataDir)
 		if err != nil {
 			return nil, fmt.Errorf("carteloyers: %w: load dataset: %w", gazetteer.ErrUpstreamPermanent, err)
 		}
