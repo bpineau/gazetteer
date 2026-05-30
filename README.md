@@ -135,7 +135,7 @@ gazetteer sources doc <name>            # print a Source's typed Result skeleton
 gazetteer query     [flags] <addr>      # run every Source against an address
 gazetteer appraise  [flags] <addr>      # query + consolidated price/rent/hazard view
 gazetteer normalize [--json] <addr>     # resolve a free-text address to a Listing
-gazetteer refresh   <source>|all        # re-fetch upstream data (stub today)
+gazetteer refresh   [sources|all]       # download/rebuild datasets into the datadir
 gazetteer version                       # build version
 ```
 
@@ -153,6 +153,42 @@ them to produce a useful answer:
 ```
 
 See [doc/cli.md](doc/cli.md) for the full reference.
+
+## Datasets & cache
+
+The offline Sources (rents, taxe foncière, vacancy, crime, schools, …) ship a
+pre-indexed dataset embedded in the binary, so they work out of the box with
+no setup. A flat **data directory** (default `~/.cache/gazetteer`, overridable
+with `--data-dir` or `$GAZETTEER_DATA_DIR`) lets you override or refresh those
+datasets from upstream **without rebuilding the library**: when a refreshed
+copy is present there it takes precedence over the embedded one; otherwise the
+embedded copy is used.
+
+`gazetteer refresh` downloads each Source's real upstream file(s) and rebuilds
+its dataset into the datadir:
+
+```bash
+gazetteer refresh --list        # show each artifact: where it loads from, size, refreshable
+gazetteer refresh               # download + (re)build every dataset into the datadir
+gazetteer refresh delinquance   # just one source
+```
+
+`refresh` is **idempotent**: a dataset already present and current in the
+datadir is skipped untouched — no download, no rebuild. Only the first run
+does work, so you can safely call it on every start (e.g. a one-time warm-up
+on boot); pass `--force` to rebuild regardless. Library callers use the same
+contract via `dataset.Refresh`:
+
+```go
+sets := /* collect dataset.Set from your sources (DatasetProvider) */
+_, err := dataset.Refresh(ctx, httpClient, sets, dataset.RefreshOptions{}) // idempotent; Force to rebuild
+```
+
+Maintainers re-embed a refreshed dataset with `gazetteer refresh
+--go-embed-update` (rebuilds into the datadir, then copies the artifact back
+into `sources/<name>/data/` for re-commit). See
+[doc/datasets.md](doc/datasets.md) for the full model and how to make an
+out-of-tree Source refreshable.
 
 ## Concepts
 
