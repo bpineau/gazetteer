@@ -35,6 +35,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `education`      | INSEE                                          | data.education.gouv.fr API  |
 | `encadrement`    | zip/INSEE + property_type + rooms (+ lat/lon for 93)| offline barème + zonage |
 | `filosofi`       | INSEE                                          | offline INSEE Filosofi 2021 |
+| `filoiris`       | `Listing.IRIS`                                 | offline INSEE Filosofi 2021 IRIS |
 | `georisques`     | lat/lon (or address)                           | georisques.gouv.fr report   |
 | `ips_ecoles`     | INSEE (arrondissement-aware)                   | offline DEPP IPS 2024-2025  |
 | `locservice`     | INSEE + property_type + rooms                  | locservice.fr HTML scrape   |
@@ -299,6 +300,24 @@ Per-commune income and minima-sociaux statistics from INSEE Filosofi
 - **Result**: median household disposable income, minima-sociaux %,
   risk flag (low / medium / high / unknown).
 - Property type is irrelevant — applies to the whole commune.
+
+## `sources/filoiris`
+
+Per-**IRIS** (sub-commune) income statistics from INSEE Filosofi (2021),
+the neighbourhood-level counterpart of `filosofi`. Answers "how wealthy is
+this *quartier*" where `filosofi` answers "how wealthy is this town" — the
+distinction that matters most in dense, socially-mixed communes (Paris,
+petite couronne), where a single commune can span a 2× spread across its
+IRIS.
+
+- **Needs**: `Listing.IRIS` (populated by the `iris` Source / the BAN
+  normalizer's IRIS resolver). Only answers inside INSEE's IRIS perimeter
+  (communes ≥ 5000 inhabitants, secret statistique permitting).
+- **Result**: IRIS median disposable income (€/UC), taux de pauvreté à
+  60 % (`PovertyRatePct`), Gini index, risk flag.
+- **Backend**: gzipped JSON embedded under `data/` (~14 490 IRIS, ~133 KB).
+- **Appraisal**: `appraisal/zonescore`'s solvabilité axis prefers this
+  IRIS-level reading over the commune-level `filosofi`.
 
 ## `sources/georisques`
 

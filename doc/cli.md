@@ -139,6 +139,7 @@ dpedist         v1
 dvf             v4
 education       v1
 encadrement     v2
+filoiris        v1
 filosofi        v1
 georisques      v1
 ips_ecoles      v1
