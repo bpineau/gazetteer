@@ -241,6 +241,16 @@ func TestRefresh_NilClient(t *testing.T) {
 	}
 }
 
+func TestRefresh_RejectsProcessedNameCollision(t *testing.T) {
+	t.Parallel()
+	a := Set{Source: "a", Version: 1, Processed: File{Name: "clash.json"}}
+	b := Set{Source: "b", Version: 1, Processed: File{Name: "clash.json"}}
+	_, err := Refresh(context.Background(), newTestClient(t), []Set{a, b}, RefreshOptions{Dir: t.TempDir()})
+	if err == nil || !strings.Contains(err.Error(), "clash.json") {
+		t.Fatalf("want collision error mentioning clash.json, got %v", err)
+	}
+}
+
 // Exists is a tiny local mirror of atomicfs.Exists to keep the test
 // self-contained for assertions.
 func Exists(p string) bool {

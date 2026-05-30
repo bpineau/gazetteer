@@ -122,7 +122,7 @@ func (idx *Index) Lookup(insee string) (Entry, bool) {
 	return e, ok
 }
 
-// Count returns the number of communes in the embedded crosswalk.
+// Count returns the number of communes in the loaded extract.
 func (idx *Index) Count() int {
 	if idx == nil {
 		return 0
