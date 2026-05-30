@@ -27,6 +27,7 @@ import (
 	ipsecoles "github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/iris"
 	"github.com/bpineau/gazetteer/sources/locservice"
+	"github.com/bpineau/gazetteer/sources/logiris"
 	"github.com/bpineau/gazetteer/sources/lovac"
 	"github.com/bpineau/gazetteer/sources/nuisances"
 	"github.com/bpineau/gazetteer/sources/oll"
@@ -138,6 +139,7 @@ var sourceRenderers = map[string]sourceRenderer{
 	iris.Name:         renderIRIS,
 	ipsecoles.Name:    renderIPSEcoles,
 	locservice.Name:   renderLocservice,
+	logiris.Name:      renderLogiris,
 	lovac.Name:        renderLovac,
 	nuisances.Name:    renderNuisances,
 	oll.Name:          renderOLL,
@@ -299,6 +301,19 @@ func renderFilosofi(data any) (string, []string) {
 	if r.Flag != "" {
 		parts = append(parts, "risk="+string(r.Flag))
 	}
+	return strings.Join(parts, ", "), nil
+}
+
+func renderLogiris(data any) (string, []string) {
+	r, ok := data.(*logiris.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no IRIS housing data (outside IDF)", nil
+	}
+	parts := []string{fmt.Sprintf("locataires %.0f%%", r.RenterSharePct)}
+	if r.SocialHousingSharePct > 0 {
+		parts = append(parts, fmt.Sprintf("HLM %.0f%%", r.SocialHousingSharePct))
+	}
+	parts = append(parts, fmt.Sprintf("vacance %.1f%%", r.VacancyRatePct))
 	return strings.Join(parts, ", "), nil
 }
 
