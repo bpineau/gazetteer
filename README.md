@@ -82,6 +82,7 @@ Building / energy / risk:
 | `georisques`   | Natural and technological hazards (flood, soil, industrial)      |
 | `catnat`       | Per-commune history of recognised natural-disaster decrees        |
 | `cdsr`         | Nearby region-flagged distressed condominiums (IDF copro risk)   |
+| `nuisances`    | IDF environmental-nuisance grid (noise + air, 500 m cells)         |
 
 Market data:
 
