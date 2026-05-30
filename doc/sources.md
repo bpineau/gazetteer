@@ -26,6 +26,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `chomage`        | INSEE                                          | offline INSEE chômage ZE2020|
 | `delinquance`    | INSEE                                          | offline SSMSI État 4001     |
 | `cdsr`           | lat/lon                                        | offline IDF CDSR snapshot    |
+| `oll`            | INSEE (+ rooms)                                | offline OLL observed rents   |
 | `dpedist`        | INSEE                                          | data.ademe.fr values_agg API|
 | `dvf`            | INSEE or address + property_type (+ surface)   | data.gouv.fr Etalab DVF     |
 | `education`      | INSEE                                          | data.education.gouv.fr API  |
@@ -198,6 +199,26 @@ la Région" (CDSR) — a small, curated, high-precision copro-risk red-flag.
   region-intervened cases). Not gated on property type — a distressed copro
   nearby is a neighbourhood signal for any property.
 - **Refresh**: from the region's Opendatasoft portal (`exports/json`).
+
+## `sources/oll`
+
+Observed market rents from the Observatoires Locaux des Loyers (OLL) — the
+field-measured median €/m²/month (hors charges), the most representative rent
+signal, complementing `encadrement` (legal cap) and `carteloyers` (model).
+
+- **Needs**: INSEE; rooms optional (refines the bucket, else the zone-level
+  all-sizes median is used).
+- **Result**: observed median + inter-quartile band (€/m²/month HC), mean
+  surface, sample size, and the resolved OLL zone. Satisfies
+  `appraisal.RentEstimator` (weight 0.95 in `DefaultRentWeights`, above the
+  modelled `carteloyers`). `IsEmpty` (StatusOKEmpty) outside the perimeter.
+- **Resolution**: INSEE → OLL zone (embedded commune→zone map) → the cell for
+  the rooms bucket. Zone numbers join the rent table via
+  `Zone_calcul = "L<agglo>.4."+zeropad2(zone)`.
+- **Scope (v1)**: the Paris-region perimeter "agglomération parisienne hors
+  Paris" (OLL code L7502 = petite/grande couronne), vintage 2024. Extensible to
+  more OLL agglomerations. Appartements only.
+- **Refresh**: from the observatory's per-agglo ZIP archive (ISO-8859-1 CSVs).
 
 ## `sources/filosofi`
 

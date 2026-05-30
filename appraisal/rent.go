@@ -108,8 +108,9 @@ type RentInput struct {
 // are deterministic offline sources, so confidence comes from the
 // rule itself, not from corroboration.
 var DefaultRentWeights = map[string]float64{
-	"encadrement": 1.0, // hard legal cap — strongest signal
-	"carteloyers": 0.9, // INSEE / DHUP reference
+	"encadrement": 1.0,  // hard legal cap — strongest signal
+	"oll":         0.95, // observed market rents — real field data > model
+	"carteloyers": 0.9,  // INSEE / DHUP reference (modelled)
 }
 
 // RentValue synthesises a consolidated rent-per-m²/month estimate from
