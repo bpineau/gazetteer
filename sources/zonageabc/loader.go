@@ -3,13 +3,27 @@ package zonageabc
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
+
+	"github.com/bpineau/gazetteer/dataset"
 )
 
 //go:embed data/zonage_abc_communes.json
-var zonageABCFS embed.FS
+var embedFS embed.FS
+
+// set binds the embedded extract to the datadir/refresh pipeline. The
+// Transform is not yet reconstructed, so the Set is read-only: Open
+// resolves datadir > embed, and refresh reports it as skipped.
+var set = dataset.Set{
+	Source:    Name,
+	Version:   Version,
+	Embed:     embedFS,
+	Processed: dataset.File{Name: "zonage_abc_communes.json"},
+}
 
 // Meta carries the manifest metadata for the embedded dataset.
 type Meta struct {
@@ -32,23 +46,45 @@ var (
 	indexErr   error
 )
 
-// Load returns the singleton zonage ABC index. Parses the embedded
-// JSON on first call; subsequent calls are constant-time.
-func Load() (*Index, error) {
+// Load returns the singleton index, resolving the processed artifact from
+// dir (the datadir) with a fallback to the embedded copy, and parsing it on
+// first call. Subsequent calls are constant-time and ignore dir — the dir
+// from the first call wins for the process lifetime. A dataset that is
+// neither in the datadir nor embedded yields an empty index (graceful
+// degradation), not an error.
+func Load(dir string) (*Index, error) {
 	indexOnce.Do(func() {
-		raw, err := zonageABCFS.ReadFile("data/zonage_abc_communes.json")
+		rc, err := set.Open(dir)
+		if errors.Is(err, dataset.ErrUnavailable) {
+			indexCache = &Index{}
+			return
+		}
 		if err != nil {
-			indexErr = fmt.Errorf("zonageabc: read dataset: %w", err)
+			indexErr = fmt.Errorf("zonageabc: open dataset: %w", err)
 			return
 		}
-		var idx Index
-		if err := json.Unmarshal(raw, &idx); err != nil {
-			indexErr = fmt.Errorf("zonageabc: parse dataset: %w", err)
+		defer func() { _ = rc.Close() }()
+		idx, err := parseIndex(rc)
+		if err != nil {
+			indexErr = err
 			return
 		}
-		indexCache = &idx
+		indexCache = idx
 	})
 	return indexCache, indexErr
+}
+
+// parseIndex decodes the JSON extract into an Index.
+func parseIndex(r io.Reader) (*Index, error) {
+	body, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("zonageabc: read dataset: %w", err)
+	}
+	var idx Index
+	if err := json.Unmarshal(body, &idx); err != nil {
+		return nil, fmt.Errorf("zonageabc: parse dataset: %w", err)
+	}
+	return &idx, nil
 }
 
 // Lookup returns the zonage classification for the given INSEE. `ok`
