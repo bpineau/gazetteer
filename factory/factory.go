@@ -36,6 +36,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/cadastre"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/cartofriches"
+	"github.com/bpineau/gazetteer/sources/catnat"
 	"github.com/bpineau/gazetteer/sources/cdsr"
 	"github.com/bpineau/gazetteer/sources/chomage"
 	"github.com/bpineau/gazetteer/sources/delinquance"
@@ -161,6 +162,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(carteloyers.NewSource(carteloyers.Options{DataDir: dataDir})).
 		With(cartofriches.NewSource(cartofriches.Options{DataDir: dataDir})).
 		With(cdsr.NewSource(cdsr.Options{DataDir: dataDir})).
+		With(catnat.NewSource(catnat.Options{DataDir: dataDir})).
 		With(chomage.NewSource(chomage.Options{DataDir: dataDir})).
 		With(delinquance.NewSource(delinquance.Options{DataDir: dataDir})).
 		With(dpedist.NewSource(dpedist.Options{})).
