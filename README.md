@@ -132,7 +132,7 @@ Commune-level signals for the investor:
 | `zonageabc`    | Official A bis / A / B1 / B2 / C tension classification          |
 | `zonetendue`   | "Zone tendue" + TLV-2013 + tendue-touristique flags              |
 | `anct`         | Action Cœur de Ville / Petites Villes de Demain / ORT membership |
-| `qpv`          | Quartiers Prioritaires de la politique de la Ville membership    |
+| `qpv`          | Quartiers Prioritaires de la politique de la Ville — point-in-polygon (is the address inside a QPV?), commune fallback |
 | `cartofriches` | Cerema brownfield inventory aggregated per commune               |
 | `education`    | Count of open schools per commune (live API)                     |
 | `bpe`          | INSEE BPE — curated commerce / health / services counts          |

@@ -54,7 +54,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `locservice`     | INSEE + property_type + rooms                  | locservice.fr HTML scrape   |
 | `osm_transit`    | lat/lon + offline station catalog              | OSM Overpass (refresh only) |
 | `gpe`            | lat/lon                                        | offline Grand Paris Express stations (SGP) |
-| `qpv`            | INSEE                                          | offline ANCT QPV 2024 list  |
+| `qpv`            | INSEE + lat/lon (point-in-polygon)             | offline ANCT QPV 2024 contours |
 | `rpls`           | INSEE                                          | offline data.gouv SRU 2024  |
 | `taxefonciere`   | INSEE + surface_m2                             | offline DGFiP rates         |
 | `lovac`          | INSEE                                          | offline LOVAC 2025 (fiscal) |
@@ -604,13 +604,20 @@ commune from the Annuaire de l'Éducation Nationale.
 
 ## `sources/qpv`
 
-Quartiers Prioritaires de la politique de la Ville (decree 2023-1314)
-membership at commune granularity.
+Quartiers Prioritaires de la politique de la Ville (decree 2023-1314):
+is the listing **inside** a QPV? Answered by point-in-polygon over the QPV
+2024 contours when coordinates are present, with a commune-level fallback.
 
-- **Needs**: INSEE.
-- **Result**: `qpv.Result` with `HasQPV`, count of QPV in the commune,
-  and the codes + labels.
-- **Backend**: offline JSON under `data/`, ~840 communes / ~1 584 QPV.
+- **Needs**: INSEE; Lat/Lon strongly recommended (unlocks the address-level
+  point-in-polygon path; without them the answer is commune-level only).
+- **Result**: `qpv.Result` with `HasQPV`, `MatchLevel` (`point` | `commune`),
+  the matched QPV code(s) + labels, and — for a point outside every QPV — a
+  `Nearest{Code,Label,Meters}` hint (within 1 km) kept out of `HasQPV`.
+  A point inside a QPV returns that single QPV at high confidence; a
+  coordinate-less query falls back to the commune's QPV list at medium
+  confidence.
+- **Backend**: offline gzipped polygon contours under `data/` (ANCT,
+  data.gouv.fr, WGS84 GeoJSON, métropole + outre-mer, ~1 584 QPV).
 
 ## `sources/zonageabc`
 
