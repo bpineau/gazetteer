@@ -6,91 +6,162 @@ import (
 	"testing"
 
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
-// TestLoad smokes the embedded dataset.
-func TestLoad(t *testing.T) {
-	t.Parallel()
-	idx, err := Load("")
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if idx == nil {
-		t.Fatalf("nil index")
-	}
-	if got := idx.Count(); got < 700 || got > 1500 {
-		t.Errorf("Count = %d, want in [700, 1500]", got)
-	}
-	if idx.Meta.RowCountQPV < 1400 {
-		t.Errorf("RowCountQPV = %d, want ≥ 1400", idx.Meta.RowCountQPV)
-	}
+func ptr(f float64) *float64 { return &f }
+
+// square returns a single-polygon MultiPolygon covering the axis-aligned
+// box [minLon,maxLon] x [minLat,maxLat].
+func square(minLon, minLat, maxLon, maxLat float64) geopoly.MultiPolygon {
+	return geopoly.MultiPolygon{geopoly.Polygon{geopoly.Ring{
+		{Lon: minLon, Lat: minLat},
+		{Lon: minLon, Lat: maxLat},
+		{Lon: maxLon, Lat: maxLat},
+		{Lon: maxLon, Lat: minLat},
+		{Lon: minLon, Lat: minLat},
+	}}}
 }
 
-// TestQuery_QPV_SaintDenis pins a known multi-QPV commune.
-func TestQuery_QPV_SaintDenis(t *testing.T) {
+// testIndex builds an Index with one QPV square in Paris (75056) plus one in
+// Saint-Denis (93066), via the test seam.
+func testIndex() *Index {
+	return NewIndexForTest([]FeatureForTest{
+		{Code: "QN07511M", Label: "Goutte D'Or", INSEE: []string{"75056"},
+			Polygons: square(2.34, 48.88, 2.36, 48.89)},
+		{Code: "QN09301M", Label: "Test SD", INSEE: []string{"93066"},
+			Polygons: square(2.35, 48.93, 2.37, 48.94)},
+	})
+}
+
+// TestQuery_PointInside proves a coordinate inside a QPV square resolves to
+// that single QPV at point granularity, high confidence.
+func TestQuery_PointInside(t *testing.T) {
 	t.Parallel()
-	l := gazetteer.Listing{INSEE: "93066"}
-	res, err := Query(context.Background(), Options{}, l)
+	l := gazetteer.Listing{INSEE: "75110", Lat: ptr(48.885), Lon: ptr(2.35)}
+	res, err := Query(context.Background(), Options{Index: testIndex()}, l)
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
-	if res == nil || res.IsEmpty() {
-		t.Fatalf("empty result for Saint-Denis (93066)")
-	}
 	if !res.HasQPV {
-		t.Errorf("HasQPV = false, want true")
+		t.Fatalf("HasQPV = false, want true (point inside Goutte d'Or)")
 	}
-	if res.QPVCount < 3 {
-		t.Errorf("QPVCount = %d, want ≥ 3", res.QPVCount)
+	if res.MatchLevel != MatchLevelPoint {
+		t.Errorf("MatchLevel = %q, want %q", res.MatchLevel, MatchLevelPoint)
 	}
-	if len(res.QPVs) != res.QPVCount {
-		t.Errorf("len(QPVs) = %d != QPVCount %d", len(res.QPVs), res.QPVCount)
+	if res.QPVCount != 1 || len(res.QPVs) != 1 {
+		t.Fatalf("QPVCount = %d, len(QPVs) = %d, want 1/1", res.QPVCount, len(res.QPVs))
 	}
-	for _, q := range res.QPVs {
-		if q.Code == "" {
-			t.Errorf("QPV with empty Code: %+v", q)
-		}
+	if res.QPVs[0].Code != "QN07511M" {
+		t.Errorf("Code = %q, want QN07511M", res.QPVs[0].Code)
 	}
 	if res.Confidence != ConfidenceHigh {
 		t.Errorf("Confidence = %q, want %q", res.Confidence, ConfidenceHigh)
 	}
 }
 
-// TestQuery_NoQPV_NeuillySurSeine pins a commune known to host no QPV.
-// Neuilly-sur-Seine (92051) is a high-income inner-ring commune with
-// no priority neighbourhood.
-func TestQuery_NoQPV_NeuillySurSeine(t *testing.T) {
+// TestQuery_PointOutside_RegressionParis10e is THE bug fix: an address in a
+// commune that hosts QPVs, but whose coordinates fall outside every polygon,
+// must answer HasQPV=false (count 0) at high confidence — not the whole
+// commune's list.
+func TestQuery_PointOutside_RegressionParis10e(t *testing.T) {
 	t.Parallel()
-	l := gazetteer.Listing{INSEE: "92051"}
-	res, err := Query(context.Background(), Options{}, l)
+	// Paris 10e centroid-ish, far from the Goutte d'Or square.
+	l := gazetteer.Listing{INSEE: "75110", Lat: ptr(48.873128), Lon: ptr(2.353599)}
+	res, err := Query(context.Background(), Options{Index: testIndex()}, l)
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
-	if res == nil {
-		t.Fatalf("nil result")
+	if res.HasQPV {
+		t.Errorf("HasQPV = true, want false (Paris 10e address is not in any QPV)")
+	}
+	if res.QPVCount != 0 {
+		t.Errorf("QPVCount = %d, want 0 (regression: must not return all 21 Paris QPV)", res.QPVCount)
+	}
+	if res.MatchLevel != MatchLevelPoint {
+		t.Errorf("MatchLevel = %q, want %q", res.MatchLevel, MatchLevelPoint)
+	}
+	if res.Confidence != ConfidenceHigh {
+		t.Errorf("Confidence = %q, want %q (an outside-all answer is high-confidence)", res.Confidence, ConfidenceHigh)
 	}
 	if !res.IsEmpty() {
-		t.Errorf("IsEmpty = false, want true (Neuilly hosts no QPV)")
+		t.Errorf("IsEmpty = false, want true")
+	}
+}
+
+// TestQuery_CommuneFallback proves the no-coordinates path returns the
+// commune's QPV list at medium confidence and commune match level.
+func TestQuery_CommuneFallback(t *testing.T) {
+	t.Parallel()
+	l := gazetteer.Listing{INSEE: "93066"} // no lat/lon
+	res, err := Query(context.Background(), Options{Index: testIndex()}, l)
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if !res.HasQPV {
+		t.Fatalf("HasQPV = false, want true (Saint-Denis hosts a QPV)")
+	}
+	if res.MatchLevel != MatchLevelCommune {
+		t.Errorf("MatchLevel = %q, want %q", res.MatchLevel, MatchLevelCommune)
+	}
+	if res.Confidence != ConfidenceMedium {
+		t.Errorf("Confidence = %q, want %q", res.Confidence, ConfidenceMedium)
+	}
+	if res.QPVCount != 1 {
+		t.Errorf("QPVCount = %d, want 1", res.QPVCount)
+	}
+}
+
+// TestQuery_CommuneFallback_FoldsArrondissement proves a Paris arrondissement
+// INSEE folds to 75056 on the commune path.
+func TestQuery_CommuneFallback_FoldsArrondissement(t *testing.T) {
+	t.Parallel()
+	l := gazetteer.Listing{INSEE: "75118"} // Paris 18e, no coords
+	res, err := Query(context.Background(), Options{Index: testIndex()}, l)
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if !res.HasQPV || res.MatchLevel != MatchLevelCommune {
+		t.Fatalf("got HasQPV=%t MatchLevel=%q, want true/commune", res.HasQPV, res.MatchLevel)
+	}
+	if res.Evidence.INSEE != "75056" {
+		t.Errorf("Evidence.INSEE = %q, want 75056 (folded)", res.Evidence.INSEE)
+	}
+}
+
+// TestQuery_Nearest exercises the nearest-QPV hint: a point just outside a
+// polygon, within NearestQPVMaxMeters, records the nearest QPV without
+// flipping HasQPV.
+func TestQuery_Nearest(t *testing.T) {
+	t.Parallel()
+	// A point ~440 m east of the Goutte d'Or square's east edge (2.36),
+	// at the same latitude band; still outside.
+	l := gazetteer.Listing{INSEE: "75110", Lat: ptr(48.885), Lon: ptr(2.366)}
+	res, err := Query(context.Background(), Options{Index: testIndex()}, l)
+	if err != nil {
+		t.Fatalf("Query: %v", err)
 	}
 	if res.HasQPV {
-		t.Errorf("HasQPV = true, want false")
+		t.Fatalf("HasQPV = true, want false (point is outside, nearest is only a hint)")
 	}
-	if res.Confidence != ConfidenceNone {
-		t.Errorf("Confidence = %q, want empty", res.Confidence)
+	if res.NearestCode != "QN07511M" {
+		t.Errorf("NearestCode = %q, want QN07511M", res.NearestCode)
+	}
+	if res.NearestMeters <= 0 || res.NearestMeters > NearestQPVMaxMeters {
+		t.Errorf("NearestMeters = %f, want (0, %f]", res.NearestMeters, NearestQPVMaxMeters)
 	}
 }
 
 // TestQuery_InsufficientInputs rejects empty INSEE.
 func TestQuery_InsufficientInputs(t *testing.T) {
 	t.Parallel()
-	_, err := Query(context.Background(), Options{}, gazetteer.Listing{})
+	_, err := Query(context.Background(), Options{Index: testIndex()}, gazetteer.Listing{})
 	if !errors.Is(err, gazetteer.ErrInsufficientInputs) {
 		t.Fatalf("err = %v, want ErrInsufficientInputs", err)
 	}
 }
 
-// TestSourceRegistered ensures the init() side-effect wired the
-// gazetteer registry.
+// TestSourceRegistered ensures the init() side-effect wired the registry.
 func TestSourceRegistered(t *testing.T) {
 	t.Parallel()
 	if got := gazetteer.Lookup(Name); got == nil {

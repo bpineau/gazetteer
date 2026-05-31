@@ -172,8 +172,10 @@ var sourceDescriptors = map[string]sourceDescriptor{
 		Inputs:  []string{"INSEE"}, Coverage: "national",
 	},
 	"qpv": {
-		Summary: "Quartiers Prioritaires de la politique de la Ville membership for the commune.",
-		Inputs:  []string{"INSEE"}, Coverage: "national",
+		Summary: "With coordinates, answers via point-in-polygon whether THIS address is inside " +
+			"a Quartier Prioritaire (QPV 2024 contours). Without coordinates, falls back to the " +
+			"commune-level QPV list (lower confidence).",
+		Inputs: []string{"INSEE", "Lat", "Lon"}, Coverage: "France métropole + outre-mer (≈1660 QPV 2024 polygons, WGS84)",
 	},
 	"anct": {
 		Summary: "ANCT programmes — Action Cœur de Ville / Petites Villes de Demain / ORT (Denormandie).",

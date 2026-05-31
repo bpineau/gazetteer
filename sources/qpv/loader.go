@@ -1,6 +1,7 @@
 package qpv
 
 import (
+	"compress/gzip"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -10,42 +11,193 @@ import (
 	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/communes"
+	"github.com/bpineau/gazetteer/helpers/geodist"
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
-//go:embed data/qpv_communes.json
+//go:embed data/qpv.json.gz
 var embedFS embed.FS
 
-// set binds the embedded extract to the datadir/refresh pipeline. Refresh
-// downloads the upstream ANCT QPV 2024 list and rebuilds the indexed JSON
-// via transform.
+// set binds the embedded contours to the datadir/refresh pipeline. Refresh
+// downloads the upstream ANCT QPV 2024 contours ZIP and rebuilds the compact
+// gzipped artifact via transform.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
-	Processed: dataset.File{Name: "qpv_communes.json"},
+	Processed: dataset.File{Name: "qpv.json.gz"},
 	Raw:       []dataset.File{{Name: rawName, URL: rawURL}},
 	Transform: transform,
 	Validate:  validate,
 }
 
-// Entry is one commune's row.
-type Entry struct {
-	Label string `json:"label,omitempty"`
-	QPVs  []QPV  `json:"qpvs,omitempty"`
+// qpvRow is one QPV in the compact embedded artifact: its identity, hosting
+// commune INSEE codes, and boundary geometry ([polygon][ring][vertex][lon,lat]).
+type qpvRow struct {
+	Code     string           `json:"code"`
+	Label    string           `json:"label,omitempty"`
+	INSEE    []string         `json:"insee,omitempty"`
+	Polygons [][][][2]float64 `json:"g"`
 }
 
-// Meta carries the manifest metadata for the embedded extract.
+// Meta carries the manifest metadata for the embedded artifact.
 type Meta struct {
-	Source           string `json:"source"`
-	RowCountCommunes int    `json:"row_count_communes"`
-	RowCountQPV      int    `json:"row_count_qpv"`
-	Note             string `json:"note"`
+	Source      string `json:"source"`
+	RowCountQPV int    `json:"row_count_qpv"`
+	RowCountCom int    `json:"row_count_communes"`
+	CRS         string `json:"crs"`
+	Note        string `json:"note"`
 }
 
-// Index is the per-INSEE lookup index.
+// processed is the on-disk JSON shape of the gzipped artifact.
+type processed struct {
+	Meta Meta     `json:"meta"`
+	QPVs []qpvRow `json:"qpvs"`
+}
+
+// poly is one resolvable QPV polygon: identity, hosting communes, geometry and
+// a precomputed bbox.
+type poly struct {
+	code, label string
+	insee       []string
+	bbox        geopoly.BBox
+	mp          geopoly.MultiPolygon
+}
+
+// Entry is one commune's QPV list (used by the commune-level fallback).
+type Entry struct {
+	Label string
+	QPVs  []QPV
+}
+
+// Index is the in-memory QPV contour index: polygons for point-in-polygon, and
+// a commune→QPVs map for the coordinate-less fallback.
 type Index struct {
-	Meta     Meta             `json:"meta"`
-	Communes map[string]Entry `json:"communes"`
+	Meta      Meta
+	polys     []poly
+	byCommune map[string]Entry
+}
+
+// hit is the result of a point-in-polygon resolve.
+type hit struct {
+	Code  string
+	Label string
+}
+
+// resolvePoint returns the QPV whose polygon contains (lat, lon), or nil when
+// the point is outside every QPV. The bbox pre-filter keeps the O(n) scan
+// cheap. polys are kept in code-sorted order (see parse / NewIndexForTest), so
+// the first cover wins deterministically on a shared boundary.
+func (idx *Index) resolvePoint(lat, lon float64) *hit {
+	if idx == nil {
+		return nil
+	}
+	p := geopoly.Point{Lon: lon, Lat: lat}
+	for i := range idx.polys {
+		pl := &idx.polys[i]
+		if pl.bbox.Contains(p) && pl.mp.Covers(p) {
+			return &hit{Code: pl.code, Label: pl.label}
+		}
+	}
+	return nil
+}
+
+// nearest returns the QPV with the smallest vertex distance to (lat, lon) and
+// that distance in metres, considering only QPVs whose bbox-expanded reach
+// could plausibly fall within maxMeters. Returns nil when none qualifies.
+func (idx *Index) nearest(lat, lon, maxMeters float64) (*hit, float64) {
+	if idx == nil {
+		return nil, 0
+	}
+	best := maxMeters
+	var bestHit *hit
+	for i := range idx.polys {
+		pl := &idx.polys[i]
+		for _, polygon := range pl.mp {
+			for _, ring := range polygon {
+				for _, v := range ring {
+					d := geodist.MetersBetween(lat, lon, v.Lat, v.Lon)
+					if d < best {
+						best = d
+						bestHit = &hit{Code: pl.code, Label: pl.label}
+					}
+				}
+			}
+		}
+	}
+	if bestHit == nil {
+		return nil, 0
+	}
+	return bestHit, best
+}
+
+// lookupCommune returns the commune's QPV entry; ok is false when the commune
+// hosts no QPV.
+func (idx *Index) lookupCommune(insee string) (Entry, bool) {
+	if idx == nil {
+		return Entry{}, false
+	}
+	insee = strings.TrimSpace(insee)
+	if insee == "" {
+		return Entry{}, false
+	}
+	e, ok := idx.byCommune[insee]
+	return e, ok
+}
+
+// PolygonCount reports the number of QPV polygons in the index.
+func (idx *Index) PolygonCount() int {
+	if idx == nil {
+		return 0
+	}
+	return len(idx.polys)
+}
+
+// CommuneCount reports the number of communes hosting at least one QPV.
+func (idx *Index) CommuneCount() int {
+	if idx == nil {
+		return 0
+	}
+	return len(idx.byCommune)
+}
+
+// FeatureForTest is one in-memory QPV used by NewIndexForTest to build an Index
+// without a dataset artifact.
+type FeatureForTest struct {
+	Code     string
+	Label    string
+	INSEE    []string
+	Polygons geopoly.MultiPolygon
+}
+
+// NewIndexForTest builds an Index from in-memory QPV polygons. Test seam:
+// production callers use Load. Commune membership folds arrondissements, same
+// as the real build.
+func NewIndexForTest(feats []FeatureForTest) *Index {
+	idx := &Index{byCommune: map[string]Entry{}}
+	for _, f := range feats {
+		pl := poly{code: f.Code, label: f.Label, insee: f.INSEE, mp: f.Polygons}
+		pl.bbox = pl.mp.Bound()
+		idx.polys = append(idx.polys, pl)
+		addCommunes(idx.byCommune, f.INSEE, f.Code, f.Label)
+	}
+	idx.Meta = Meta{RowCountQPV: len(idx.polys), RowCountCom: len(idx.byCommune)}
+	return idx
+}
+
+// addCommunes inserts a QPV into the commune→QPVs index under every hosting
+// INSEE, folding arrondissements to the parent commune (Paris/Lyon/Marseille).
+func addCommunes(m map[string]Entry, insees []string, code, label string) {
+	for _, raw := range insees {
+		ins := communes.FoldArrondissement(strings.TrimSpace(raw))
+		if ins == "" {
+			continue
+		}
+		e := m[ins]
+		e.QPVs = append(e.QPVs, QPV{Code: code, Label: label})
+		m[ins] = e
+	}
 }
 
 var (
@@ -54,65 +206,66 @@ var (
 	indexErr   error
 )
 
-// Load returns the singleton index, resolving the processed artifact from
-// dir (the datadir) with a fallback to the embedded copy, and parsing it on
-// first call. Subsequent calls are constant-time and ignore dir — the dir
-// from the first call wins for the process lifetime. A dataset that is
-// neither in the datadir nor embedded yields an empty index (graceful
-// degradation), not an error.
+// Load returns the singleton contour index, resolving the artifact from dir
+// (the datadir) with a fallback to the embedded snapshot, parsed on first call.
+// The dir from the first call wins for the process lifetime. A missing
+// (non-embedded) artifact yields an empty index rather than an error.
 func Load(dir string) (*Index, error) {
 	indexOnce.Do(func() {
-		rc, err := set.Open(dir)
-		if errors.Is(err, dataset.ErrUnavailable) {
-			indexCache = &Index{}
-			return
-		}
-		if err != nil {
-			indexErr = fmt.Errorf("qpv: open dataset: %w", err)
-			return
-		}
-		defer func() { _ = rc.Close() }()
-		idx, err := parseIndex(rc)
-		if err != nil {
-			indexErr = err
-			return
-		}
-		indexCache = idx
+		indexCache, indexErr = parse(dir)
 	})
 	return indexCache, indexErr
 }
 
-// parseIndex decodes the JSON extract into an Index.
-func parseIndex(r io.Reader) (*Index, error) {
-	body, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("qpv: read body: %w", err)
+func parse(dir string) (*Index, error) {
+	rc, err := set.Open(dir)
+	if errors.Is(err, dataset.ErrUnavailable) {
+		return &Index{byCommune: map[string]Entry{}}, nil
 	}
-	var idx Index
-	if err := json.Unmarshal(body, &idx); err != nil {
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rc.Close() }()
+	return parseIndex(rc)
+}
+
+// parseIndex decodes the gzipped JSON artifact into an Index, building both the
+// polygon list (point-in-polygon) and the commune→QPVs map (fallback).
+func parseIndex(r io.Reader) (*Index, error) {
+	gz, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, fmt.Errorf("qpv: gunzip: %w", err)
+	}
+	defer func() { _ = gz.Close() }()
+
+	var p processed
+	if err := json.NewDecoder(gz).Decode(&p); err != nil {
 		return nil, fmt.Errorf("qpv: parse json: %w", err)
 	}
-	return &idx, nil
+	idx := &Index{Meta: p.Meta, polys: make([]poly, 0, len(p.QPVs)), byCommune: map[string]Entry{}}
+	for _, r := range p.QPVs {
+		pl := poly{code: r.Code, label: r.Label, insee: r.INSEE, mp: toMultiPolygon(r.Polygons)}
+		pl.bbox = pl.mp.Bound()
+		idx.polys = append(idx.polys, pl)
+		addCommunes(idx.byCommune, r.INSEE, r.Code, r.Label)
+	}
+	return idx, nil
 }
 
-// Lookup returns the entry for the given INSEE. `ok` is false when
-// the commune hosts no QPV.
-func (idx *Index) Lookup(insee string) (Entry, bool) {
-	if idx == nil {
-		return Entry{}, false
+// toMultiPolygon converts the compact [polygon][ring][vertex][lon,lat] shape
+// into a geopoly.MultiPolygon.
+func toMultiPolygon(polys [][][][2]float64) geopoly.MultiPolygon {
+	mp := make(geopoly.MultiPolygon, 0, len(polys))
+	for _, polygon := range polys {
+		gp := make(geopoly.Polygon, 0, len(polygon))
+		for _, ring := range polygon {
+			gr := make(geopoly.Ring, 0, len(ring))
+			for _, v := range ring {
+				gr = append(gr, geopoly.Point{Lon: v[0], Lat: v[1]})
+			}
+			gp = append(gp, gr)
+		}
+		mp = append(mp, gp)
 	}
-	insee = strings.TrimSpace(insee)
-	if insee == "" {
-		return Entry{}, false
-	}
-	e, ok := idx.Communes[insee]
-	return e, ok
-}
-
-// Count returns the number of communes hosting at least one QPV.
-func (idx *Index) Count() int {
-	if idx == nil {
-		return 0
-	}
-	return len(idx.Communes)
+	return mp
 }
