@@ -92,6 +92,13 @@ type Evidence struct {
 	// False on full-text fallback or empty results.
 	NumberMatched bool `json:"number_matched"`
 
+	// StreetMatched is true when the picked row's street (voie type word
+	// + name tokens) matched the listing's street — the discriminator
+	// that tells "8 Rue des Petites Ecuries" apart from "8 Cour des
+	// Petites Ecuries". False when the query carried no usable street or
+	// the picked row is on a different voie (a wrong-street pick).
+	StreetMatched bool `json:"street_matched"`
+
 	// URL is the full data-fair URL the Source queried. Empty when the
 	// Source bailed before building a URL (insufficient inputs).
 	URL string `json:"url,omitempty"`

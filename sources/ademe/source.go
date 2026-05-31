@@ -20,7 +20,14 @@ const Name = "ademe"
 
 // sourceVersion bumps when the Source's internal logic changes.
 // Stateful callers gate cache invalidation on it.
-const sourceVersion = 2
+//
+// v3: street-aware matching. Among rows matching the listing's house
+// number, those on the same voie (street type word + name tokens, e.g.
+// "rue petites ecuries" vs "cour petites ecuries") are preferred, and
+// only a number+street+DPE match earns "high" confidence — a
+// number-matched but wrong-street row is no longer a false-positive
+// "high".
+const sourceVersion = 3
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -156,12 +163,20 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	if l.SurfaceM2 != nil {
 		wantSurface = *l.SurfaceM2
 	}
+	// wantStreetKey is the listing's street signature (type word + name
+	// tokens) — the discriminator that tells "Rue des Petites Ecuries"
+	// apart from "Cour des Petites Ecuries", which fraddr deliberately
+	// cannot (it drops the type word). Empty ⇒ no usable street ⇒
+	// street-matching is treated as "unknown", never as a mismatch.
+	wantStreetKey := streetKey(l.Address)
 	idx := -1
 	numberMatched := false
+	streetMatched := false
 	if parts.Number != "" {
-		if i, ok := PickBestByNumber(rows, parts.Number, wantSurface); ok {
+		if i, ok, sm := PickBestByNumber(rows, parts.Number, wantStreetKey, wantSurface); ok {
 			idx = i
 			numberMatched = true
+			streetMatched = sm
 		}
 	}
 	if idx == -1 {
@@ -190,9 +205,16 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	}
 	row := rows[idx]
 
+	// When the row was picked via the no-number / full-text fallback,
+	// recompute streetMatched against the finally-picked row so a
+	// fallback pick on the right street can still earn its street flag.
+	if !numberMatched {
+		streetMatched = streetMatches(wantStreetKey, row)
+	}
+
 	out := buildResult(row)
 	out.SampleSize = 1
-	out.Confidence = PickConfidence(true, numberMatched, row.EtiquetteDPE)
+	out.Confidence = PickConfidence(true, numberMatched, streetMatched, row.EtiquetteDPE)
 	out.Evidence = Evidence{
 		MatchStrategy: MatchByZipFulltext,
 		Zip:           resolvedZip,
@@ -200,6 +222,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		RawCount:      len(rows),
 		PickedIndex:   idx,
 		NumberMatched: numberMatched,
+		StreetMatched: streetMatched,
 		URL:           u,
 	}
 	return out, nil

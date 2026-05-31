@@ -309,6 +309,88 @@ func TestSource_PicksRowMatchingStreetNumber(t *testing.T) {
 	}
 }
 
+// TestSource_PrefersStreetMatchOverWrongStreet reproduces the
+// false-positive bug: the data-fair full-text query for "Rue des
+// Petites Ecuries" also returns rows for "Cour des Petites Ecuries"
+// (shared discriminating tokens). The picker must NOT pick the Cour row
+// just because its number matches; it must prefer the row whose street
+// (type + name) matches the listing, and only then report high.
+func TestSource_PrefersStreetMatchOverWrongStreet(t *testing.T) {
+	t.Parallel()
+
+	// Row A (Cour, wrong street) ranked FIRST; row B (Rue, right
+	// street) ranked second. Both share number 8 and carry a DPE.
+	body := []byte(`{"total":2,"results":[
+        {"numero_dpe":"cour","etiquette_dpe":"E","adresse_ban":"8 Cour des Petites Ecuries 75010 Paris"},
+        {"numero_dpe":"rue","etiquette_dpe":"D","adresse_ban":"8 Rue des Petites Ecuries 75010 Paris"}
+    ]}`)
+	srv := newStubServer(t, http.StatusOK, body)
+	s := NewSource(Options{
+		BaseURL:  srv.URL,
+		Geocoder: stubGeocoder{postCode: "75010"},
+	})
+	data, err := s.Query(context.Background(), gazetteer.Listing{
+		Address: "8 Rue des Petites Ecuries 75010 Paris",
+		Zip:     "75010",
+	})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	res := data.(*Result)
+	if res.Adresse == nil {
+		t.Fatal("Adresse = nil, want populated")
+	}
+	if !strings.Contains(strings.ToLower(res.Adresse.AdresseBAN), "rue des petites ecuries") {
+		t.Errorf("picked AdresseBAN = %q, want the Rue row", res.Adresse.AdresseBAN)
+	}
+	if res.DPE == nil || res.DPE.NumeroDPE != "rue" {
+		t.Errorf("picked DPE = %+v, want NumeroDPE=rue", res.DPE)
+	}
+	if res.Confidence != ConfidenceHigh {
+		t.Errorf("Confidence = %q, want high (correct street + number + DPE)", res.Confidence)
+	}
+	if !res.Evidence.StreetMatched {
+		t.Error("Evidence.StreetMatched = false, want true")
+	}
+}
+
+// TestSource_WrongStreetOnlyIsNotHigh asserts that when ONLY a
+// wrong-street row exists (number matches, DPE present, but the street
+// type differs: Cour vs Rue), the Source must not report high
+// confidence — a wrong-street pick is at most medium.
+func TestSource_WrongStreetOnlyIsNotHigh(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"total":1,"results":[
+        {"numero_dpe":"cour","etiquette_dpe":"E","adresse_ban":"8 Cour des Petites Ecuries 75010 Paris"}
+    ]}`)
+	srv := newStubServer(t, http.StatusOK, body)
+	s := NewSource(Options{
+		BaseURL:  srv.URL,
+		Geocoder: stubGeocoder{postCode: "75010"},
+	})
+	data, err := s.Query(context.Background(), gazetteer.Listing{
+		Address: "8 Rue des Petites Ecuries 75010 Paris",
+		Zip:     "75010",
+	})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	res := data.(*Result)
+	if res.Confidence == ConfidenceHigh {
+		t.Errorf("Confidence = high, want NOT high on a wrong-street pick (got street %q)",
+			func() string {
+				if res.Adresse != nil {
+					return res.Adresse.AdresseBAN
+				}
+				return ""
+			}())
+	}
+	if res.Evidence.StreetMatched {
+		t.Error("Evidence.StreetMatched = true, want false on wrong-street pick")
+	}
+}
+
 func TestSource_ConfidenceMediumWhenNoNumberMatch(t *testing.T) {
 	t.Parallel()
 
