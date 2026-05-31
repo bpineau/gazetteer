@@ -24,6 +24,7 @@ var sourceDimensions = []struct {
 	{"Équipements & écoles", []string{"bpe", "education", "ips_ecoles"}},
 	{"Contexte social & réglementaire", []string{"rpls", "qpv", "anct", "cartofriches", "zonageabc", "zonetendue"}},
 	{"Localisation", []string{"iris"}},
+	{"Liens externes", []string{"links"}},
 }
 
 // runSourcesDimensions implements `gazetteer sources dimensions`: the sources

@@ -342,6 +342,19 @@
     "result_schema": {}
   },
   {
+    "name": "links",
+    "version": 1,
+    "default": true,
+    "summary": "Deep links to third-party tools (maps, prices/DVF, Géorisques, PLU, commune fiche) for the address — built from coordinates / INSEE / address, no HTTP.",
+    "inputs": [
+      "lat/lon (or INSEE, or address)"
+    ],
+    "coverage": "national",
+    "result_schema": {
+      "links": null
+    }
+  },
+  {
     "name": "locservice",
     "version": 1,
     "default": true,

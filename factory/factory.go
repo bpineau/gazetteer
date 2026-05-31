@@ -50,6 +50,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/gpe"
 	"github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/iris"
+	"github.com/bpineau/gazetteer/sources/links"
 	"github.com/bpineau/gazetteer/sources/locservice"
 	"github.com/bpineau/gazetteer/sources/logiris"
 	"github.com/bpineau/gazetteer/sources/lovac"
@@ -197,6 +198,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(ips_ecoles.NewSource(ips_ecoles.Options{DataDir: dataDir})).
 		With(zonageabc.NewSource(zonageabc.Options{DataDir: dataDir})).
 		With(zonetendue.NewSource(zonetendue.Options{DataDir: dataDir})).
+		With(links.NewSource(links.Options{})).
 		With(gzosm.NewSource(gzosm.Options{DataDir: dataDir, Fetcher: gzosm.NewHTTPOverpassFetcher(hc, "")}))
 	return b, nil
 }

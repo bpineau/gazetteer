@@ -26,6 +26,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/gpe"
 	"github.com/bpineau/gazetteer/sources/ips_ecoles"
 	"github.com/bpineau/gazetteer/sources/iris"
+	"github.com/bpineau/gazetteer/sources/links"
 	"github.com/bpineau/gazetteer/sources/locservice"
 	"github.com/bpineau/gazetteer/sources/logiris"
 	"github.com/bpineau/gazetteer/sources/lovac"
@@ -315,6 +316,13 @@ func sourceCatalog() []sourceFactory {
 			Default: true,
 			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
 				return zonetendue.NewSource(zonetendue.Options{DataDir: d.DataDir}), nil
+			},
+		},
+		{
+			Name:    links.Name,
+			Default: true,
+			Build: func(_ *runtimeDeps) (gazetteer.Source, error) {
+				return links.NewSource(links.Options{}), nil
 			},
 		},
 	}
