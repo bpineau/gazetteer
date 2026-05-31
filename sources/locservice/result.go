@@ -47,9 +47,9 @@ const (
 type Result struct {
 	// TensionLabel is the tensiometer bucket derived from TensionScore.
 	// Sentinel value LabelEquilibre is stamped on the no-data branch
-	// (HasData=false) for backwards-compat with payloads written
+	// (SampleSize==0) for backwards-compat with payloads written
 	// before consumers learned to gate on method.params.no_data. The
-	// caller MUST check NoData first.
+	// caller MUST check IsEmpty() (or Evidence.NoData) first.
 	TensionLabel string `json:"tension_label"`
 
 	// TensionScore is the raw 0..8 LocService arrow value for the

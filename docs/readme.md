@@ -27,8 +27,8 @@ godoc found via `go doc github.com/bpineau/gazetteer/...`.
 | [testing.md](testing.md)                | Library consumers writing tests       |
 | [cli.md](cli.md)                        | End users of `cmd/gazetteer`          |
 
-For runnable examples, look at `gazetteer/example_test.go` and the
-per-source `example_test.go` files; they are reachable via
+For runnable examples, look at `gazetteer/example_test.go` and
+`appraisal/zonescore/example_test.go`; they are reachable via
 `go doc -examples ./...`.
 
 ## Project layout

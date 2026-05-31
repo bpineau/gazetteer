@@ -4,9 +4,9 @@
 //
 // The Source needs the listing's INSEE; property type is irrelevant
 // (the Filosofi profile applies to the whole commune). It returns a
-// *Result carrying median household disposable income, minima-sociaux
-// percentage and a coarse income-risk flag (low / medium / high /
-// unknown).
+// *Result carrying the revenu disponible médian par UC (€/an),
+// minima-sociaux percentage and a coarse income-risk flag (low /
+// medium / high / unknown).
 //
 // Example — wire the Source, query a Listing, and read the typed
 // payload:

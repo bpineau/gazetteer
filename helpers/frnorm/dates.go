@@ -60,7 +60,7 @@ var frenchMonthLookup = map[string]time.Month{
 // FrenchMonth returns the time.Month for a French month name.
 // Case-insensitive ; tolerates a trailing dot ("janv.") and surrounding
 // whitespace. Accepts both the accented and accent-stripped forms
-// (e.g. "fevrier" and "fevrier" both return time.February).
+// (e.g. "février" and "fevrier" both return time.February).
 //
 // Returns (0, false) for unknown inputs. The 0 month value is invalid in
 // time.Date so callers can use the boolean directly OR safely pass 0

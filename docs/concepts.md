@@ -37,6 +37,7 @@ type Listing struct {
     City, Zip    string
     INSEE        string
     Lat, Lon     *float64
+    IRIS         string // 9-digit INSEE IRIS code, set by a Normalizer with an IRISResolver
     PropertyType PropertyType
     SurfaceM2    *float64
     Rooms        *int

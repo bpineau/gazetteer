@@ -25,7 +25,7 @@
 //	})
 //	if err != nil { log.Fatal(err) }
 //	r := data.(*locservice.Result)
-//	if r.NoData {
+//	if r.IsEmpty() {
 //	    fmt.Println("no LocService reading for this INSEE × typology")
 //	    return
 //	}

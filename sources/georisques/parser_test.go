@@ -205,6 +205,9 @@ func TestBuildResult_NilReport(t *testing.T) {
 	if rb.Confidence != ConfidenceLow {
 		t.Errorf("Confidence(nil) = %q, want low", rb.Confidence)
 	}
+	if !rb.IsEmpty() || !rb.Skipped || rb.SkipReason != SkipReasonNoMatch {
+		t.Errorf("nil report: IsEmpty/Skipped/SkipReason = %v/%v/%q, want true/true/%q", rb.IsEmpty(), rb.Skipped, rb.SkipReason, SkipReasonNoMatch)
+	}
 	if rb.Address != nil || rb.Commune != nil {
 		t.Errorf("expected nil sub-blobs, got %+v", rb)
 	}

@@ -98,6 +98,11 @@ var sourceDescriptors = map[string]sourceDescriptor{
 		Inputs:  []string{"INSEE"}, Coverage: "national",
 		Feeds: []string{"zonescore: tension (commune vacancy, fallback for logiris)"},
 	},
+	"rnc": {
+		Summary: "Copropriété context from the Registre National d'Immatriculation (syndic type, mandate status, lots, construction period, QPV, ANAH-aided). Low-confidence 'à vérifier' triage hint; NO hard distress flag — procedures/arrêtés are redacted upstream.",
+		Inputs:  []string{"INSEE", "lat/lon", "address"}, Coverage: "national",
+		Feeds: []string{"buyer due-diligence: copropriété context (fiche only)"},
+	},
 	"lovac": {
 		Summary: "Per-commune fiscal vacancy rate from the LOVAC file (TLV perimeter).",
 		Inputs:  []string{"INSEE"}, Coverage: "national",

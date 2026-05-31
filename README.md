@@ -5,8 +5,8 @@ well-extracted data across dimension that matters when evaluating a
 property as an investment**:  price, rents, rental demand, tenant solvency,
 taxes, safety, transport, hazards, building quality, the social and regulatory
 context, and more. Each dimension comes from a dedicated `Source` as a
-fully-typed `Result` with documented, unit-bearing fields; a `Client.Collect`
-runs them in parallel and returns a typed `Dossier`.
+fully-typed `Result` with [documented, unit-bearing fields](docs/sources.md);
+a `Client.Collect` runs them in parallel and returns a typed `Dossier`.
 
 An optional, thin convenience layer (`appraisal` + `appraisal/zonescore`)
 consolidates a few dimensions and composites them into an high-level score .
@@ -35,6 +35,7 @@ import (
 
 	"github.com/bpineau/gazetteer/factory"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/dvf"
 )
 
@@ -58,9 +59,19 @@ func main() {
 	// payloads into a Dossier.
 	dossier := client.Collect(ctx, listing)
 
-	if r, ok := gazetteer.Get[*dvf.Result](dossier, dvf.Name); ok {
-		fmt.Printf("DVF: sample_size=%d, level=%s\n",
-			r.SampleSize, r.Evidence.LevelUsed)
+	// Pull out exactly the typed data you care about. The unit always
+	// lives in the field name (see docs/sources.md): DVF prices are
+	// integer *centimes*, so divide by 100 for €/m².
+	if r, ok := gazetteer.Get[*dvf.Result](dossier, dvf.Name); ok && r.ValueEURPerM2Cents != nil {
+		fmt.Printf("Sale price: %d €/m² over %d sales (%s confidence)\n",
+			*r.ValueEURPerM2Cents/100, r.SampleSize, r.Confidence)
+	}
+
+	// A second dimension, a second Result shape: carteloyers exposes the
+	// reference rent as a float in €/m²/month, charges comprises (CC).
+	if r, ok := gazetteer.Get[*carteloyers.Result](dossier, carteloyers.Name); ok && !r.IsEmpty() {
+		fmt.Printf("Reference rent: %.1f €/m²/month CC (%.1f–%.1f)\n",
+			r.LoyerMedEURPerM2CC, r.LoyerLowEURPerM2CC, r.LoyerHighEURPerM2CC)
 	}
 }
 ```

@@ -34,6 +34,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/oll"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/qpv"
+	"github.com/bpineau/gazetteer/sources/rnc"
 	"github.com/bpineau/gazetteer/sources/rpls"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
@@ -147,6 +148,7 @@ var sourceRenderers = map[string]sourceRenderer{
 	oll.Name:          renderOLL,
 	gzosm.Name:        renderOSM,
 	qpv.Name:          renderQPV,
+	rnc.Name:          renderRNC,
 	rpls.Name:         renderRPLS,
 	taxefonciere.Name: renderTaxeFonciere,
 	vacance.Name:      renderVacance,
@@ -724,6 +726,32 @@ func renderVacance(data any) (string, []string) {
 		headline += " (" + string(r.Tier) + ")"
 	}
 	return headline, nil
+}
+
+func renderRNC(data any) (string, []string) {
+	r, ok := data.(*rnc.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no copropriété matched in the RNC", nil
+	}
+	headline := "RNC " + r.Immatriculation
+	if r.Attention {
+		headline += " — à vérifier: " + strings.Join(r.Signals, ", ")
+	}
+	var lines []string
+	if r.LotsTotal > 0 {
+		lines = append(lines, fmt.Sprintf("%d lots (%d hab)", r.LotsTotal, r.LotsHabitation))
+	}
+	if r.TypeSyndic != "" {
+		lines = append(lines, "syndic: "+r.TypeSyndic)
+	}
+	if r.MandatEnCours != "" {
+		lines = append(lines, "mandat: "+r.MandatEnCours)
+	}
+	if r.ConstructionPeriod != "" {
+		lines = append(lines, "construction: "+r.ConstructionPeriod)
+	}
+	lines = append(lines, "match: "+string(r.MatchMethod)+"/"+r.Confidence)
+	return headline, lines
 }
 
 func renderIPSEcoles(data any) (string, []string) {

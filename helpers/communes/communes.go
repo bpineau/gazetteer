@@ -295,8 +295,8 @@ func (t *Table) NearestDept(lat, lon float64) string {
 // points in kilometers. Historical re-export of [geodist.KmBetween]:
 // `helpers/communes` was the only public package exposing this utility,
 // so existing callers depend on it. New callers should import
-// `helpers/geodist` directly to avoid pulling the embedded INSEE CSV
-// (~100 KB) along with them.
+// `helpers/geodist` directly to avoid pulling the embedded INSEE CSVs
+// (~1.4 MB france.csv plus ~0.5 MB insee_cp.csv) along with them.
 func HaversineKm(lat1, lon1, lat2, lon2 float64) float64 {
 	return geodist.KmBetween(lat1, lon1, lat2, lon2)
 }

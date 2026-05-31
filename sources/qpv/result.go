@@ -12,8 +12,8 @@ const (
 // human-readable label.
 type QPV struct {
 	// Code is the official ANCT identifier — format "QNXXXYYZ" where
-	// XX is the department code, YY the order within the department,
-	// Z a single-letter suffix.
+	// XXX is the 3-digit department code, YY the order within the
+	// department, Z a single-letter suffix.
 	Code string `json:"code"`
 
 	// Label is the QPV's official name (e.g. "Belleville",

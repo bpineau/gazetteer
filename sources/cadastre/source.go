@@ -193,10 +193,10 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 // error — soft-fail is the contract.
 //
 // The bâti dump is fetched per-INSEE; for Paris/Lyon/Marseille the
-// arrondissement INSEE comes from the parcel id (idu) when available,
-// else from the property code_arr field, else from the property
-// code_insee — in order of fidelity. This matches the bundler's
-// indexing (the parent commune INSEE returns an empty body).
+// arrondissement INSEE comes from the parcel id (idu) prefix when it
+// looks like an arrondissement code, else from the property code_insee
+// — in order of fidelity. This matches the bundler's indexing (the
+// parent commune INSEE returns an empty body).
 func (s *Source) runBati(ctx context.Context, feature Feature, parcel *Parcel, out *Result, logger *slog.Logger) {
 	batiINSEE := s.resolveBatiINSEE(feature.Properties, parcel.ID)
 	if batiINSEE == "" {
@@ -240,15 +240,13 @@ func (s *Source) runBati(ctx context.Context, feature Feature, parcel *Parcel, o
 // bundler keys per arrondissement for Paris / Lyon / Marseille, so we
 // prefer (in order):
 //
-//  1. The first 5 chars of the parcel idu when it differs from the
-//     property code_insee — that signals an arrondissement-vs-parent
-//     case and the idu is the canonical anchor.
-//  2. code_arr-derived INSEE: the property's `code_dep` + `code_arr`
-//     would be needed; we instead use `code_insee` whose value is
-//     already the arrondissement when the upstream resolved it that
-//     way for non-Paris communes.
-//  3. property code_insee — the parent code on Paris/Lyon/Marseille,
-//     which the bundler returns empty for (logged as a soft skip).
+//  1. The first 5 chars of the parcel idu when they are all digits (or
+//     a Corsica 2A/2B code) AND differ from the property code_insee —
+//     that signals an arrondissement-vs-parent case and the idu is the
+//     canonical anchor.
+//  2. property code_insee — already the arrondissement for non-PLM
+//     communes; the parent code on Paris/Lyon/Marseille, which the
+//     bundler returns empty for (logged as a soft skip).
 func (s *Source) resolveBatiINSEE(props FeatureProperties, parcelID string) string {
 	if len(parcelID) >= 5 {
 		idPrefix := parcelID[:5]

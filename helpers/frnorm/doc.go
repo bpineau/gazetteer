@@ -14,7 +14,7 @@
 // French formatting wins by default. "1 336 500,50 €" parses; the
 // Anglo "1,336,500.50" shape is rejected on purpose by
 // ParseFRPriceToCentimes (see its doc for the disambiguation rules).
-// Accent folding is case-preserving: "Etoile" → "Etoile". NBSP and
+// Accent folding is case-preserving: "Étoile" → "Etoile". NBSP and
 // narrow NBSP collapse to plain space wherever they appear.
 //
 // # When to reach for the stdlib instead

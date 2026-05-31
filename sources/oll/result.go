@@ -22,8 +22,9 @@ const (
 //
 // Envelope-only fields are the framework's responsibility (see gazetteer.Result).
 type Result struct {
-	// ObservedMedianEURPerM2 is the observed median rent, €/m²/month, charges
-	// comprises (OLL publishes loyer charges comprises). Zero when no cell
+	// ObservedMedianEURPerM2 is the observed median rent, €/m²/month, HORS
+	// CHARGES (OLL's headline indicator is the loyer de base hors charges;
+	// see RentEstimate for why this matches encadrement). Zero when no cell
 	// matched.
 	ObservedMedianEURPerM2 float64 `json:"observed_median_eur_per_m2"`
 
@@ -88,8 +89,8 @@ func (r *Result) IsEmpty() bool {
 //
 // Basis: OLL publishes the median rent HORS CHARGES per m² of habitable surface
 // (the OLL methodology's headline indicator), the same basis as encadrement
-// (loyer de référence HC) and carteloyers — so the three blend into
-// appraisal.RentValue without a unit mismatch.
+// (loyer de référence HC) and as carteloyers once it applies its CC→HC factor —
+// so the three blend into appraisal.RentValue on a single hors-charges basis.
 func (r *Result) RentEstimate() appraisal.RentEstimate {
 	if r == nil || r.ObservedMedianEURPerM2 <= 0 {
 		return appraisal.RentEstimate{}

@@ -52,11 +52,11 @@ type Result struct {
 	// address scope. Echoed verbatim from the API.
 	ReportURL string `json:"report_url,omitempty"`
 
-	// Naturels maps stable snake_case keys (cf. canonicalNaturels) to
+	// Naturels maps stable snake_case keys (cf. CanonicalNaturels) to
 	// per-risk RiskBlob. Always 12 entries on the happy path.
 	Naturels map[string]RiskBlob `json:"naturels,omitempty"`
 
-	// Technos maps stable snake_case keys (cf. canonicalTechnos) to
+	// Technos maps stable snake_case keys (cf. CanonicalTechnos) to
 	// per-risk RiskBlob. Always 6 entries on the happy path.
 	Technos map[string]RiskBlob `json:"technos,omitempty"`
 
@@ -72,10 +72,10 @@ type Result struct {
 	// "commune") that produced this Result.
 	LevelUsed string `json:"level_used,omitempty"`
 
-	// Skipped is true on the no-match sentinel result (today: only when
-	// the report parsed as fully empty) so consumers can route the row
-	// through their "skipped" path instead of trying to render absent
-	// fields.
+	// Skipped is true on the no-match sentinel result — set by
+	// BuildResult when BRGM resolved neither an Address nor a Commune —
+	// so consumers can route the row through their "skipped" path
+	// instead of trying to render absent fields. Drives IsEmpty.
 	Skipped bool `json:"skipped,omitempty"`
 
 	// SkipReason is a stable identifier populated on skipped results
@@ -149,9 +149,12 @@ type Evidence struct {
 	LevelUsed string `json:"level_used"`
 }
 
-// IsEmpty satisfies gazetteer.EmptyReporter. Returns true when the
-// BRGM report carries no Address, no Commune, and no risk data — the
-// framework records Status == StatusOKEmpty in this case.
+// IsEmpty satisfies gazetteer.EmptyReporter. Returns true when BRGM
+// resolved no scope for the point — neither an Address nor a Commune —
+// i.e. the request bounced (BuildResult marks such results Skipped). The
+// framework records Status == StatusOKEmpty in this case. A point that
+// resolves to a commune with zero live hazards is NOT empty — that is a
+// real "no hazard here" reading.
 func (r *Result) IsEmpty() bool {
 	if r == nil {
 		return true

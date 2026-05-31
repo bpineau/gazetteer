@@ -20,7 +20,7 @@ var sourceDimensions = []struct {
 	{"Transports", []string{"osm_transit", "gpe"}},
 	{"Risques & nuisances", []string{"georisques", "catnat", "nuisances"}},
 	{"Bâti & énergie", []string{"ademe", "bdnb", "dpedist"}},
-	{"Copropriété", []string{"cdsr"}},
+	{"Copropriété", []string{"cdsr", "rnc"}},
 	{"Équipements & écoles", []string{"bpe", "education", "ips_ecoles"}},
 	{"Contexte social & réglementaire", []string{"rpls", "qpv", "anct", "cartofriches", "zonageabc", "zonetendue"}},
 	{"Localisation", []string{"iris"}},

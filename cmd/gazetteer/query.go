@@ -15,9 +15,10 @@ import (
 )
 
 // runQuery implements `gazetteer query [--source ...] [--json] [--verbose]
-// [--dump] <addr>`. Normalises the address, fires the selected Sources
-// in parallel via the gazetteer Client, prints either a per-source
-// human summary or the full Dossier as JSON.
+// [--dump] [--explain] <addr>`. Normalises the address, fires the selected
+// Sources in parallel via the gazetteer Client, then prints either a
+// per-source human summary, the full Dossier as JSON (--json), or a
+// per-source why-empty/why-failed diagnosis (--explain).
 func runQuery(ctx context.Context, args []string) error {
 	q, err := parseQueryFlags("query", args)
 	if err != nil {
@@ -74,9 +75,9 @@ func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 		fs.PrintDefaults()
 	}
 	q.common.registerVerbose(fs)
-	fs.StringVar(&q.sources, "source", "", "Comma-separated source names (default: all officials + atomic rental). See list above.")
+	fs.StringVar(&q.sources, "source", "", "Comma-separated source names (default: all sources except opt-in ones like bdnb). See list above.")
 	fs.StringVar(&q.propertyType, "property-type", "apartment",
-		"Property type: apartment | house | land | commercial. Drives source eligibility (DVF, MA, encadrement, …).")
+		"Property type: apartment | house | land | commercial. Drives source eligibility (DVF, encadrement, …).")
 	fs.Float64Var(&q.surface, "surface", 0,
 		"Habitable surface in m² (e.g. 45). Required by DVF, taxe-foncière, encadrement for a meaningful answer.")
 	fs.IntVar(&q.rooms, "rooms", 0,

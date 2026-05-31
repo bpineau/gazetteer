@@ -13,10 +13,10 @@ import (
 // Name is the canonical Source identifier. Stable; used as the
 // gazetteer.Dossier results key and the registry key.
 //
-// IMPORTANT — disambiguation: `vacance` (no suffix) is the FISCAL
-// source (TLV-2013 zone classification). `vacance` is the
-// DEMOGRAPHIC vacancy-rate source (INSEE census base logement). The
-// two are correlated but not interchangeable.
+// IMPORTANT — disambiguation: `lovac` is the FISCAL source (the LOVAC
+// dataset used to assess the Taxe sur les Logements Vacants). `vacance`
+// is the DEMOGRAPHIC vacancy-rate source (INSEE census base logement).
+// The two are correlated but not interchangeable.
 const Name = "vacance"
 
 // sourceVersion bumps when the Source's internal logic changes.

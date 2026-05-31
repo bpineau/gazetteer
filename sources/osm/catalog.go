@@ -26,7 +26,7 @@ const RefreshAfter = 30 * 24 * time.Hour
 
 // Catalog is the in-memory snapshot of every train-class station in
 // metropolitan France, loaded once at process start. Lookups are
-// O(N) — N≈3-5 k at the time of writing — which is sub-millisecond on
+// O(N) — N≈9 k at the time of writing — which is sub-millisecond on
 // modern hardware and well within the per-auction budget.
 type Catalog struct {
 	SchemaVersion int       `json:"schema_version"`
@@ -57,9 +57,10 @@ func (c *Catalog) IsFresh(now time.Time) bool {
 // points stop matching catalog stations thousands of kilometres away.
 //
 // Linear scan — kept naive on purpose for MVP. A k-d-tree shaves the
-// per-call cost from ~50 µs to ~5 µs but at N≈5 000 stations × M≈8 000
-// auctions = 400 ms total enrich-run cost, which is invisible next to
-// the SQL+JSON round-trips. Revisit when M crosses 100 000.
+// per-call cost from tens of µs to a few µs but at N≈9 000 stations ×
+// M≈8 000 auctions the total enrich-run cost stays well under a second,
+// invisible next to the SQL+JSON round-trips. Revisit when M crosses
+// 100 000.
 func (c *Catalog) NearestStation(lat, lon float64) (st *Station, haversineMeters float64, walkMeters int) {
 	return c.NearestStationWithinMeters(lat, lon, 0)
 }

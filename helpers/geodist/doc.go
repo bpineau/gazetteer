@@ -7,6 +7,6 @@
 //
 // Example:
 //
-//	d := geodist.HaversineKm(48.8566, 2.3522, 45.7640, 4.8357)
-//	// d ≈ 392.0 (Paris ↔ Lyon, km)
+//	d := geodist.KmBetween(48.8566, 2.3522, 45.7640, 4.8357)
+//	// d ≈ 391.5 (Paris ↔ Lyon, km)
 package geodist
