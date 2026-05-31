@@ -1,4 +1,4 @@
-numero_immatriculation,nom_usage_copropriete,type_syndic,mandat_en_cours,numero_voie_adresse,adresse_complementaire_1,adresse_complementaire_2,adresse_complementaire_3,longitude,latitude,syndicat_cooperatif,residence_service,nombre_total_lots,nombre_lots_habitation,periode_construction,copro_aidee,code_qp_2024,nom_qp_2024,code_officiel_commune
-AA0000001,Residence A,professionnel,Mandat en cours,20 r de gramont,,,,2.3370,48.8705,non,non,39,18,AVANT_1949,Non,,,75102
-BB0000002,,,Pas de mandat en cours,47 rue des tournelles,,,,2.367037,48.858421,non,non,45,37,AVANT_1949,Non,,,75103
-CC0000003,Le Parc,benevole,Mandat en cours,1 rue des fleurs,,,,2.385,48.655,non,non,60,55,DE_1961_A_1974,Oui,QP091001,Grigny Centre,91286
+numero_immatriculation,nom_usage_copropriete,type_syndic,mandat_en_cours,numero_voie_adresse,adresse_complementaire_1,adresse_complementaire_2,adresse_complementaire_3,longitude,latitude,syndicat_cooperatif,residence_service,nombre_total_lots,nombre_lots_habitation,periode_construction,copro_aidee,code_qp_2024,nom_qp_2024,code_officiel_commune,code_officiel_arrondissement_commune
+AA0000001,Residence A,professionnel,Mandat en cours,20 r de gramont,,,,2.3370,48.8705,non,non,39,18,AVANT_1949,Non,,,75002,75102
+BB0000002,,,Pas de mandat en cours,5 av du Test,,,,2.3400,48.8600,non,non,12,0,,Non,,,75011,75111
+CC0000003,SDC bénévole,bénévole,Mandat en cours,3 rue de Grigny,benevole,,,2.3850,48.6550,oui,oui,60,28,DE_1975_A_1993,oui,91286,Grigny Centre,91350,91286

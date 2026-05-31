@@ -45,6 +45,15 @@ func TestTransform_Golden(t *testing.T) {
 	if v := by["AA0000001"].VoieNorm; v == "" || v == "20 r de gramont" {
 		t.Errorf("AA0000001 VoieNorm = %q, want normalized", v)
 	}
+	// INSEE is the COG code from code_officiel_arrondissement_commune (75102),
+	// NOT the postal code in the mislabeled code_officiel_commune (75002).
+	if got := by["AA0000001"].INSEE; got != "75102" {
+		t.Errorf("AA0000001 INSEE = %q, want 75102 (COG, not the 75002 postal code)", got)
+	}
+	// A non-PLM commune: COG 91286, not the 91350 postal code.
+	if got := by["CC0000003"].INSEE; got != "91286" {
+		t.Errorf("CC0000003 INSEE = %q, want 91286 (COG, not the 91350 postal code)", got)
+	}
 
 	// Row 2: no mandate + empty syndic.
 	s2 := sortStr(amberSignals(ptrEntry(by["BB0000002"])))
