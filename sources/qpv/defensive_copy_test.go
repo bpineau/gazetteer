@@ -7,33 +7,23 @@ import (
 	"github.com/bpineau/gazetteer/gazetteer"
 )
 
-// TestQuery_ResultSliceMutationDoesNotCorruptIndex verifies that
-// mutating the returned Result.QPVs slice does not leak back into the
-// singleton index — i.e. that the Source ships a defensive copy on the
-// happy path. Without the copy, a downstream consumer rewriting a
-// QPV entry would silently corrupt every subsequent Query.
-func TestQuery_ResultSliceMutationDoesNotCorruptIndex(t *testing.T) {
+// TestDefensiveCopy ensures a caller mutating Result.QPVs cannot corrupt
+// the shared singleton index used by subsequent queries. Exercised on the
+// commune-fallback path (no coordinates), which returns the commune's list
+// straight from the index.
+func TestDefensiveCopy(t *testing.T) {
 	t.Parallel()
-	src := NewSource(Options{})
-
-	first, err := src.Query(context.Background(), gazetteer.Listing{INSEE: "93066"})
+	l := gazetteer.Listing{INSEE: "93066"} // no coords → commune fallback
+	res1, err := Query(context.Background(), Options{}, l)
 	if err != nil {
-		t.Fatalf("Query 1: %v", err)
+		t.Fatalf("Query: %v", err)
 	}
-	r1 := first.(*Result)
-	if len(r1.QPVs) == 0 {
-		t.Skip("Saint-Denis (93066) carries no QPV entry in the embedded index; cannot exercise the defensive copy")
+	if len(res1.QPVs) == 0 {
+		t.Fatalf("no QPVs to test copy semantics")
 	}
-	beforeCode := r1.QPVs[0].Code
-	r1.QPVs[0].Code = "MUTATED"
-
-	second, err := src.Query(context.Background(), gazetteer.Listing{INSEE: "93066"})
-	if err != nil {
-		t.Fatalf("Query 2: %v", err)
-	}
-	r2 := second.(*Result)
-	if r2.QPVs[0].Code != beforeCode {
-		t.Errorf("singleton index corrupted: QPVs[0].Code expected %q after first-call mutation, got %q",
-			beforeCode, r2.QPVs[0].Code)
+	res1.QPVs[0].Code = "MUTATED"
+	res2, _ := Query(context.Background(), Options{}, l)
+	if res2.QPVs[0].Code == "MUTATED" {
+		t.Fatalf("mutation leaked into shared index")
 	}
 }

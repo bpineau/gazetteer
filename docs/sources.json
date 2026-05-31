@@ -465,13 +465,15 @@
   },
   {
     "name": "qpv",
-    "version": 1,
+    "version": 2,
     "default": true,
-    "summary": "Quartiers Prioritaires de la politique de la Ville membership for the commune.",
+    "summary": "With coordinates, answers via point-in-polygon whether THIS address is inside a Quartier Prioritaire (QPV 2024 contours). Without coordinates, falls back to the commune-level QPV list (lower confidence).",
     "inputs": [
-      "INSEE"
+      "INSEE",
+      "Lat",
+      "Lon"
     ],
-    "coverage": "national",
+    "coverage": "France métropole + outre-mer (≈1660 QPV 2024 polygons, WGS84)",
     "result_schema": {
       "has_qpv": false,
       "confidence": ""

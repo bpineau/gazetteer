@@ -1,28 +1,63 @@
 package qpv
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"io"
 	"os"
-	"reflect"
 	"testing"
 )
 
-// fixtureRawSet serves a single named file from testdata, implementing
-// dataset.RawSet for the transform under test.
-type fixtureRawSet struct{ path string }
+// zipRawSet wraps an on-disk .zip and serves it under rawName, implementing
+// dataset.RawSet for the transform under test (the upstream raw is a ZIP).
+type zipRawSet struct{ path string }
 
-func (f fixtureRawSet) Open(string) (io.ReadCloser, error) { return os.Open(f.path) }
+func (z zipRawSet) Open(string) (io.ReadCloser, error) { return os.Open(z.path) }
 
+// makeZip builds a tiny zip in memory containing the sample GeoJSON under a
+// member name that mirrors the upstream layout (GEOJSON/...WGS84.geojson), so
+// the transform's member-selection logic is exercised.
+func makeZip(t *testing.T) string {
+	t.Helper()
+	geo, err := os.ReadFile("testdata/qpv_sample.geojson")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	// A decoy non-geojson member, then the real one.
+	if w, err := zw.Create("GEOJSON/readme.txt"); err == nil {
+		_, _ = w.Write([]byte("decoy"))
+	}
+	w, err := zw.Create("GEOJSON/QP2024_France_Hexagonale_Outre_Mer_WGS84.geojson")
+	if err != nil {
+		t.Fatalf("zip create: %v", err)
+	}
+	if _, err := w.Write(geo); err != nil {
+		t.Fatalf("zip write: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("zip close: %v", err)
+	}
+	path := t.TempDir() + "/qpv_geo.zip"
+	if err := os.WriteFile(path, buf.Bytes(), 0o600); err != nil {
+		t.Fatalf("write zip: %v", err)
+	}
+	return path
+}
+
+// TestTransform_Golden feeds the tiny zipped GeoJSON fixture through transform
+// and asserts the rebuilt gzipped index carries the right polygons, codes and
+// commune membership (folding the blank-code row out).
 func TestTransform_Golden(t *testing.T) {
 	t.Parallel()
+	zipPath := makeZip(t)
+
 	var buf bytes.Buffer
-	if err := transform(context.Background(), fixtureRawSet{"testdata/listeqp2024_sample.csv"}, &buf); err != nil {
+	if err := transform(context.Background(), zipRawSet{zipPath}, &buf); err != nil {
 		t.Fatalf("transform: %v", err)
 	}
-
-	// The rebuilt bytes must validate and parse.
 	if err := validate(bytes.NewReader(buf.Bytes())); err != nil {
 		t.Fatalf("validate: %v", err)
 	}
@@ -31,67 +66,31 @@ func TestTransform_Golden(t *testing.T) {
 		t.Fatalf("parseIndex: %v", err)
 	}
 
-	// Three communes: two single (one needing zero-pad) and one multi-commune.
-	// The blank-code row is skipped.
-	if idx.Count() != 3 {
-		t.Fatalf("count = %d, want 3 (blank-code row must be skipped)", idx.Count())
+	// Three QPV polygons (blank-code row skipped).
+	if got := idx.PolygonCount(); got != 3 {
+		t.Fatalf("PolygonCount = %d, want 3 (blank-code row skipped)", got)
 	}
-	if idx.Meta.RowCountCommunes != 3 {
-		t.Errorf("RowCountCommunes = %d, want 3", idx.Meta.RowCountCommunes)
+
+	// Point-in-polygon: inside the Paris square → QN07511M.
+	res := idx.resolvePoint(48.05, 2.05)
+	if res == nil || res.Code != "QN07511M" {
+		t.Fatalf("resolvePoint(inside Paris) = %+v, want QN07511M", res)
 	}
-	if idx.Meta.RowCountQPV != 4 {
-		t.Errorf("RowCountQPV = %d, want 4", idx.Meta.RowCountQPV)
+	if res.Label != "Goutte D'Or" {
+		t.Errorf("Label = %q, want Goutte D'Or", res.Label)
 	}
+
+	// Commune membership: 75056 hosts QN07511M; the low-department code
+	// "2691" must be zero-padded to "02691".
+	if e, ok := idx.lookupCommune("75056"); !ok || len(e.QPVs) != 1 || e.QPVs[0].Code != "QN07511M" {
+		t.Errorf("75056 commune entry = %+v ok=%t, want [QN07511M]", e, ok)
+	}
+	if e, ok := idx.lookupCommune("02691"); !ok || len(e.QPVs) != 1 || e.QPVs[0].Code != "QN00201M" {
+		t.Errorf("02691 commune entry = %+v ok=%t, want [QN00201M] (zero-padded)", e, ok)
+	}
+
+	// Meta sanity.
 	if idx.Meta.Source != metaSource {
 		t.Errorf("Source = %q, want %q", idx.Meta.Source, metaSource)
-	}
-
-	want := map[string]Entry{
-		// Low-dept code "1053" is zero-padded; the two QPVs are sorted by code
-		// (input gave them out of order).
-		"01053": {
-			Label: "Bourg-en-Bresse",
-			QPVs: []QPV{
-				{Code: "QN00101M", Label: "Grande Reyssouze Terre Des Fleurs"},
-				{Code: "QN00102M", Label: "Croix Blanche"},
-			},
-		},
-		"01004": {
-			Label: "Ambérieu-en-Bugey",
-			QPVs:  []QPV{{Code: "QN00103M", Label: "Les Courbes De L'Albarine"}},
-		},
-		// Multi-commune QPV: insee_com kept verbatim as the key, lib_com as label.
-		"02571; 02691": {
-			Label: "Omissy; Saint-Quentin",
-			QPVs:  []QPV{{Code: "QN00201M", Label: "Europe"}},
-		},
-	}
-	for key, w := range want {
-		got, ok := idx.Lookup(key)
-		if !ok {
-			t.Errorf("%q: not found", key)
-			continue
-		}
-		if !reflect.DeepEqual(got, w) {
-			t.Errorf("%q: got %+v, want %+v", key, got, w)
-		}
-	}
-}
-
-func TestCommuneKey(t *testing.T) {
-	t.Parallel()
-	cases := map[string]string{
-		"1053":         "01053",
-		"01004":        "01004",
-		" 1004 ":       "01004",
-		"75056":        "75056",
-		"02571; 02691": "02571; 02691",
-		"":             "",
-		"  ":           "",
-	}
-	for in, want := range cases {
-		if got := communeKey(in); got != want {
-			t.Errorf("communeKey(%q) = %q, want %q", in, got, want)
-		}
 	}
 }

@@ -18,19 +18,28 @@ const Name = "qpv"
 // sourceVersion bumps when the Source's internal logic changes.
 //
 // History:
-//   - v1: initial release. Embeds the QPV 2024 list (decree
-//     2023-1314) at commune granularity — answers "does this commune
-//     host one or more QPVs?".
-const sourceVersion = 1
+//   - v1: commune granularity — embedded the QPV 2024 list from the ANCT
+//     CSV and answered "does this commune host one or more QPVs?".
+//   - v2: point-in-polygon. Embeds the QPV 2024 contours (WGS84) and,
+//     when the Listing carries coordinates, answers the real "is THIS
+//     address inside a QPV?". Falls back to the commune-level list (lower
+//     confidence) only when coordinates are absent.
+const sourceVersion = 2 // v2
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
 const Version = sourceVersion
 
+// NearestQPVMaxMeters caps the nearest-QPV hint: on a point match that
+// lands outside every QPV, the Source records the closest QPV only when a
+// QPV vertex lies within this distance. A hint only — it never affects
+// HasQPV. ~1 km is "the next street over could be a QPV" territory.
+const NearestQPVMaxMeters = 1000.0
+
 // Options configures a qpv Source.
 type Options struct {
 	// Index overrides the lazily-loaded singleton. Tests inject a stub
-	// here; production callers leave it nil.
+	// here (see NewIndexForTest); production callers leave it nil.
 	Index *Index
 
 	// DataDir is the gazetteer data directory. When set, a refreshed copy
@@ -39,8 +48,8 @@ type Options struct {
 	DataDir string
 }
 
-// Source implements gazetteer.Source for the per-commune QPV lookup
-// using an embedded JSON. Use NewSource to construct.
+// Source implements gazetteer.Source for the QPV lookup using embedded
+// contours. Use NewSource to construct.
 type Source struct {
 	opts Options
 }
@@ -57,21 +66,29 @@ func (s *Source) Name() string { return Name }
 func (s *Source) Version() int { return sourceVersion }
 
 // Datasets implements gazetteer.DatasetProvider, exposing the embedded
-// extract to the dataset refresh tooling.
+// contours to the dataset refresh tooling.
 func (s *Source) Datasets() []dataset.Set { return []dataset.Set{set} }
+
+func (s *Source) index() (*Index, error) {
+	if s.opts.Index != nil {
+		return s.opts.Index, nil
+	}
+	return Load(s.opts.DataDir)
+}
 
 // Query implements gazetteer.Source. Pipeline:
 //
 //  1. Require Listing.INSEE (5-digit). Without it the Source emits
 //     gazetteer.ErrInsufficientInputs.
-//  2. Look up the commune in the embedded QPV index.
-//  3. Return (*Result, nil). Communes without QPV surface as
-//     IsEmpty() (the vast majority — only ~840 communes host QPVs).
+//  2. If Lat/Lon are present: point-in-polygon. Inside a QPV → HasQPV
+//     true with that single QPV; outside all → HasQPV false (the correct
+//     answer for most addresses). Both are MatchLevelPoint /
+//     ConfidenceHigh. An outside hit optionally records a NearestQPV hint
+//     when a QPV lies within NearestQPVMaxMeters.
+//  3. If coordinates are absent: fall back to the commune-level list
+//     (arrondissements folded), MatchLevelCommune / ConfidenceMedium.
 //
-// Property type is irrelevant — QPV designation is geographic. Note
-// also that this Source operates at the commune level, NOT the
-// address level: a positive result tells the caller the commune
-// contains QPVs, not that the specific listing is inside one.
+// Property type is irrelevant — QPV designation is geographic.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	_ = ctx
 	insee := strings.TrimSpace(l.INSEE)
@@ -79,46 +96,88 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		return nil, fmt.Errorf("qpv: %w: listing.INSEE required", gazetteer.ErrInsufficientInputs)
 	}
 
-	idx := s.opts.Index
-	if idx == nil {
-		loaded, err := Load(s.opts.DataDir)
-		if err != nil {
-			return nil, fmt.Errorf("qpv: %w: load dataset: %w", gazetteer.ErrUpstreamPermanent, err)
-		}
-		idx = loaded
+	idx, err := s.index()
+	if err != nil {
+		return nil, fmt.Errorf("qpv: %w: load dataset: %w", gazetteer.ErrUpstreamPermanent, err)
 	}
 
-	// Paris / Lyon / Marseille arrondissements share the parent
-	// commune's QPV list — the ANCT publishes QPVs against the
-	// parent commune INSEE only (75056 / 69123 / 13055).
-	insee = communes.FoldArrondissement(insee)
+	// Point-in-polygon path — the authoritative answer when we have
+	// coordinates. (0,0) is the "unset coords" sentinel.
+	if l.Lat != nil && l.Lon != nil && !(*l.Lat == 0 && *l.Lon == 0) {
+		return s.queryPoint(idx, *l.Lat, *l.Lon), nil
+	}
 
+	// Commune-level fallback — no coordinates.
+	return s.queryCommune(idx, insee), nil
+}
+
+// queryPoint runs point-in-polygon over the QPV contours.
+func (s *Source) queryPoint(idx *Index, lat, lon float64) *Result {
+	ev := Evidence{
+		MatchLevel:   MatchLevelPoint,
+		Lat:          lat,
+		Lon:          lon,
+		PolygonCount: idx.PolygonCount(),
+	}
+	if h := idx.resolvePoint(lat, lon); h != nil {
+		return &Result{
+			HasQPV:     true,
+			QPVCount:   1,
+			QPVs:       []QPV{{Code: h.Code, Label: h.Label}},
+			MatchLevel: MatchLevelPoint,
+			Confidence: ConfidenceHigh,
+			Evidence:   ev,
+		}
+	}
+	// Outside every QPV — the correct (high-confidence) answer for most
+	// addresses. Attach the nearest-QPV hint if one is close enough.
+	res := &Result{
+		MatchLevel: MatchLevelPoint,
+		Confidence: ConfidenceHigh,
+		Evidence:   ev,
+	}
+	if near, dist := idx.nearest(lat, lon, NearestQPVMaxMeters); near != nil {
+		res.NearestCode = near.Code
+		res.NearestLabel = near.Label
+		res.NearestMeters = dist
+	}
+	return res
+}
+
+// queryCommune runs the coordinate-less commune-level fallback.
+func (s *Source) queryCommune(idx *Index, insee string) *Result {
+	// Paris / Lyon / Marseille arrondissements share the parent commune's
+	// QPV list. Folding is only needed on this path — point-in-polygon
+	// needs no commune at all.
+	insee = communes.FoldArrondissement(insee)
 	ev := Evidence{
 		INSEE:            insee,
-		RowCountCommunes: idx.Count(),
+		MatchLevel:       MatchLevelCommune,
+		PolygonCount:     idx.PolygonCount(),
+		RowCountCommunes: idx.CommuneCount(),
 	}
-	e, ok := idx.Lookup(insee)
+	e, ok := idx.lookupCommune(insee)
 	if !ok {
 		return &Result{
+			MatchLevel: MatchLevelCommune,
 			Confidence: ConfidenceNone,
 			Evidence:   ev,
-		}, nil
+		}
 	}
 	ev.CommuneLabel = e.Label
 	return &Result{
 		HasQPV:     true,
 		QPVCount:   len(e.QPVs),
 		QPVs:       copyQPVs(e.QPVs),
-		Confidence: ConfidenceHigh,
+		MatchLevel: MatchLevelCommune,
+		Confidence: ConfidenceMedium,
 		Evidence:   ev,
-	}, nil
+	}
 }
 
-// copyQPVs returns a shallow copy of s. The Source's embedded
-// singleton index is shared across all Query calls; without the copy
-// a caller mutating Result.QPVs would corrupt the next call's
-// reading. Cheap (most QPV-hosting communes carry 1-3 entries; the
-// largest tops out around 30).
+// copyQPVs returns a shallow copy of s. The Source's embedded singleton
+// index is shared across all Query calls; without the copy a caller
+// mutating Result.QPVs would corrupt the next call's reading.
 func copyQPVs(s []QPV) []QPV {
 	if s == nil {
 		return nil

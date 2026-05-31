@@ -1,0 +1,39 @@
+{
+  "type": "FeatureCollection",
+  "name": "QP2024_sample",
+  "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "code_qp": "QN07511M", "lib_qp": "Goutte D'Or", "insee_com": "75056", "lib_com": "Paris" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [ [ [2.0, 48.0], [2.0, 48.1], [2.1, 48.1], [2.1, 48.0], [2.0, 48.0] ] ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "code_qp": "QN09301M", "lib_qp": "Test Saint-Denis", "insee_com": "93066", "lib_com": "Saint-Denis" },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [ [ [ [3.0, 49.0], [3.0, 49.1], [3.1, 49.1], [3.1, 49.0], [3.0, 49.0] ] ] ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "code_qp": "QN00201M", "lib_qp": "Europe", "insee_com": "2691", "lib_com": "Saint-Quentin" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [ [ [4.0, 50.0], [4.0, 50.1], [4.1, 50.1], [4.1, 50.0], [4.0, 50.0] ] ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "code_qp": "", "lib_qp": "Blank Skip", "insee_com": "99999", "lib_com": "Nowhere" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [ [ [5.0, 51.0], [5.0, 51.1], [5.1, 51.1], [5.1, 51.0], [5.0, 51.0] ] ]
+      }
+    }
+  ]
+}

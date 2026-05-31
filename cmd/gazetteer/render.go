@@ -508,12 +508,15 @@ func renderEducation(data any) (string, []string) {
 func renderQPV(data any) (string, []string) {
 	r, ok := data.(*qpv.Result)
 	if !ok || r == nil || r.IsEmpty() {
-		return "no QPV in this commune", nil
+		return "address not in a QPV", nil
 	}
-	headline := fmt.Sprintf("%d QPV in commune", r.QPVCount)
-	extra := make([]string, 0, len(r.QPVs))
+	headline := fmt.Sprintf("has_qpv=%t (%s, %d QPV)", r.HasQPV, r.MatchLevel, r.QPVCount)
+	extra := make([]string, 0, len(r.QPVs)+1)
 	for _, q := range r.QPVs {
 		extra = append(extra, fmt.Sprintf("%s — %s", q.Code, q.Label))
+	}
+	if r.NearestCode != "" {
+		extra = append(extra, fmt.Sprintf("nearest: %s (%.0f m)", r.NearestLabel, r.NearestMeters))
 	}
 	return headline, extra
 }

@@ -1,52 +1,75 @@
 package qpv
 
 import (
+	"archive/zip"
+	"bytes"
+	"compress/gzip"
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
 
-// rawName is the datadir filename for the upstream raw input — the ANCT
-// "Liste des quartiers prioritaires de la politique de la ville 2024"
-// CSV (one row per QPV, COG 2024 communal geography).
-const rawName = "listeqp2024.raw.csv"
+// coordDecimals rounds contour coordinates to ~11 m — well within QPV boundary
+// fidelity (city-block scale), and enough to keep the embedded artifact under
+// ~1.5 MB gzipped.
+const coordDecimals = 4
 
-// rawURL is the ANCT national QPV 2024 list (format COG 2024), published
-// on the data.gouv.fr dataset slug
-// quartiers-prioritaires-de-la-politique-de-la-ville-qpv. data.gouv mints
-// a dated static path per revision; bump this when the ANCT republishes
-// the list (the slug page lists the current resource).
-const rawURL = "https://static.data.gouv.fr/resources/quartiers-prioritaires-de-la-politique-de-la-ville-qpv/20260116-110350/listeqp2024-cog2024.csv"
+// rawName is the datadir filename for the upstream raw input — the ANCT QPV
+// 2024 contours ZIP (it bundles several GeoJSON variants; we use the WGS84
+// hexagonale + outre-mer one).
+const rawName = "qpv_geo.zip"
 
-// metaSource is the provenance string recorded in the rebuilt artifact —
-// kept byte-identical to the committed embed so a refresh is a no-op diff.
-const metaSource = "data.gouv.fr ANCT — Quartiers Prioritaires Politique de la Ville (QPV 2024)"
+// rawURL is the ANCT national QPV 2024 contours ZIP, published on the
+// data.gouv.fr dataset slug
+// quartiers-prioritaires-de-la-politique-de-la-ville-qpv. data.gouv mints a
+// dated static path per revision; bump this when the ANCT republishes (the
+// slug page lists the current resource).
+const rawURL = "https://static.data.gouv.fr/resources/quartiers-prioritaires-de-la-politique-de-la-ville-qpv/20260115-204323/qpv-2024-geojson.zip"
 
-// metaNote documents the artifact semantics; byte-identical to the embed.
-const metaNote = "Communes hosting at least one QPV. Effective 1 January 2024 (decree 2023-1314)."
+// geojsonMemberMarker selects the WGS84 hexagonale + outre-mer GeoJSON member
+// inside the ZIP. The other members are Lambert-93 / UTM (reprojection we
+// avoid) or per-territory subsets.
+const geojsonMemberMarker = "WGS84.geojson"
 
-// Upstream column headers in listeqp2024-cog2024.csv.
+// metaSource is the provenance string recorded in the rebuilt artifact.
+const metaSource = "data.gouv.fr ANCT — Quartiers Prioritaires Politique de la Ville (QPV 2024) contours"
+
+// metaCRS records the coordinate system of the embedded geometry.
+const metaCRS = "WGS84 (CRS84, lon/lat)"
+
+// metaNote documents the artifact semantics + coverage limitation.
+const metaNote = "QPV 2024 contours (decree 2023-1314, effective 1 January 2024). " +
+	"Métropole + Outre-mer in WGS84. Point-in-polygon membership; commune index for the coordinate-less fallback."
+
+// Upstream GeoJSON property keys (QP2024_*_WGS84.geojson). Each feature
+// carries exactly one hosting commune (insee_com / lib_com) — the contours
+// are published one feature per QPV-within-commune.
 const (
-	colCodeQP = "code_qp"   // QPV code, format "QNXXXYYZ"
-	colLibQP  = "lib_qp"    // QPV name
-	colInsee  = "insee_com" // hosting commune INSEE (a "; "-joined list when the QPV spans communes)
-	colLibCom = "lib_com"   // hosting commune name (matching "; "-joined when multi-commune)
+	propCodeQP = "code_qp"   // QPV code, format "QNXXXNNL"
+	propLibQP  = "lib_qp"    // QPV name
+	propInsee  = "insee_com" // hosting commune INSEE (5-digit, zero-padded)
 )
 
-// transform rebuilds the processed qpv artifact from the upstream ANCT CSV.
-// Each row is one QPV with its hosting commune(s). The transform groups
-// QPVs under their insee_com key — a single INSEE for single-commune QPVs
-// (zero-padded to 5 digits), or the verbatim "; "-joined list the ANCT
-// publishes for QPVs straddling several communes. lib_com supplies the
-// commune label (also "; "-joined when multi-commune). QPVs are sorted by
-// code within each commune so the output is deterministic.
+// feature is one decoded GeoJSON feature (only the fields we keep).
+type feature struct {
+	Properties map[string]json.RawMessage `json:"properties"`
+	Geometry   struct {
+		Type        string          `json:"type"`
+		Coordinates json.RawMessage `json:"coordinates"`
+	} `json:"geometry"`
+}
+
+// transform rebuilds the processed qpv artifact from the upstream contours ZIP.
+// It opens the ZIP, picks the WGS84 GeoJSON member, extracts per-QPV {code,
+// label, commune INSEEs, multipolygon}, rounds coordinates, and emits a compact
+// gzipped JSON artifact (nested float arrays, not raw GeoJSON).
 func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	rc, err := raw.Open(rawName)
 	if err != nil {
@@ -54,105 +77,181 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	}
 	defer func() { _ = rc.Close() }()
 
-	cr := csv.NewReader(dataset.BOMReader(rc))
-	cr.Comma = ';'
-	cr.FieldsPerRecord = -1
-
-	header, err := cr.Read()
+	body, err := io.ReadAll(rc)
 	if err != nil {
-		return fmt.Errorf("qpv: read header: %w", err)
+		return fmt.Errorf("qpv: read raw zip: %w", err)
 	}
-	codeQP := indexOf(header, colCodeQP)
-	libQP := indexOf(header, colLibQP)
-	insee := indexOf(header, colInsee)
-	libCom := indexOf(header, colLibCom)
-	if codeQP < 0 || libQP < 0 || insee < 0 || libCom < 0 {
-		return fmt.Errorf("qpv: header missing required columns: %v", header)
+	zr, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		return fmt.Errorf("qpv: open zip: %w", err)
 	}
 
-	communes := map[string]Entry{}
-	qpvCount := 0
-	for {
-		rec, err := cr.Read()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("qpv: read row: %w", err)
-		}
-		code := strings.TrimSpace(rec[codeQP])
+	geo, err := openGeoJSONMember(zr)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = geo.Close() }()
+
+	var fc struct {
+		Features []feature `json:"features"`
+	}
+	if err := json.NewDecoder(dataset.BOMReader(geo)).Decode(&fc); err != nil {
+		return fmt.Errorf("qpv: decode geojson: %w", err)
+	}
+
+	out := make([]qpvRow, 0, len(fc.Features))
+	communeSet := map[string]struct{}{}
+	for _, f := range fc.Features {
+		code := strProp(f.Properties, propCodeQP)
 		if code == "" {
 			continue
 		}
-		key := communeKey(rec[insee])
-		if key == "" {
+		polys, err := decodeGeometry(f.Geometry.Type, f.Geometry.Coordinates)
+		if err != nil {
+			return fmt.Errorf("qpv: %s: %w", code, err)
+		}
+		if len(polys) == 0 {
 			continue
 		}
-		e := communes[key]
-		e.Label = strings.TrimSpace(rec[libCom])
-		e.QPVs = append(e.QPVs, QPV{Code: code, Label: strings.TrimSpace(rec[libQP])})
-		communes[key] = e
-		qpvCount++
+		insees := splitINSEE(strProp(f.Properties, propInsee))
+		for _, ins := range insees {
+			communeSet[ins] = struct{}{}
+		}
+		out = append(out, qpvRow{
+			Code:     code,
+			Label:    strProp(f.Properties, propLibQP),
+			INSEE:    insees,
+			Polygons: polys,
+		})
 	}
-	if len(communes) == 0 {
-		return errors.New("qpv: transform produced no communes")
+	if len(out) == 0 {
+		return errors.New("qpv: transform produced no features")
 	}
-	for k, e := range communes {
-		sort.Slice(e.QPVs, func(i, j int) bool { return e.QPVs[i].Code < e.QPVs[j].Code })
-		communes[k] = e
-	}
+	// Deterministic order for byte-stable output (and first-cover tie-breaks).
+	sort.Slice(out, func(i, j int) bool { return out[i].Code < out[j].Code })
 
-	idx := Index{
+	p := processed{
 		Meta: Meta{
-			Source:           metaSource,
-			RowCountCommunes: len(communes),
-			RowCountQPV:      qpvCount,
-			Note:             metaNote,
+			Source:      metaSource,
+			RowCountQPV: len(out),
+			RowCountCom: len(communeSet),
+			CRS:         metaCRS,
+			Note:        metaNote,
 		},
-		Communes: communes,
+		QPVs: out,
 	}
-	return json.NewEncoder(dst).Encode(idx)
+	gz := gzip.NewWriter(dst)
+	if err := json.NewEncoder(gz).Encode(p); err != nil {
+		return err
+	}
+	return gz.Close()
 }
 
-// communeKey normalises the upstream insee_com field into the artifact key.
-// A bare commune code is zero-padded to the canonical 5 digits (the ANCT
-// CSV drops the leading zero for departments < 10, e.g. "1053"). A
-// multi-commune QPV arrives as a "; "-joined list already zero-padded by
-// the ANCT (e.g. "02571; 02691"); it is kept verbatim.
-func communeKey(insee string) string {
-	insee = strings.TrimSpace(insee)
-	if insee == "" {
+// openGeoJSONMember returns a reader over the WGS84 GeoJSON member of the ZIP.
+func openGeoJSONMember(zr *zip.Reader) (io.ReadCloser, error) {
+	for _, f := range zr.File {
+		if strings.HasSuffix(f.Name, geojsonMemberMarker) {
+			return f.Open()
+		}
+	}
+	return nil, fmt.Errorf("qpv: no %q member in zip", geojsonMemberMarker)
+}
+
+// strProp extracts a string property (decoded JSON string) from a feature.
+func strProp(props map[string]json.RawMessage, key string) string {
+	raw, ok := props[key]
+	if !ok {
 		return ""
 	}
-	if strings.Contains(insee, ";") {
-		return insee
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return ""
 	}
-	for len(insee) < 5 {
-		insee = "0" + insee
-	}
-	return insee
+	return strings.TrimSpace(s)
 }
 
-// validate gates publication: the rebuilt artifact must parse and be
-// non-empty.
+// splitINSEE parses the insee_com property into a slice of zero-padded 5-digit
+// INSEE codes. The WGS84 contours carry a single commune per feature, but a
+// comma-separated form is tolerated defensively and each code zero-padded.
+func splitINSEE(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		for len(p) < 5 {
+			p = "0" + p
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+// decodeGeometry normalises a GeoJSON Polygon or MultiPolygon into the
+// [polygon][ring][vertex][lon,lat] shape, rounding coordinates.
+func decodeGeometry(typ string, coords json.RawMessage) ([][][][2]float64, error) {
+	switch typ {
+	case "Polygon":
+		var p [][][]float64
+		if err := json.Unmarshal(coords, &p); err != nil {
+			return nil, fmt.Errorf("polygon coords: %w", err)
+		}
+		return [][][][2]float64{roundRings(p)}, nil
+	case "MultiPolygon":
+		var mp [][][][]float64
+		if err := json.Unmarshal(coords, &mp); err != nil {
+			return nil, fmt.Errorf("multipolygon coords: %w", err)
+		}
+		out := make([][][][2]float64, 0, len(mp))
+		for _, p := range mp {
+			out = append(out, roundRings(p))
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("unsupported geometry type %q", typ)
+	}
+}
+
+func roundRings(rings [][][]float64) [][][2]float64 {
+	out := make([][][2]float64, 0, len(rings))
+	for _, ring := range rings {
+		rr := make([][2]float64, 0, len(ring))
+		for _, v := range ring {
+			if len(v) < 2 {
+				continue
+			}
+			rr = append(rr, [2]float64{roundTo(v[0]), roundTo(v[1])})
+		}
+		out = append(out, rr)
+	}
+	return out
+}
+
+func roundTo(f float64) float64 {
+	p := math.Pow(10, coordDecimals)
+	return math.Round(f*p) / p
+}
+
+// validate gates a freshly-built artifact: it must gunzip, parse, and carry a
+// plausible number of QPVs with geometry.
 func validate(r io.Reader) error {
 	idx, err := parseIndex(r)
 	if err != nil {
 		return err
 	}
-	if idx.Count() == 0 {
-		return errors.New("qpv: validated artifact has no communes")
+	if idx.PolygonCount() == 0 {
+		return errors.New("qpv: validated artifact has no QPV polygons")
 	}
-	return nil
-}
-
-// indexOf returns the index of the column whose trimmed header equals name,
-// or -1.
-func indexOf(header []string, name string) int {
-	for i, h := range header {
-		if strings.TrimSpace(h) == name {
-			return i
+	for i := range idx.polys {
+		if idx.polys[i].code == "" || len(idx.polys[i].mp) == 0 {
+			return fmt.Errorf("qpv: polygon %d has no code/geometry", i)
 		}
 	}
-	return -1
+	return nil
 }
