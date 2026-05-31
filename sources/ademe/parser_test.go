@@ -84,17 +84,19 @@ func TestPickBestByNumber_LeadingMatch(t *testing.T) {
 		{AdresseBAN: "82 Rue de la Roquette 75011 Paris", EtiquetteDPE: "D"},
 		{AdresseBAN: "84 Rue de la Roquette 75011 Paris", EtiquetteDPE: "C"},
 	}
-	idx, ok := PickBestByNumber(rows, "82", 0)
+	// Empty street key → number-only behaviour (street-aware preference
+	// is a no-op, so these pin the pre-v3 number semantics unchanged).
+	idx, ok, _ := PickBestByNumber(rows, "82", "", 0)
 	if !ok || idx != 1 {
 		t.Fatalf("PickBestByNumber(82) = (%d, %v), want (1, true)", idx, ok)
 	}
-	if i, ok := PickBestByNumber(rows, "78", 0); !ok || i != 0 {
+	if i, ok, _ := PickBestByNumber(rows, "78", "", 0); !ok || i != 0 {
 		t.Errorf("PickBestByNumber(78) = (%d, %v), want (0, true)", i, ok)
 	}
-	if i, ok := PickBestByNumber(rows, "99", 0); ok || i != -1 {
+	if i, ok, _ := PickBestByNumber(rows, "99", "", 0); ok || i != -1 {
 		t.Errorf("PickBestByNumber(99) = (%d, %v), want (-1, false)", i, ok)
 	}
-	if i, ok := PickBestByNumber(rows, "", 0); ok || i != -1 {
+	if i, ok, _ := PickBestByNumber(rows, "", "", 0); ok || i != -1 {
 		t.Errorf("PickBestByNumber(\"\") = (%d, %v), want (-1, false)", i, ok)
 	}
 }
@@ -106,10 +108,10 @@ func TestPickBestByNumber_DoesNotMatchOnPrefix(t *testing.T) {
 	rows := []Row{
 		{AdresseBAN: "180 Rue X 75011 Paris"},
 	}
-	if i, ok := PickBestByNumber(rows, "18", 0); ok || i != -1 {
+	if i, ok, _ := PickBestByNumber(rows, "18", "", 0); ok || i != -1 {
 		t.Errorf("PickBestByNumber(18) on 180 = (%d, %v), want (-1, false)", i, ok)
 	}
-	if i, ok := PickBestByNumber(rows, "180", 0); !ok || i != 0 {
+	if i, ok, _ := PickBestByNumber(rows, "180", "", 0); !ok || i != 0 {
 		t.Errorf("PickBestByNumber(180) on 180 = (%d, %v), want (0, true)", i, ok)
 	}
 }
@@ -120,7 +122,7 @@ func TestPickBestByNumber_LetterSuffix(t *testing.T) {
 	rows := []Row{
 		{AdresseBAN: "82B Rue X"},
 	}
-	if i, ok := PickBestByNumber(rows, "82", 0); !ok || i != 0 {
+	if i, ok, _ := PickBestByNumber(rows, "82", "", 0); !ok || i != 0 {
 		t.Errorf("PickBestByNumber(82) on 82B = (%d, %v), want (0, true)", i, ok)
 	}
 }
@@ -145,7 +147,7 @@ func TestPickBestByNumber_RangeRightBound(t *testing.T) {
 		{"99", -1},
 	}
 	for _, tc := range cases {
-		i, ok := PickBestByNumber(rows, tc.num, 0)
+		i, ok, _ := PickBestByNumber(rows, tc.num, "", 0)
 		if (tc.idx == -1 && (ok || i != -1)) || (tc.idx >= 0 && (!ok || i != tc.idx)) {
 			t.Errorf("PickBestByNumber(%q) = (%d, %v), want (%d, %v)", tc.num, i, ok, tc.idx, tc.idx >= 0)
 		}
@@ -159,8 +161,76 @@ func TestPickBestByNumber_FallbackToAdresseBrut(t *testing.T) {
 	rows := []Row{
 		{AdresseBrut: "82 RUE DE LA ROQUETTE"},
 	}
-	if i, ok := PickBestByNumber(rows, "82", 0); !ok || i != 0 {
+	if i, ok, _ := PickBestByNumber(rows, "82", "", 0); !ok || i != 0 {
 		t.Errorf("PickBestByNumber on AdresseBrut = (%d, %v), want (0, true)", i, ok)
+	}
+}
+
+// TestPickBestByNumber_PrefersStreet pins the v3 street-aware
+// preference: among number-matching rows, the one on the listing's
+// street is chosen even when a wrong-street row precedes it; and when no
+// number-matching row is on the right street, the picker falls back to
+// the number-only set reporting streetMatched=false.
+func TestPickBestByNumber_PrefersStreet(t *testing.T) {
+	t.Parallel()
+
+	rows := []Row{
+		{AdresseBAN: "8 Cour des Petites Ecuries 75010 Paris"},
+		{AdresseBAN: "8 Rue des Petites Ecuries 75010 Paris"},
+	}
+	want := streetKey("8 Rue des Petites Ecuries 75010 Paris")
+	idx, ok, sm := PickBestByNumber(rows, "8", want, 0)
+	if !ok || idx != 1 || !sm {
+		t.Errorf("PickBestByNumber = (%d,%v,%v), want (1,true,true)", idx, ok, sm)
+	}
+
+	onlyCour := []Row{{AdresseBAN: "8 Cour des Petites Ecuries 75010 Paris"}}
+	idx, ok, sm = PickBestByNumber(onlyCour, "8", want, 0)
+	if !ok || idx != 0 || sm {
+		t.Errorf("PickBestByNumber(fallback) = (%d,%v,%v), want (0,true,false)", idx, ok, sm)
+	}
+}
+
+// TestStreetKey pins the street-signature normalisation: type word kept
+// + canonicalised, number and postal code stripped, article/preposition
+// stopwords dropped, accents folded. streetMatches must reject a
+// different voie type and treat an empty want-key as "unknown".
+func TestStreetKey(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		addr string
+		want string
+	}{
+		{"8 Rue des Petites Ecuries 75010 Paris", "rue petites ecuries"},
+		{"8 Cour des Petites Ecuries 75010 Paris", "cour petites ecuries"},
+		{"12 av. de la République 75011 Paris", "avenue republique"},
+		{"12 Avenue de la Republique 75011 Paris", "avenue republique"},
+		{"3 bd Voltaire", "boulevard voltaire"},
+		{"5 Boulevard Voltaire", "boulevard voltaire"},
+		{"  10   Rue   du   Château  75008 Paris ", "rue chateau"},
+		{"75010 Paris", ""},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.addr, func(t *testing.T) {
+			if got := streetKey(tt.addr); got != tt.want {
+				t.Errorf("streetKey(%q) = %q, want %q", tt.addr, got, tt.want)
+			}
+		})
+	}
+
+	rue := Row{AdresseBAN: "8 Rue des Petites Ecuries 75010 Paris"}
+	cour := Row{AdresseBAN: "8 Cour des Petites Ecuries 75010 Paris"}
+	wantRue := streetKey("8 Rue des Petites Ecuries 75010 Paris")
+	if !streetMatches(wantRue, rue) {
+		t.Error("streetMatches(rue, rue row) = false, want true")
+	}
+	if streetMatches(wantRue, cour) {
+		t.Error("streetMatches(rue, cour row) = true, want false (different voie)")
+	}
+	if streetMatches("", rue) {
+		t.Error("streetMatches(empty, row) = true, want false (unknown ≠ match)")
 	}
 }
 
@@ -210,16 +280,16 @@ func TestPickBestByNumber_SurfaceTieBreak(t *testing.T) {
 		{AdresseBAN: "82 Rue X", EtiquetteDPE: "E", SurfaceHabitableLogement: &s38},
 		{AdresseBAN: "82 Rue X", EtiquetteDPE: "D", SurfaceHabitableLogement: &s48},
 	}
-	idx, ok := PickBestByNumber(rows, "82", 46)
+	idx, ok, _ := PickBestByNumber(rows, "82", "", 46)
 	if !ok || idx != 2 {
 		t.Errorf("PickBestByNumber(82, 46) = (%d, %v), want (2, true)", idx, ok)
 	}
 	// Caller wants 100 m² → picks the 103 m² row.
-	if i, _ := PickBestByNumber(rows, "82", 100); i != 0 {
+	if i, _, _ := PickBestByNumber(rows, "82", "", 100); i != 0 {
 		t.Errorf("PickBestByNumber(82, 100) = %d, want 0", i)
 	}
 	// wantSurface == 0 keeps the historical "first match" behaviour.
-	if i, _ := PickBestByNumber(rows, "82", 0); i != 0 {
+	if i, _, _ := PickBestByNumber(rows, "82", "", 0); i != 0 {
 		t.Errorf("PickBestByNumber(82, 0) = %d, want 0 (first match)", i)
 	}
 }
@@ -235,7 +305,7 @@ func TestPickBestByNumber_SurfaceTieBreak_IgnoresRowsWithoutSurface(t *testing.T
 		{AdresseBAN: "82 Rue X", EtiquetteDPE: "G"},
 		{AdresseBAN: "82 Rue X", EtiquetteDPE: "F", SurfaceHabitableLogement: &s500},
 	}
-	if i, _ := PickBestByNumber(rows, "82", 46); i != 1 {
+	if i, _, _ := PickBestByNumber(rows, "82", "", 46); i != 1 {
 		t.Errorf("PickBestByNumber(82, 46) = %d, want 1 (only ranked row)", i)
 	}
 }
@@ -266,20 +336,22 @@ func TestPickConfidence(t *testing.T) {
 		name      string
 		matched   bool
 		num       bool
+		street    bool
 		etiquette string
 		want      string
 	}{
-		{"unmatched", false, false, "", ConfidenceLow},
-		{"num+etiquette", true, true, "D", ConfidenceHigh},
-		{"num only", true, true, "", ConfidenceMedium},
-		{"etiquette only", true, false, "F", ConfidenceMedium},
-		{"matched but neither", true, false, "", ConfidenceLow},
+		{"unmatched", false, false, false, "", ConfidenceLow},
+		{"num+street+etiquette", true, true, true, "D", ConfidenceHigh},
+		{"num+etiquette wrong street", true, true, false, "D", ConfidenceMedium},
+		{"num only", true, true, false, "", ConfidenceMedium},
+		{"etiquette only", true, false, false, "F", ConfidenceMedium},
+		{"matched but neither", true, false, false, "", ConfidenceLow},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := PickConfidence(tc.matched, tc.num, tc.etiquette); got != tc.want {
-				t.Errorf("PickConfidence(%v,%v,%q) = %q, want %q",
-					tc.matched, tc.num, tc.etiquette, got, tc.want)
+			if got := PickConfidence(tc.matched, tc.num, tc.street, tc.etiquette); got != tc.want {
+				t.Errorf("PickConfidence(%v,%v,%v,%q) = %q, want %q",
+					tc.matched, tc.num, tc.street, tc.etiquette, got, tc.want)
 			}
 		})
 	}

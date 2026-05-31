@@ -31,9 +31,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"github.com/bpineau/gazetteer/helpers/fraddr"
+	"github.com/bpineau/gazetteer/helpers/frnorm"
 )
 
 // ErrEmptyBody is returned by ParseList when the input is empty or
@@ -105,12 +107,24 @@ func ParseList(body []byte) ([]Row, error) {
 // pre-tie-break behaviour).
 //
 // Range labels like "80-82" / "80/82" / "80 - 82" are also accepted
-// when their right-hand bound matches `wantNum`. Returns (-1, false)
-// when no row matches; callers then fall back to PickBest.
-func PickBestByNumber(rows []Row, wantNum string, wantSurface float64) (int, bool) {
+// when their right-hand bound matches `wantNum`. Returns (-1, false,
+// false) when no row matches; callers then fall back to PickBest.
+//
+// Street-aware selection (v3): when `wantStreetKey` is non-empty and any
+// number-matching row is ALSO on the listing's street (per streetKey),
+// the pick is restricted to that street-matching subset — this prevents
+// picking "8 Cour des Petites Ecuries" when the caller asked for "8 Rue
+// des Petites Ecuries" (both share number 8 and the discriminating name
+// tokens, so a number-only filter would otherwise pick the wrong voie).
+// Surface stays the tie-break WITHIN the chosen subset (it disambiguates
+// dwellings on the SAME street, never across streets). When no
+// number-matching row is on the listing's street, the picker falls back
+// to the full number-matching set. The third return value reports
+// whether the finally-picked row street-matched.
+func PickBestByNumber(rows []Row, wantNum, wantStreetKey string, wantSurface float64) (int, bool, bool) {
 	wantNum = strings.TrimSpace(wantNum)
 	if wantNum == "" {
-		return -1, false
+		return -1, false, false
 	}
 	var matches []int
 	for i, r := range rows {
@@ -119,9 +133,156 @@ func PickBestByNumber(rows []Row, wantNum string, wantSurface float64) (int, boo
 		}
 	}
 	if len(matches) == 0 {
-		return -1, false
+		return -1, false, false
 	}
-	return pickClosestBySurface(rows, matches, wantSurface), true
+	// Prefer number-matching rows that are also on the right street.
+	var onStreet []int
+	if wantStreetKey != "" {
+		for _, i := range matches {
+			if streetMatches(wantStreetKey, rows[i]) {
+				onStreet = append(onStreet, i)
+			}
+		}
+	}
+	if len(onStreet) > 0 {
+		return pickClosestBySurface(rows, onStreet, wantSurface), true, true
+	}
+	return pickClosestBySurface(rows, matches, wantSurface), true, false
+}
+
+// streetTypeAbbrev canonicalises common French voie-type abbreviations
+// to their full spelling, so "av des Champs" and "avenue des Champs"
+// compare equal. The type word is KEPT (it is the discriminator that
+// tells "rue" apart from "cour") — only normalised, never dropped.
+var streetTypeAbbrev = map[string]string{
+	"av":   "avenue",
+	"ave":  "avenue",
+	"bd":   "boulevard",
+	"bld":  "boulevard",
+	"bvd":  "boulevard",
+	"blvd": "boulevard",
+	"fbg":  "faubourg",
+	"fg":   "faubourg",
+	"pl":   "place",
+	"imp":  "impasse",
+	"rte":  "route",
+	"sq":   "square",
+	"all":  "allee",
+	"chem": "chemin",
+	"che":  "chemin",
+	"pas":  "passage",
+	"ste":  "sente",
+	"crs":  "cours",
+	"qu":   "quai",
+	"pte":  "porte",
+	"vla":  "villa",
+	"cite": "cite",
+}
+
+// streetStopwords are French articles / prepositions dropped from a
+// street signature so "rue des petites ecuries" and "rue de petites
+// ecuries" (rare upstream variants) still compare equal. The type word
+// and the proper-name tokens are kept.
+var streetStopwords = map[string]bool{
+	"de": true, "des": true, "du": true, "d": true,
+	"la": true, "le": true, "les": true, "l": true,
+	"aux": true, "au": true, "et": true,
+}
+
+// streetKey normalises an address into a comparable street signature:
+// lowercased + accent-folded, the leading house-number token dropped,
+// everything from the first 5-digit postal-code token onward dropped
+// (removing "75010 Paris"), French article/preposition stopwords
+// dropped, and the leading voie-type word canonicalised via
+// streetTypeAbbrev (but kept — it is the discriminator). The remaining
+// name tokens are kept in order.
+//
+//	"8 Rue des Petites Ecuries 75010 Paris"  → "rue petites ecuries"
+//	"8 Cour des Petites Ecuries 75010 Paris" → "cour petites ecuries"
+//	"12 av. de la République"                → "avenue republique"
+//
+// Returns "" when no usable street tokens remain (caller treats that as
+// "unknown", not a mismatch).
+func streetKey(addr string) string {
+	folded := frnorm.NormaliseSpace(strings.ToLower(frnorm.StripAccents(addr)))
+	if folded == "" {
+		return ""
+	}
+	rawTokens := strings.Fields(folded)
+	out := make([]string, 0, len(rawTokens))
+	for i, tok := range rawTokens {
+		// Drop everything from the first 5-digit postal code onward.
+		if fraddr.IsFrPostalCode(tok) {
+			break
+		}
+		// Drop a leading house-number token (with optional bis/ter/
+		// letter suffix, e.g. "8", "8b", "80-82").
+		if i == 0 && startsWithDigit(tok) {
+			continue
+		}
+		tok = strings.Trim(tok, ".,;:")
+		if tok == "" {
+			continue
+		}
+		if streetStopwords[tok] {
+			continue
+		}
+		if canon, ok := streetTypeAbbrev[tok]; ok {
+			tok = canon
+		}
+		out = append(out, tok)
+	}
+	return strings.Join(out, " ")
+}
+
+// startsWithDigit reports whether s begins with an ASCII digit.
+func startsWithDigit(s string) bool {
+	return s != "" && s[0] >= '0' && s[0] <= '9'
+}
+
+// streetTokensEqual compares two street signatures order-insensitively
+// (token-set equality on the multiset of tokens). This tolerates the
+// occasional token-reordering between adresse_ban and adresse_brut while
+// still requiring the SAME type word and SAME name tokens — so "rue
+// petites ecuries" never matches "cour petites ecuries".
+func streetTokensEqual(a, b string) bool {
+	if a == b {
+		return true
+	}
+	if a == "" || b == "" {
+		return false
+	}
+	ta := strings.Fields(a)
+	tb := strings.Fields(b)
+	if len(ta) != len(tb) {
+		return false
+	}
+	sort.Strings(ta)
+	sort.Strings(tb)
+	for i := range ta {
+		if ta[i] != tb[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// streetMatches reports whether wantKey (the listing's streetKey) equals
+// the streetKey of the row's AdresseBAN OR AdresseBrut. An empty wantKey
+// means the query carried no usable street → "unknown", which is treated
+// as NOT a match (so it can never upgrade confidence to high) but also
+// never used to reject a row (see the caller's fallback).
+func streetMatches(wantKey string, r Row) bool {
+	if wantKey == "" {
+		return false
+	}
+	if streetTokensEqual(wantKey, streetKey(r.AdresseBAN)) {
+		return true
+	}
+	if streetTokensEqual(wantKey, streetKey(r.AdresseBrut)) {
+		return true
+	}
+	return false
 }
 
 // PickBest returns the index of the best row when no number match is
@@ -278,16 +439,21 @@ func rangeRightBound(s string) string {
 	return s[hiStart:i]
 }
 
-// PickConfidence implements the confidence calibration:
+// PickConfidence implements the confidence calibration (v3 —
+// street-aware):
 //
-//	high   : row matched by exact street-number AND etiquette_dpe non-empty.
-//	medium : either number matched OR etiquette_dpe non-empty, not both.
-//	low    : neither (caller wraps in an empty/skipped result).
-func PickConfidence(matched bool, numberMatched bool, etiquetteDPE string) string {
+//	high   : street-number matched AND street (type+name) matched AND
+//	         etiquette_dpe non-empty — the row is on the right voie at
+//	         the right number with a DPE label.
+//	medium : a partial match — number matched OR etiquette present, but
+//	         NOT all three. Crucially a number-matched, DPE-bearing row
+//	         on the WRONG street is medium, never high (the bug fix).
+//	low    : nothing matched (caller wraps in an empty/skipped result).
+func PickConfidence(matched, numberMatched, streetMatched bool, etiquetteDPE string) string {
 	if !matched {
 		return ConfidenceLow
 	}
-	if numberMatched && etiquetteDPE != "" {
+	if numberMatched && streetMatched && etiquetteDPE != "" {
 		return ConfidenceHigh
 	}
 	if numberMatched || etiquetteDPE != "" {

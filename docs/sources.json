@@ -1,7 +1,7 @@
 [
   {
     "name": "ademe",
-    "version": 2,
+    "version": 3,
     "default": true,
     "summary": "DPE (energy performance certificate) at the address — class, GES, dwelling attrs.",
     "inputs": [
