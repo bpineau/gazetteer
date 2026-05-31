@@ -69,12 +69,18 @@ const (
 var ErrInsufficientFilter = errors.New("ademe: insufficient filter inputs")
 
 // URLForAddress builds the ADEME data-fair URL filtering by zip
-// (direct `code_postal_ban=<zip>` field-equality param) + a full-text
-// query on the BAN adresse field (`q=<query>&q_fields=adresse_ban`).
+// (`code_postal_ban_in=<zip>` field-equality param) + a full-text query
+// on the BAN adresse field (`q=<query>&q_fields=adresse_ban`).
+//
+// The filter param is the `_in` variant: data-fair's bare
+// `code_postal_ban=<zip>` is SILENTLY IGNORED (it returns the entire
+// ~14.8M-row dataset), which left the full-text `q` ranking as the only
+// effective constraint — so a common street name like "Général de Gaulle"
+// could surface a DPE in a commune 500 km away. `code_postal_ban_in`
+// actually scopes the query to the zip.
 //
 // The Elasticsearch-style `qs=` operator is intentionally avoided —
-// ADEME's data-fair layer rejects it with HTTP 403 in practice;
-// field-equality on code_postal_ban produces equivalent results.
+// ADEME's data-fair layer rejects it with HTTP 403 in practice.
 //
 // Both `zip` and `query` are required.
 func URLForAddress(baseURL, zip, query string) (string, error) {
@@ -87,7 +93,7 @@ func URLForAddress(baseURL, zip, query string) (string, error) {
 		baseURL = DefaultBaseURL
 	}
 	q := url.Values{}
-	q.Set("code_postal_ban", zip)
+	q.Set("code_postal_ban_in", zip)
 	q.Set("q", query)
 	q.Set("q_fields", QFields)
 	q.Set("size", fraddr.ItoaPositive(DefaultLimit))
