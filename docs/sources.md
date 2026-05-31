@@ -61,6 +61,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `vacance`        | INSEE (arrondissement-aware)                   | offline INSEE RP 2021       |
 | `zonageabc`      | INSEE                                          | offline arrêté 2025-09-05   |
 | `zonetendue`     | INSEE                                          | offline décret 2013-392     |
+| `links`          | lat/lon (or INSEE / address)                   | built in-process (no backend)|
 
 ## `sources/ademe`
 
@@ -682,3 +683,24 @@ Copropriété context from the Registre National d'Immatriculation des Copropri�
 - **IsEmpty()**: true when no copropriété matched the address.
 - **Limitation**: the public RNC file **redacts** financial declarations AND the legal-procedure columns (administration provisoire 29-1, mandataire ad hoc 29-1A, plan de sauvegarde, arrêtés péril/insalubrité). A hard distress flag is therefore impossible from open data.
 - **Upstream data**: data.gouv.fr "registre-national-dimmatriculation-des-coproprietes", resource "RNIC - Actualisation quotidienne" (daily "with-qpv" CSV, ~400 MB). Refresh: `gazetteer refresh --go-embed-update rnc`.
+
+## `sources/links`
+
+Deep-link URLs to useful third-party tools and datasets for the address —
+including tools whose data other sources already extract, so a human can
+cross-check a typed `Result` against the original site in one click. The odd one
+out: it performs **no HTTP and ships no dataset**, it merely *builds* well-known
+deep links from the listing's coordinates and address fields.
+
+- **Needs**: at least one of lat/lon, INSEE, or an address; otherwise
+  `gazetteer.ErrInsufficientInputs`. Coordinates unlock the bulk of the links.
+- **Result**: `Links []Link` (each `{Key, Label, Category, URL}`), plus a
+  `Map()` helper returning a `key→URL` map. Categories: `map`, `prices`,
+  `risks`, `urbanism`, `context`.
+- **Links built** (v1): Google Maps / Street View, OpenStreetMap, Géoportail
+  (ortho + cadastre WMTS), IGN Remonter le temps (`map`); Pappers Immobilier,
+  DVF explorer on explore.data.gouv.fr (`prices`); Géorisques rapport, enriched
+  with INSEE/city when present (`risks`); Géoportail de l'Urbanisme / PLU
+  (`urbanism`); INSEE commune fiche (COG) + a plain web search (`context`).
+- **Not scored**: navigation convenience only — deliberately kept out of the
+  zone score.
