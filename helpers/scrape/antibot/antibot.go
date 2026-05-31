@@ -103,9 +103,9 @@ var cfBodyMarkers = [][]byte{
 	[]byte("attention required"), // CF "Attention Required" page
 }
 
-// cfHeaderName is the response header CF stamps on a mitigation.
-// Lowercase per net/http canonicalisation; we always check via
-// http.Header.Get which canonicalises the lookup.
+// cfHeaderName is the response header CF stamps on a mitigation, in
+// net/http canonical MIME form. We always check via http.Header.Get,
+// which canonicalises the lookup key regardless of casing.
 const cfHeaderName = "Cf-Mitigated"
 
 // Detect reports a Cloudflare verdict when any title/script regex,

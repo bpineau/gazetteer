@@ -56,7 +56,7 @@ type Evidence struct {
 }
 
 // IsEmpty satisfies gazetteer.EmptyReporter: true when the IRIS was not
-// found / has no résidences principales to derive shares from.
+// found / has no dwellings (TotalLogements <= 0).
 func (r *Result) IsEmpty() bool {
 	if r == nil {
 		return true

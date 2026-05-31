@@ -19,9 +19,9 @@ type Result struct {
 	// been on the original TLV list, and vice versa.
 	FlaggedTLV2013 bool `json:"flagged_tlv_2013,omitempty"`
 
-	// Confidence is ConfidenceHigh on every populated row (the source
-	// dataset is the legal reference). Empty when no row was found —
-	// but note that "no row" maps to TierNonTendue, which is itself
+	// Confidence is always ConfidenceHigh (the source dataset is the
+	// legal reference). It stays ConfidenceHigh even when no row was
+	// found, because "no row" maps to TierNonTendue, which is itself
 	// the legally correct answer for those communes.
 	Confidence string `json:"confidence"`
 

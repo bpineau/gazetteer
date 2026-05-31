@@ -200,7 +200,10 @@ never disables corporate secret-scanning.
 - `zonescore.Options.Weights` **replaces** the default weight set wholesale — a
   partial map means "score only these axes", not "tweak a few".
 - `gazetteer refresh` is **idempotent** (a current dataset is skipped); safe on boot.
-- The IRIS sources (`iris`, `filoiris`, `logiris`) cover **Île-de-France only**.
+- IRIS coverage is **Île-de-France only in practice**: the `iris` resolver and
+  `logiris` are IDF-scoped datasets. `filoiris`'s dataset is *national*, but it
+  only fires where `Listing.IRIS` is set — and `iris` (IDF-only) is the sole
+  resolver that sets it, so non-IDF addresses get no IRIS and thus no `filoiris`.
 - `oll` **excludes Paris intra-muros** (use `encadrement` for Paris rents).
 - `gpe` (future Grand Paris Express stations) is **informational, not scored** —
   future transit must not distort the yield-first-today score.

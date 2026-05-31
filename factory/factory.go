@@ -57,6 +57,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/oll"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/qpv"
+	"github.com/bpineau/gazetteer/sources/rnc"
 	"github.com/bpineau/gazetteer/sources/rpls"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
@@ -94,10 +95,10 @@ type Options struct {
 
 // NewDefault builds a *gazetteer.Client wired with every stable
 // in-tree Source: dvf, ademe, anct, bdnb, bpe, cadastre, carteloyers,
-// cartofriches, cdsr, georisques, gpe, ips_ecoles, locservice, chomage,
-// delinquance, dpedist, education, encadrement, filosofi, filoiris, logiris,
-// qpv, rpls, taxefonciere, lovac, vacance, zonageabc, zonetendue,
-// osm_transit.
+// cartofriches, catnat, cdsr, georisques, gpe, iris, ips_ecoles, locservice,
+// oll, nuisances, chomage, delinquance, dpedist, education, encadrement, filosofi,
+// filoiris, logiris, qpv, rpls, taxefonciere, lovac, vacance, zonageabc,
+// zonetendue, osm_transit.
 //
 // osm_transit ships an embedded baseline station catalog (overridable
 // from the datadir) and a live Overpass fallback for points the catalog
@@ -192,6 +193,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(taxefonciere.NewSource(taxefonciere.Options{DataDir: dataDir})).
 		With(lovac.NewSource(lovac.Options{DataDir: dataDir})).
 		With(vacance.NewSource(vacance.Options{DataDir: dataDir})).
+		With(rnc.NewSource(rnc.Options{DataDir: dataDir})).
 		With(ips_ecoles.NewSource(ips_ecoles.Options{DataDir: dataDir})).
 		With(zonageabc.NewSource(zonageabc.Options{DataDir: dataDir})).
 		With(zonetendue.NewSource(zonetendue.Options{DataDir: dataDir})).

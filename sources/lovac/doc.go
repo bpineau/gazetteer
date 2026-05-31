@@ -1,4 +1,4 @@
-// Package vacance is a gazetteer.Source for the LOVAC 2025 per-commune
+// Package lovac is a gazetteer.Source for the LOVAC 2025 per-commune
 // housing vacancy dataset, served from an embedded CSV.
 //
 // The Source needs Listing.INSEE. It returns the commune-wide

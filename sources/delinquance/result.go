@@ -28,10 +28,10 @@ const (
 // Result is the typed payload returned by Source.Query.
 //
 // The rate map is keyed by the SSMSI indicator's short English handle —
-// see loader.LABEL for the upstream French → handle mapping. Every
-// rate is expressed in events per 1 000 inhabitants per year (or per
-// 1 000 logements for the burglary indicator, which is the SSMSI
-// convention).
+// see label2handle in transform.go for the upstream French → handle
+// mapping. Every rate is expressed in events per 1 000 inhabitants per
+// year (or per 1 000 logements for the burglary indicator, which is the
+// SSMSI convention).
 type Result struct {
 	// Rates is the indicator → events-per-1000 rate map for the
 	// reference year. Empty when the commune is missing from the
@@ -42,10 +42,11 @@ type Result struct {
 	// the rate denominator (zero when the commune is missing).
 	Population int `json:"population,omitempty"`
 
-	// Flag is the coarse, peer-relative risk bucket derived from the
-	// burglary indicator (per 1 000 logements, robust to ambient
-	// population). RiskUnknown when the commune is missing from the
-	// dataset.
+	// Flag is the coarse, peer-relative SOCIAL-DISTRESS bucket derived
+	// from the drug-trafficking, street-violence and unarmed-robbery
+	// indicators (see classifyRisk). RiskUnknown when the commune is
+	// missing from the dataset, or suppressed for arrondissement-split
+	// cities (see RatesPerInhabitantInflated).
 	Flag RiskFlag `json:"flag,omitempty"`
 
 	// RatesPerInhabitantInflated is true when the commune's
@@ -57,8 +58,10 @@ type Result struct {
 	// raw "Paris 1er theft = 325 ‰" is statistically meaningless for
 	// an investor's risk assessment.
 	//
-	// `Flag` itself is NOT affected — it only uses burglary, which is
-	// per-logement and thus robust to this distortion.
+	// When this flag is true, `Flag` is suppressed to RiskUnknown: the
+	// social-distress indicators classifyRisk relies on are per-inhabitant
+	// and thus distorted by the same ambient-population effect, so no
+	// credible verdict can be issued for arrondissement-split cities.
 	RatesPerInhabitantInflated bool `json:"rates_per_inhabitant_inflated,omitempty"`
 
 	// Confidence is "high" when the commune was found in the dataset,

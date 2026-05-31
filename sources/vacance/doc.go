@@ -2,14 +2,13 @@
 // per-commune DEMOGRAPHIC vacancy rate from INSEE's Recensement de la
 // Population 2021 ("base communale logement").
 //
-// IMPORTANT — naming disambiguation: the existing sources/vacance
-// source surfaces the FISCAL vacancy status (TLV-2013 zone tendue
-// classification used by Bercy to assess the Taxe sur les Logements
-// Vacants). This source is the DEMOGRAPHIC rate — the share of LOGVAC
-// over LOG observed in the census, regardless of any taxation gate.
-// The two signals are correlated but distinct: a commune outside the
-// TLV-2013 zone can still have a high vacancy rate (déprise) and
-// vice-versa.
+// IMPORTANT — naming disambiguation: the sources/lovac source surfaces
+// the FISCAL vacancy reading (the LOVAC dataset Bercy uses to assess
+// the Taxe sur les Logements Vacants). This source is the DEMOGRAPHIC
+// rate — the share of LOGVAC over LOG observed in the census,
+// regardless of any taxation gate. The two signals are correlated but
+// distinct: a commune outside the fiscal vacancy perimeter can still
+// have a high census vacancy rate (déprise) and vice-versa.
 //
 // The signal matters for a rental investor because the vacancy rate
 // is a leading proxy for letting risk and time-on-market:

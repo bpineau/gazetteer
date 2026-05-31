@@ -74,7 +74,8 @@ srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.R
 A Source that fans out to many sub-URLs (e.g. one per cadastral
 section) needs the test httpx Client to **not** rate-limit per host:
 the default of 2 req/s makes the test take forever, and the retry
-layer's 30 s backoff makes a single 5xx fixture sit and wait.
+layer's exponential backoff (500 ms × 2ⁿ, capped at 60 s, over
+DefaultMaxRetries=5 attempts) makes a single 5xx fixture sit and wait.
 
 The recipe:
 

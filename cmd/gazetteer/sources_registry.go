@@ -33,6 +33,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/oll"
 	gzosm "github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/qpv"
+	"github.com/bpineau/gazetteer/sources/rnc"
 	"github.com/bpineau/gazetteer/sources/rpls"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
@@ -60,9 +61,9 @@ type sourceFactory struct {
 // a fresh slice on each call so callers can mutate / filter it without
 // affecting peers.
 //
-// Defaults: every source EXCEPT osm_transit (it needs an offline
-// catalog the CLI doesn't yet wire; --source osm_transit opts in and
-// surfaces the missing-catalog error explicitly).
+// Defaults: every source EXCEPT bdnb (its public PostgREST endpoint
+// throttles anonymous traffic, so it is opt-in via --source bdnb; see
+// the per-entry note below).
 func sourceCatalog() []sourceFactory {
 	return []sourceFactory{
 		{
@@ -286,6 +287,13 @@ func sourceCatalog() []sourceFactory {
 			Default: true,
 			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
 				return vacance.NewSource(vacance.Options{DataDir: d.DataDir}), nil
+			},
+		},
+		{
+			Name:    rnc.Name,
+			Default: true,
+			Build: func(d *runtimeDeps) (gazetteer.Source, error) {
+				return rnc.NewSource(rnc.Options{DataDir: d.DataDir}), nil
 			},
 		},
 		{

@@ -43,15 +43,15 @@ import (
 //     deadline failure → Observe(theErr). Non-transport errors (4xx,
 //     5xx without transport shape) are ignored — they're application
 //     signals, not infrastructure failures.
-//   - TransportCircuit can adopt a RateWindow via SetRateWindow. The
-//     Observe flow already classifies err, so the wiring is one extra
-//     call.
+//   - A caller using TransportCircuit (or any custom path) can drive a
+//     RateWindow directly: construct one sharing the same *atomic.Bool
+//     flag and call its Observe alongside the TransportCircuit's, since
+//     both classify err the same way.
 //
-// The breaker pointer (*atomic.Bool) is shared with HTTPFetcher /
-// TransportCircuit — the rate-window flips the same flag the
-// consecutive-streak counter does. Callers check `flag.Load()` once on
-// the hot path; the rate-window's machinery is invisible from the
-// outside.
+// The breaker pointer (*atomic.Bool) is shared with HTTPFetcher — the
+// rate-window flips the same flag the consecutive-streak counter does.
+// Callers check `flag.Load()` once on the hot path; the rate-window's
+// machinery is invisible from the outside.
 //
 // # Defaults
 //

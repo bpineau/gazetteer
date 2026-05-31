@@ -60,9 +60,11 @@ type Result struct {
 	// "lyon_villeurbanne". Empty when no match.
 	ZoneSource string `json:"zone_source,omitempty"`
 
-	// Confidence is "medium" on a match (the grille gives a single value
-	// with no per-cell sample size, so the operator-facing copy flags
-	// the "approx époque" caveat). ConfidenceNone otherwise.
+	// Confidence is "medium" on a clean match — the grille gives a single
+	// value with no per-cell sample size, so the operator-facing copy flags
+	// the "approx époque" caveat — and "low" on a resolved-but-ambiguous
+	// match (a multi-zone EPT commune queried without coordinates, collapsed
+	// across its zones; see ConfidenceLow). ConfidenceNone otherwise.
 	Confidence string `json:"confidence"`
 
 	// Evidence captures reproducibility metadata about the query that

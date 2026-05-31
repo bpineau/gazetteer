@@ -6,6 +6,12 @@ the per-source `go doc` are the data dictionary** — for field-by-field meaning
 and units, read `go doc github.com/bpineau/gazetteer/sources/<name> Result`, or
 `gazetteer sources catalog --json` for the machine-readable map.
 
+This page documents the typed `Result` of each Source at the field level: every
+entry names the **load-bearing fields with their unit** so you can consume a
+Source directly, and `go doc` has the exhaustive list. Convention: the unit
+lives in the field name (cents vs euros, `…EURPerM2` vs `…EURPerM2HC`
+€/m²/month, `…Pct` %, `…M2`, counts).
+
 Every shipped Source lives under `sources/<name>/` and exposes the
 canonical pattern:
 
@@ -63,9 +69,11 @@ dataset on data.gouv.fr.
 
 - **Needs**: a free-form address. Zip is resolved via the configured
   Geocoder when missing.
-- **Result**: `ademe.Result` carries `DPELabel`, `GESLabel`, surface,
-  build year, dwelling type and the picked candidate's distance + match
-  score (Evidence).
+- **Result**: `DPE` (sub-struct: DPE letter + GES letter), `Logement`
+  (surface, build year, dwelling type), `Adresse` (BAN-normalised picked
+  candidate), `Confidence` and `SampleSize` (1 when a row was picked, 0 on a
+  skipped/empty result). The picked candidate's distance + match score live in
+  `Evidence`.
 - **`IsEmpty()`**: true when the API returns `results: []`.
 - **Eligibility**: residential only; commercial/land returns `Skipped`
   via the typed Result rather than an error.
@@ -77,9 +85,13 @@ Building-level facts from the Base de Données Nationale des Bâtiments
 
 - **Needs**: address + zip (or INSEE). The PostgREST filter requires a
   5-digit INSEE; the Source resolves it via the BAN cascade.
-- **Result**: `bdnb.Result` exposes building age, structure, dwellings,
-  parcel surface. `Evidence` records the address pattern and number of
-  candidate rows.
+- **Result**: `Building` (sub-struct: year of construction, dwelling count,
+  floors, emprise-sol surface, height), `DPE` (class, conso, emissions,
+  isolation), `Risks` (monument-historique proximity, ABF perimeter, PLU
+  patrimonial, QPV), `Identity` (batiment_groupe id + normalised address),
+  `Confidence` and `SampleSize`. Each sub-struct is a nil pointer when the
+  picked row carried none of its fields. `Evidence` records the address pattern
+  and number of candidate rows.
 - **Quota**: BDNB enforces a per-key rolling 10 000-call quota.
   Callers wire a `helpers/circuit.HTTPFetcher` (see
   [circuit_breakers.md](circuit_breakers.md)) to trip the breaker on
@@ -122,8 +134,12 @@ des loyers).
 
 - **Needs**: INSEE + property type + rooms (used to pick a typology
   bucket: House, Apt 1-2 pieces, Apt 3+, generic Apt).
-- **Result**: median rent €/m²/month at three typology granularities;
-  satisfies `appraisal.RentEstimator`.
+- **Result**: `LoyerMedEURPerM2CC` (median rent, **€/m²/month charges
+  comprises** — apply a CC→HC factor ~0.90 if you need hors-charges),
+  `LoyerLowEURPerM2CC` / `LoyerHighEURPerM2CC` (80 % prediction interval),
+  `Typology` (which bucket was used), `NbObservations` (commune sample) and
+  `Confidence`. Also satisfies `appraisal.RentEstimator` — its `RentEstimate`
+  applies the CC→HC factor so it blends hors-charges with `oll` / `encadrement`.
 - **Fallback**: when the rooms-bucket dataset misses on a commune, the
   Source widens to `TypologyApartment` and stamps
   `Evidence.FallbackToGeneric=true`.
@@ -135,8 +151,11 @@ data.gouv.fr Etalab.
 
 - **Needs**: property type + (INSEE OR a resolvable address); surface
   recommended for €-total estimates.
-- **Result**: median, p25, p75 €/m² (in cents); satisfies
-  `appraisal.PriceEstimator`.
+- **Result**: `ValueEURPerM2Cents` (median price, **centimes** — ÷100 for
+  €/m²), `P25EURPerM2Cents` / `P75EURPerM2Cents` (the quartile band),
+  `ValueEURCents` (total = per-m² × surface, when surface is known),
+  `SampleSize` (mutations behind the median) and `Confidence`
+  (`high`/`medium`/`low`). Also satisfies `appraisal.PriceEstimator`.
 - **Ladder**: 4-tier `helpers/fallback.Walk`:
   1. `address_radius` — 500 m disk around `(Lat, Lon)`, MinSample 12
   2. `commune` — listing's INSEE
@@ -188,9 +207,10 @@ Lyon / Villeurbanne.
 
 - **Needs**: zip OR INSEE + property type + rooms; coordinates
   (lat/lon) for the precise Seine-Saint-Denis zone.
-- **Result**: a regulated rent value with low/medium/high ceilings;
-  satisfies `appraisal.RentEstimator` with `Bracket` populated when a
-  legal cap applies.
+- **Result**: `LoyerRefMajEURPerM2HC` (the **legal max**, loyer de référence
+  majoré, €/m²/month HC), `LoyerRefEURPerM2HC` (the published reference, ~20 %
+  below), `Zone` + `ZoneSource` (resolved zone, e.g. `Paris 11e` /
+  `plaine_commune`) and `Confidence`. Also satisfies `appraisal.RentEstimator`.
 - **Zone identification**:
   - Paris by zip: 75001..75020, 75116 (arrondissement-median).
   - Lyon / Villeurbanne by INSEE: 69381..69389, 69266.
@@ -214,9 +234,10 @@ modelled hazard, `catnat` reports the realised sinistralité.
 
 - **Needs**: INSEE (a PLM arrondissement folds to its mother commune — decrees
   are issued at commune level).
-- **Result**: total decree count, recent-window count (last 10 years vs the
-  dataset vintage), per-category breakdown (inondation / sécheresse /
-  mouvement_terrain / tempête), latest event year, and a frequency tier.
+- **Result**: `TotalArretes` (all-time decree count since 1982), `RecentCount`
+  (decrees in the last 10 years vs the dataset vintage), `ByCategory` (map →
+  count: inondation / sécheresse / mouvement_terrain / tempête),
+  `LastEventYear` and `Tier` (recent-frequency tier).
   Satisfies `appraisal.HazardReporter`, so the confirmed categories flow into
   `appraisal.HazardProfile` alongside `georisques`. `IsEmpty` (StatusOKEmpty)
   for a commune with no recorded decree.
@@ -284,10 +305,13 @@ signal, complementing `encadrement` (legal cap) and `carteloyers` (model).
 
 - **Needs**: INSEE; rooms optional (refines the bucket, else the zone-level
   all-sizes median is used).
-- **Result**: observed median + inter-quartile band (€/m²/month HC), mean
-  surface, sample size, and the resolved OLL zone. Satisfies
-  `appraisal.RentEstimator` (weight 0.95 in `DefaultRentWeights`, above the
-  modelled `carteloyers`). `IsEmpty` (StatusOKEmpty) outside the perimeter.
+- **Result**: `ObservedMedianEURPerM2` (observed median, **€/m²/month hors
+  charges**), `ObservedQ1EURPerM2` / `ObservedQ3EURPerM2` (inter-quartile band),
+  `AvgSurfaceM2` (mean dwelling surface — sanity-checks the bucket),
+  `SampleSize`, `Zone` + `Agglo` + `Pieces` (resolved cell) and `Confidence`.
+  Satisfies `appraisal.RentEstimator` (weight 0.95 in `DefaultRentWeights`,
+  above the modelled `carteloyers`). `IsEmpty` (StatusOKEmpty) outside the
+  perimeter.
 - **Resolution**: INSEE → OLL zone (embedded commune→zone map) → the cell for
   the rooms bucket. Zone numbers join the rent table via
   `Zone_calcul = "L<agglo>.4."+zeropad2(zone)`.
@@ -305,8 +329,9 @@ Per-commune income and minima-sociaux statistics from INSEE Filosofi
 (2021 vintage).
 
 - **Needs**: INSEE.
-- **Result**: median household disposable income, minima-sociaux %,
-  risk flag (low / medium / high / unknown).
+- **Result**: `MedianEUR` (revenu disponible médian par UC, **€/an**),
+  `MinimaPct` (part des minima sociaux, **%** — poverty proxy), `Flag`
+  (low / medium / high / unknown risk bucket) and `Confidence`.
 - Property type is irrelevant — applies to the whole commune.
 
 ## `sources/filoiris`
@@ -321,8 +346,10 @@ IRIS.
 - **Needs**: `Listing.IRIS` (populated by the `iris` Source / the BAN
   normalizer's IRIS resolver). Only answers inside INSEE's IRIS perimeter
   (communes ≥ 5000 inhabitants, secret statistique permitting).
-- **Result**: IRIS median disposable income (€/UC), taux de pauvreté à
-  60 % (`PovertyRatePct`), Gini index, risk flag.
+- **Result**: `MedianEUR` (IRIS revenu disponible médian par UC, **€/an**),
+  `PovertyRatePct` (taux de pauvreté au seuil de 60 %, **%**), `Gini` (income
+  Gini index, **0..1** — a "socially mixed" signal even when the median looks
+  comfortable), `Flag` and `Confidence`.
 - **Backend**: gzipped JSON embedded under `data/` (~14 490 IRIS, ~133 KB).
 - **Appraisal**: `appraisal/zonescore`'s solvabilité axis prefers this
   IRIS-level reading over the commune-level `filosofi`.
@@ -350,8 +377,11 @@ Natural and technological hazards from georisques.gouv.fr (BRGM
 rapport-risque).
 
 - **Needs**: lat/lon (resolved via Geocoder when absent).
-- **Result**: flood / soil / industrial / nuclear hazards, ICPE /
-  Seveso classifications, radon level; satisfies
+- **Result**: `Naturels` (map of 12 natural-hazard keys → `RiskBlob`:
+  flood, soil/clay, seismic…) and `Technos` (6 technological keys: ICPE,
+  Seveso, nuclear…), `Summary` (operator-actionable counters + red flags),
+  `ReportURL` (georisques.gouv.fr permalink), `LevelUsed`
+  (`address`/`commune` granularity) and `Confidence`. Satisfies
   `appraisal.HazardReporter`.
 - **`IsEmpty()`**: true when both Adresse and Commune fields parse
   empty.
@@ -361,10 +391,13 @@ rapport-risque).
 Rental-market tension labels from locservice.fr.
 
 - **Needs**: INSEE + property type + rooms (for the logement keyword).
-- **Result**: tension label (`tendu` / `équilibré` / `détendu`) plus
-  median rent reading; `Evidence.FellBack=true` when the
-  logement-specific call returned no data and the Source widened to
-  the commune-wide call.
+- **Result**: `TensionLabel` (`tendu` / `équilibré` / `détendu`),
+  `TensionScore` / `SupplyScore` (raw **0..8** "facilité à trouver une
+  location" gauge — high = landlord-friendly), `BudgetScore` (**0..8** tenant
+  solvency gauge), `ScoreScale` + `Description` (rendered context) and
+  `Confidence`. No rent value — these are demand/solvency gauges, not a price.
+  `Evidence.FellBack=true` when the logement-specific call returned no data and
+  the Source widened to the commune-wide call.
 
 ## `sources/osm`
 
@@ -409,11 +442,14 @@ station, not Paris" thesis (pairs with the `transport` ZoneScore profile).
 Per-commune `taxe foncière` estimate.
 
 - **Needs**: INSEE + surface_m2.
-- **Result**: estimated annual `taxe foncière` in cents, broken down
-  into TFPB and TEOM portions; confidence reflects whether the
-  V2 (DGFiP voted rates × VLC × surface) or V1 (legacy per-m² ratio)
-  path applied, and whether the lookup hit the commune or fell back to
-  the department.
+- **Result**: `EstimatedEURPerYear` (the TFPB the landlord pays
+  out-of-pocket, **€/year**), `TEOMEURPerYear` (the recoverable TEOM, **€/year**
+  — surfaced separately so it doesn't pollute net cashflow), `TauxTFPBApplied` /
+  `TauxTEOMApplied` (voted rates, **%**), `VLEURPerM2` (the per-m² valeur
+  locative applied), `UsedDeptFallback` / `UsedV1Fallback` flags and
+  `Confidence`. Confidence reflects whether the V2 (DGFiP voted rates × VLC ×
+  surface) or V1 (legacy per-m² ratio) path applied, and whether the lookup hit
+  the commune or fell back to the department.
 
 ## `sources/lovac`
 
@@ -635,3 +671,14 @@ local `httptest.NewServer` in tests. The Source's `Options.BaseURL`
 or the corresponding package-level `BaseURL` var (when blank) is read
 at Query time, so a single change at the constructor level swaps the
 upstream cleanly. See [testing.md](testing.md).
+
+## `sources/rnc`
+
+Copropriété context from the Registre National d'Immatriculation des Copropriétés (RNC, ANAH / data.gouv.fr).
+
+- **Needs**: INSEE (5-digit). Lat/Lon strongly recommended (primary matching key); Address used to normalize the street. Without INSEE the Source emits `gazetteer.ErrInsufficientInputs`.
+- **Match**: geo-proximity (≤ ~60 m) + normalized street within the commune — no cadastral parcelle. `MatchMethod` (`geo_voie`/`voie`) + `Confidence` (`high`/`medium`/`low`) are exposed.
+- **Result**: `Immatriculation`, `NomUsage`, lots (`LotsTotal`/`LotsHabitation`), `ConstructionPeriod`, `TypeSyndic`, `MandatEnCours`, `CoproAidee`, QPV, `WebURL`, plus `Attention` + `Signals` — a LOW-CONFIDENCE triage hint (`no_active_mandate`, `syndic_unknown`, `syndic_benevole`, `copro_aidee`), **not a distress verdict**.
+- **IsEmpty()**: true when no copropriété matched the address.
+- **Limitation**: the public RNC file **redacts** financial declarations AND the legal-procedure columns (administration provisoire 29-1, mandataire ad hoc 29-1A, plan de sauvegarde, arrêtés péril/insalubrité). A hard distress flag is therefore impossible from open data.
+- **Upstream data**: data.gouv.fr "registre-national-dimmatriculation-des-coproprietes", resource "RNIC - Actualisation quotidienne" (daily "with-qpv" CSV, ~400 MB). Refresh: `gazetteer refresh --go-embed-update rnc`.

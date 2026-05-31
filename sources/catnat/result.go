@@ -34,7 +34,7 @@ type Result struct {
 	TotalArretes int `json:"total_arretes"`
 
 	// RecentCount is the number of decrees whose event began in the recent
-	// window (the last RecentWindowYears years up to the dataset vintage —
+	// window (the last recentWindowYears years up to the dataset vintage —
 	// see Evidence.RefYear).
 	RecentCount int `json:"recent_count"`
 
@@ -64,7 +64,7 @@ type Evidence struct {
 	// latest event year in the snapshot).
 	RefYear int `json:"ref_year,omitempty"`
 
-	// WindowYears is the width of the recent window (RecentWindowYears).
+	// WindowYears is the width of the recent window (recentWindowYears).
 	WindowYears int `json:"window_years,omitempty"`
 }
 

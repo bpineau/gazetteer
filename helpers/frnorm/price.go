@@ -27,9 +27,10 @@ import (
 //     "1.5" → 1.50 €) and any earlier dots collapse into thousand seps.
 //
 // Anglo-style numbers like "150,000.50" are rejected by rule 4 (the
-// comma forces decimal interpretation, yielding 150.00050 → 15 cents,
-// which is *defensibly garbage* — the caller is expected to supply
-// FR-formatted text). Empty / non-numeric input returns 0.
+// comma forces decimal interpretation, yielding 150.0005 → 15000 cents
+// = 150.00 €, which is *defensibly garbage* versus the intended
+// 150 000.50 — the caller is expected to supply FR-formatted text).
+// Empty / non-numeric input returns 0.
 //
 // Edge cases covered by TestParseFRPriceToCentimes :
 //

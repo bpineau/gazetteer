@@ -54,7 +54,7 @@ func ExtractRedFlags(result map[string]any) ([]string, bool) {
 // detail map) and returns the deduplicated, lowercase slugs whose
 // `present` field is true. This is a richer signal than the red-flag
 // list (which only flags subjectively scary risks); a buyer also wants
-// to know about, say, an active "mvt_terrain" (movement of terrain)
+// to know about, say, an active "mouvement_terrain" (movement of terrain)
 // even if it's not on the red-flag short list.
 //
 // Returns (nil, false) when `naturels` is absent / empty.

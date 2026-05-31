@@ -7,10 +7,10 @@
 // returns a *Result carrying building age, construction class,
 // dwelling count and parcel surface.
 //
-// Quota: BDNB enforces a rolling 10 000-request budget per API key,
-// surfaced via the `x-quota-remaining` response header and HTTP 429
-// once the budget is gone. Wire a helpers/circuit.HTTPFetcher to
-// trip the breaker on either signal.
+// Quota: BDNB enforces a rolling 10 000-request budget per 30-day
+// window (no API key required), surfaced via the `x-quota-remaining`
+// response header and HTTP 429 once the budget is gone. Wire a
+// helpers/circuit.HTTPFetcher to trip the breaker on either signal.
 //
 // Example — wire the Source, query a Listing, and read the typed
 // payload:

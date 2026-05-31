@@ -12,16 +12,17 @@ var _ appraisal.RentEstimator = (*Result)(nil)
 func TestResult_RentEstimateValueMapping(t *testing.T) {
 	t.Parallel()
 
-	// 18.45 €/m²/month CC → 1845 cents. Typology + confidence carry
-	// through to the appraisal envelope.
+	// 18.45 €/m²/month CC → HC via the 0.90 CC→HC factor → 16.605 →
+	// 1661 cents, so it blends with oll/encadrement (both HC) without a
+	// unit mismatch. Typology + confidence carry through to the envelope.
 	r := &Result{
 		LoyerMedEURPerM2CC: 18.45,
 		Typology:           TypologyApt12,
 		Confidence:         ConfidenceHigh,
 	}
 	got := r.RentEstimate()
-	if got.EurPerM2Cents != 1845 {
-		t.Errorf("EurPerM2Cents = %d, want 1845 (18.45 €/m²/month CC × 100)", got.EurPerM2Cents)
+	if got.EurPerM2Cents != 1661 {
+		t.Errorf("EurPerM2Cents = %d, want 1661 (18.45 CC × 0.90 × 100)", got.EurPerM2Cents)
 	}
 	if got.Confidence != appraisal.ConfidenceHigh {
 		t.Errorf("Confidence = %v, want High", got.Confidence)
@@ -32,6 +33,20 @@ func TestResult_RentEstimateValueMapping(t *testing.T) {
 	// Bracket is not populated by carteloyers (no regulated cap).
 	if got.Bracket != "" {
 		t.Errorf("Bracket = %q, want empty (carteloyers is reference, not cap)", got.Bracket)
+	}
+}
+
+func TestResult_RentEstimateAppliesCCtoHCFactor(t *testing.T) {
+	t.Parallel()
+
+	// Lock the CC→HC conversion: carte des loyers ships charges-comprises,
+	// the appraisal blend is hors-charges (oll/encadrement basis), so
+	// RentEstimate applies ccToHCFactor. 10.00 CC → 9.00 HC → 900 cents.
+	r := &Result{LoyerMedEURPerM2CC: 10.0, Confidence: ConfidenceHigh}
+	got := r.RentEstimate()
+	want := int64(10.0 * ccToHCFactor * 100)
+	if got.EurPerM2Cents != want || want != 900 {
+		t.Errorf("EurPerM2Cents = %d, want %d (10.00 CC × %.2f CC→HC)", got.EurPerM2Cents, want, ccToHCFactor)
 	}
 }
 

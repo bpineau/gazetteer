@@ -13,9 +13,10 @@ const EarthRadiusKm = 6371.0
 // Conventions :
 //   - Inputs are decimal degrees (NOT radians). North/East positive.
 //   - Output is in km. Use [MetersBetween] when meters are needed.
-//   - For points within a few km, the small-angle approximation
-//     used here is accurate to ~0.5 % relative error (good enough for
-//     property-to-property comparisons within a city).
+//   - This is the full haversine formula on a spherical Earth; its
+//     only error is the sphere-vs-ellipsoid mismatch, at most ~0.5 %
+//     relative (good enough for property-to-property comparisons
+//     within a city).
 //   - NaN inputs propagate to NaN output.
 func KmBetween(lat1, lon1, lat2, lon2 float64) float64 {
 	rad := math.Pi / 180.0

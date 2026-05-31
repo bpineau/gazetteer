@@ -17,7 +17,7 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Commands:")
 	fmt.Fprintln(w, "  query      Collect every source's typed data for an address (the core); summary or --json.")
-	fmt.Fprintln(w, "  sources    list | doc <name> | catalog [--json]  — discover sources + their Result data.")
+	fmt.Fprintln(w, "  sources    list | doc <name> | catalog [--json] | dimensions  — discover sources + their Result data.")
 	fmt.Fprintln(w, "  appraise   Optional: query + consolidated price / rent / hazard + zone score.")
 	fmt.Fprintln(w, "  compare    Optional: rank several addresses by zone score.")
 	fmt.Fprintln(w, "  normalize  Resolve a free-text address into a canonical Listing via BAN.")

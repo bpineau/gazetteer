@@ -258,19 +258,21 @@ func hasPrefixCI(s, prefix string) bool {
 //     statutAdresse fields are empty).
 //
 // Confidence calibration:
-//   - high: at least one risk is present at any scale AND we have a
-//     resolved address OR a commune INSEE — i.e. the request landed on
-//     a real point inside France.
-//   - medium: zero risks present (rare but legitimate — middle-of-
-//     nowhere coords with full BRGM coverage but no live hazard).
-//   - low: zero coords + zero INSEE (the BRGM bounced the request
-//     entirely).
+//   - low + Skipped (IsEmpty): BRGM resolved no scope at all — neither an
+//     address nor a commune — so there is no real reading for this point
+//     (the request bounced). The framework records StatusOKEmpty.
+//   - medium: a real place (address or commune resolved) with full BRGM
+//     coverage but zero live hazard — a legitimate "nothing here" reading,
+//     NOT an empty result.
+//   - high: at least one risk present at any scale on a resolved point.
 func BuildResult(r *Report) *Result {
 	if r == nil {
 		return &Result{
 			Confidence: ConfidenceLow,
 			LevelUsed:  LevelCommune,
 			Summary:    Summary{RedFlags: []string{}},
+			Skipped:    true,
+			SkipReason: SkipReasonNoMatch,
 		}
 	}
 
@@ -353,10 +355,14 @@ func BuildResult(r *Report) *Result {
 	}
 
 	switch {
+	case out.Address == nil && out.Commune == nil:
+		// BRGM bounced — no address and no commune scope resolved, so
+		// there is no real reading for this point. Mark it empty.
+		out.Confidence = ConfidenceLow
+		out.Skipped = true
+		out.SkipReason = SkipReasonNoMatch
 	case natPresent+techPresent == 0:
 		out.Confidence = ConfidenceMedium
-	case r.Adresse.Latitude == 0 && r.Adresse.Longitude == 0 && r.Commune.CodeInsee == "":
-		out.Confidence = ConfidenceLow
 	default:
 		out.Confidence = ConfidenceHigh
 	}

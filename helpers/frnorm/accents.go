@@ -12,8 +12,8 @@ import "strings"
 //   - Case-preserving (lawyer/avoventes parity ; the vench slug helper
 //     lowercases first BEFORE calling — that's a slug concern, not an
 //     accent-folding concern).
-//   - "oe" → "oe", "OE" → "OE", "ae" → "ae", "AE" → "AE" (digraph expansion).
-//   - "c" → "c", "C" → "C".
+//   - "œ" → "oe", "Œ" → "OE", "æ" → "ae", "Æ" → "AE" (digraph expansion).
+//   - "ç" → "c", "Ç" → "C".
 //   - Apostrophes (', ’, `) and quotes are PRESERVED. Vench's slug
 //     helper drops them via its own dedicated rule ; general callers
 //     (lawyer / avoventes substring matching) need them preserved so

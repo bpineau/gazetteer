@@ -33,9 +33,9 @@
 // Upstream data: data.gouv.fr "Taux de logements sociaux dans les
 // Communes" (dataset ressource r/b0d30277-3a14-4673-a988-2fa6c11e030c,
 // relayed from Caisse des Dépôts open-data). Licence Ouverte 2.0.
-// Vintage: 2024 (frozen 2025-01-01). Re-run the build script
-// (`/tmp/gazetteer-data/build_rpls.py`) against the latest CSV to
-// refresh the embedded blob.
+// Vintage: 2024. Refresh the embedded blob with
+// `gazetteer refresh --go-embed-update rpls`, which downloads the
+// latest CSV and rebuilds the gzipped JSON via the transform pipeline.
 //
 // Tier thresholds — calibrated against the 2024 distribution:
 //

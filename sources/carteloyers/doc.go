@@ -4,7 +4,7 @@
 //
 // The Source picks a typology bucket (House, Apt 1-2 pieces, Apt 3+,
 // generic Apt) from the listing's property type + rooms, looks it up
-// in the embedded JSON index, and returns a *Result that satisfies
+// in the embedded CSV index, and returns a *Result that satisfies
 // appraisal.RentEstimator. When the rooms-bucket dataset misses on a
 // commune the Source falls back to the generic apartment dataset and
 // stamps Evidence.FallbackToGeneric = true.

@@ -231,9 +231,12 @@ func TestSource_GarbageBody_Transient(t *testing.T) {
 	}
 }
 
-func TestSource_EmptyBodyYieldsMediumConfidence(t *testing.T) {
+func TestSource_EmptyBodyYieldsEmptyResult(t *testing.T) {
 	t.Parallel()
 
+	// A bare `{}` rapport: BRGM resolved no address and no commune —
+	// the request bounced. That is an empty result (StatusOKEmpty), not
+	// a confident "no hazard" reading.
 	srv := newStubServer(t, http.StatusOK, []byte("{}"))
 	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}})
 	data, err := s.Query(context.Background(), newListingParis11())
@@ -241,11 +244,38 @@ func TestSource_EmptyBodyYieldsMediumConfidence(t *testing.T) {
 		t.Fatalf("Query: %v", err)
 	}
 	res := data.(*Result)
+	if !res.IsEmpty() {
+		t.Errorf("IsEmpty() = false, want true on a no-scope rapport")
+	}
+	if !res.Skipped || res.SkipReason != SkipReasonNoMatch {
+		t.Errorf("Skipped/SkipReason = %v/%q, want true/%q", res.Skipped, res.SkipReason, SkipReasonNoMatch)
+	}
+	if res.Confidence != ConfidenceLow {
+		t.Errorf("Confidence = %q, want %q for a bounced rapport", res.Confidence, ConfidenceLow)
+	}
+}
+
+func TestSource_CommuneNoHazardsYieldsMediumNotEmpty(t *testing.T) {
+	t.Parallel()
+
+	// A real place: BRGM resolved a commune but reports zero live
+	// hazards. This is a legitimate "nothing here" reading — medium
+	// confidence and NOT empty.
+	srv := newStubServer(t, http.StatusOK, []byte(`{"commune":{"codeInsee":"75111"}}`))
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}})
+	data, err := s.Query(context.Background(), newListingParis11())
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	res := data.(*Result)
+	if res.IsEmpty() {
+		t.Error("IsEmpty() = true, want false when a commune resolved")
+	}
 	if res.Confidence != ConfidenceMedium {
-		t.Errorf("Confidence = %q, want %q for empty rapport", res.Confidence, ConfidenceMedium)
+		t.Errorf("Confidence = %q, want %q (commune resolved, zero hazards)", res.Confidence, ConfidenceMedium)
 	}
 	if res.LevelUsed != LevelCommune {
-		t.Errorf("LevelUsed = %q, want %q on empty Adresse", res.LevelUsed, LevelCommune)
+		t.Errorf("LevelUsed = %q, want %q on commune-only rapport", res.LevelUsed, LevelCommune)
 	}
 }
 

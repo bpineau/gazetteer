@@ -34,9 +34,13 @@ const rawURL = "https://www.insee.fr/fr/statistiques/fichier/8202349/base-cc-log
 // is kept byte-identical to the committed embedded blob.
 const metaSource = "INSEE Recensement de la Population 2021 — base communale logement (file 8202349)"
 
-// metaNote documents the derivation, mirroring the committed blob.
+// metaNote documents the derivation, recorded into the rebuilt artifact.
+// (The committed blob predates the gazetteer/lovac rename and still says
+// "gazetteer/vacance" here; a `refresh --go-embed-update vacance` rebuild
+// propagates this corrected text — it is provenance only, read by nothing
+// at query time.)
 const metaNote = "Demographic vacancy rate = P21_LOGVAC / P21_LOG. Distinct from the " +
-	"gazetteer/vacance source, which carries the LOVAC fiscal status (Taxe " +
+	"gazetteer/lovac source, which carries the LOVAC fiscal status (Taxe " +
 	"sur les Logements Vacants 2013). Paris/Lyon/Marseille publish per-" +
 	"arrondissement rows in this dataset."
 

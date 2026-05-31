@@ -102,8 +102,8 @@ func runRefresh(ctx context.Context, args []string) error {
 
 // collectDatasetSources instantiates every source the CLI knows and keeps
 // those that expose datasets, grouping their Sets by source name. Sources
-// whose constructor fails (e.g. osm without a catalog) are skipped — they
-// are not dataset sources anyway.
+// whose constructor fails to build are skipped — they are not dataset
+// sources anyway.
 func collectDatasetSources(deps *runtimeDeps) (map[string][]dataset.Set, []string) {
 	bySource := map[string][]dataset.Set{}
 	for _, f := range sourceCatalog() {

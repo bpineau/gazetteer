@@ -1,9 +1,9 @@
-// Package vacance ports the rental enricher's commune vacancy-rate
+// Package lovac ports the rental enricher's commune vacancy-rate
 // lookup into a standalone gazetteer Source. Given a Listing the
 // Source resolves the commune INSEE and returns the LOVAC-derived
 // taux de logements vacants + taux de vacance longue (≥ 2 ans).
 //
-// The Source is fully offline: the vacance CSV ships embedded under
+// The Source is fully offline: the LOVAC CSV ships embedded under
 // `data/`.
 package lovac
 

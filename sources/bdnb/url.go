@@ -157,8 +157,8 @@ func URLForAddress(insee, pattern string) (string, error) {
 type AddressParts = fraddr.Parts
 
 // ParseAddress turns a free-text address into an AddressParts struct.
-// See AddressPattern for the back-compat front-end and the spec list
-// of normalisation steps. Examples:
+// See AddressPattern for the back-compat front-end and fraddr.Parse for
+// the full normalisation rules. Examples:
 //
 //	"3 Impasse de Mont Louis 75011 Paris"     → {3, [de Mont Louis]}
 //	"106 Boulevard Voltaire 75011 Paris"      → {106, [Voltaire]}

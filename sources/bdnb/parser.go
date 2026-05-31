@@ -300,7 +300,7 @@ func completenessScore(r Row) int {
 	return score
 }
 
-// PickConfidence implements the spec's confidence calibration:
+// PickConfidence implements the confidence calibration:
 //
 //	high   : a row matched by exact BAN id, fiabilite reported as
 //	         "fiable" (case-insensitive substring).

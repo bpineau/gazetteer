@@ -53,9 +53,10 @@ const (
 // sample size for the commune × typology bucket.
 //
 // Loyers are in EUR/m²/month "charges comprises" (CC) — the source
-// dataset publishes them CC and we keep that convention here. The
-// caller decides whether to apply a CC→HC factor (a typical default
-// is 0.90).
+// dataset publishes them CC and the Result fields keep that native
+// convention. A caller reading the fields directly applies its own
+// CC→HC factor if needed; the appraisal path (RentEstimate) already
+// converts via ccToHCFactor so it blends hors-charges with oll/encadrement.
 //
 // Envelope-only fields (schema_version, source_version, computed_at,
 // input_hash) are NOT part of this payload — those are the framework's
@@ -80,9 +81,9 @@ type Result struct {
 	NbObservations int `json:"nb_observations"`
 
 	// Confidence is one of "high" / "medium" / "low" per the
-	// PickConfidence rules (commune-fit ≥ 30 obs = high, ≥ 10 = medium,
-	// otherwise low; borrowed-neighbour ("maille") fits collapse to
-	// low).
+	// classifyConfidence rules (commune-fit ≥ 30 obs = high, ≥ 10 =
+	// medium, otherwise low; borrowed-neighbour ("maille") fits collapse
+	// to low).
 	Confidence string `json:"confidence"`
 
 	// Evidence captures reproducibility metadata about the query that
@@ -135,16 +136,24 @@ func (r *Result) IsEmpty() bool {
 	return r.LoyerMedEURPerM2CC <= 0
 }
 
+// ccToHCFactor converts a charges-comprises (CC) rent to hors-charges
+// (HC). Carte des loyers publishes rents CC, but the appraisal blend is
+// hors-charges (oll's observed median and encadrement's loyer de
+// référence are both HC), so RentEstimate scales by this factor to keep
+// appraisal.RentValue on a single basis. 0.90 is the conventional CC→HC
+// default (provisions for charges ≈ 10 % of an all-in rent).
+const ccToHCFactor = 0.90
+
 // RentEstimate satisfies appraisal.RentEstimator. Converts the median
-// rent EUR/m²/month CC (charges comprises) into the cents convention
-// used by the appraisal layer.
+// rent EUR/m²/month into the cents convention used by the appraisal
+// layer, applying ccToHCFactor so the value enters the blend hors
+// charges.
 //
-// CC vs HC: carte des loyers publishes rents charges-comprises ; the
-// appraisal layer is unit-agnostic between CC and HC (consumers that
-// care about the CC/HC distinction must apply their own conversion
-// factor BEFORE passing options to appraisal.RentValue, or branch on
-// the Bracket / Method labels). Method records the typology so callers
-// can audit which dataset the row came from.
+// CC vs HC: carte des loyers publishes rents charges-comprises while the
+// blend is hors-charges; RentEstimate applies ccToHCFactor so carteloyers
+// joins oll/encadrement (both HC) without a unit mismatch. The stored
+// Result.LoyerMedEURPerM2CC keeps the source's native CC basis untouched —
+// only the appraisal contribution is converted.
 //
 // Method follows the "carteloyers_<typology>" convention so downstream
 // auditors can tell at a glance which dataset bucket was consumed.
@@ -153,7 +162,7 @@ func (r *Result) RentEstimate() appraisal.RentEstimate {
 		return appraisal.RentEstimate{}
 	}
 	return appraisal.RentEstimate{
-		EurPerM2Cents: int64(math.Round(r.LoyerMedEURPerM2CC * 100)),
+		EurPerM2Cents: int64(math.Round(r.LoyerMedEURPerM2CC * ccToHCFactor * 100)),
 		Confidence:    mapCLConfidence(r.Confidence),
 		Method:        fmt.Sprintf("carteloyers_%s", nonEmptyTypology(r.Typology)),
 	}
