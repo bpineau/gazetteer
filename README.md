@@ -147,6 +147,12 @@ Transport:
 | `osm`          | Walking distance to nearest métro / RER / tram / train station   |
 | `gpe`          | Nearest *future* Grand Paris Express station + line + distance    |
 
+External links:
+
+| Source         | What it provides                                                 |
+|----------------|------------------------------------------------------------------|
+| `links`        | Deep links to useful third-party tools for the address — maps, prices/DVF, Géorisques, PLU, INSEE fiche (built from coordinates / INSEE / address, no HTTP) |
+
 ### Optional convenience layer
 
 On top of the typed `Dossier` (the main product) sits a thin, *optional*

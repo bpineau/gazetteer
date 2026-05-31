@@ -98,8 +98,8 @@ type Options struct {
 // in-tree Source: dvf, ademe, anct, bdnb, bpe, cadastre, carteloyers,
 // cartofriches, catnat, cdsr, georisques, gpe, iris, ips_ecoles, locservice,
 // oll, nuisances, chomage, delinquance, dpedist, education, encadrement, filosofi,
-// filoiris, logiris, qpv, rpls, taxefonciere, lovac, vacance, zonageabc,
-// zonetendue, osm_transit.
+// filoiris, logiris, qpv, rnc, rpls, taxefonciere, lovac, vacance, zonageabc,
+// zonetendue, links, osm_transit.
 //
 // osm_transit ships an embedded baseline station catalog (overridable
 // from the datadir) and a live Overpass fallback for points the catalog
