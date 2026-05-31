@@ -47,7 +47,18 @@ const (
 	colAidee   = "copro_aidee"
 	colQpvCode = "code_qp_2024"
 	colQpvNom  = "nom_qp_2024"
-	colInsee   = "code_officiel_commune"
+
+	// colInsee is the real Code Officiel Géographique (INSEE) of the commune —
+	// and, for Paris/Lyon/Marseille, of the arrondissement (e.g. 75110 for
+	// Paris 10e). This is the granularity the BAN normalizer emits for a
+	// Listing, so it is what we key the per-INSEE candidate bucket on.
+	//
+	// Footgun: despite its name, the upstream "code_officiel_commune" column
+	// holds the POSTAL code, not the INSEE (e.g. 75010 for Paris 10e, 06400
+	// for Cannes). Keying on it leaves ~62 % of copropriétés unmatchable —
+	// every commune whose code postal differs from its code INSEE. Use the
+	// arrondissement column, which carries the true INSEE for every row.
+	colInsee = "code_officiel_arrondissement_commune"
 )
 
 func oui(s string) bool { return strings.EqualFold(strings.TrimSpace(s), "oui") }
