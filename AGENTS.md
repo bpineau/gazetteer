@@ -2,7 +2,7 @@
 
 This file is the **canonical entry point** for working in this repo. Read it
 first; it is written to be ingested in one shot. Deeper references live in
-[`docs/`](docs/). Everything here is kept honest by tests — if a fact below is
+[`docs/`](docs/). Everything here is kept honest by tests. If a fact below is
 wrong, that's a bug.
 
 ## What this is — the data is the product
