@@ -22,8 +22,13 @@ func TestURLForAddress_Happy(t *testing.T) {
 		t.Errorf("path = %q", u.Path)
 	}
 	q := u.Query()
-	if q.Get("code_postal_ban") != "75011" {
-		t.Errorf("code_postal_ban = %q", q.Get("code_postal_ban"))
+	// data-fair filters by the `_in` variant; the bare code_postal_ban param
+	// is silently ignored by the API (returns the whole dataset).
+	if q.Get("code_postal_ban_in") != "75011" {
+		t.Errorf("code_postal_ban_in = %q, want 75011", q.Get("code_postal_ban_in"))
+	}
+	if q.Get("code_postal_ban") != "" {
+		t.Errorf("bare code_postal_ban must not be set (it is inert), got %q", q.Get("code_postal_ban"))
 	}
 	if q.Get("qs") != "" {
 		t.Errorf("qs should be empty (Elasticsearch syntax rejected by upstream), got %q", q.Get("qs"))

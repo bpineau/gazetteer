@@ -133,8 +133,8 @@ func TestSource_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse captured URL: %v", err)
 	}
-	if got := u.Query().Get("code_postal_ban"); got != "75011" {
-		t.Errorf("code_postal_ban = %q, want 75011", got)
+	if got := u.Query().Get("code_postal_ban_in"); got != "75011" {
+		t.Errorf("code_postal_ban_in = %q, want 75011", got)
 	}
 	if got := u.Query().Get("q_fields"); got != "adresse_ban" {
 		t.Errorf("q_fields = %q, want adresse_ban", got)
@@ -272,8 +272,8 @@ func TestSource_FallsBackToGeocoderForZip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse captured URL: %v", err)
 	}
-	if got := u.Query().Get("code_postal_ban"); got != "75011" {
-		t.Errorf("code_postal_ban = %q, want geocoded 75011", got)
+	if got := u.Query().Get("code_postal_ban_in"); got != "75011" {
+		t.Errorf("code_postal_ban_in = %q, want geocoded 75011", got)
 	}
 }
 
