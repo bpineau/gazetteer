@@ -14,6 +14,7 @@ var sourceDimensions = []struct {
 	{"Prix / valeur", []string{"dvf", "cadastre"}},
 	{"Loyers", []string{"oll", "carteloyers", "encadrement"}},
 	{"Demande locative / tension", []string{"locservice", "logiris", "vacance", "lovac"}},
+	{"Offre / construction", []string{"sitadel"}},
 	{"Solvabilité des locataires", []string{"filoiris", "filosofi", "chomage"}},
 	{"Fiscalité", []string{"taxefonciere"}},
 	{"Sécurité", []string{"delinquance"}},

@@ -56,6 +56,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `gpe`            | lat/lon                                        | offline Grand Paris Express stations (SGP) |
 | `qpv`            | INSEE + lat/lon (point-in-polygon)             | offline ANCT QPV 2024 contours |
 | `rpls`           | INSEE                                          | offline data.gouv SRU 2024  |
+| `sitadel`        | INSEE (arrondissement-folding)                 | offline SDES Sitadel 2026-06 |
 | `taxefonciere`   | INSEE + surface_m2                             | offline DGFiP rates         |
 | `lovac`          | INSEE                                          | offline LOVAC 2025 (fiscal) |
 | `vacance`        | INSEE (arrondissement-aware)                   | offline INSEE RP 2021       |
@@ -497,6 +498,36 @@ the loi SRU article 55 framework.
 - **Note**: ≈ 64 % of communes report a 0 % rate — these are below
   the SRU obligation threshold; the answer is real (TierRural,
   Confidence=high), not missing.
+
+## `sources/sitadel`
+
+Per-commune housing-construction dynamics from the SDES Sitadel annual
+file: building permits **authorised** (LOG_AUT) and housing **starts**
+(LOG_COM, "commencés"), counted in dwellings. A forward-looking SUPPLY
+signal — how much new housing a commune is permitting and breaking ground
+on — which weighs on future rents and resale where it is large relative
+to the existing stock.
+
+- **Needs**: INSEE. Paris / Lyon / Marseille arrondissements fold to the
+  parent commune. The upstream publishes both the parent aggregate
+  (75056 / 69123 / 13055) and, for Paris/Lyon only, the per-arrondissement
+  codes; the build keeps only the parent aggregates, and `Query` folds
+  arrondissement INSEE through `communes.FoldArrondissement`.
+- **Result**: `sitadel.Result` with `AuthorizedLatest` / `StartedLatest`
+  (dwellings, with their `LatestYear` / `StartedLatestYear` — the latest
+  millésime is provisional and carries no starts, so the started year is
+  typically one behind), `AuthorizedAvg5y` / `StartedAvg5y` (dwellings/year
+  over the last 5 populated years), `CollectifSharePct` (apartment share of
+  authorised dwellings, %), and `AuthorizedSeries` + `SeriesStartYear` (the
+  full 2013→latest authorised series for a sparkline). Counts only —
+  SDP_* floor-area columns are ignored. Deliberately raw (no composite
+  tier): absolute counts scale with commune size, so per-stock
+  normalisation belongs in the appraisal layer.
+- **Backend**: gzipped JSON embedded under `data/` (~35 k communes; SDES
+  Sitadel 2026-06 millésime, years 2013→2025). Blank upstream cells are
+  kept distinct from a real 0.
+- **`IsEmpty()`**: true when the commune is absent, or present with no
+  non-zero authorised dwelling in any year.
 
 ## `sources/ips_ecoles`
 

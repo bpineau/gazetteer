@@ -36,6 +36,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/qpv"
 	"github.com/bpineau/gazetteer/sources/rnc"
 	"github.com/bpineau/gazetteer/sources/rpls"
+	"github.com/bpineau/gazetteer/sources/sitadel"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
 	"github.com/bpineau/gazetteer/sources/zonageabc"
@@ -150,6 +151,7 @@ var sourceRenderers = map[string]sourceRenderer{
 	qpv.Name:          renderQPV,
 	rnc.Name:          renderRNC,
 	rpls.Name:         renderRPLS,
+	sitadel.Name:      renderSitadel,
 	taxefonciere.Name: renderTaxeFonciere,
 	vacance.Name:      renderVacance,
 	zonageabc.Name:    renderZonageABC,
@@ -729,6 +731,22 @@ func renderVacance(data any) (string, []string) {
 		headline += " (" + string(r.Tier) + ")"
 	}
 	return headline, nil
+}
+
+func renderSitadel(data any) (string, []string) {
+	r, ok := data.(*sitadel.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no construction data for this commune", nil
+	}
+	headline := fmt.Sprintf("%d logts autorisés (%d)", r.AuthorizedLatest, r.LatestYear)
+	if r.StartedLatestYear > 0 {
+		headline += fmt.Sprintf(", %d commencés (%d)", r.StartedLatest, r.StartedLatestYear)
+	}
+	lines := []string{
+		fmt.Sprintf("moy. 5 ans: %.1f autorisés/an, %.1f commencés/an", r.AuthorizedAvg5y, r.StartedAvg5y),
+		fmt.Sprintf("part collectif (autorisés): %.1f%%", r.CollectifSharePct),
+	}
+	return headline, lines
 }
 
 func renderRNC(data any) (string, []string) {
