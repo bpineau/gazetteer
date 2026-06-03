@@ -7,10 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"sort"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/geoindex"
 )
 
 // coordDecimals rounds contour coordinates to ~1 m — far finer than any IRIS
@@ -58,7 +58,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		if code == "" {
 			continue
 		}
-		polys, err := decodeGeometry(f.Geometry.Type, f.Geometry.Coordinates)
+		polys, err := geoindex.DecodeGeoJSONGeometry(f.Geometry.Type, f.Geometry.Coordinates, coordDecimals)
 		if err != nil {
 			return fmt.Errorf("iris: %s: %w", code, err)
 		}
@@ -78,51 +78,6 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		return err
 	}
 	return gz.Close()
-}
-
-// decodeGeometry normalises a GeoJSON Polygon or MultiPolygon into the
-// [polygon][ring][vertex][lon,lat] shape, rounding coordinates.
-func decodeGeometry(typ string, coords json.RawMessage) ([][][][2]float64, error) {
-	switch typ {
-	case "Polygon":
-		var p [][][]float64
-		if err := json.Unmarshal(coords, &p); err != nil {
-			return nil, fmt.Errorf("polygon coords: %w", err)
-		}
-		return [][][][2]float64{roundRings(p)}, nil
-	case "MultiPolygon":
-		var mp [][][][]float64
-		if err := json.Unmarshal(coords, &mp); err != nil {
-			return nil, fmt.Errorf("multipolygon coords: %w", err)
-		}
-		out := make([][][][2]float64, 0, len(mp))
-		for _, p := range mp {
-			out = append(out, roundRings(p))
-		}
-		return out, nil
-	default:
-		return nil, fmt.Errorf("unsupported geometry type %q", typ)
-	}
-}
-
-func roundRings(rings [][][]float64) [][][2]float64 {
-	out := make([][][2]float64, 0, len(rings))
-	for _, ring := range rings {
-		rr := make([][2]float64, 0, len(ring))
-		for _, v := range ring {
-			if len(v) < 2 {
-				continue
-			}
-			rr = append(rr, [2]float64{roundTo(v[0]), roundTo(v[1])})
-		}
-		out = append(out, rr)
-	}
-	return out
-}
-
-func roundTo(f float64) float64 {
-	p := math.Pow(10, coordDecimals)
-	return math.Round(f*p) / p
 }
 
 // validate gates a freshly-built artifact: it must gunzip, parse, and carry a

@@ -9,11 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"sort"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/geoindex"
 )
 
 // coordDecimals rounds contour coordinates to ~11 m — well within QPV boundary
@@ -106,7 +106,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		if code == "" {
 			continue
 		}
-		polys, err := decodeGeometry(f.Geometry.Type, f.Geometry.Coordinates)
+		polys, err := geoindex.DecodeGeoJSONGeometry(f.Geometry.Type, f.Geometry.Coordinates, coordDecimals)
 		if err != nil {
 			return fmt.Errorf("qpv: %s: %w", code, err)
 		}
@@ -193,63 +193,24 @@ func splitINSEE(s string) []string {
 	return out
 }
 
-// decodeGeometry normalises a GeoJSON Polygon or MultiPolygon into the
-// [polygon][ring][vertex][lon,lat] shape, rounding coordinates.
-func decodeGeometry(typ string, coords json.RawMessage) ([][][][2]float64, error) {
-	switch typ {
-	case "Polygon":
-		var p [][][]float64
-		if err := json.Unmarshal(coords, &p); err != nil {
-			return nil, fmt.Errorf("polygon coords: %w", err)
-		}
-		return [][][][2]float64{roundRings(p)}, nil
-	case "MultiPolygon":
-		var mp [][][][]float64
-		if err := json.Unmarshal(coords, &mp); err != nil {
-			return nil, fmt.Errorf("multipolygon coords: %w", err)
-		}
-		out := make([][][][2]float64, 0, len(mp))
-		for _, p := range mp {
-			out = append(out, roundRings(p))
-		}
-		return out, nil
-	default:
-		return nil, fmt.Errorf("unsupported geometry type %q", typ)
-	}
-}
-
-func roundRings(rings [][][]float64) [][][2]float64 {
-	out := make([][][2]float64, 0, len(rings))
-	for _, ring := range rings {
-		rr := make([][2]float64, 0, len(ring))
-		for _, v := range ring {
-			if len(v) < 2 {
-				continue
-			}
-			rr = append(rr, [2]float64{roundTo(v[0]), roundTo(v[1])})
-		}
-		out = append(out, rr)
-	}
-	return out
-}
-
-func roundTo(f float64) float64 {
-	p := math.Pow(10, coordDecimals)
-	return math.Round(f*p) / p
-}
-
 // validate gates a freshly-built artifact: it must gunzip, parse, and carry a
-// plausible number of QPVs with geometry.
+// plausible number of QPVs each with a code and geometry.
 func validate(r io.Reader) error {
-	idx, err := parseIndex(r)
+	gz, err := gzip.NewReader(r)
 	if err != nil {
-		return err
+		return fmt.Errorf("qpv: validate gunzip: %w", err)
 	}
-	if idx.PolygonCount() == 0 {
+	defer func() { _ = gz.Close() }()
+
+	var p processed
+	if err := json.NewDecoder(gz).Decode(&p); err != nil {
+		return fmt.Errorf("qpv: validate decode: %w", err)
+	}
+	if len(p.QPVs) == 0 {
 		return errors.New("qpv: validated artifact has no QPV polygons")
 	}
-	for i := range idx.polys {
-		if idx.polys[i].code == "" || len(idx.polys[i].mp) == 0 {
+	for i := range p.QPVs {
+		if p.QPVs[i].Code == "" || len(p.QPVs[i].Polygons) == 0 {
 			return fmt.Errorf("qpv: polygon %d has no code/geometry", i)
 		}
 	}

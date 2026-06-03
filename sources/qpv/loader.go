@@ -12,7 +12,7 @@ import (
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/helpers/communes"
-	"github.com/bpineau/gazetteer/helpers/geodist"
+	"github.com/bpineau/gazetteer/helpers/geoindex"
 	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
@@ -38,7 +38,7 @@ type qpvRow struct {
 	Code     string           `json:"code"`
 	Label    string           `json:"label,omitempty"`
 	INSEE    []string         `json:"insee,omitempty"`
-	Polygons [][][][2]float64 `json:"g"`
+	Polygons geoindex.Compact `json:"g"`
 }
 
 // Meta carries the manifest metadata for the embedded artifact.
@@ -56,73 +56,46 @@ type processed struct {
 	QPVs []qpvRow `json:"qpvs"`
 }
 
-// poly is one resolvable QPV polygon: identity, geometry and a precomputed
-// bbox. (Commune membership is served from Index.byCommune, not from here.)
-type poly struct {
-	code, label string
-	bbox        geopoly.BBox
-	mp          geopoly.MultiPolygon
-}
-
 // Entry is one commune's QPV list (used by the commune-level fallback).
 type Entry struct {
 	Label string
 	QPVs  []QPV
 }
 
-// Index is the in-memory QPV contour index: polygons for point-in-polygon, and
-// a commune→QPVs map for the coordinate-less fallback.
+// Index is the in-memory QPV contour index: a geoindex of QPV polygons for
+// point-in-polygon (payload is the QPV identity), and a commune→QPVs map for
+// the coordinate-less fallback.
 type Index struct {
 	Meta      Meta
-	polys     []poly
+	geo       *geoindex.Index[QPV]
 	byCommune map[string]Entry
 }
 
 // resolvePoint returns the QPV whose polygon contains (lat, lon), or nil when
 // the point is outside every QPV. The bbox pre-filter keeps the O(n) scan
-// cheap. polys are kept in code-sorted order (see parse / NewIndexForTest), so
-// the first cover wins deterministically on a shared boundary.
+// cheap. Features are kept in code-sorted order (see parse / NewIndexForTest),
+// so the first cover wins deterministically on a shared boundary.
 func (idx *Index) resolvePoint(lat, lon float64) *QPV {
 	if idx == nil {
 		return nil
 	}
-	p := geopoly.Point{Lon: lon, Lat: lat}
-	for i := range idx.polys {
-		pl := &idx.polys[i]
-		if pl.bbox.Contains(p) && pl.mp.Covers(p) {
-			return &QPV{Code: pl.code, Label: pl.label}
-		}
+	if h, ok := idx.geo.Resolve(lat, lon); ok {
+		return &h
 	}
 	return nil
 }
 
 // nearest returns the QPV with the smallest vertex distance to (lat, lon) and
-// that distance in metres, considering only QPVs within maxMeters. Returns nil
-// when none qualifies.
+// that distance in metres, considering only QPVs whose nearest vertex falls
+// within maxMeters. Returns nil when none qualifies.
 func (idx *Index) nearest(lat, lon, maxMeters float64) (*QPV, float64) {
 	if idx == nil {
 		return nil, 0
 	}
-	best := maxMeters
-	var bestQPV *QPV
-	for i := range idx.polys {
-		pl := &idx.polys[i]
-		for _, polygon := range pl.mp {
-			for _, ring := range polygon {
-				for _, v := range ring {
-					d := geodist.MetersBetween(lat, lon, v.Lat, v.Lon)
-					if d < best {
-						best = d
-						bestQPV = &QPV{Code: pl.code, Label: pl.label}
-					}
-				}
-			}
-		}
+	if h, dist, ok := idx.geo.Nearest(lat, lon, maxMeters); ok {
+		return &h, dist
 	}
-	if bestQPV == nil {
-		return nil, 0
-	}
-	return bestQPV, best
+	return nil, 0
 }
 
 // lookupCommune returns the commune's QPV entry; ok is false when the commune
@@ -144,7 +117,7 @@ func (idx *Index) PolygonCount() int {
 	if idx == nil {
 		return 0
 	}
-	return len(idx.polys)
+	return idx.geo.Len()
 }
 
 // CommuneCount reports the number of communes hosting at least one QPV.
@@ -169,13 +142,13 @@ type FeatureForTest struct {
 // as the real build.
 func NewIndexForTest(feats []FeatureForTest) *Index {
 	idx := &Index{byCommune: map[string]Entry{}}
+	gfeats := make([]geoindex.Feature[QPV], 0, len(feats))
 	for _, f := range feats {
-		pl := poly{code: f.Code, label: f.Label, mp: f.Polygons}
-		pl.bbox = pl.mp.Bound()
-		idx.polys = append(idx.polys, pl)
+		gfeats = append(gfeats, geoindex.NewFeature(QPV{Code: f.Code, Label: f.Label}, f.Polygons))
 		addCommunes(idx.byCommune, f.INSEE, f.Code, f.Label)
 	}
-	idx.Meta = Meta{RowCountQPV: len(idx.polys), RowCountCom: len(idx.byCommune)}
+	idx.geo = geoindex.New(gfeats)
+	idx.Meta = Meta{RowCountQPV: idx.geo.Len(), RowCountCom: len(idx.byCommune)}
 	return idx
 }
 
@@ -235,30 +208,12 @@ func parseIndex(r io.Reader) (*Index, error) {
 	if err := json.NewDecoder(gz).Decode(&p); err != nil {
 		return nil, fmt.Errorf("qpv: parse json: %w", err)
 	}
-	idx := &Index{Meta: p.Meta, polys: make([]poly, 0, len(p.QPVs)), byCommune: map[string]Entry{}}
+	idx := &Index{Meta: p.Meta, byCommune: map[string]Entry{}}
+	gfeats := make([]geoindex.Feature[QPV], 0, len(p.QPVs))
 	for _, r := range p.QPVs {
-		pl := poly{code: r.Code, label: r.Label, mp: toMultiPolygon(r.Polygons)}
-		pl.bbox = pl.mp.Bound()
-		idx.polys = append(idx.polys, pl)
+		gfeats = append(gfeats, geoindex.NewFeature(QPV{Code: r.Code, Label: r.Label}, r.Polygons.MultiPolygon()))
 		addCommunes(idx.byCommune, r.INSEE, r.Code, r.Label)
 	}
+	idx.geo = geoindex.New(gfeats)
 	return idx, nil
-}
-
-// toMultiPolygon converts the compact [polygon][ring][vertex][lon,lat] shape
-// into a geopoly.MultiPolygon.
-func toMultiPolygon(polys [][][][2]float64) geopoly.MultiPolygon {
-	mp := make(geopoly.MultiPolygon, 0, len(polys))
-	for _, polygon := range polys {
-		gp := make(geopoly.Polygon, 0, len(polygon))
-		for _, ring := range polygon {
-			gr := make(geopoly.Ring, 0, len(ring))
-			for _, v := range ring {
-				gr = append(gr, geopoly.Point{Lon: v[0], Lat: v[1]})
-			}
-			gp = append(gp, gr)
-		}
-		mp = append(mp, gp)
-	}
-	return mp
 }
