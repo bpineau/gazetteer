@@ -41,7 +41,7 @@ func TestTransform_Golden(t *testing.T) {
 		t.Errorf("iris[1] = %+v, want 930660903/Test A", p.Iris[1])
 	}
 	// The transformed geometry must cover an interior point.
-	mp := toMultiPolygon(p.Iris[1].Polygons)
+	mp := p.Iris[1].Polygons.MultiPolygon()
 	if !mp.Covers(geopoly.Point{Lon: 2.05, Lat: 48.95}) {
 		t.Error("interior point not covered by transformed polygon")
 	}
