@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
-	"github.com/bpineau/gazetteer/helpers/geopoly"
+	"github.com/bpineau/gazetteer/helpers/geoindex"
 )
 
 //go:embed data/encadrement_paris.json data/encadrement_plaine_commune.json data/encadrement_lyon_villeurbanne.json data/encadrement_est_ensemble.json data/encadrement_plaine_commune_zones.json data/encadrement_est_ensemble_zones.json
@@ -150,8 +150,9 @@ type Index struct {
 	byLyonInsee map[string][]Entry
 
 	// zones holds the embedded zonage geometry for the Seine-Saint-Denis EPTs
-	// (Plaine Commune, Est Ensemble), used to resolve a coordinate to its zone.
-	zones []zoneArea
+	// (Plaine Commune, Est Ensemble), as a geoindex whose payload is the zone
+	// identity — used to resolve a coordinate to its zone.
+	zones *geoindex.Index[zoneID]
 
 	// inseeEPT maps each EPT commune INSEE to its EPT (zone_source) — the
 	// membership test for the Seine-Saint-Denis resolution branch.
@@ -166,16 +167,13 @@ type Index struct {
 	inseeZones map[string][]string
 }
 
-// zoneArea is one resolvable zone polygon: its EPT, zone id and commune
-// identity, the boundary geometry, and a precomputed bounding box used to
-// reject non-candidates before the O(n) point-in-polygon test.
-type zoneArea struct {
+// zoneID is the per-feature payload carried by the zonage geoindex: a zone's
+// EPT, zone number, hosting-commune INSEE and human-readable name.
+type zoneID struct {
 	ept     string
 	zone    string
 	insee   string
 	commune string
-	bbox    geopoly.BBox
-	mp      geopoly.MultiPolygon
 }
 
 var (
@@ -361,19 +359,16 @@ func (idx *Index) resolve93(insee string, lat, lon *float64) (ept93Match, bool) 
 	// Island, and every EPT commune is far from it, so this never rejects a
 	// genuine coordinate here.
 	if lat != nil && lon != nil && !(*lat == 0 && *lon == 0) {
-		p := geopoly.Point{Lon: *lon, Lat: *lat}
-		for _, za := range idx.zones {
-			if za.insee != insee || !za.bbox.Contains(p) {
-				continue
-			}
-			if za.mp.Covers(p) {
-				return ept93Match{
-					ept:     ept,
-					zones:   []string{za.zone},
-					commune: firstNonEmpty(za.commune, commune),
-					conf:    ConfidenceMedium,
-				}, true
-			}
+		// Scope the point-in-polygon scan to the listing's own commune, so a
+		// coordinate that drifts into a neighbouring commune cannot override the
+		// stated commune.
+		if za, ok := idx.zones.ResolveWhere(*lat, *lon, func(z zoneID) bool { return z.insee == insee }); ok {
+			return ept93Match{
+				ept:     ept,
+				zones:   []string{za.zone},
+				commune: firstNonEmpty(za.commune, commune),
+				conf:    ConfidenceMedium,
+			}, true
 		}
 	}
 
@@ -436,7 +431,7 @@ type zoneRow struct {
 	Zone     string           `json:"zone"`
 	INSEE    string           `json:"insee"`
 	Commune  string           `json:"commune"`
-	Polygons [][][][2]float64 `json:"polygons"`
+	Polygons geoindex.Compact `json:"polygons"`
 }
 
 type lyonRow struct {
@@ -582,6 +577,8 @@ func parseAll(dir string) (*Index, error) {
 	}
 
 	// Seine-Saint-Denis zonage geometry (Plaine Commune + Est Ensemble).
+	var zoneFeats []geoindex.Feature[zoneID]
+	var zoneIDs []zoneID
 	for _, zs := range []dataset.Set{setPlaineCommuneZones, setEstEnsembleZones} {
 		raw, err = readSet(zs, dir)
 		if err != nil {
@@ -592,33 +589,21 @@ func parseAll(dir string) (*Index, error) {
 			return nil, fmt.Errorf("encadrement: parse %s: %w", zs.Processed.Name, err)
 		}
 		for _, z := range rows {
-			idx.addZone(z)
+			id := idx.addZone(z)
+			zoneFeats = append(zoneFeats, geoindex.NewFeature(id, z.Polygons.MultiPolygon()))
+			zoneIDs = append(zoneIDs, id)
 		}
 	}
-	idx.finalizeZones()
+	idx.zones = geoindex.New(zoneFeats)
+	idx.finalizeZones(zoneIDs)
 
 	return idx, nil
 }
 
-// addZone materialises one zonage feature into a geopoly geometry and records
-// its EPT/commune membership in the lookup maps.
-func (idx *Index) addZone(z zoneRow) {
-	mp := make(geopoly.MultiPolygon, 0, len(z.Polygons))
-	for _, poly := range z.Polygons {
-		gp := make(geopoly.Polygon, 0, len(poly))
-		for _, ring := range poly {
-			gr := make(geopoly.Ring, 0, len(ring))
-			for _, v := range ring {
-				gr = append(gr, geopoly.Point{Lon: v[0], Lat: v[1]})
-			}
-			gp = append(gp, gr)
-		}
-		mp = append(mp, gp)
-	}
-	idx.zones = append(idx.zones, zoneArea{
-		ept: z.EPT, zone: z.Zone, insee: z.INSEE, commune: z.Commune,
-		bbox: mp.Bound(), mp: mp,
-	})
+// addZone records one zonage feature's EPT/commune membership in the lookup
+// maps and returns its identity payload (the caller builds the geoindex
+// feature from it plus the geometry).
+func (idx *Index) addZone(z zoneRow) zoneID {
 	if z.INSEE != "" {
 		if idx.inseeEPT[z.INSEE] == "" {
 			idx.inseeEPT[z.INSEE] = z.EPT
@@ -627,14 +612,15 @@ func (idx *Index) addZone(z zoneRow) {
 			idx.inseeCommune[z.INSEE] = z.Commune
 		}
 	}
+	return zoneID{ept: z.EPT, zone: z.Zone, insee: z.INSEE, commune: z.Commune}
 }
 
 // finalizeZones derives the per-commune distinct-zone lists from the loaded
-// geometry, so resolve93 can tell single-zone communes (resolvable without
-// coordinates) from multi-zone ones.
-func (idx *Index) finalizeZones() {
+// zone identities, so resolve93 can tell single-zone communes (resolvable
+// without coordinates) from multi-zone ones.
+func (idx *Index) finalizeZones(zones []zoneID) {
 	tmp := map[string]map[string]struct{}{}
-	for _, za := range idx.zones {
+	for _, za := range zones {
 		if tmp[za.insee] == nil {
 			tmp[za.insee] = map[string]struct{}{}
 		}

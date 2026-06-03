@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
-	"github.com/bpineau/gazetteer/helpers/geopoly"
+	"github.com/bpineau/gazetteer/helpers/geoindex"
 )
 
 //go:embed data/iris.json.gz
@@ -31,30 +31,29 @@ type irisRow struct {
 	Code     string           `json:"code"`
 	Nom      string           `json:"nom"`
 	Typ      string           `json:"typ"`
-	Polygons [][][][2]float64 `json:"g"`
+	Polygons geoindex.Compact `json:"g"`
 }
 
 type processed struct {
 	Iris []irisRow `json:"iris"`
 }
 
-// area is one resolvable IRIS: identity, geometry and a precomputed bbox.
-type area struct {
+// irisID is the per-feature payload carried by the geoindex: an IRIS identity.
+type irisID struct {
 	code, nom, typ string
-	bbox           geopoly.BBox
-	mp             geopoly.MultiPolygon
 }
 
-// Index is the in-memory IRIS contour index.
+// Index is the in-memory IRIS contour index: a geoindex of IRIS polygons for
+// point-in-polygon, plus a code→identity map for direct lookups.
 type Index struct {
-	areas  []area
-	byCode map[string]area
+	geo    *geoindex.Index[irisID]
+	byCode map[string]irisID
 }
 
 // resolve returns the IRIS whose polygon contains (lat, lon). ok is false when
 // the point is outside the covered perimeter.
 //
-// areas are stored in code-sorted order (see parse), so the first covering
+// Features are stored in code-sorted order (see parse), so the first covering
 // polygon wins deterministically when a point lands on a boundary shared by two
 // IRIS — a negligible case given coordinates are real geocodes and boundaries
 // are rounded to ~1 m. The bbox pre-filter keeps the O(n) scan cheap (one call
@@ -63,14 +62,11 @@ func (idx *Index) resolve(lat, lon float64) (code, nom, typ string, ok bool) {
 	if idx == nil {
 		return "", "", "", false
 	}
-	p := geopoly.Point{Lon: lon, Lat: lat}
-	for i := range idx.areas {
-		a := &idx.areas[i]
-		if a.bbox.Contains(p) && a.mp.Covers(p) {
-			return a.code, a.nom, a.typ, true
-		}
+	id, ok := idx.geo.Resolve(lat, lon)
+	if !ok {
+		return "", "", "", false
 	}
-	return "", "", "", false
+	return id.code, id.nom, id.typ, true
 }
 
 // lookupCode returns the name/type for a known IRIS code (used when a Listing
@@ -88,7 +84,7 @@ func (idx *Index) Count() int {
 	if idx == nil {
 		return 0
 	}
-	return len(idx.areas)
+	return idx.geo.Len()
 }
 
 var (
@@ -111,7 +107,7 @@ func Load(dir string) (*Index, error) {
 func parse(dir string) (*Index, error) {
 	rc, err := set.Open(dir)
 	if errors.Is(err, dataset.ErrUnavailable) {
-		return &Index{byCode: map[string]area{}}, nil
+		return &Index{byCode: map[string]irisID{}}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -128,33 +124,17 @@ func parse(dir string) (*Index, error) {
 	if err := json.NewDecoder(gz).Decode(&p); err != nil {
 		return nil, err
 	}
-	// The artifact is code-sorted (see transform); appending in order keeps
-	// areas sorted, which resolve relies on for deterministic first-cover
-	// tie-breaks. IRIS codes are unique upstream, so byCode and areas agree.
-	idx := &Index{areas: make([]area, 0, len(p.Iris)), byCode: make(map[string]area, len(p.Iris))}
+	// The artifact is code-sorted (see transform); building features in order
+	// keeps them sorted, which resolve relies on for deterministic first-cover
+	// tie-breaks. IRIS codes are unique upstream, so byCode and the geoindex
+	// agree.
+	idx := &Index{byCode: make(map[string]irisID, len(p.Iris))}
+	feats := make([]geoindex.Feature[irisID], 0, len(p.Iris))
 	for _, r := range p.Iris {
-		a := area{code: r.Code, nom: r.Nom, typ: r.Typ, mp: toMultiPolygon(r.Polygons)}
-		a.bbox = a.mp.Bound()
-		idx.areas = append(idx.areas, a)
-		idx.byCode[r.Code] = a
+		id := irisID{code: r.Code, nom: r.Nom, typ: r.Typ}
+		feats = append(feats, geoindex.NewFeature(id, r.Polygons.MultiPolygon()))
+		idx.byCode[r.Code] = id
 	}
+	idx.geo = geoindex.New(feats)
 	return idx, nil
-}
-
-// toMultiPolygon converts the compact [polygon][ring][vertex][lon,lat] shape
-// into a geopoly.MultiPolygon.
-func toMultiPolygon(polys [][][][2]float64) geopoly.MultiPolygon {
-	mp := make(geopoly.MultiPolygon, 0, len(polys))
-	for _, poly := range polys {
-		gp := make(geopoly.Polygon, 0, len(poly))
-		for _, ring := range poly {
-			gr := make(geopoly.Ring, 0, len(ring))
-			for _, v := range ring {
-				gr = append(gr, geopoly.Point{Lon: v[0], Lat: v[1]})
-			}
-			gp = append(gp, gr)
-		}
-		mp = append(mp, gp)
-	}
-	return mp
 }
