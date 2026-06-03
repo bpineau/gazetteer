@@ -107,8 +107,8 @@ func ParseList(body []byte) ([]Row, error) {
 // pre-tie-break behaviour).
 //
 // Range labels like "80-82" / "80/82" / "80 - 82" are also accepted
-// when their right-hand bound matches `wantNum`. Returns (-1, false,
-// false) when no row matches; callers then fall back to PickBest.
+// when their right-hand bound matches `wantNum`. Returns (-1, false) when
+// no row matches; callers then fall back to PickBest.
 //
 // Street-aware selection (v3): when `wantStreetKey` is non-empty and any
 // number-matching row is ALSO on the listing's street (per streetKey),
@@ -119,12 +119,12 @@ func ParseList(body []byte) ([]Row, error) {
 // Surface stays the tie-break WITHIN the chosen subset (it disambiguates
 // dwellings on the SAME street, never across streets). When no
 // number-matching row is on the listing's street, the picker falls back
-// to the full number-matching set. The third return value reports
-// whether the finally-picked row street-matched.
-func PickBestByNumber(rows []Row, wantNum, wantStreetKey string, wantSurface float64) (int, bool, bool) {
+// to the full number-matching set. Callers derive whether the picked row
+// street-matched directly from the picked row via streetMatches.
+func PickBestByNumber(rows []Row, wantNum, wantStreetKey string, wantSurface float64) (int, bool) {
 	wantNum = strings.TrimSpace(wantNum)
 	if wantNum == "" {
-		return -1, false, false
+		return -1, false
 	}
 	var matches []int
 	for i, r := range rows {
@@ -133,7 +133,7 @@ func PickBestByNumber(rows []Row, wantNum, wantStreetKey string, wantSurface flo
 		}
 	}
 	if len(matches) == 0 {
-		return -1, false, false
+		return -1, false
 	}
 	// Prefer number-matching rows that are also on the right street.
 	var onStreet []int
@@ -145,9 +145,9 @@ func PickBestByNumber(rows []Row, wantNum, wantStreetKey string, wantSurface flo
 		}
 	}
 	if len(onStreet) > 0 {
-		return pickClosestBySurface(rows, onStreet, wantSurface), true, true
+		return pickClosestBySurface(rows, onStreet, wantSurface), true
 	}
-	return pickClosestBySurface(rows, matches, wantSurface), true, false
+	return pickClosestBySurface(rows, matches, wantSurface), true
 }
 
 // streetTypeAbbrev canonicalises common French voie-type abbreviations

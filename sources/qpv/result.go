@@ -116,9 +116,6 @@ type Evidence struct {
 	// logging / diagnostics; not always populated.
 	CommuneLabel string `json:"commune_label,omitempty"`
 
-	// MatchLevel mirrors Result.MatchLevel.
-	MatchLevel string `json:"match_level,omitempty"`
-
 	// Lat / Lon are the coordinates used for the point-in-polygon test
 	// (decimal degrees). Zero on the commune fallback path.
 	Lat float64 `json:"lat,omitempty"`
