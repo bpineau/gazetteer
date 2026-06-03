@@ -171,12 +171,10 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	wantStreetKey := streetKey(l.Address)
 	idx := -1
 	numberMatched := false
-	streetMatched := false
 	if parts.Number != "" {
-		if i, ok, sm := PickBestByNumber(rows, parts.Number, wantStreetKey, wantSurface); ok {
+		if i, ok := PickBestByNumber(rows, parts.Number, wantStreetKey, wantSurface); ok {
 			idx = i
 			numberMatched = true
-			streetMatched = sm
 		}
 	}
 	if idx == -1 {
@@ -205,12 +203,10 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	}
 	row := rows[idx]
 
-	// When the row was picked via the no-number / full-text fallback,
-	// recompute streetMatched against the finally-picked row so a
-	// fallback pick on the right street can still earn its street flag.
-	if !numberMatched {
-		streetMatched = streetMatches(wantStreetKey, row)
-	}
+	// streetMatched is fully derivable from the finally-picked row, so
+	// compute it once here — covering both the number-match and full-text
+	// fallback paths — rather than threading it out of the picker.
+	streetMatched := streetMatches(wantStreetKey, row)
 
 	out := buildResult(row)
 	out.SampleSize = 1

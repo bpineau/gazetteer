@@ -56,11 +56,10 @@ type processed struct {
 	QPVs []qpvRow `json:"qpvs"`
 }
 
-// poly is one resolvable QPV polygon: identity, hosting communes, geometry and
-// a precomputed bbox.
+// poly is one resolvable QPV polygon: identity, geometry and a precomputed
+// bbox. (Commune membership is served from Index.byCommune, not from here.)
 type poly struct {
 	code, label string
-	insee       []string
 	bbox        geopoly.BBox
 	mp          geopoly.MultiPolygon
 }
@@ -79,17 +78,11 @@ type Index struct {
 	byCommune map[string]Entry
 }
 
-// hit is the result of a point-in-polygon resolve.
-type hit struct {
-	Code  string
-	Label string
-}
-
 // resolvePoint returns the QPV whose polygon contains (lat, lon), or nil when
 // the point is outside every QPV. The bbox pre-filter keeps the O(n) scan
 // cheap. polys are kept in code-sorted order (see parse / NewIndexForTest), so
 // the first cover wins deterministically on a shared boundary.
-func (idx *Index) resolvePoint(lat, lon float64) *hit {
+func (idx *Index) resolvePoint(lat, lon float64) *QPV {
 	if idx == nil {
 		return nil
 	}
@@ -97,21 +90,21 @@ func (idx *Index) resolvePoint(lat, lon float64) *hit {
 	for i := range idx.polys {
 		pl := &idx.polys[i]
 		if pl.bbox.Contains(p) && pl.mp.Covers(p) {
-			return &hit{Code: pl.code, Label: pl.label}
+			return &QPV{Code: pl.code, Label: pl.label}
 		}
 	}
 	return nil
 }
 
 // nearest returns the QPV with the smallest vertex distance to (lat, lon) and
-// that distance in metres, considering only QPVs whose bbox-expanded reach
-// could plausibly fall within maxMeters. Returns nil when none qualifies.
-func (idx *Index) nearest(lat, lon, maxMeters float64) (*hit, float64) {
+// that distance in metres, considering only QPVs within maxMeters. Returns nil
+// when none qualifies.
+func (idx *Index) nearest(lat, lon, maxMeters float64) (*QPV, float64) {
 	if idx == nil {
 		return nil, 0
 	}
 	best := maxMeters
-	var bestHit *hit
+	var bestQPV *QPV
 	for i := range idx.polys {
 		pl := &idx.polys[i]
 		for _, polygon := range pl.mp {
@@ -120,16 +113,16 @@ func (idx *Index) nearest(lat, lon, maxMeters float64) (*hit, float64) {
 					d := geodist.MetersBetween(lat, lon, v.Lat, v.Lon)
 					if d < best {
 						best = d
-						bestHit = &hit{Code: pl.code, Label: pl.label}
+						bestQPV = &QPV{Code: pl.code, Label: pl.label}
 					}
 				}
 			}
 		}
 	}
-	if bestHit == nil {
+	if bestQPV == nil {
 		return nil, 0
 	}
-	return bestHit, best
+	return bestQPV, best
 }
 
 // lookupCommune returns the commune's QPV entry; ok is false when the commune
@@ -177,7 +170,7 @@ type FeatureForTest struct {
 func NewIndexForTest(feats []FeatureForTest) *Index {
 	idx := &Index{byCommune: map[string]Entry{}}
 	for _, f := range feats {
-		pl := poly{code: f.Code, label: f.Label, insee: f.INSEE, mp: f.Polygons}
+		pl := poly{code: f.Code, label: f.Label, mp: f.Polygons}
 		pl.bbox = pl.mp.Bound()
 		idx.polys = append(idx.polys, pl)
 		addCommunes(idx.byCommune, f.INSEE, f.Code, f.Label)
@@ -244,7 +237,7 @@ func parseIndex(r io.Reader) (*Index, error) {
 	}
 	idx := &Index{Meta: p.Meta, polys: make([]poly, 0, len(p.QPVs)), byCommune: map[string]Entry{}}
 	for _, r := range p.QPVs {
-		pl := poly{code: r.Code, label: r.Label, insee: r.INSEE, mp: toMultiPolygon(r.Polygons)}
+		pl := poly{code: r.Code, label: r.Label, mp: toMultiPolygon(r.Polygons)}
 		pl.bbox = pl.mp.Bound()
 		idx.polys = append(idx.polys, pl)
 		addCommunes(idx.byCommune, r.INSEE, r.Code, r.Label)

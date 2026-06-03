@@ -114,7 +114,6 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 // queryPoint runs point-in-polygon over the QPV contours.
 func (s *Source) queryPoint(idx *Index, lat, lon float64) *Result {
 	ev := Evidence{
-		MatchLevel:   MatchLevelPoint,
 		Lat:          lat,
 		Lon:          lon,
 		PolygonCount: idx.PolygonCount(),
@@ -152,7 +151,6 @@ func (s *Source) queryCommune(idx *Index, insee string) *Result {
 	insee = communes.FoldArrondissement(insee)
 	ev := Evidence{
 		INSEE:            insee,
-		MatchLevel:       MatchLevelCommune,
 		PolygonCount:     idx.PolygonCount(),
 		RowCountCommunes: idx.CommuneCount(),
 	}
