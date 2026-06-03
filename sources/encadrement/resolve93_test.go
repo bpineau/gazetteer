@@ -18,7 +18,7 @@ func TestLoad_93(t *testing.T) {
 		t.Errorf("CountEstEnsemble = %d, want ≥ 100", got)
 	}
 	// 9 PC communes (Saint-Denis ×2) + 9 EE communes (Montreuil ×2) = 20 zones.
-	if got := len(idx.zones); got != 20 {
+	if got := idx.zones.Len(); got != 20 {
 		t.Errorf("loaded zones = %d, want 20", got)
 	}
 	// Saint-Denis (93066) straddles two PC zones; Pantin (93055) is single-zone.

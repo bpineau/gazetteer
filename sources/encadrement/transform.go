@@ -7,11 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"strconv"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/geoindex"
 )
 
 // Raw input filenames (datadir basenames) and upstream URLs --------------
@@ -254,7 +254,7 @@ func transformZones(raw dataset.RawSet, spec zoneGeoSpec, dst io.Writer) error {
 		if zone == "" || insee == "" {
 			return fmt.Errorf("encadrement: %s feature %d: missing zone/insee (zone=%q insee=%q)", spec.rawName, i, zone, insee)
 		}
-		polys, err := decodeGeometry(f.Geometry.Type, f.Geometry.Coordinates)
+		polys, err := geoindex.DecodeGeoJSONGeometry(f.Geometry.Type, f.Geometry.Coordinates, zoneCoordDecimals)
 		if err != nil {
 			return fmt.Errorf("encadrement: %s feature %d (%s): %w", spec.rawName, i, commune, err)
 		}
@@ -264,52 +264,6 @@ func transformZones(raw dataset.RawSet, spec zoneGeoSpec, dst io.Writer) error {
 		return fmt.Errorf("encadrement: %s transform produced no zones", spec.rawName)
 	}
 	return json.NewEncoder(dst).Encode(out)
-}
-
-// decodeGeometry normalises a GeoJSON Polygon or MultiPolygon into the
-// [polygon][ring][vertex][lon,lat] shape, rounding coordinates. Vertices may
-// carry a third (altitude) ordinate upstream; only lon/lat are kept.
-func decodeGeometry(typ string, coords json.RawMessage) ([][][][2]float64, error) {
-	switch typ {
-	case "Polygon":
-		var p [][][]float64
-		if err := json.Unmarshal(coords, &p); err != nil {
-			return nil, fmt.Errorf("polygon coords: %w", err)
-		}
-		return [][][][2]float64{roundRings(p)}, nil
-	case "MultiPolygon":
-		var mp [][][][]float64
-		if err := json.Unmarshal(coords, &mp); err != nil {
-			return nil, fmt.Errorf("multipolygon coords: %w", err)
-		}
-		out := make([][][][2]float64, 0, len(mp))
-		for _, p := range mp {
-			out = append(out, roundRings(p))
-		}
-		return out, nil
-	default:
-		return nil, fmt.Errorf("unsupported geometry type %q", typ)
-	}
-}
-
-func roundRings(rings [][][]float64) [][][2]float64 {
-	out := make([][][2]float64, 0, len(rings))
-	for _, ring := range rings {
-		rr := make([][2]float64, 0, len(ring))
-		for _, v := range ring {
-			if len(v) < 2 {
-				continue
-			}
-			rr = append(rr, [2]float64{roundTo(v[0], zoneCoordDecimals), roundTo(v[1], zoneCoordDecimals)})
-		}
-		out = append(out, rr)
-	}
-	return out
-}
-
-func roundTo(f float64, decimals int) float64 {
-	p := math.Pow(10, float64(decimals))
-	return math.Round(f*p) / p
 }
 
 // scalarString coerces a JSON property value (string or number) to its trimmed

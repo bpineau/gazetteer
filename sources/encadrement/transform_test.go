@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/bpineau/gazetteer/dataset"
-	"github.com/bpineau/gazetteer/helpers/geopoly"
+	"github.com/bpineau/gazetteer/helpers/geoindex"
 )
 
 // fixtureRawSet serves a single named file from testdata, implementing
@@ -164,22 +164,15 @@ func TestTransformZones_Golden(t *testing.T) {
 					r0.EPT, r0.Zone, r0.INSEE, c.wantEPT, c.wantZone, c.wantINSEE)
 			}
 			// The transformed geometry must cover the known interior point.
-			idx := &Index{
-				inseeEPT: map[string]string{}, inseeCommune: map[string]string{},
-				inseeZones: map[string][]string{},
-			}
+			feats := make([]geoindex.Feature[zoneID], 0, len(rows))
 			for _, z := range rows {
-				idx.addZone(z)
+				feats = append(feats, geoindex.NewFeature(
+					zoneID{ept: z.EPT, zone: z.Zone, insee: z.INSEE, commune: z.Commune},
+					z.Polygons.MultiPolygon(),
+				))
 			}
-			p := geopoly.Point{Lon: c.inLon, Lat: c.inLat}
-			covered := false
-			for _, za := range idx.zones {
-				if za.mp.Covers(p) {
-					covered = true
-				}
-			}
-			if !covered {
-				t.Errorf("interior point %v not covered by any transformed polygon", p)
+			if _, ok := geoindex.New(feats).Resolve(c.inLat, c.inLon); !ok {
+				t.Errorf("interior point (%v,%v) not covered by any transformed polygon", c.inLat, c.inLon)
 			}
 		})
 	}
