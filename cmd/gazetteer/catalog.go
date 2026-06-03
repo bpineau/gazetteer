@@ -171,6 +171,11 @@ var sourceDescriptors = map[string]sourceDescriptor{
 		Summary: "Share of logements locatifs sociaux (loi SRU) per commune.",
 		Inputs:  []string{"INSEE"}, Coverage: "national",
 	},
+	"sitadel": {
+		Summary: "Per-commune housing-construction dynamics from SDES Sitadel: dwellings authorised (permits) + started, latest year, 5-year mean, collectif share and the per-year authorised series.",
+		Inputs:  []string{"INSEE"}, Coverage: "national (metropole + DOM)",
+		Feeds: []string{"supply-side signal: new-housing pipeline (rents/prices headwind)"},
+	},
 	"qpv": {
 		Summary: "With coordinates, answers via point-in-polygon whether THIS address is inside " +
 			"a Quartier Prioritaire (QPV 2024 contours). Without coordinates, falls back to the " +
