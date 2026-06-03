@@ -513,6 +513,27 @@
     }
   },
   {
+    "name": "sitadel",
+    "version": 1,
+    "default": true,
+    "summary": "Per-commune housing-construction dynamics from SDES Sitadel: dwellings authorised (permits) + started, latest year, 5-year mean, collectif share and the per-year authorised series.",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national (metropole + DOM)",
+    "feeds": [
+      "supply-side signal: new-housing pipeline (rents/prices headwind)"
+    ],
+    "result_schema": {
+      "authorized_latest": 0,
+      "started_latest": 0,
+      "authorized_avg_5y": 0,
+      "started_avg_5y": 0,
+      "collectif_share_pct": 0,
+      "confidence": ""
+    }
+  },
+  {
     "name": "taxefonciere",
     "version": 1,
     "default": true,
