@@ -118,6 +118,7 @@ Market data:
 | `oll`          | Observed market rents by zone (Observatoires Locaux des Loyers)  |
 | `encadrement`  | Rent control caps (Paris, Plaine Commune + Est Ensemble 93, Lyon) |
 | `lovac`        | Vacancy rate per commune from the LOVAC fiscal file              |
+| `sitadel`      | New-housing pipeline per commune — permits authorised + housing starts (SDES Sitadel) |
 | `taxefonciere` | Property tax ratios by commune                                   |
 
 Commune-level signals for the investor:
