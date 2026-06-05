@@ -329,6 +329,32 @@ func TestPricePerM2_StatusOKEmptyKept(t *testing.T) {
 	}
 }
 
+func TestPricePerM2_EmptyEstimateExcludedFromMean(t *testing.T) {
+	t.Parallel()
+
+	// A price scraper that found no listing returns a ZERO estimate. Like
+	// rent, a zero reading must NOT enter the weighted mean — otherwise one
+	// empty scraper halves the consolidated price. Only dvf has data here.
+	d := buildDossier(map[string]fakeEntry{
+		"dvf":             {data: fakePriceEstimator{eurPerM2Cents: 5_000_00, confidence: ConfidenceMedium}},
+		"meilleursagents": {data: fakePriceEstimator{eurPerM2Cents: 0}, status: gazetteer.StatusOKEmpty},
+	})
+
+	got := PricePerM2(d)
+	if got.EurPerM2Cents != 5_000_00 {
+		t.Errorf("EurPerM2Cents = %d, want %d (empty contributors must not dilute the mean)", got.EurPerM2Cents, 5_000_00)
+	}
+	contributing := 0
+	for _, in := range got.Inputs {
+		if !in.Excluded && in.Estimate.EurPerM2Cents > 0 {
+			contributing++
+		}
+	}
+	if contributing != 1 {
+		t.Errorf("contributing inputs = %d, want 1 (only dvf has a non-zero reading)", contributing)
+	}
+}
+
 func TestPricePerM2_CustomWeightsOverrideDefaults(t *testing.T) {
 	t.Parallel()
 

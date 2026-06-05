@@ -106,6 +106,14 @@ func PricePerM2(d gazetteer.Dossier, opts ...PriceOptions) PriceConsolidated {
 			continue
 		}
 		e := est.PriceEstimate()
+		// A zero reading is "nothing to contribute": a scraper that found no
+		// listing is StatusOKEmpty and returns 0. Letting it into the
+		// weighted mean would drag the consolidated price toward zero (one
+		// empty scraper would roughly halve a single-real-source price).
+		// Skip empty estimates; only real readings reach the mean.
+		if e.EurPerM2Cents <= 0 {
+			continue
+		}
 		inputs = append(inputs, PriceInput{
 			Source:   name,
 			Estimate: e,
