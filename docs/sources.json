@@ -343,7 +343,7 @@
   },
   {
     "name": "links",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "Deep links to third-party tools (maps, prices/DVF, Géorisques, PLU, commune fiche) for the address — built from coordinates / INSEE / address, no HTTP.",
     "inputs": [
