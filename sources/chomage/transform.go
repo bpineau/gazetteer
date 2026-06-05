@@ -315,7 +315,10 @@ func nationalSeries(zes map[string][]float64, n int) []float64 {
 		sum := 0.0
 		count := 0
 		for _, s := range zes {
-			if q < len(s) {
+			// Skip blank/garbled cells: parseRate maps them to 0, and no
+			// employment zone has a real 0 % unemployment rate, so a 0 means
+			// "missing". Averaging it in would drag the national mean down.
+			if q < len(s) && s[q] > 0 {
 				sum += s[q]
 				count++
 			}

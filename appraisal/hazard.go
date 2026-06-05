@@ -54,8 +54,9 @@ type HazardConsolidated struct {
 	// Empty when no source implements HazardReporter.
 	Inputs []HazardInput
 
-	// Confidence escalates with the number of contributing sources:
-	// 1 → Low, 2 → Medium, ≥ 3 → High.
+	// Confidence escalates with the number of sources that actually
+	// reported (a zero-value report from a skipped/out-of-data source does
+	// not count): 1 → Low, 2 → Medium, ≥ 3 → High.
 	Confidence Confidence
 }
 
@@ -87,6 +88,7 @@ func HazardProfile(d gazetteer.Dossier, opts ...HazardOptions) HazardConsolidate
 	var inputs []HazardInput
 	naturalSet := map[string]struct{}{}
 	industrialSet := map[string]struct{}{}
+	contributing := 0
 
 	for _, name := range names {
 		r := d.Results[name]
@@ -100,7 +102,16 @@ func HazardProfile(d gazetteer.Dossier, opts ...HazardOptions) HazardConsolidate
 			continue
 		}
 		report := rep.HazardReport()
+		// Keep every reporter in Inputs for attribution, but only count the
+		// ones that actually reported toward the confidence tier. A source
+		// outside its data (catnat with no decrees, georisques skipped)
+		// returns the zero-value HazardReport{} — counting it would assert
+		// "2 sources agree" over a single real reading, the same dilution the
+		// empty-estimate guard prevents in RentValue/PricePerM2.
 		inputs = append(inputs, HazardInput{Source: name, Report: report})
+		if hazardReported(report) {
+			contributing++
+		}
 		for _, nr := range report.NaturalRisks {
 			naturalSet[nr] = struct{}{}
 		}
@@ -111,9 +122,9 @@ func HazardProfile(d gazetteer.Dossier, opts ...HazardOptions) HazardConsolidate
 
 	conf := ConfidenceLow
 	switch {
-	case len(inputs) >= 3:
+	case contributing >= 3:
 		conf = ConfidenceHigh
-	case len(inputs) >= 2:
+	case contributing >= 2:
 		conf = ConfidenceMedium
 	}
 
@@ -123,6 +134,15 @@ func HazardProfile(d gazetteer.Dossier, opts ...HazardOptions) HazardConsolidate
 		Inputs:          inputs,
 		Confidence:      conf,
 	}
+}
+
+// hazardReported reports whether a source actually contributed a reading,
+// as opposed to returning the zero-value HazardReport{} because it was
+// outside its data or skipped. Real implementers set a non-zero Confidence
+// (or list risks); an empty report has neither. Used so empty contributors
+// do not inflate the consolidated Confidence tier.
+func hazardReported(r HazardReport) bool {
+	return len(r.NaturalRisks) > 0 || len(r.IndustrialRisks) > 0 || r.Confidence > ConfidenceLow
 }
 
 // setToSortedSlice flattens a set-as-map into a deterministically sorted

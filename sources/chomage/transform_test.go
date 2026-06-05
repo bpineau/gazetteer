@@ -279,6 +279,25 @@ func TestParseRate(t *testing.T) {
 	}
 }
 
+func TestNationalSeries_SkipsEmptyCells(t *testing.T) {
+	t.Parallel()
+	// A ZE quarter that is blank/garbled in the source parses to 0 (parseRate).
+	// It must NOT enter the national mean as a real 0 % rate — no employment
+	// zone has a 0 % unemployment rate, so 0 means "missing" and averaging it
+	// in drags the national average down. Same class as the empty-source guard
+	// in appraisal.RentValue: skip empty contributors before the mean.
+	zes := map[string][]float64{
+		"ZE-A": {8.0},
+		"ZE-B": {6.0},
+		"ZE-C": {0.0}, // blank/missing cell — must be skipped, not averaged as 0
+	}
+	got := nationalSeries(zes, 1)
+	want := 7.0 // mean of 8 and 6, NOT (8+6+0)/3 = 4.67
+	if len(got) != 1 || math.Abs(got[0]-want) > 1e-9 {
+		t.Errorf("nationalSeries = %v, want [%v] (blank cell skipped, not averaged as 0)", got, want)
+	}
+}
+
 // goldenQuarters returns 2021-T1 .. latestQuarter (keptQuarters labels).
 func goldenQuarters() []string {
 	out := make([]string, 0, keptQuarters)
