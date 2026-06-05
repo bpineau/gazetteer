@@ -289,6 +289,37 @@ func TestRentValue_StatusOKEmptyKept(t *testing.T) {
 	}
 }
 
+func TestRentValue_EmptyEstimateExcludedFromMean(t *testing.T) {
+	t.Parallel()
+
+	// Real-world empty sources (oll/encadrement outside their perimeter)
+	// return a ZERO estimate — "nothing to contribute". A zero reading must
+	// NOT enter the weighted mean, or it drags the result toward zero.
+	// Here only carteloyers has data; oll and encadrement are empty (0).
+	// The result must be carteloyers' value, not the diluted
+	// (0.9*2800)/(0.9+1.0+0.95) ≈ 884 cents.
+	d := buildDossier(map[string]fakeEntry{
+		"carteloyers": {data: fakeRentEstimator{eurPerM2Cents: 28_00, confidence: ConfidenceMedium}},
+		"oll":         {data: fakeRentEstimator{eurPerM2Cents: 0}, status: gazetteer.StatusOKEmpty},
+		"encadrement": {data: fakeRentEstimator{eurPerM2Cents: 0}, status: gazetteer.StatusOKEmpty},
+	})
+
+	got := RentValue(d)
+	if got.EurPerM2Cents != 28_00 {
+		t.Errorf("EurPerM2Cents = %d, want %d (empty contributors must not dilute the mean)", got.EurPerM2Cents, 28_00)
+	}
+	// Only carteloyers actually contributes a value.
+	contributing := 0
+	for _, in := range got.Inputs {
+		if !in.Excluded && in.Estimate.EurPerM2Cents > 0 {
+			contributing++
+		}
+	}
+	if contributing != 1 {
+		t.Errorf("contributing inputs = %d, want 1 (only carteloyers has a non-zero reading)", contributing)
+	}
+}
+
 func TestRentValue_UnknownSourceUsesDefaultWeight(t *testing.T) {
 	t.Parallel()
 

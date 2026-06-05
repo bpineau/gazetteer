@@ -153,6 +153,15 @@ func RentValue(d gazetteer.Dossier, opts ...RentOptions) RentConsolidated {
 			continue
 		}
 		e := est.RentEstimate()
+		// A zero reading is "nothing to contribute" (see RentEstimate doc):
+		// a source outside its perimeter (oll/encadrement on a rural commune)
+		// is StatusOKEmpty and returns 0. Letting it into the weighted mean
+		// would drag the result toward zero — e.g. a real 14.85 €/m² from
+		// carteloyers collapses to ~4.7 once two empty sources are averaged
+		// in. Skip empty estimates; only real readings reach the mean.
+		if e.EurPerM2Cents <= 0 {
+			continue
+		}
 		inputs = append(inputs, RentInput{
 			Source:   name,
 			Estimate: e,
