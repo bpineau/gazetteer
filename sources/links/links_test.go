@@ -12,7 +12,7 @@ import (
 
 func TestQueryFromCoords(t *testing.T) {
 	res, err := links.Query(context.Background(), links.Options{}, gazetteer.Listing{
-		Lat: new(48.873128), Lon: new(2.352599), INSEE: "75102", City: "Paris",
+		Lat: new(48.873128), Lon: new(2.352599), INSEE: "75102", City: "Paris", Zip: "75002",
 	})
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -26,13 +26,14 @@ func TestQueryFromCoords(t *testing.T) {
 	if got := m["pappersimmo"]; !strings.Contains(got, "lat=48.873128") || !strings.Contains(got, "lon=2.352599") {
 		t.Errorf("pappersimmo url = %q, want lat/lon embedded", got)
 	}
-	// INSEE-based context link.
-	if got := m["insee_commune"]; !strings.HasSuffix(got, "COM75102") {
-		t.Errorf("insee_commune url = %q, want COM75102 suffix", got)
+	// INSEE "dossier complet" fact-sheet, keyed by the commune code.
+	if got := m["insee_commune"]; !strings.Contains(got, "geo=COM-75102") {
+		t.Errorf("insee_commune url = %q, want geo=COM-75102", got)
 	}
-	// Géorisques is enriched with INSEE + city when present.
-	if got := m["georisques"]; !strings.Contains(got, "codeInsee=75102") || !strings.Contains(got, "city=Paris") {
-		t.Errorf("georisques url = %q, want codeInsee + city", got)
+	// Géorisques commune report: rapport2 keyed by INSEE + postal code
+	// (the city segment is a decorative slug).
+	if got := m["georisques"]; !strings.Contains(got, "/rapport2/75102/") || !strings.Contains(got, "/commune/75002") {
+		t.Errorf("georisques url = %q, want /rapport2/<insee>/<slug>/commune/<cp>", got)
 	}
 	// Every link must carry the four fields.
 	for _, l := range res.Links {

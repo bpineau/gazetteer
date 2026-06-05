@@ -18,7 +18,7 @@ const Name = "links"
 //
 // v1 builds map/imagery, price, hazard, urbanism and commune deep links from
 // the listing's coordinates, INSEE and address.
-const sourceVersion = 2
+const sourceVersion = 3
 
 // Version exposes sourceVersion so callers can mirror it.
 const Version = sourceVersion
@@ -112,15 +112,14 @@ func build(l gazetteer.Listing) []Link {
 		add("dvf", "DVF — Demandes de valeurs foncières", CategoryPrices,
 			"https://explore.data.gouv.fr/fr/immobilier?onglet=carte&lat="+lat+"&lng="+lon+"&zoom=18")
 
-		// hazards: Géorisques report, enriched with INSEE/city when available
-		geo := "https://www.georisques.gouv.fr/mes-risques/connaitre-les-risques-pres-de-chez-moi/rapport?lon=" + lon + "&lat=" + lat
-		if l.INSEE != "" {
-			geo += "&codeInsee=" + l.INSEE
+		// hazards: Géorisques commune risk report. The current rapport2 route is
+		// keyed by INSEE + postal code (the city segment is a decorative slug);
+		// the old lon/lat "rapport" endpoint is gone (404).
+		if l.INSEE != "" && l.Zip != "" {
+			add("georisques", "Géorisques (rapport)", CategoryRisks,
+				"https://www.georisques.gouv.fr/mes-risques/connaitre-les-risques-pres-de-chez-moi/rapport2/"+
+					l.INSEE+"/"+citySlug(l.City)+"/commune/"+l.Zip)
 		}
-		if l.City != "" {
-			geo += "&city=" + url.QueryEscape(l.City)
-		}
-		add("georisques", "Géorisques (rapport)", CategoryRisks, geo)
 
 		// urbanism: PLU / zonage
 		add("gpu", "Géoportail de l'Urbanisme (PLU)", CategoryUrbanism,
@@ -130,7 +129,7 @@ func build(l gazetteer.Listing) []Link {
 	// context: commune fact-sheet (INSEE) and a plain web search (address)
 	if l.INSEE != "" {
 		add("insee_commune", "INSEE — fiche commune", CategoryContext,
-			"https://www.insee.fr/fr/metadonnees/cog/commune/COM"+l.INSEE)
+			"https://www.insee.fr/fr/statistiques/2011101?geo=COM-"+l.INSEE)
 	}
 	if addr := addressLine(l); addr != "" {
 		add("google_search", "Recherche web", CategoryContext,
@@ -152,6 +151,18 @@ func addressLine(l gazetteer.Listing) string {
 		parts = append(parts, zipCity)
 	}
 	return strings.Join(parts, ", ")
+}
+
+// citySlug builds the decorative city segment of the Géorisques rapport2 URL.
+// Géorisques keys the report on INSEE + postal code and ignores this segment,
+// so a readable, space-free slug suffices; an empty city falls back to a
+// placeholder so the path stays well-formed.
+func citySlug(city string) string {
+	city = strings.TrimSpace(city)
+	if city == "" {
+		return "commune"
+	}
+	return strings.ReplaceAll(city, " ", "-")
 }
 
 func init() {
