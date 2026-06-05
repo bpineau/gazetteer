@@ -42,6 +42,35 @@ func TestQueryFromCoords(t *testing.T) {
 	}
 }
 
+// TestGeoportailLinksHonorCenter guards the Géoportail deep links: the SPA only
+// restores the center/zoom when permalink=yes is present — without it both the
+// ortho and cadastre links open on the whole-France view (reported bug). The
+// ortho link must also actually select the orthophoto layer.
+func TestGeoportailLinksHonorCenter(t *testing.T) {
+	res, err := links.Query(context.Background(), links.Options{}, gazetteer.Listing{
+		Lat: new(48.861396), Lon: new(2.474050),
+	})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	m := res.Map()
+	for _, key := range []string{"geoportail", "cadastre"} {
+		u := m[key]
+		if !strings.Contains(u, "c=2.474050,48.861396") {
+			t.Errorf("%s url = %q, want center c=lon,lat", key, u)
+		}
+		if !strings.Contains(u, "permalink=yes") {
+			t.Errorf("%s url = %q, missing permalink=yes (center is ignored without it)", key, u)
+		}
+	}
+	if u := m["geoportail"]; !strings.Contains(u, "ORTHOIMAGERY.ORTHOPHOTOS") {
+		t.Errorf("geoportail (ortho) url = %q, want the orthophoto layer", u)
+	}
+	if u := m["cadastre"]; !strings.Contains(u, "CADASTRALPARCELS.PARCELLAIRE_EXPRESS") {
+		t.Errorf("cadastre url = %q, want the cadastral-parcels layer", u)
+	}
+}
+
 func TestQueryInseeOnly(t *testing.T) {
 	res, err := links.Query(context.Background(), links.Options{}, gazetteer.Listing{INSEE: "93048"})
 	if err != nil {

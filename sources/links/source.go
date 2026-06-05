@@ -18,7 +18,7 @@ const Name = "links"
 //
 // v1 builds map/imagery, price, hazard, urbanism and commune deep links from
 // the listing's coordinates, INSEE and address.
-const sourceVersion = 1
+const sourceVersion = 2
 
 // Version exposes sourceVersion so callers can mirror it.
 const Version = sourceVersion
@@ -96,10 +96,13 @@ func build(l gazetteer.Listing) []Link {
 			"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint="+lat+","+lon)
 		add("openstreetmap", "OpenStreetMap", CategoryMap,
 			"https://www.openstreetmap.org/?mlat="+lat+"&mlon="+lon+"#map=18/"+lat+"/"+lon)
+		// Géoportail honours the center/zoom only when permalink=yes is set —
+		// without it the SPA opens on the whole-France view. The ortho link
+		// must also select the orthophoto layer explicitly.
 		add("geoportail", "Géoportail (ortho)", CategoryMap,
-			"https://www.geoportail.gouv.fr/carte?c="+lon+","+lat+"&z=19")
+			"https://www.geoportail.gouv.fr/carte?c="+lon+","+lat+"&z=19&l0=ORTHOIMAGERY.ORTHOPHOTOS::GEOPORTAIL:OGC:WMTS(1)&permalink=yes")
 		add("cadastre", "Cadastre (Géoportail)", CategoryMap,
-			"https://www.geoportail.gouv.fr/carte?c="+lon+","+lat+"&z=19&l0=CADASTRALPARCELS.PARCELLAIRE_EXPRESS::GEOPORTAIL:OGC:WMTS(1)")
+			"https://www.geoportail.gouv.fr/carte?c="+lon+","+lat+"&z=19&l0=CADASTRALPARCELS.PARCELLAIRE_EXPRESS::GEOPORTAIL:OGC:WMTS(1)&permalink=yes")
 		add("remonterletemps", "IGN — Remonter le temps", CategoryMap,
 			"https://remonterletemps.ign.fr/comparer?lon="+lon+"&lat="+lat+"&z=18")
 
