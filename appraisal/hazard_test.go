@@ -207,3 +207,33 @@ func TestHazardProfile_StatusOKEmptyKept(t *testing.T) {
 		t.Errorf("NaturalRisks = %v, want [inondation]", got.NaturalRisks)
 	}
 }
+
+func TestHazardProfile_EmptyReportDoesNotInflateConfidence(t *testing.T) {
+	t.Parallel()
+
+	// An empty/skipped source returns the zero-value HazardReport{} (no risks,
+	// Confidence Low). Real implementers (catnat with decrees, georisques with
+	// a present reading) set Confidence High. The consolidated Confidence must
+	// count only sources that actually reported — an empty contributor must not
+	// bump a single real source from Low to Medium. Same class as the
+	// empty-estimate guard in RentValue/PricePerM2.
+	d := buildDossier(map[string]fakeEntry{
+		"georisques": {
+			data:   fakeHazardReporter{natural: []string{"inondation"}, confidence: ConfidenceHigh},
+			status: gazetteer.StatusOK,
+		},
+		"catnat": { // outside its data: zero-value report, contributed nothing
+			data:   fakeHazardReporter{},
+			status: gazetteer.StatusOKEmpty,
+		},
+	})
+
+	got := HazardProfile(d)
+	if got.Confidence != ConfidenceLow {
+		t.Errorf("Confidence = %v, want Low (only 1 real contributor; the empty source must not inflate it)", got.Confidence)
+	}
+	// Inputs stays complete for attribution — the empty one is still listed.
+	if len(got.Inputs) != 2 {
+		t.Errorf("Inputs len = %d, want 2 (all contributors kept for attribution)", len(got.Inputs))
+	}
+}
