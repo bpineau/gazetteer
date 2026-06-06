@@ -169,15 +169,27 @@ var years = []string{"2022", "2023", "2024"}
 // depts lists every geo-dvf department file code (métropole + Corse + DOM).
 var depts = buildDepts()
 
+// notInDVF are départements absent from DVF / geo-dvf, so declaring their
+// URLs would 404 the refresh (the download phase is fatal on a missing raw
+// file). Alsace-Moselle (57, 67, 68) keeps the Livre Foncier rather than the
+// cadastre; Mayotte (976) is not published in geo-dvf.
+var notInDVF = map[string]bool{"57": true, "67": true, "68": true, "976": true}
+
 func buildDepts() []string {
 	var d []string
 	for i := 1; i <= 95; i++ {
 		if i == 20 { // Corsica is 2A/2B in geo-dvf
 			continue
 		}
-		d = append(d, fmt.Sprintf("%02d", i))
+		if code := fmt.Sprintf("%02d", i); !notInDVF[code] {
+			d = append(d, code)
+		}
 	}
-	d = append(d, "2A", "2B", "971", "972", "973", "974", "976")
+	for _, code := range []string{"2A", "2B", "971", "972", "973", "974", "976"} {
+		if !notInDVF[code] {
+			d = append(d, code)
+		}
+	}
 	return d
 }
 
