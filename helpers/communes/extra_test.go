@@ -5,6 +5,35 @@ import (
 	"testing"
 )
 
+// TestAll verifies the exported All() method returns a defensive copy of rows.
+func TestAll(t *testing.T) {
+	tbl, err := Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	all := tbl.All()
+	if len(all) < 30000 {
+		t.Fatalf("All() returned %d communes, want >= 30000", len(all))
+	}
+	// Should include Paris commune-mère
+	found := false
+	for _, c := range all {
+		if c.INSEE == "75056" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("All() missing 75056 (Paris)")
+	}
+	// Defensive copy: mutating the slice doesn't pollute the Table
+	all[0] = Commune{}
+	all2 := tbl.All()
+	if len(all2) == 0 || all2[0].INSEE == "" {
+		t.Error("All() is not a defensive copy — mutation leaked back")
+	}
+}
+
 // TestLookup_NilReceiver_AndMissing exercises the two early-return
 // branches of Lookup that the existing Default-table tests don't reach:
 // a nil *Table (the package contract: zero value, not a panic) and a

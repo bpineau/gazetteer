@@ -248,6 +248,17 @@ func normalizeCityName(s string) string {
 	return b.String()
 }
 
+// All returns a defensive copy of every Commune in the table. The caller
+// may mutate the returned slice without affecting the Table's internal state.
+func (t *Table) All() []Commune {
+	if t == nil {
+		return nil
+	}
+	out := make([]Commune, len(t.rows))
+	copy(out, t.rows)
+	return out
+}
+
 // SameDepartment implements Communes.SameDepartment.
 func (t *Table) SameDepartment(insee string) []string {
 	if t == nil {
