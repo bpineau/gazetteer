@@ -12,6 +12,9 @@ import (
 type Options struct {
 	// DataDir lets refreshed copies in the datadir override the embedded CSV.
 	DataDir string
+	// Index overrides Load when non-nil; tests inject a stub to avoid the
+	// embedded singleton and the sync.Once cache.
+	Index *Index
 }
 
 // Source implements gazetteer.Source + gazetteer.DatasetProvider for the
@@ -33,9 +36,13 @@ func (s *Source) Datasets() []dataset.Set { return []dataset.Set{theSet} }
 // Query implements gazetteer.Source: returns the commune aggregate for the
 // listing's INSEE. Empty Result (IsEmpty) when the commune has no sales.
 func (s *Source) Query(_ context.Context, l gazetteer.Listing) (any, error) {
-	idx, err := Load(s.opts.DataDir)
-	if err != nil {
-		return nil, err
+	idx := s.opts.Index
+	if idx == nil {
+		var err error
+		idx, err = Load(s.opts.DataDir)
+		if err != nil {
+			return nil, err
+		}
 	}
 	insee := strings.TrimSpace(l.INSEE)
 	r, _ := idx.Lookup(insee)

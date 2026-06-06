@@ -202,11 +202,10 @@ func rawFiles() []dataset.File {
 
 // transform is the dataset.Transform: gunzip every raw file, aggregate, write CSV.
 func transform(ctx context.Context, raw dataset.RawSet, dst io.Writer) error {
-	names := make([]string, 0, len(years)*len(depts))
-	for _, y := range years {
-		for _, d := range depts {
-			names = append(names, rawName(y, d))
-		}
+	files := rawFiles()
+	names := make([]string, len(files))
+	for i, f := range files {
+		names[i] = f.Name
 	}
 	return transformFiles(ctx, raw, names, dst)
 }
