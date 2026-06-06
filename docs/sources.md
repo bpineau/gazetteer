@@ -34,6 +34,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `bpe`            | INSEE                                          | offline INSEE BPE 2024 subset |
 | `cadastre`       | lat/lon                                        | apicarto.ign.fr + cadastre.data.gouv.fr |
 | `carteloyers`    | INSEE + property_type + rooms                  | offline ANIL / DHUP dataset |
+| `dvfagg`         | INSEE                                          | offline geo-dvf price aggregate |
 | `cartofriches`   | INSEE                                          | offline Cerema brownfields  |
 | `chomage`        | INSEE                                          | offline INSEE chômage ZE2020|
 | `delinquance`    | INSEE                                          | offline SSMSI État 4001     |
@@ -145,6 +146,23 @@ des loyers).
 - **Fallback**: when the rooms-bucket dataset misses on a commune, the
   Source widens to `TypologyApartment` and stamps
   `Evidence.FallbackToGeneric=true`.
+
+## `sources/dvfagg`
+
+Per-commune DVF sale-price aggregate (median €/m² + dispersion), the
+offline batch complement to the live, per-address `dvf` source.
+
+- **Needs**: INSEE.
+- **Result**: `PriceMedianEURM2` / `PriceP25EURM2` / `PriceP75EURM2`
+  (dispersion over single-lot apartment sales; a wide spread flags a
+  bimodal commune), `PriceMedianSmallEURM2` (18–55 m², to pair with a
+  T1–T2 rent), `N` / `NSmall` (sample sizes), `Dept`. Empty when the
+  commune had no qualifying sale.
+- **Build**: `gazetteer refresh -go-embed-update dvfagg` downloads the
+  geo-dvf bulk files (dept × last 3 years), keeps single-lot apartment
+  *Vente* mutations, and writes the embedded `dvf_communes.csv`
+  (~9 k communes, vintage 2022-2024). Excludes 57/67/68 (Livre Foncier)
+  and 976 (not in DVF).
 
 ## `sources/dvf`
 

@@ -25,7 +25,10 @@ func TestSource_QueryKnownCommune(t *testing.T) {
 		t.Fatalf("Query: %v", err)
 	}
 	r, ok := got.(*Result)
-	if !ok || r.IsEmpty() || r.PriceMedianSmallEURM2 != 2549 {
+	// Embedded data is the live national artifact (refreshed ~2×/year), so
+	// assert shape, not an exact value (exact-value coverage is in the
+	// injected-Index test). Garges (95268) is a populated 95 commune.
+	if !ok || r.IsEmpty() || r.PriceMedianSmallEURM2 <= 0 || r.N <= 0 || r.Dept != "95" {
 		t.Fatalf("bad query result: %#v (ok=%v)", got, ok)
 	}
 }
