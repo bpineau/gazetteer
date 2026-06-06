@@ -1,6 +1,10 @@
 package dvfagg
 
 import (
+	"bytes"
+	"compress/gzip"
+	"context"
+	"io"
 	"math"
 	"strings"
 	"testing"
@@ -50,5 +54,44 @@ func TestPercentileLinear(t *testing.T) {
 	}
 	if got := percentile(xs, 0.25); math.Abs(got-17.5) > 1e-9 {
 		t.Fatalf("p25 want 17.5 got %v", got)
+	}
+}
+
+type fakeRaw map[string][]byte // name -> gzipped bytes
+
+func (f fakeRaw) Open(name string) (io.ReadCloser, error) {
+	b, ok := f[name]
+	if !ok {
+		return nil, io.EOF
+	}
+	return io.NopCloser(bytes.NewReader(b)), nil
+}
+
+func gz(s string) []byte {
+	var b bytes.Buffer
+	w := gzip.NewWriter(&b)
+	_, _ = w.Write([]byte(s))
+	_ = w.Close()
+	return b.Bytes()
+}
+
+func TestTransform_WritesCSV(t *testing.T) {
+	// flat name: "2024_95.csv.gz" (no slash — dataset.validName rejects slashes)
+	raw := fakeRaw{"2024_95.csv.gz": gz(rawFixture)}
+	var out bytes.Buffer
+	if err := transformFiles(context.Background(), raw, []string{"2024_95.csv.gz"}, &out); err != nil {
+		t.Fatalf("transform: %v", err)
+	}
+	got := out.String()
+	if !strings.HasPrefix(got, "INSEE_C;DEP;n;p25;p50;p75;n_small;p50_small\n") {
+		t.Fatalf("bad header: %q", got)
+	}
+	// p25/p50/p75 via linear interpolation on [1800,2500,4400] (n=3):
+	// p25: 1800+0.5*(2500-1800)=2150, p50=2500, p75: 2500+0.5*(4400-2500)=3450
+	if !strings.Contains(got, "95268;95;3;2150;2500;3450;3;2500") {
+		t.Fatalf("missing aggregated row, got:\n%s", got)
+	}
+	if err := validate(strings.NewReader(got)); err != nil {
+		t.Fatalf("validate rejected good output: %v", err)
 	}
 }

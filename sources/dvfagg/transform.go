@@ -1,12 +1,17 @@
 package dvfagg
 
 import (
+	"compress/gzip"
+	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/bpineau/gazetteer/dataset"
 )
 
 // sanity bounds, identical to the validated screening methodology.
@@ -156,4 +161,120 @@ func percentile(sorted []float64, p float64) float64 {
 
 func round2(v float64) float64 {
 	return float64(int64(v*100+0.5)) / 100
+}
+
+// Vintage: the 3 most recent full DVF years. Bump on refresh.
+var years = []string{"2022", "2023", "2024"}
+
+// depts lists every geo-dvf department file code (métropole + Corse + DOM).
+var depts = buildDepts()
+
+func buildDepts() []string {
+	var d []string
+	for i := 1; i <= 95; i++ {
+		if i == 20 { // Corsica is 2A/2B in geo-dvf
+			continue
+		}
+		d = append(d, fmt.Sprintf("%02d", i))
+	}
+	d = append(d, "2A", "2B", "971", "972", "973", "974", "976")
+	return d
+}
+
+// rawName is the flat dataset-local name for a year × dept file.
+// Must be a clean single path element (no slashes) to satisfy dataset.validName.
+func rawName(year, dep string) string { return year + "_" + dep + ".csv.gz" }
+
+func rawURL(year, dep string) string {
+	return "https://files.data.gouv.fr/geo-dvf/latest/csv/" + year + "/departements/" + dep + ".csv.gz"
+}
+
+// rawFiles is the full dept×year input list declared on the dataset.Set.
+func rawFiles() []dataset.File {
+	var out []dataset.File
+	for _, y := range years {
+		for _, d := range depts {
+			out = append(out, dataset.File{Name: rawName(y, d), URL: rawURL(y, d)})
+		}
+	}
+	return out
+}
+
+// transform is the dataset.Transform: gunzip every raw file, aggregate, write CSV.
+func transform(ctx context.Context, raw dataset.RawSet, dst io.Writer) error {
+	names := make([]string, 0, len(years)*len(depts))
+	for _, y := range years {
+		for _, d := range depts {
+			names = append(names, rawName(y, d))
+		}
+	}
+	return transformFiles(ctx, raw, names, dst)
+}
+
+// transformFiles is the testable inner loop (decoupled from rawFiles()).
+func transformFiles(ctx context.Context, raw dataset.RawSet, names []string, dst io.Writer) error {
+	m := map[string]*acc{}
+	for _, name := range names {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		rc, err := raw.Open(name)
+		if err != nil {
+			// A missing dept/year file is non-fatal (some DOM gaps).
+			continue
+		}
+		gzr, err := gzip.NewReader(rc)
+		if err != nil {
+			_ = rc.Close()
+			return fmt.Errorf("dvfagg: gunzip %s: %w", name, err)
+		}
+		err = accumulate(gzr, m)
+		_ = gzr.Close()
+		_ = rc.Close()
+		if err != nil {
+			return fmt.Errorf("dvfagg: %s: %w", name, err)
+		}
+	}
+	rows := finalize(m)
+	if len(rows) == 0 {
+		return errors.New("dvfagg: transform produced no rows")
+	}
+	// deterministic order
+	keys := make([]string, 0, len(rows))
+	for k := range rows {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	w := csv.NewWriter(dst)
+	w.Comma = ';'
+	if err := w.Write([]string{"INSEE_C", "DEP", "n", "p25", "p50", "p75", "n_small", "p50_small"}); err != nil {
+		return err
+	}
+	for _, k := range keys {
+		r := rows[k]
+		if err := w.Write([]string{
+			k, r.Dept, strconv.Itoa(r.N),
+			f2(r.PriceP25EURM2), f2(r.PriceMedianEURM2), f2(r.PriceP75EURM2),
+			strconv.Itoa(r.NSmall), f2(r.PriceMedianSmallEURM2),
+		}); err != nil {
+			return err
+		}
+	}
+	w.Flush()
+	return w.Error()
+}
+
+// f2 prints a float with no trailing zeros (point decimals), e.g. 2500 not 2500.00.
+func f2(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
+
+// validate gates publication: the rebuilt CSV must parse and be non-empty.
+func validate(r io.Reader) error {
+	idx, err := parseCSV(r)
+	if err != nil {
+		return err
+	}
+	if len(idx.byINSEE) == 0 {
+		return errors.New("dvfagg: validated artifact has no rows")
+	}
+	return nil
 }
