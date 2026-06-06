@@ -191,7 +191,7 @@ func rawURL(year, dep string) string {
 
 // rawFiles is the full dept×year input list declared on the dataset.Set.
 func rawFiles() []dataset.File {
-	var out []dataset.File
+	out := make([]dataset.File, 0, len(years)*len(depts))
 	for _, y := range years {
 		for _, d := range depts {
 			out = append(out, dataset.File{Name: rawName(y, d), URL: rawURL(y, d)})
