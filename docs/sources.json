@@ -210,6 +210,28 @@
     }
   },
   {
+    "name": "dvfagg",
+    "version": 1,
+    "default": true,
+    "summary": "Per-commune DVF aggregate — median €/m² + quartiles (3-year window, apartment sales, offline).",
+    "inputs": [
+      "INSEE"
+    ],
+    "coverage": "national",
+    "feeds": [
+      "prospection: commune-level price benchmark"
+    ],
+    "result_schema": {
+      "price_median_eur_m2": 0,
+      "price_p25_eur_m2": 0,
+      "price_p75_eur_m2": 0,
+      "price_median_small_eur_m2": 0,
+      "n": 0,
+      "n_small": 0,
+      "department": ""
+    }
+  },
+  {
     "name": "education",
     "version": 1,
     "default": true,

@@ -35,6 +35,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/bpe"
 	"github.com/bpineau/gazetteer/sources/cadastre"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
+	"github.com/bpineau/gazetteer/sources/dvfagg"
 	"github.com/bpineau/gazetteer/sources/cartofriches"
 	"github.com/bpineau/gazetteer/sources/catnat"
 	"github.com/bpineau/gazetteer/sources/cdsr"
@@ -184,6 +185,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(locservice.NewSource(locservice.Options{Geocoder: ban})).
 		With(oll.NewSource(oll.Options{DataDir: dataDir})).
 		With(carteloyers.NewSource(carteloyers.Options{DataDir: dataDir})).
+		With(dvfagg.NewSource(dvfagg.Options{DataDir: dataDir})).
 		With(cartofriches.NewSource(cartofriches.Options{DataDir: dataDir})).
 		With(cdsr.NewSource(cdsr.Options{DataDir: dataDir})).
 		With(catnat.NewSource(catnat.Options{DataDir: dataDir})).
