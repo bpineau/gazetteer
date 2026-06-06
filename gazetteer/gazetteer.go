@@ -38,6 +38,33 @@ func (b *Builder) With(s Source) *Builder {
 	return b
 }
 
+// Without removes every already-added Source whose Name matches one of names.
+// Unknown names are ignored. Returns the Builder for chaining.
+//
+// It is meant to prune Sources a caller never consumes — cutting their fetch
+// latency and failure surface — while keeping the rest of a pre-populated
+// roster intact (e.g. factory.BuilderDefault), including Sources added to that
+// roster later. Call it after the With chain so every default is present to
+// filter. Since Collect runs Sources independently (none reads another's
+// Result), dropping an unconsumed Source cannot affect the others.
+func (b *Builder) Without(names ...string) *Builder {
+	if len(names) == 0 {
+		return b
+	}
+	drop := make(map[string]bool, len(names))
+	for _, n := range names {
+		drop[n] = true
+	}
+	kept := b.sources[:0]
+	for _, s := range b.sources {
+		if !drop[s.Name()] {
+			kept = append(kept, s)
+		}
+	}
+	b.sources = kept
+	return b
+}
+
 // WithHTTPClient overrides the default HTTP client propagated to Sources.
 //
 // The client is stored on ctx via WithHTTPClient when Client.Collect runs;
@@ -119,6 +146,30 @@ type Client struct {
 // the context-key helpers. Sources that need a persistent kvcache.Cache
 // receive it via their own Options field instead of a framework slot.
 func (c *Client) Collect(ctx context.Context, l Listing) Dossier {
+	return c.collect(ctx, l, c.sources)
+}
+
+// CollectSome runs only the configured Sources whose Name is in names, in
+// parallel, and returns a partial Dossier — Sources not named are skipped and
+// unknown names are ignored. Semantics otherwise match Collect. Use it to fetch
+// a fast, decision-critical subset (e.g. cheap embedded Sources) before paying
+// for the full roster's slow live APIs.
+func (c *Client) CollectSome(ctx context.Context, l Listing, names ...string) Dossier {
+	want := make(map[string]bool, len(names))
+	for _, n := range names {
+		want[n] = true
+	}
+	sel := make([]Source, 0, len(want))
+	for _, s := range c.sources {
+		if want[s.Name()] {
+			sel = append(sel, s)
+		}
+	}
+	return c.collect(ctx, l, sel)
+}
+
+// collect is the shared parallel runner behind Collect and CollectSome.
+func (c *Client) collect(ctx context.Context, l Listing, sources []Source) Dossier {
 	started := time.Now()
 
 	ctx = WithHTTPClient(ctx, c.httpClient)
@@ -130,11 +181,11 @@ func (c *Client) Collect(ctx context.Context, l Listing) Dossier {
 		sem = make(chan struct{}, c.maxConcur)
 	}
 
-	results := make(map[string]Result, len(c.sources))
+	results := make(map[string]Result, len(sources))
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	for _, s := range c.sources {
+	for _, s := range sources {
 		wg.Go(func() {
 			if sem != nil {
 				sem <- struct{}{}

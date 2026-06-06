@@ -93,6 +93,13 @@ type Options struct {
 	// os.UserCacheDir()/gazetteer). Set "-" to disable the datadir and
 	// force embedded-only loading.
 	DataDir string
+
+	// Exclude drops the named Sources (matched on Source.Name) from the
+	// default roster — to cut the fetch latency and failure surface of
+	// Sources the caller never consumes. Unknown names are ignored. The
+	// rest of the roster stays auto-updated as in-tree Sources are added,
+	// so this is a deny-list, not an allow-list.
+	Exclude []string
 }
 
 // NewDefault builds a *gazetteer.Client wired with every stable

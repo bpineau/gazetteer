@@ -202,3 +202,69 @@ func (s *slowSource) Query(ctx context.Context, _ Listing) (any, error) {
 		return nil, ctx.Err()
 	}
 }
+
+// namedSource is a no-op Source identified only by its Name, for roster tests.
+type namedSource string
+
+func (n namedSource) Name() string                                { return string(n) }
+func (n namedSource) Version() int                                { return 1 }
+func (n namedSource) Query(context.Context, Listing) (any, error) { return &fakeEmptyPayload{}, nil }
+
+func TestBuilderWithout(t *testing.T) {
+	c, err := NewBuilder().
+		With(namedSource("a")).
+		With(namedSource("b")).
+		With(namedSource("c")).
+		Without("b", "absent"). // "absent" is a no-op; "b" is dropped
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	got := make(map[string]bool, len(c.sources))
+	for _, s := range c.sources {
+		got[s.Name()] = true
+	}
+	if !got["a"] || !got["c"] {
+		t.Fatalf("Without dropped a kept source: have %v, want a and c", got)
+	}
+	if got["b"] {
+		t.Fatalf("Without did not drop %q: have %v", "b", got)
+	}
+	if len(c.sources) != 2 {
+		t.Fatalf("roster size = %d, want 2 (a, c)", len(c.sources))
+	}
+
+	// No-op: Without() with no names returns the roster unchanged.
+	c2, _ := NewBuilder().With(namedSource("x")).Without().Build()
+	if len(c2.sources) != 1 {
+		t.Fatalf("Without() with no names changed the roster: size %d, want 1", len(c2.sources))
+	}
+}
+
+func TestCollectSome(t *testing.T) {
+	c, err := NewBuilder().
+		With(namedSource("a")).
+		With(namedSource("b")).
+		With(namedSource("c")).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	d := c.CollectSome(context.Background(), Listing{}, "a", "c", "absent")
+	if _, ok := d.Results["a"]; !ok {
+		t.Errorf("CollectSome dropped requested source %q", "a")
+	}
+	if _, ok := d.Results["c"]; !ok {
+		t.Errorf("CollectSome dropped requested source %q", "c")
+	}
+	if _, ok := d.Results["b"]; ok {
+		t.Errorf("CollectSome ran unrequested source %q", "b")
+	}
+	if len(d.Results) != 2 {
+		t.Errorf("CollectSome ran %d sources, want 2 (a, c)", len(d.Results))
+	}
+	// No names ⇒ empty partial Dossier (runs nothing).
+	if e := c.CollectSome(context.Background(), Listing{}); len(e.Results) != 0 {
+		t.Errorf("CollectSome() with no names ran %d sources, want 0", len(e.Results))
+	}
+}
