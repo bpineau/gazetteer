@@ -24,14 +24,14 @@ import (
 // Saint-Denis (93066) which spans two zones (311 and 312).
 var plaineCommuneCommunes = map[string][]string{
 	"93001": {"314"},        // Aubervilliers
-	"93027": {"316"},        // L'Île-Saint-Denis
+	"93027": {"316"},        // La Courneuve
 	"93031": {"315"},        // Épinay-sur-Seine
-	"93039": {"312"},        // Stains
+	"93039": {"312"},        // L'Île-Saint-Denis
 	"93059": {"317"},        // Pierrefitte-sur-Seine
 	"93066": {"311", "312"}, // Saint-Denis
 	"93070": {"310"},        // Saint-Ouen-sur-Seine
-	"93072": {"318"},        // Villetaneuse
-	"93079": {"316"},        // La Courneuve — zone 316 per the embedded data
+	"93072": {"318"},        // Stains
+	"93079": {"316"},        // Villetaneuse (zone 316 per the embedded data)
 }
 
 // estEnsembleCommunes is the set of Est Ensemble INSEE codes and their
