@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"math"
+	"os"
 	"strings"
 	"testing"
 )
@@ -55,6 +56,12 @@ func TestPercentileLinear(t *testing.T) {
 	if got := percentile(xs, 0.25); math.Abs(got-17.5) > 1e-9 {
 		t.Fatalf("p25 want 17.5 got %v", got)
 	}
+	if got := percentile([]float64{42}, 0.5); got != 42 {
+		t.Fatalf("n=1 want 42 got %v", got)
+	}
+	if got := percentile(xs, 1.0); math.Abs(got-40) > 1e-9 {
+		t.Fatalf("p=1.0 want 40 got %v", got)
+	}
 }
 
 type fakeRaw map[string][]byte // name -> gzipped bytes
@@ -62,7 +69,7 @@ type fakeRaw map[string][]byte // name -> gzipped bytes
 func (f fakeRaw) Open(name string) (io.ReadCloser, error) {
 	b, ok := f[name]
 	if !ok {
-		return nil, io.EOF
+		return nil, os.ErrNotExist
 	}
 	return io.NopCloser(bytes.NewReader(b)), nil
 }
