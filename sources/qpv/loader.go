@@ -112,6 +112,14 @@ func (idx *Index) lookupCommune(insee string) (Entry, bool) {
 	return e, ok
 }
 
+// HasQPV reports whether the commune identified by its INSEE code hosts at
+// least one QPV. This is a coordinate-free commune-level test; it does not
+// check whether a specific point falls inside a QPV polygon.
+func (idx *Index) HasQPV(insee string) bool {
+	_, ok := idx.lookupCommune(insee)
+	return ok
+}
+
 // PolygonCount reports the number of QPV polygons in the index.
 func (idx *Index) PolygonCount() int {
 	if idx == nil {

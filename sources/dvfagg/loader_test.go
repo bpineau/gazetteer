@@ -5,6 +5,24 @@ import (
 	"testing"
 )
 
+func TestIndex_Codes(t *testing.T) {
+	idx, _ := Load("")
+	codes := idx.Codes()
+	if len(codes) < 3 {
+		t.Fatalf("want >=3 bootstrap codes, got %d", len(codes))
+	}
+	// sorted + contains a known code
+	found := false
+	for _, c := range codes {
+		if c == "95268" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("95268 missing from Codes()")
+	}
+}
+
 func TestParseCSV_Lookup(t *testing.T) {
 	const csv = "INSEE_C;DEP;n;p25;p50;p75;n_small;p50_small\n95268;95;431;1984;2313;2694;169;2549\n"
 	idx, err := parseCSV(strings.NewReader(csv))

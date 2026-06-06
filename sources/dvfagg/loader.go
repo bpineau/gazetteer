@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -42,6 +43,19 @@ func (idx *Index) Lookup(insee string) (Result, bool) {
 	}
 	r, ok := idx.byINSEE[strings.TrimSpace(insee)]
 	return r, ok
+}
+
+// Codes returns the sorted list of INSEE codes that have price data.
+func (idx *Index) Codes() []string {
+	if idx == nil {
+		return nil
+	}
+	out := make([]string, 0, len(idx.byINSEE))
+	for k := range idx.byINSEE {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // Count returns the number of communes parsed (tests/tools).

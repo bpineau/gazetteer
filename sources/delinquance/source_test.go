@@ -80,6 +80,53 @@ func TestQuery_InsufficientInputs(t *testing.T) {
 	}
 }
 
+// TestIndex_Level verifies the exported Level method and RiskFlag.String().
+func TestIndex_Level(t *testing.T) {
+	t.Parallel()
+	idx, err := Load("")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	// Unknown INSEE → "unknown"
+	if got := idx.Level("99999"); got.String() != "unknown" {
+		t.Fatalf("Level(99999).String() = %q, want \"unknown\"", got.String())
+	}
+	// A Paris arrondissement (75101) → "unknown" because per-inhabitant rates
+	// are inflated for arrondissement-split cities (ambient population effect).
+	if got := idx.Level("75101"); got.String() != "unknown" {
+		t.Fatalf("Level(75101).String() = %q, want \"unknown\" (inflated per-inhabitant rates)", got.String())
+	}
+	// A real commune — Neuilly-sur-Seine (92051) — should produce a valid level
+	lvl := idx.Level("92051")
+	if lvl.String() == "" {
+		t.Fatal("Level(92051).String() is empty, want non-empty")
+	}
+	switch lvl.String() {
+	case "low", "medium", "high", "unknown":
+		// OK
+	default:
+		t.Fatalf("Level(92051).String() = %q, want one of low/medium/high/unknown", lvl.String())
+	}
+}
+
+// TestRiskFlag_String verifies the String() method on every constant.
+func TestRiskFlag_String(t *testing.T) {
+	cases := []struct {
+		flag RiskFlag
+		want string
+	}{
+		{RiskUnknown, "unknown"},
+		{RiskLow, "low"},
+		{RiskMedium, "medium"},
+		{RiskHigh, "high"},
+	}
+	for _, c := range cases {
+		if got := c.flag.String(); got != c.want {
+			t.Errorf("RiskFlag(%q).String() = %q, want %q", c.flag, got, c.want)
+		}
+	}
+}
+
 // TestClassifyRisk pins the social-distress three-bucket logic.
 // Inputs are drug-trafficking, street-violence and unarmed-robbery
 // rates (all per 1 000 inhabitants); burglary is intentionally

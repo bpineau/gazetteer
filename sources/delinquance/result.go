@@ -25,6 +25,10 @@ const (
 	RiskHigh    RiskFlag = "high"
 )
 
+// String returns the stable string representation of a RiskFlag
+// ("low" | "medium" | "high" | "unknown"). Satisfies fmt.Stringer.
+func (f RiskFlag) String() string { return string(f) }
+
 // Result is the typed payload returned by Source.Query.
 //
 // The rate map is keyed by the SSMSI indicator's short English handle —

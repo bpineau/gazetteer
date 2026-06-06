@@ -122,6 +122,24 @@ func (idx *Index) Lookup(insee string) (Entry, bool) {
 	return e, ok
 }
 
+// Level returns the social-distress RiskFlag for the given INSEE. It
+// returns RiskUnknown when the commune is absent from the dataset or when
+// per-inhabitant rates are inflated (arrondissement-split cities such as
+// Paris/Lyon/Marseille — see classifyRisk documentation).
+func (idx *Index) Level(insee string) RiskFlag {
+	if idx == nil {
+		return RiskUnknown
+	}
+	if hasInflatedPerInhabitantRates(insee) {
+		return RiskUnknown
+	}
+	e, ok := idx.Lookup(insee)
+	if !ok {
+		return RiskUnknown
+	}
+	return classifyRisk(e.Rates)
+}
+
 // Count returns the number of communes with at least one indicator
 // populated.
 func (idx *Index) Count() int {
