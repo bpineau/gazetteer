@@ -1,19 +1,40 @@
 package overview
 
 import (
+	"math"
+	"sort"
+	"strings"
+
 	"github.com/bpineau/gazetteer/helpers/communes"
+	"github.com/bpineau/gazetteer/helpers/geodist"
 	"github.com/bpineau/gazetteer/sources/anct"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/delinquance"
 	"github.com/bpineau/gazetteer/sources/dvfagg"
 	"github.com/bpineau/gazetteer/sources/encadrement"
 	"github.com/bpineau/gazetteer/sources/filosofi"
+	"github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/qpv"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
 	"github.com/bpineau/gazetteer/sources/zonageabc"
 	"github.com/bpineau/gazetteer/sources/zonetendue"
 )
+
+// parisLat / parisLon are the WGS-84 centroid of Paris used for
+// DistanceParisKm. Notre-Dame de Paris (~geometric centre of the city).
+const (
+	parisLat = 48.8566
+	parisLon = 2.3522
+)
+
+// transitRadiusM is the haversine search radius for TransitLines: stations
+// within this distance of the commune centroid are considered "served".
+const transitRadiusM = 2500.0
+
+// maxTransitLines caps the TransitLines slice to avoid noise on hubs like
+// Châtelet that sit at the centroid of several arrondissements.
+const maxTransitLines = 6
 
 // CommuneOverview is the per-commune data row produced by the Build join.
 // It merges DVF price aggregates with rent, socio-economic and regulatory
@@ -47,6 +68,10 @@ type CommuneOverview struct {
 	// Regulatory / location
 	ZonageABC  string `json:"zonage_abc"`
 	ZoneTendue string `json:"zone_tendue"`
+
+	// Geo (embedded-only, computed from commune centroid)
+	DistanceParisKm float64  `json:"distance_paris_km"`
+	TransitLines    []string `json:"transit_lines"`
 }
 
 // Options configures a Build call.
@@ -85,11 +110,16 @@ func Build(o Options) ([]CommuneOverview, error) {
 	zt, _ := zonetendue.Load(o.DataDir)
 	enc, _ := encadrement.Load(o.DataDir)
 
-	// Communes table: used for name resolution.
+	// Communes table: used for name resolution and geo fields.
 	com, err := communes.Default()
 	if err != nil {
 		return nil, err
 	}
+
+	// OSM embedded station catalog — loaded once, offline, no network call.
+	// On failure (should never happen with the embedded gz) transit is silently
+	// skipped so the other fields are unaffected.
+	osmCat, _ := osm.Load(o.DataDir)
 
 	deptSet := map[string]bool{}
 	for _, d := range o.Depts {
@@ -113,9 +143,11 @@ func Build(o Options) ([]CommuneOverview, error) {
 			PriceNSmall:           price.NSmall,
 		}
 
-		// Commune name.
+		// Commune name + geo fields derived from the centroid.
 		if c, ok := com.Lookup(insee); ok {
 			row.Name = c.Name
+			row.DistanceParisKm = roundKm1(geodist.KmBetween(c.Lat, c.Lon, parisLat, parisLon))
+			row.TransitLines = transitLinesNear(osmCat, c.Lat, c.Lon)
 		}
 
 		// Carte des loyers: apt 1-2 pièces, HC.
@@ -168,4 +200,140 @@ func Build(o Options) ([]CommuneOverview, error) {
 		out = append(out, row)
 	}
 	return out, nil
+}
+
+// roundKm1 rounds a kilometre value to one decimal place.
+func roundKm1(km float64) float64 {
+	return math.Round(km*10) / 10
+}
+
+// lineLabel turns a (TransitType, raw ref) pair into the user-visible label
+// surfaced in TransitLines: "Métro 5", "RER A", "T3a", "Transilien J".
+// It normalises the ref so that pre-prefixed values like "RER B" or
+// "Transilien H" from the OSM catalog are not double-prefixed.
+func lineLabel(tt osm.TransitType, ref string) string {
+	// Some OSM contributors store the full label in the ref tag
+	// (e.g. ref="RER B", ref="Transilien H"). Detect that and return as-is.
+	switch {
+	case strings.HasPrefix(ref, "RER "):
+		return ref
+	case strings.HasPrefix(ref, "Transilien "):
+		return ref
+	case strings.HasPrefix(ref, "Métro "):
+		return ref
+	}
+	switch tt {
+	case osm.TransitTypeMetro:
+		if ref == "" {
+			return "Métro"
+		}
+		return "Métro " + ref
+	case osm.TransitTypeRER:
+		if ref == "" {
+			return "RER"
+		}
+		return "RER " + ref
+	case osm.TransitTypeTransilien:
+		if ref == "" {
+			return "Transilien"
+		}
+		return "Transilien " + ref
+	case osm.TransitTypeTram:
+		if ref == "" {
+			return "Tram"
+		}
+		// Tram refs come in two flavours: "T3a" (already prefixed) or bare
+		// numerics like "1", "2" (Lyon/Bordeaux style). Prefix bare numbers
+		// with "T" so the label is consistent.
+		if len(ref) > 0 && ref[0] >= '0' && ref[0] <= '9' {
+			return "T" + ref
+		}
+		return ref // already "T1", "T3a" — self-explanatory
+	case osm.TransitTypeTrain:
+		if ref == "" {
+			return "Train"
+		}
+		return "Train " + ref
+	}
+	return ref
+}
+
+// transitTypeOrder returns a sort key for transit types so Metro < RER <
+// Transilien < Tram < Train in the output slice. Lower = higher priority.
+func transitTypeOrder(tt osm.TransitType) int {
+	switch tt {
+	case osm.TransitTypeMetro:
+		return 0
+	case osm.TransitTypeRER:
+		return 1
+	case osm.TransitTypeTransilien:
+		return 2
+	case osm.TransitTypeTram:
+		return 3
+	case osm.TransitTypeTrain:
+		return 4
+	}
+	return 5
+}
+
+// transitLinesNear collects unique line labels (e.g. "Métro 5", "RER A",
+// "T1") for all stations within transitRadiusM of (lat, lon). The result is
+// capped at maxTransitLines, de-duplicated, and sorted by mode priority then
+// alphabetically within the mode. Returns nil when the catalog is nil or no
+// stations are nearby.
+func transitLinesNear(cat *osm.Catalog, lat, lon float64) []string {
+	if cat == nil || len(cat.Stations) == 0 {
+		return nil
+	}
+	if lat == 0 && lon == 0 {
+		return nil
+	}
+
+	// Collect (label → TransitType) so we can sort by priority.
+	type entry struct {
+		label string
+		order int
+	}
+	seen := make(map[string]struct{}, 8)
+	var entries []entry
+
+	for i := range cat.Stations {
+		st := &cat.Stations[i]
+		d := geodist.MetersBetween(lat, lon, st.Lat, st.Lon)
+		if d > transitRadiusM {
+			continue
+		}
+		// Stations without any line refs are skipped: a type-only label
+		// ("Train") adds little value when nearby stations already carry
+		// specific refs, and is noise when they don't.
+		for _, ref := range st.Lines {
+			lbl := lineLabel(st.Type, ref)
+			if _, dup := seen[lbl]; !dup {
+				seen[lbl] = struct{}{}
+				entries = append(entries, entry{lbl, transitTypeOrder(st.Type)})
+			}
+		}
+	}
+
+	if len(entries) == 0 {
+		return nil
+	}
+
+	// Sort: by mode priority first, then alphabetically within the mode.
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].order != entries[j].order {
+			return entries[i].order < entries[j].order
+		}
+		return entries[i].label < entries[j].label
+	})
+
+	// Cap and extract labels.
+	if len(entries) > maxTransitLines {
+		entries = entries[:maxTransitLines]
+	}
+	out := make([]string, len(entries))
+	for i, e := range entries {
+		out[i] = e.label
+	}
+	return out
 }
