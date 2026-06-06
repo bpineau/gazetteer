@@ -23,29 +23,29 @@ import (
 // encadrement zone(s). Each commune belongs to exactly one zone, except
 // Saint-Denis (93066) which spans two zones (311 and 312).
 var plaineCommuneCommunes = map[string][]string{
-	"93001": {"314"}, // Aubervilliers
-	"93027": {"316"}, // L'Île-Saint-Denis
-	"93031": {"315"}, // Épinay-sur-Seine
-	"93039": {"312"}, // Stains
-	"93059": {"317"}, // Pierrefitte-sur-Seine
+	"93001": {"314"},        // Aubervilliers
+	"93027": {"316"},        // L'Île-Saint-Denis
+	"93031": {"315"},        // Épinay-sur-Seine
+	"93039": {"312"},        // Stains
+	"93059": {"317"},        // Pierrefitte-sur-Seine
 	"93066": {"311", "312"}, // Saint-Denis
-	"93070": {"310"}, // Saint-Ouen-sur-Seine
-	"93072": {"318"}, // Villetaneuse
-	"93079": {"316"}, // La Courneuve — zone 316 per the embedded data
+	"93070": {"310"},        // Saint-Ouen-sur-Seine
+	"93072": {"318"},        // Villetaneuse
+	"93079": {"316"},        // La Courneuve — zone 316 per the embedded data
 }
 
 // estEnsembleCommunes is the set of Est Ensemble INSEE codes and their
 // encadrement zone(s).
 var estEnsembleCommunes = map[string][]string{
-	"93006": {"308"}, // Bagnolet
-	"93008": {"315"}, // Bobigny — note: 315 here is EE zone, distinct from PC zone 315
-	"93010": {"318"}, // Bondy
-	"93045": {"307"}, // Les Lilas
+	"93006": {"308"},        // Bagnolet
+	"93008": {"315"},        // Bobigny — note: 315 here is EE zone, distinct from PC zone 315
+	"93010": {"318"},        // Bondy
+	"93045": {"307"},        // Les Lilas
 	"93048": {"307", "308"}, // Montreuil
-	"93053": {"311"}, // Noisy-le-Sec — note: 311 here is EE zone, distinct from PC zone 311
-	"93055": {"308"}, // Pantin
-	"93061": {"308"}, // Le Pré-Saint-Gervais
-	"93063": {"313"}, // Romainville
+	"93053": {"311"},        // Noisy-le-Sec — note: 311 here is EE zone, distinct from PC zone 311
+	"93055": {"308"},        // Pantin
+	"93061": {"308"},        // Le Pré-Saint-Gervais
+	"93063": {"313"},        // Romainville
 }
 
 // RepresentativeT2Majore returns a representative loyer de référence majoré
