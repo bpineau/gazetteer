@@ -102,3 +102,20 @@ func TestTransform_WritesCSV(t *testing.T) {
 		t.Fatalf("validate rejected good output: %v", err)
 	}
 }
+
+func TestBuildDeptsExcludesNonDVF(t *testing.T) {
+	in := map[string]bool{}
+	for _, d := range buildDepts() {
+		in[d] = true
+	}
+	for _, d := range []string{"57", "67", "68", "976"} { // Alsace-Moselle + Mayotte: 404 in geo-dvf
+		if in[d] {
+			t.Errorf("dept %s must be excluded (not in DVF / would 404 the refresh)", d)
+		}
+	}
+	for _, d := range []string{"75", "93", "2A", "974"} {
+		if !in[d] {
+			t.Errorf("dept %s must be present", d)
+		}
+	}
+}
