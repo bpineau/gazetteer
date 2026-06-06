@@ -144,6 +144,10 @@ func (r *Result) IsEmpty() bool {
 // default (provisions for charges ≈ 10 % of an all-in rent).
 const ccToHCFactor = 0.90
 
+// HCEURPerM2 converts the commune's CC median rent to hors-charges (HC),
+// the basis used by the appraisal blend and the prospection benchmark.
+func (r Row) HCEURPerM2() float64 { return r.LoyerMedCC * ccToHCFactor }
+
 // RentEstimate satisfies appraisal.RentEstimator. Converts the median
 // rent EUR/m²/month into the cents convention used by the appraisal
 // layer, applying ccToHCFactor so the value enters the blend hors

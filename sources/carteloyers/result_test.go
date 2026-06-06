@@ -1,10 +1,18 @@
 package carteloyers
 
 import (
+	"math"
 	"testing"
 
 	"github.com/bpineau/gazetteer/appraisal"
 )
+
+func TestRow_HCEURPerM2(t *testing.T) {
+	r := Row{LoyerMedCC: 20.0}
+	if got := r.HCEURPerM2(); math.Abs(got-18.0) > 1e-9 { // 20 * 0.90
+		t.Fatalf("want 18.0 HC, got %v", got)
+	}
+}
 
 // Compile-time check: *Result satisfies appraisal.RentEstimator.
 var _ appraisal.RentEstimator = (*Result)(nil)
