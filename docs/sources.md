@@ -729,6 +729,36 @@ or the corresponding package-level `BaseURL` var (when blank) is read
 at Query time, so a single change at the constructor level swaps the
 upstream cleanly. See [testing.md](testing.md).
 
+### Batch / commune-level access
+
+The offline, commune-keyed Sources expose their embedded index directly, so
+you can read **many communes without building a `Listing` or running `Query`**
+— load once, look up repeatedly:
+
+| Helper | Returns |
+|---|---|
+| `dvfagg.Load(dir)` → `*Index`      | `.Codes()` (every INSEE with price data), `.Lookup(insee)` → `Result` |
+| `qpv.Load(dir)` → `*Index`         | `.HasQPV(insee)` — coordinate-free, commune-level (NOT point-in-polygon) |
+| `delinquance.Load(dir)` → `*Index` | `.Level(insee)` → coarse `RiskFlag` |
+| `carteloyers.Load(dir)` → `*Index` | `.Lookup(insee, typology)` → `Row`; `Row.HCEURPerM2()` converts the CC median to hors-charges |
+| `communes.Default()` → `Table`     | `.All()` (every commune row), `.Lookup(insee)` |
+
+`dir` is the datadir (`""` loads the embedded dataset). On top of these, the
+top-level **`overview`** package joins them into one row per commune:
+
+```go
+import "github.com/bpineau/gazetteer/overview"
+
+rows, _ := overview.Build(overview.Options{Depts: []string{"75", "93"}})
+// each CommuneOverview merges price (dvfagg), market rent (carteloyers),
+// encadrement cap, income (filosofi), vacancy, taxe foncière, QPV, zonage,
+// zone tendue, distance-to-Paris and nearby transit lines — all offline.
+```
+
+`overview.Build` does no network I/O; it iterates the communes `dvfagg` has
+price data for (`Depts` empty = national). It is the batch/screening
+counterpart to the per-address `Client.Collect`.
+
 ## `sources/rnc`
 
 Copropriété context from the Registre National d'Immatriculation des Copropriétés (RNC, ANAH / data.gouv.fr).

@@ -19,6 +19,8 @@ gazetteer compare    [flags] <addr1> <addr2> [...]
 gazetteer normalize  [--json] [--verbose] <addr>
 gazetteer sources    list
 gazetteer sources    doc       <name>
+gazetteer sources    catalog   [--json]
+gazetteer sources    dimensions
 gazetteer refresh    [<source>|all] [--list] [--data-dir DIR] [--force] [--go-embed-update]
 gazetteer version
 ```
@@ -133,7 +135,7 @@ List every Source registered with the library plus its version:
 
 ```bash
 $ gazetteer sources list
-ademe           v2
+ademe           v3
 anct            v1
 bdnb            v2  (opt-in via --source)
 bpe             v1
@@ -146,6 +148,7 @@ chomage         v1
 delinquance     v3
 dpedist         v1
 dvf             v4
+dvfagg          v1
 education       v1
 encadrement     v2
 filoiris        v1
@@ -154,14 +157,17 @@ georisques      v1
 gpe             v1
 ips_ecoles      v1
 iris            v1
+links           v3
 locservice      v1
 logiris         v1
 lovac           v1
 nuisances       v1
 oll             v1
 osm_transit     v3
-qpv             v1
+qpv             v2
+rnc             v1
 rpls            v1
+sitadel         v1
 taxefonciere    v1
 vacance         v1
 zonageabc       v1

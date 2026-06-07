@@ -1,6 +1,3 @@
-// Package overview provides a batch join of per-commune data from all embedded
-// gazetteer sources, producing []CommuneOverview — the input to the prospection
-// service. The join is embedded-only (no network, no CF).
 package overview
 
 import (

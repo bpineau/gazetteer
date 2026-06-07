@@ -39,6 +39,7 @@ gazetteer/gazettestest/  reusable test doubles (StubSource)
 factory/           one-call wiring of every stable in-tree Source
 appraisal/         consolidation across Sources (price/rent/hazard)
 appraisal/zonescore/  yield-first 0–100 zone score + multi-zone Compare
+overview/          offline per-commune batch join (CommuneOverview) for screening
 sources/<name>/    one package per data source
 helpers/<name>/    reusable utilities (banx, httpx, kvcache, circuit, ...)
 cmd/gazetteer/     command-line front-end
