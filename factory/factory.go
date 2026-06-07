@@ -211,6 +211,13 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		With(zonetendue.NewSource(zonetendue.Options{DataDir: dataDir})).
 		With(links.NewSource(links.Options{})).
 		With(gzosm.NewSource(gzosm.Options{DataDir: dataDir, Fetcher: gzosm.NewHTTPOverpassFetcher(hc, "")}))
+
+	// Apply the deny-list last, once the full roster is assembled, so a
+	// caller's Exclude prunes Sources regardless of wiring order and
+	// in-tree Sources added later still flow in by default.
+	if len(opts.Exclude) > 0 {
+		b = b.Without(opts.Exclude...)
+	}
 	return b, nil
 }
 
