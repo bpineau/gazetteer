@@ -41,6 +41,27 @@ func TestNewDefault_Smoke(t *testing.T) {
 	}
 }
 
+// TestNewDefault_Exclude verifies Options.Exclude prunes the named Sources
+// from the default roster (a deny-list) while leaving the rest wired. This is
+// the contract consumers rely on to drop Sources they never consume — e.g.
+// locador excludes bdnb so its zone report doesn't pay the live BDNB API.
+func TestNewDefault_Exclude(t *testing.T) {
+	t.Parallel()
+	client, err := factory.NewDefaultWith(context.Background(), factory.Options{Exclude: []string{"bdnb", "nonexistent"}})
+	if err != nil {
+		t.Fatalf("NewDefaultWith: %v", err)
+	}
+	d := client.Collect(context.Background(), gazetteer.Listing{})
+	if _, ok := d.Results["bdnb"]; ok {
+		t.Error("Results[\"bdnb\"] present — Exclude did not drop it from the roster")
+	}
+	// An unrelated default Source must still be wired (Exclude is a deny-list,
+	// not an allow-list; unknown names are ignored).
+	if _, ok := d.Results["dvf"]; !ok {
+		t.Error("Results[\"dvf\"] missing — Exclude over-pruned the roster")
+	}
+}
+
 // TestNewDefault_SkipNormalizer produces a Client whose Normalize
 // returns gazetteer.ErrNormalizerNotConfigured.
 func TestNewDefault_SkipNormalizer(t *testing.T) {
