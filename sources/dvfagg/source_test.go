@@ -2,6 +2,7 @@ package dvfagg
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/bpineau/gazetteer/gazetteer"
@@ -48,5 +49,29 @@ func TestSource_QueryWithInjectedIndex(t *testing.T) {
 	}
 	if r.PriceMedianSmallEURM2 != 1234 {
 		t.Fatalf("want PriceMedianSmallEURM2=1234, got %v", r.PriceMedianSmallEURM2)
+	}
+	if r.Evidence.INSEE != "99999" {
+		t.Fatalf("want Evidence.INSEE=99999, got %q", r.Evidence.INSEE)
+	}
+}
+
+// A missing INSEE must surface as ErrInsufficientInputs (uniform contract),
+// not a silent empty Result.
+func TestSource_MissingINSEE(t *testing.T) {
+	s := NewSource(Options{Index: &Index{byINSEE: map[string]Result{}}})
+	if _, err := s.Query(context.Background(), gazetteer.Listing{}); !errors.Is(err, gazetteer.ErrInsufficientInputs) {
+		t.Fatalf("want ErrInsufficientInputs for blank INSEE, got %v", err)
+	}
+}
+
+// The atomic Query helper mirrors the other sources' contract.
+func TestQuery_AtomicHelper(t *testing.T) {
+	idx := &Index{byINSEE: map[string]Result{"95268": {N: 9, PriceMedianEURM2: 4200, Dept: "95"}}}
+	r, err := Query(context.Background(), Options{Index: idx}, gazetteer.Listing{INSEE: "95268"})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if r.IsEmpty() || r.PriceMedianEURM2 != 4200 || r.Evidence.INSEE != "95268" {
+		t.Fatalf("unexpected Result: %+v (evidence %+v)", r, r.Evidence)
 	}
 }

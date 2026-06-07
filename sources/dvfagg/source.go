@@ -2,6 +2,8 @@ package dvfagg
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
@@ -34,19 +36,39 @@ func (s *Source) Version() int { return Version }
 func (s *Source) Datasets() []dataset.Set { return []dataset.Set{theSet} }
 
 // Query implements gazetteer.Source: returns the commune aggregate for the
-// listing's INSEE. Empty Result (IsEmpty) when the commune has no sales.
+// listing's INSEE. Without an INSEE it emits gazetteer.ErrInsufficientInputs;
+// a present-but-unmatched commune surfaces as IsEmpty() (no qualifying sale).
 func (s *Source) Query(_ context.Context, l gazetteer.Listing) (any, error) {
+	insee := strings.TrimSpace(l.INSEE)
+	if insee == "" {
+		return nil, fmt.Errorf("dvfagg: %w: listing.INSEE required", gazetteer.ErrInsufficientInputs)
+	}
 	idx := s.opts.Index
 	if idx == nil {
-		var err error
-		idx, err = Load(s.opts.DataDir)
+		loaded, err := Load(s.opts.DataDir)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("dvfagg: %w: load dataset: %w", gazetteer.ErrUpstreamPermanent, err)
 		}
+		idx = loaded
 	}
-	insee := strings.TrimSpace(l.INSEE)
 	r, _ := idx.Lookup(insee)
+	r.Evidence = Evidence{INSEE: insee}
 	return &r, nil
+}
+
+// Query is the atomic helper for callers who don't want the builder. The error
+// is non-nil only when the Source failed; a successful but empty response still
+// returns a non-nil *Result with IsEmpty() == true.
+func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
+	data, err := NewSource(opts).Query(ctx, l)
+	if err != nil {
+		return nil, err
+	}
+	res, ok := data.(*Result)
+	if !ok {
+		return nil, errors.New("dvfagg: typed result mismatch")
+	}
+	return res, nil
 }
 
 func init() {
