@@ -3,7 +3,9 @@
 //
 // It is a terminal consumer: it reads the typed Results other sources produced
 // (via gazetteer.Get) and the consolidated appraisal views, normalises each into
-// a 0–100 axis, and combines the axes by weight into a 0–100 Composite. The
+// a 0–100 axis, and combines the axes by weight into a 0–100 Composite where
+// higher = better. The score is an informational, yield-first reading of the
+// zone — a comparison aid, not investment advice. The
 // rendement (gross-yield) axis dominates; the rest temper it with the factors
 // that protect a realised yield — letting (tension, vacancy), tenant
 // reliability (income, employment), safety, the net-yield drag of the property

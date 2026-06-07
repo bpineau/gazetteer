@@ -230,6 +230,21 @@ never disables corporate secret-scanning.
   future transit must not distort the yield-first-today score.
 - Datasets ship **embedded in the binary**; the datadir (`~/.cache/gazetteer`)
   is an *optional* override populated by `refresh`, never required.
+- **Gate a Result on `IsEmpty()`, never on `field != 0`.** Many numeric Result
+  fields are plain values where `0` is a *legitimate* reading (e.g. `rpls` 0 %
+  social housing — ~64 % of communes; a count of 0) — distinct from "no data".
+  `IsEmpty()` (⇒ `StatusOKEmpty`) is the only correct "did this source find
+  anything" test; comparing a field to zero silently drops real zeros.
+- **Rent basis — CC vs HC.** `carteloyers` rents are *charges comprises* (CC,
+  field suffix `…CC`); `oll` and `encadrement` are *hors charges* (HC, `…HC`).
+  Don't compare the raw fields across sources — different bases. Use
+  `appraisal.RentValue`, which converts CC→HC (≈0.90) before blending.
+- `taxefonciere.EstimatedEURPerYear` is an **order-of-magnitude estimate, not
+  the exact bill** — a valeur-locative proxy understates high-value communes
+  (Paris ≈ ½ the real figure). Compare communes with it; don't quote it as the sum due.
+- `CollectSome` / `Builder.Without` / `factory.Options.Exclude` **ignore unknown
+  Source names** (a typo'd name silently runs/keeps nothing) — they now log a
+  warning, so watch the logs when a subset comes back unexpectedly empty.
 
 ## Where things live
 

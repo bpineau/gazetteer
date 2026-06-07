@@ -470,6 +470,13 @@ Per-commune `taxe foncière` estimate.
   `Confidence`. Confidence reflects whether the V2 (DGFiP voted rates × VLC ×
   surface) or V1 (legacy per-m² ratio) path applied, and whether the lookup hit
   the commune or fell back to the department.
+- **Limitation (read before trusting the €)**: this is an *order-of-magnitude*
+  estimate, not the exact bill. The voted taux are real, but they multiply a
+  per-m² valeur-locative **proxy**, not the dwelling's actual cadastral base, so
+  the figure **systematically understates** the tax in high-value communes —
+  notably **Paris, where it can be ~half** the real amount. Use it to *compare*
+  communes, not as the precise sum due. (A per-commune REI base would fix it;
+  deferred.)
 
 ## `sources/lovac`
 
