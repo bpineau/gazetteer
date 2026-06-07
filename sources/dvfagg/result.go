@@ -21,6 +21,16 @@ type Result struct {
 	N      int    `json:"n"`
 	NSmall int    `json:"n_small"`
 	Dept   string `json:"department"`
+
+	// Evidence is the reproducibility sidecar (json:"-"), per the uniform
+	// Source contract. It records which commune INSEE produced the aggregate.
+	Evidence Evidence `json:"-"`
+}
+
+// Evidence captures reproducibility metadata about the lookup.
+type Evidence struct {
+	// INSEE is the commune code that was looked up to produce this Result.
+	INSEE string `json:"insee,omitempty"`
 }
 
 // IsEmpty satisfies gazetteer.EmptyReporter: no sales ⇒ empty.
