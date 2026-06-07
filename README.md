@@ -86,10 +86,26 @@ if err != nil { log.Fatal(err) }
 client, _ := b.With(myPlugin).Build()
 ```
 
-`factory.NewDefault` wires every stable Source, including `osm_transit`
-(it ships an embedded station catalog with a live Overpass fallback, so
-no setup is needed). Only `bdnb` is left out of the default set — add it
-via the Builder path when you have an API key and quota to spend.
+`factory.NewDefault` wires **every** stable Source, including `osm_transit`
+(an embedded station catalog with a live Overpass fallback, so no setup is
+needed) and `bdnb` (a live building API with a per-key rolling quota). To
+prune Sources you never consume — cutting their latency and failure surface —
+pass a deny-list:
+
+```go
+client, _ := factory.NewDefaultWith(ctx, factory.Options{Exclude: []string{"bdnb"}})
+```
+
+`Exclude` is applied to the full default roster, so in-tree Sources added
+later still flow in automatically. (The `gazetteer` CLI omits `bdnb` from
+its default `query`/`appraise` set for the same quota reason; pass
+`--source bdnb` to include it.) Two finer-grained controls:
+
+- `builder.Without(names…)` drops Sources from a pre-populated Builder
+  (e.g. `factory.BuilderDefault`) before `.Build()`.
+- `client.CollectSome(ctx, listing, names…)` collects only a named subset
+  on an existing Client — e.g. fetch the cheap embedded Sources first,
+  before paying for the slow live APIs.
 
 ## Sources shipped
 
@@ -113,6 +129,7 @@ Market data:
 | Source         | What it provides                                                 |
 |----------------|------------------------------------------------------------------|
 | `dvf`          | Demandes de Valeurs Foncières — historical transaction prices    |
+| `dvfagg`       | Per-commune DVF price aggregate (median €/m² + dispersion, offline) — the batch complement to `dvf` |
 | `locservice`   | Rental market reference data (tension, médiane €/m²)             |
 | `carteloyers`  | National rent observatory tiers                                  |
 | `oll`          | Observed market rents by zone (Observatoires Locaux des Loyers)  |
@@ -165,6 +182,43 @@ and selectable weight presets (`yield` / `balanced` / `patrimoine` /
 `transport`, via the CLI `--profile`). The IRIS-level income (`filoiris`) and
 housing (`logiris`) sources sharpen the solvabilité and tension axes where
 neighbourhoods diverge within a commune.
+
+## Batch / commune-level data
+
+The per-address flow above (`Normalize` → `Collect` → `Dossier`) answers
+"tell me everything about *this* address". For the inverse — screening
+*every* commune at once — the `overview` package joins the embedded,
+commune-keyed Sources **offline** into one row per commune:
+
+```go
+import "github.com/bpineau/gazetteer/overview"
+
+rows, _ := overview.Build(overview.Options{Depts: []string{"75", "93", "94"}})
+for _, c := range rows {
+    fmt.Printf("%s %s: %.0f €/m², loyer %.1f €/m² HC, délinquance %s\n",
+        c.INSEE, c.Name, c.PriceMedianEURM2, c.RentMarketEURM2HC, c.DelinquanceLevel)
+}
+```
+
+`overview.Build` does no network I/O. It is keyed off the communes that
+have DVF price data (`dvfagg`) and merges price, market rent, the
+encadrement cap, income, vacancy, taxe foncière, QPV, zonage and nearby
+transit lines per commune (`Depts` empty = all communes nationally).
+
+The same commune-keyed shortcut is available per Source via **batch-read
+helpers** that skip the full `Query`/`Listing` path — load an index once,
+then read many communes:
+
+```go
+idx, _ := dvfagg.Load("")               // "" = embedded dataset
+for _, insee := range idx.Codes() {     // every commune with price data
+    r, _ := idx.Lookup(insee)
+    _ = r.PriceMedianEURM2
+}
+```
+
+Companion helpers: `qpv.Index.HasQPV(insee)`,
+`delinquance.Index.Level(insee)`, `communes.Table.All()`.
 
 ## CLI
 

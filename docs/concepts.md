@@ -155,6 +155,28 @@ dossier := client.Collect(ctx, listing)
 `WithMaxConcurrency` if set). Per-Source errors land on the `Result`
 envelope; `Collect` itself never returns an error.
 
+#### Running a subset
+
+Sources are independent (none reads another's `Result`), so you can run
+fewer of them freely:
+
+```go
+// On the Builder: prune a pre-populated roster (e.g. factory.BuilderDefault)
+// before Build(). A deny-list; call it after the With chain.
+client, _ := factory.BuilderDefault(ctx, factory.Options{}).Without("bdnb").Build()
+
+// factory shortcut for the same deny-list:
+client, _ = factory.NewDefaultWith(ctx, factory.Options{Exclude: []string{"bdnb"}})
+
+// On the Client: collect only a named subset for one call — e.g. the cheap
+// embedded Sources first, before paying for the slow live APIs.
+fast := client.CollectSome(ctx, listing, "dvfagg", "carteloyers", "delinquance")
+```
+
+`Builder.Without(names…)` and `factory.Options.Exclude` prune the roster
+at construction time; `Client.CollectSome(ctx, listing, names…)` selects a
+subset per call without rebuilding. Unknown names are ignored in all three.
+
 ### `Normalizer`
 
 ```go

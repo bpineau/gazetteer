@@ -161,6 +161,27 @@ high-level API, not the project's purpose.
   `zonescore.Personas` / the CLI `--profile`. The catalog's `feeds` field says
   which source drives which axis.
 
+## Batch & subset access — beyond one-address-at-a-time
+
+Two patterns sit alongside the per-address `Collect`:
+
+- **Run fewer Sources.** `factory.Options.Exclude` is a deny-list applied to
+  the full default roster (e.g. `Exclude: []string{"bdnb"}` drops the live BDNB
+  API); `Builder.Without(names…)` prunes a pre-populated Builder before
+  `.Build()`; `Client.CollectSome(ctx, listing, names…)` collects only a named
+  subset on an existing Client (cheap embedded Sources first, before slow live
+  APIs). Sources run independently, so dropping an unconsumed one never affects
+  the others.
+- **Screen every commune offline.** `overview.Build(overview.Options{Depts…})`
+  joins the embedded, commune-keyed Sources into one `CommuneOverview` row per
+  commune (price, market rent, encadrement cap, income, vacancy, taxe foncière,
+  QPV, zonage, transit lines) with **no network I/O** — the inverse of the
+  per-address Dossier. It rides on per-Source **batch-read helpers** that skip
+  the `Listing`/`Query` path: `dvfagg.Load(dir).Codes()` / `.Lookup(insee)`,
+  `qpv.Load(dir).HasQPV(insee)`, `delinquance.Load(dir).Level(insee)`,
+  `communes.Default().All()` — reach for these whenever you need many communes
+  at once instead of one address.
+
 ## Adding a new Source (checklist)
 
 Copy a model: `sources/filoiris` (clean dataset-backed source) or `sources/gpe`
@@ -218,6 +239,7 @@ factory/              one-call wiring of every stable source (NewDefault)
 sources/<name>/       one package per source (uniform shape, see above)
 appraisal/            PricePerM2 / RentValue / HazardProfile consolidation
 appraisal/zonescore/  the 0–100 zone score + Compare + Personas
+overview/             offline per-commune batch join (CommuneOverview) for screening
 helpers/<name>/       banx, httpx, geopoly, geodist, communes, circuit, kvcache…
 cmd/gazetteer/        the CLI (+ the source catalog)
 docs/                 long-form reference (start at docs/readme.md)
