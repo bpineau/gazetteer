@@ -19,6 +19,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/delinquance"
 	"github.com/bpineau/gazetteer/sources/dpedist"
 	"github.com/bpineau/gazetteer/sources/dvf"
+	"github.com/bpineau/gazetteer/sources/dvfagg"
 	"github.com/bpineau/gazetteer/sources/education"
 	"github.com/bpineau/gazetteer/sources/encadrement"
 	"github.com/bpineau/gazetteer/sources/filoiris"
@@ -134,6 +135,7 @@ var sourceRenderers = map[string]sourceRenderer{
 	delinquance.Name:  renderDelinquance,
 	dpedist.Name:      renderDPEDist,
 	dvf.Name:          renderDVF,
+	dvfagg.Name:       renderDVFAgg,
 	education.Name:    renderEducation,
 	encadrement.Name:  renderEncadrement,
 	filoiris.Name:     renderFiloIris,
@@ -177,6 +179,22 @@ func renderDVF(data any) (string, []string) {
 		parts = append(parts, "conf="+r.Confidence)
 	}
 	return strings.Join(parts, ", "), nil
+}
+
+func renderDVFAgg(data any) (string, []string) {
+	r, ok := data.(*dvfagg.Result)
+	if !ok || r == nil || r.IsEmpty() {
+		return "no commune-level DVF aggregate", nil
+	}
+	headline := fmt.Sprintf("%.0f €/m² médian (%d ventes)", r.PriceMedianEURM2, r.N)
+	var extra []string
+	if r.PriceP25EURM2 > 0 && r.PriceP75EURM2 > 0 {
+		extra = append(extra, fmt.Sprintf("dispersion P25–P75: %.0f–%.0f €/m²", r.PriceP25EURM2, r.PriceP75EURM2))
+	}
+	if r.PriceMedianSmallEURM2 > 0 {
+		extra = append(extra, fmt.Sprintf("petites surfaces (18–55 m²): %.0f €/m² (%d ventes)", r.PriceMedianSmallEURM2, r.NSmall))
+	}
+	return headline, extra
 }
 
 func renderAdeme(data any) (string, []string) {
