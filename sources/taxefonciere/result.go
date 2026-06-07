@@ -9,6 +9,14 @@
 // fallback runs only when V2 has no signal at all (commune + dept
 // both missing).
 //
+// LIMITATION — this is an order-of-magnitude estimate, not the exact bill.
+// The voted taux are real, but they are applied to a valeur-locative *proxy*
+// (a per-m² tariff), not the dwelling's actual cadastral base. The proxy
+// systematically understates the tax in high-value communes — notably Paris,
+// where the figure can be roughly half the real amount. Use EstimatedEURPerYear
+// for relative comparison between communes, not as the precise sum due. (A
+// per-commune REI base would fix this; it is deferred.)
+//
 // The Source is fully offline: both embedded datasets ship under
 // `data/`.
 package taxefonciere
@@ -31,8 +39,11 @@ const (
 // framework's responsibility (see gazetteer.Result).
 type Result struct {
 	// EstimatedEURPerYear is the TF the landlord pays out-of-pocket
-	// (TFPB leg only — TEOM is recoverable). Zero when no signal
-	// could be derived.
+	// (TFPB leg only — TEOM is recoverable), €/an. Zero when no signal
+	// could be derived. APPROXIMATION: taux votés × a valeur-locative
+	// *proxy* × surface — it can materially understate the real bill in
+	// high-value communes (notably Paris, ~½ the actual). Treat it as a
+	// comparison signal, not the exact amount (see package doc).
 	EstimatedEURPerYear float64 `json:"estimated_eur_per_year"`
 
 	// TEOMEURPerYear is the recoverable TEOM (€/an). Surfaced

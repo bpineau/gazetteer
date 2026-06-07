@@ -16,6 +16,8 @@ type PriceEstimator interface {
 // PriceEstimate is one source's contribution to the consolidated
 // price-per-m² synthesis.
 type PriceEstimate struct {
+	// EurPerM2Cents is the price-per-m² in centimes (÷100 for €/m²) — the
+	// integer-cents convention shared with appraisal.RentEstimate.
 	EurPerM2Cents int64
 	Confidence    Confidence
 	SampleSize    int    // 0 if unknown
@@ -47,6 +49,7 @@ type PriceOptions struct {
 
 // PriceConsolidated is the synthesised output.
 type PriceConsolidated struct {
+	// EurPerM2Cents is the weighted-mean price-per-m² in centimes (÷100 for €/m²).
 	EurPerM2Cents int64
 	Confidence    Confidence
 	Inputs        []PriceInput
