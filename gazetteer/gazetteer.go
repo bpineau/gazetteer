@@ -39,7 +39,8 @@ func (b *Builder) With(s Source) *Builder {
 }
 
 // Without removes every already-added Source whose Name matches one of names.
-// Unknown names are ignored. Returns the Builder for chaining.
+// Unknown names are ignored (a warning is logged, since a name matching no
+// added Source is usually a typo). Returns the Builder for chaining.
 //
 // It is meant to prune Sources a caller never consumes — cutting their fetch
 // latency and failure surface — while keeping the rest of a pre-populated
@@ -55,13 +56,20 @@ func (b *Builder) Without(names ...string) *Builder {
 	for _, n := range names {
 		drop[n] = true
 	}
+	present := make(map[string]bool, len(b.sources))
 	kept := b.sources[:0]
 	for _, s := range b.sources {
+		present[s.Name()] = true
 		if !drop[s.Name()] {
 			kept = append(kept, s)
 		}
 	}
 	b.sources = kept
+	for _, n := range names {
+		if !present[n] {
+			b.logger.Warn("Without: no added Source matches name; ignoring", "name", n)
+		}
+	}
 	return b
 }
 
@@ -150,19 +158,28 @@ func (c *Client) Collect(ctx context.Context, l Listing) Dossier {
 }
 
 // CollectSome runs only the configured Sources whose Name is in names, in
-// parallel, and returns a partial Dossier — Sources not named are skipped and
-// unknown names are ignored. Semantics otherwise match Collect. Use it to fetch
-// a fast, decision-critical subset (e.g. cheap embedded Sources) before paying
-// for the full roster's slow live APIs.
+// parallel, and returns a partial Dossier — Sources not named are skipped.
+// A name matching no configured Source is ignored but logged as a warning
+// (it is usually a typo and yields no Result for that name). Semantics
+// otherwise match Collect. Use it to fetch a fast, decision-critical subset
+// (e.g. cheap embedded Sources) before paying for the full roster's slow live
+// APIs.
 func (c *Client) CollectSome(ctx context.Context, l Listing, names ...string) Dossier {
 	want := make(map[string]bool, len(names))
 	for _, n := range names {
 		want[n] = true
 	}
 	sel := make([]Source, 0, len(want))
+	matched := make(map[string]bool, len(want))
 	for _, s := range c.sources {
 		if want[s.Name()] {
 			sel = append(sel, s)
+			matched[s.Name()] = true
+		}
+	}
+	for n := range want {
+		if !matched[n] {
+			c.logger.Warn("CollectSome: no configured Source matches name; it will produce no Result", "name", n)
 		}
 	}
 	return c.collect(ctx, l, sel)
