@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # goimports (for `make fmt-check`) and golangci-lint v2 (the
+      # .golangci.yml uses the v2 schema). install.sh fetches the latest v2
+      # release and drops it on PATH ($GOPATH/bin is added by setup-go).
+      - name: Install tooling
+        run: |
+          go install golang.org/x/tools/cmd/goimports@latest
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin"
+
+      # The exact gate developers run locally via the pre-commit hook:
+      # fmt-check + vet + lint + test + tidy-check.
+      - name: Quality gate (make precommit)
+        run: make precommit
+
+      # Extra signal the local gate skips for speed.
+      - name: Tests under the race detector
+        run: make test-race
