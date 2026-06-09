@@ -623,10 +623,6 @@ func (s *Source) resolveSections(ctx context.Context, insee string) []string {
 // adapters.
 func (s *Source) Sections() *SectionDiscoverer { return s.sections }
 
-// API exposes the Source's underlying API client. Useful for callers
-// that need to issue raw GetMutations calls outside the ladder.
-func (s *Source) API() *API { return s.api }
-
 // Query is the atomic helper for callers who don't want the builder.
 // The error is non-nil only when the Source failed or could not be
 // constructed; a successful but empty response still returns a

@@ -35,18 +35,6 @@ func TestSource_NameVersion(t *testing.T) {
 	}
 }
 
-func TestSource_BaseURL(t *testing.T) {
-	t.Parallel()
-	s := NewSource(Options{})
-	if got := s.BaseURL(); got != DefaultBaseURL {
-		t.Errorf("BaseURL() default = %q, want %q", got, DefaultBaseURL)
-	}
-	s2 := NewSource(Options{BaseURL: "https://example.invalid/api"})
-	if got := s2.BaseURL(); got != "https://example.invalid/api" {
-		t.Errorf("BaseURL() override = %q, want %q", got, "https://example.invalid/api")
-	}
-}
-
 func TestSource_HappyPath(t *testing.T) {
 	t.Parallel()
 	body := mustReadFixture(t, "paris11.json")

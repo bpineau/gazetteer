@@ -57,15 +57,6 @@ func (s *Source) Name() string { return Name }
 // Version implements gazetteer.Source.
 func (s *Source) Version() int { return sourceVersion }
 
-// BaseURL implements gazetteer.BaseURLer. Returns the effective
-// upstream root the Source will hit.
-func (s *Source) BaseURL() string {
-	if s.opts.BaseURL != "" {
-		return s.opts.BaseURL
-	}
-	return DefaultBaseURL
-}
-
 // Query implements gazetteer.Source. Pipeline:
 //
 //  1. Require Listing.INSEE — the upstream API filters by

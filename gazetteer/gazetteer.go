@@ -16,7 +16,6 @@ type Builder struct {
 	sources    []Source
 	httpClient *http.Client
 	logger     *slog.Logger
-	debugDump  bool
 	maxConcur  int
 	normalizer Normalizer
 }
@@ -90,13 +89,6 @@ func (b *Builder) WithLogger(l *slog.Logger) *Builder {
 	return b
 }
 
-// WithDebugDump enables raw request/response logging for sources that
-// honour the flag.
-func (b *Builder) WithDebugDump(on bool) *Builder {
-	b.debugDump = on
-	return b
-}
-
 // WithMaxConcurrency caps the number of Sources executed in parallel by
 // Client.Collect. Zero or negative = unlimited.
 func (b *Builder) WithMaxConcurrency(n int) *Builder {
@@ -127,7 +119,6 @@ func (b *Builder) Build() (*Client, error) {
 		sources:    append([]Source(nil), b.sources...),
 		httpClient: b.httpClient,
 		logger:     b.logger,
-		debugDump:  b.debugDump,
 		maxConcur:  b.maxConcur,
 		normalizer: b.normalizer,
 	}
@@ -139,7 +130,6 @@ type Client struct {
 	sources    []Source
 	httpClient *http.Client
 	logger     *slog.Logger
-	debugDump  bool
 	maxConcur  int
 	normalizer Normalizer
 }
@@ -150,8 +140,8 @@ type Client struct {
 // itself does not return an error.
 //
 // Concurrency is unlimited unless WithMaxConcurrency was set. The shared
-// ctx propagates HTTP client / logger / debug-dump to each Source via
-// the context-key helpers. Sources that need a persistent kvcache.Cache
+// ctx propagates HTTP client / logger to each Source via the context-key
+// helpers. Sources that need a persistent kvcache.Cache
 // receive it via their own Options field instead of a framework slot.
 func (c *Client) Collect(ctx context.Context, l Listing) Dossier {
 	return c.collect(ctx, l, c.sources)
@@ -191,7 +181,6 @@ func (c *Client) collect(ctx context.Context, l Listing, sources []Source) Dossi
 
 	ctx = WithHTTPClient(ctx, c.httpClient)
 	ctx = WithLogger(ctx, c.logger)
-	ctx = WithDebugDump(ctx, c.debugDump)
 
 	var sem chan struct{}
 	if c.maxConcur > 0 {

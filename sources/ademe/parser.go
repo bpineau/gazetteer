@@ -516,16 +516,3 @@ func adresseEmpty(a Adresse) bool {
 	return a.AdresseBrut == "" && a.AdresseBAN == "" &&
 		a.CodePostalBAN == "" && a.NomCommuneBAN == ""
 }
-
-// ParseAddress turns a free-text address into the structured AddressParts
-// used to build the ADEME query.
-//
-// This is a type alias for fraddr.Parts, re-exported for ergonomics so
-// callers don't need to import fraddr directly.
-type AddressParts = fraddr.Parts
-
-// ParseAddress turns a free-text address into an AddressParts struct.
-// See fraddr.Parse for the full normalisation rules.
-func ParseAddress(addr string) AddressParts {
-	return fraddr.Parse(addr)
-}

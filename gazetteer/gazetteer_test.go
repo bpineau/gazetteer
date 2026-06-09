@@ -62,7 +62,6 @@ func TestBuilder_OptionSetters(t *testing.T) {
 	b := NewBuilder().
 		WithHTTPClient(customHC).
 		WithLogger(customLog).
-		WithDebugDump(true).
 		WithMaxConcurrency(3).
 		WithNormalizer(&fakeNormalizer{})
 
@@ -71,9 +70,6 @@ func TestBuilder_OptionSetters(t *testing.T) {
 	}
 	if b.logger != customLog {
 		t.Errorf("WithLogger did not apply")
-	}
-	if !b.debugDump {
-		t.Errorf("WithDebugDump did not apply")
 	}
 	if b.maxConcur != 3 {
 		t.Errorf("WithMaxConcurrency = %d, want 3", b.maxConcur)

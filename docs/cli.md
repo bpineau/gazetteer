@@ -62,8 +62,6 @@ $ gazetteer query --json "1 rue de Rivoli, 75001 Paris" | jq .
   a missing required input vs no data for this address. The first move for a
   mostly-empty Dossier.
 - `--verbose` — DEBUG-level slog output to stderr.
-- `--dump` — log raw HTTP request/response payloads for Sources that
-  honour the flag.
 
 Every Source prints a compact, human-readable one-line summary of what
 it found (e.g. `dvf  10132 €/m², 1645 sales, tier=address_radius`;

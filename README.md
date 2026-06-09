@@ -251,7 +251,7 @@ them to produce a useful answer:
 --rooms <N>
 --source <comma-separated names>                  (default: every Source the CLI knows)
 --json                                            (emit the full Dossier)
---verbose --dump                                  (debug)
+--verbose                                         (debug)
 ```
 
 See [docs/cli.md](docs/cli.md) for the full reference.

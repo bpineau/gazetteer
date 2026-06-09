@@ -49,7 +49,6 @@ type cacheMeta struct {
 	FetchedAtSec int64       `json:"fetched_at"`
 	ExpiresAtSec int64       `json:"expires_at,omitempty"` // 0 = never auto-expires (rely on validators)
 	BodyLen      int64       `json:"body_len"`
-	VaryKey      string      `json:"vary_key,omitempty"` // raw values used in the hash
 }
 
 // RoundTrip implements http.RoundTripper.

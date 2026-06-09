@@ -16,20 +16,10 @@ import (
 
 // OverpassFetcher abstracts "POST a QL query, get back the body bytes"
 // so the catalog refresher is testable without an httpx.Client. The
-// production implementation is HTTPOverpassFetcher ; tests inject
-// FuncOverpassFetcher.
+// production implementation is HTTPOverpassFetcher ; tests inject their
+// own stubs.
 type OverpassFetcher interface {
 	Query(ctx context.Context, ql string) ([]byte, error)
-}
-
-// FuncOverpassFetcher adapts a plain function to the OverpassFetcher
-// interface — same func-as-interface idiom as helpers/circuit, but
-// scoped to this package because Overpass uses POST not GET.
-type FuncOverpassFetcher func(ctx context.Context, ql string) ([]byte, error)
-
-// Query satisfies the OverpassFetcher interface.
-func (f FuncOverpassFetcher) Query(ctx context.Context, ql string) ([]byte, error) {
-	return f(ctx, ql)
 }
 
 // HTTPOverpassFetcher posts QL queries against an Overpass endpoint.
@@ -172,65 +162,6 @@ func (f *HTTPOverpassFetcher) queryOne(ctx context.Context, endpoint, ql string)
 		return nil, fmt.Errorf("osm: overpass HTTP %d: %s", resp.StatusCode, preview)
 	}
 	return body, nil
-}
-
-// RefreshCatalogFromOverpass runs one full France-wide query through
-// `fetcher`, parses the response, and returns a freshly minted
-// Catalog. Does NOT touch disk — caller is responsible for SaveCatalog.
-// `bbox` may be empty (falls back to FranceMetropolitanBBox).
-//
-// Empty-result guard: a France-wide query that parses to zero stations
-// is treated as a silent-mirror failure (common Overpass overload
-// signature: HTTP 200 with `{"elements":[]}` instead of 429/504) and
-// returns an error WITHOUT a catalog, matching the per-dept refresher's
-// MinExpectedStations behaviour. The threshold check below the floor
-// also prevents an obviously degraded snapshot from being persisted by
-// a caller that forgot to validate the result.
-//
-// Deprecated: use RefreshCatalogFromOverpassByDepts which avoids
-// server timeouts by issuing one small sub-query per department.
-func RefreshCatalogFromOverpass(ctx context.Context, fetcher OverpassFetcher, bbox string) (*Catalog, error) {
-	if fetcher == nil {
-		return nil, errors.New("osm: nil fetcher")
-	}
-	if bbox == "" {
-		bbox = FranceMetropolitanBBox
-	}
-	ql := FranceTransitOverpassQL(bbox)
-	body, err := fetcher.Query(ctx, ql)
-	if err != nil {
-		return nil, err
-	}
-	stations, err := ParseOverpass(body)
-	if err != nil {
-		return nil, err
-	}
-	// Silent-mirror guard: a France-wide query MUST return non-empty.
-	// An empty parse means the mirror served `{"elements":[]}` (the
-	// classic overload-without-error signature) — surface as an error
-	// instead of producing a successful but empty catalog.
-	if len(stations) == 0 {
-		return nil, fmt.Errorf("osm: France-wide query returned 0 stations (silent mirror overload, body=%d bytes)", len(body))
-	}
-	// Below-threshold guard mirrors RefreshCatalogFromOverpassByDepts so
-	// the deprecated entry point cannot stealthily ship a degraded catalog.
-	if len(stations) < MinExpectedStations {
-		return nil, fmt.Errorf("osm: France-wide query below threshold (got=%d min=%d)", len(stations), MinExpectedStations)
-	}
-	// Companion query: routes + stop_areas so Station.Lines gets
-	// populated. Failures here are tolerated — we'd rather ship a
-	// catalog with empty `lines` than nothing.
-	if routesBody, rerr := fetcher.Query(ctx, FranceTransitRoutesOverpassQL(bbox)); rerr == nil {
-		if routes, stopAreas, perr := ParseOverpassRoutes(routesBody); perr == nil {
-			AttachLinesFromRoutes(stations, routes, stopAreas)
-		}
-	}
-	return &Catalog{
-		SchemaVersion: CatalogSchemaVersion,
-		FetchedAt:     time.Now().UTC(),
-		BBox:          bbox,
-		Stations:      stations,
-	}, nil
 }
 
 // RefreshCatalogFromOverpassByDepts fetches the transit station catalog

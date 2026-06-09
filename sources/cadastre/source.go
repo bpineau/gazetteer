@@ -11,7 +11,6 @@ import (
 
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/banx"
-	"github.com/bpineau/gazetteer/sources/cadastre/geom"
 )
 
 // Name is the canonical Source identifier. Stable; used as the
@@ -92,16 +91,6 @@ func (s *Source) Name() string { return Name }
 
 // Version implements gazetteer.Source.
 func (s *Source) Version() int { return sourceVersion }
-
-// BaseURL implements gazetteer.BaseURLer — surfaces the effective
-// parcelle endpoint root so callers can diagnose which upstream this
-// instance is pointed at without inspecting Options.
-func (s *Source) BaseURL() string {
-	if s.opts.BaseURL != "" {
-		return s.opts.BaseURL
-	}
-	return BaseURL
-}
 
 // Query implements gazetteer.Source. It resolves the listing's
 // lat/lon (preferring the Listing's pointers; falling back to a
@@ -389,30 +378,9 @@ func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, err
 	return res, nil
 }
 
-// emprise returns the share of the parcel covered by buildings, as a
-// fraction in [0, +∞). Useful for callers that want the ratio without
-// guarding on nil pointers themselves. Returns 0 when EmpriseRatio is
-// nil.
-func emprise(out *Result) float64 {
-	if out == nil || out.EmpriseRatio == nil {
-		return 0
-	}
-	return *out.EmpriseRatio
-}
-
-var _ = emprise // exported intent — keep the helper compiled until the appraisal layer wires it in
-
-// Ensure the Source satisfies the gazetteer.Source interface and the
-// BaseURLer side-protocol at compile time.
-var (
-	_ gazetteer.Source    = (*Source)(nil)
-	_ gazetteer.BaseURLer = (*Source)(nil)
-)
-
-// Ensure geom import is used (compile guard — the package imports the
-// geom symbols transitively but on some build configurations the linter
-// may still complain).
-var _ = geom.Point{}
+// Ensure the Source satisfies the gazetteer.Source interface at compile
+// time.
+var _ gazetteer.Source = (*Source)(nil)
 
 func init() {
 	gazetteer.Register(Name, func() any { return &Result{} })
