@@ -9,23 +9,19 @@ import (
 	"github.com/bpineau/gazetteer/gazetteer"
 )
 
-// inputCheck maps a catalog "inputs" token to a predicate on the Listing, so
-// `query --explain` can tell whether a source that returned nothing was missing
-// a required input or genuinely has no data for the address.
-type inputCheck struct {
-	token string // substring that appears in a descriptor's Inputs prose
-	label string // how to name the Listing field in the diagnosis
-	has   func(gazetteer.Listing) bool
-}
-
-var inputChecks = []inputCheck{
-	{"IRIS", "Listing.IRIS", func(l gazetteer.Listing) bool { return l.IRIS != "" }},
-	{"lat/lon", "lat/lon", func(l gazetteer.Listing) bool { _, _, ok := l.Coords(); return ok }},
-	{"INSEE", "INSEE", func(l gazetteer.Listing) bool { return l.INSEE != "" }},
-	{"surface", "surface", func(l gazetteer.Listing) bool { return l.SurfaceM2 != nil }},
-	{"rooms", "rooms", func(l gazetteer.Listing) bool { return l.Rooms != nil }},
-	{"property_type", "property_type", func(l gazetteer.Listing) bool { return l.PropertyType != "" }},
-	{"address", "address", func(l gazetteer.Listing) bool { return l.Address != "" }},
+// inputTokenPresent is the canonical input vocabulary: one predicate per
+// token an inputClause may reference. The catalog test validates every
+// descriptor clause against this map, so `query --explain` reasons over
+// structure — no prose parsing, no silently-unmatched requirement.
+var inputTokenPresent = map[string]func(gazetteer.Listing) bool{
+	"Listing.IRIS":  func(l gazetteer.Listing) bool { return l.IRIS != "" },
+	"lat/lon":       func(l gazetteer.Listing) bool { _, _, ok := l.Coords(); return ok },
+	"INSEE":         func(l gazetteer.Listing) bool { return l.INSEE != "" },
+	"zip":           func(l gazetteer.Listing) bool { return l.Zip != "" },
+	"surface":       func(l gazetteer.Listing) bool { return l.SurfaceM2 != nil },
+	"rooms":         func(l gazetteer.Listing) bool { return l.Rooms != nil },
+	"property_type": func(l gazetteer.Listing) bool { return l.PropertyType != "" },
+	"address":       func(l gazetteer.Listing) bool { return l.Address != "" },
 }
 
 // printDiagnosis explains, per source, why it did or didn't return data —
@@ -88,30 +84,25 @@ func emptyVerdict(name string, l gazetteer.Listing) string {
 	return fmt.Sprintf("inputs present → no data for this address (coverage: %s)", cov)
 }
 
-// missingInputs returns the canonical Listing fields a source's inputs mention
-// but the Listing lacks. An "X or Y" input is satisfied if either is present.
-func missingInputs(inputs []string, l gazetteer.Listing) []string {
+// missingInputs returns the required clauses the Listing does not satisfy.
+// A clause is satisfied when any of its AnyOf tokens is present; Optional
+// clauses never gate (a missing "surface (for €-total)" is not a cause of
+// emptiness).
+func missingInputs(inputs []inputClause, l gazetteer.Listing) []string {
 	var missing []string
-	for _, in := range inputs {
-		// Collect the checks this input clause mentions.
-		var mentioned []inputCheck
-		anyPresent := false
-		for _, c := range inputChecks {
-			if strings.Contains(in, c.token) {
-				mentioned = append(mentioned, c)
-				if c.has(l) {
-					anyPresent = true
-				}
+	for _, c := range inputs {
+		if c.Optional {
+			continue
+		}
+		satisfied := false
+		for _, tok := range c.AnyOf {
+			if has, ok := inputTokenPresent[tok]; ok && has(l) {
+				satisfied = true
+				break
 			}
 		}
-		// A clause is unsatisfied only when it mentions field(s) and NONE is
-		// present (handles "INSEE or address" as a single OR requirement).
-		if len(mentioned) > 0 && !anyPresent {
-			labels := make([]string, len(mentioned))
-			for i, c := range mentioned {
-				labels[i] = c.label
-			}
-			missing = append(missing, strings.Join(labels, "/"))
+		if !satisfied {
+			missing = append(missing, strings.Join(c.AnyOf, "/"))
 		}
 	}
 	return dedupeStrings(missing)

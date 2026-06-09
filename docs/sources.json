@@ -369,7 +369,7 @@
     "default": true,
     "summary": "Deep links to third-party tools (maps, prices/DVF, Géorisques, PLU, commune fiche) for the address — built from coordinates / INSEE / address, no HTTP.",
     "inputs": [
-      "lat/lon (or INSEE, or address)"
+      "lat/lon or INSEE or address"
     ],
     "coverage": "national",
     "result_schema": {
@@ -492,8 +492,7 @@
     "summary": "With coordinates, answers via point-in-polygon whether THIS address is inside a Quartier Prioritaire (QPV 2024 contours). Without coordinates, falls back to the commune-level QPV list (lower confidence).",
     "inputs": [
       "INSEE",
-      "Lat",
-      "Lon"
+      "lat/lon (polygon containment + nearest-QPV hint)"
     ],
     "coverage": "France métropole + outre-mer (≈1660 QPV 2024 polygons, WGS84)",
     "result_schema": {
@@ -508,8 +507,7 @@
     "summary": "Copropriété context from the Registre National d'Immatriculation (syndic type, mandate status, lots, construction period, QPV, ANAH-aided). Low-confidence 'à vérifier' triage hint; NO hard distress flag — procedures/arrêtés are redacted upstream.",
     "inputs": [
       "INSEE",
-      "lat/lon",
-      "address"
+      "lat/lon or address (improves unit matching)"
     ],
     "coverage": "national",
     "feeds": [
