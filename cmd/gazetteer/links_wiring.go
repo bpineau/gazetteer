@@ -12,7 +12,7 @@ import (
 func init() {
 	sourceDescriptors[links.Name] = sourceDescriptor{
 		Summary:  "Deep links to third-party tools (maps, prices/DVF, Géorisques, PLU, commune fiche) for the address — built from coordinates / INSEE / address, no HTTP.",
-		Inputs:   []string{"lat/lon (or INSEE, or address)"},
+		Inputs:   []inputClause{need("lat/lon", "INSEE", "address")},
 		Coverage: "national",
 	}
 	sourceRenderers[links.Name] = renderLinks

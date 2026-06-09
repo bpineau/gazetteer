@@ -13,15 +13,17 @@ func TestMissingInputs(t *testing.T) {
 	withINSEE := gazetteer.Listing{INSEE: "75110", Address: "x"}
 	cases := []struct {
 		name   string
-		inputs []string
+		inputs []inputClause
 		l      gazetteer.Listing
 		want   []string
 	}{
-		{"iris missing", []string{"Listing.IRIS"}, gazetteer.Listing{}, []string{"Listing.IRIS"}},
-		{"iris present", []string{"Listing.IRIS"}, withIRIS, nil},
-		{"INSEE-or-address satisfied by INSEE", []string{"INSEE or address"}, withINSEE, nil},
-		{"rooms missing", []string{"INSEE", "rooms"}, withINSEE, []string{"rooms"}},
-		{"all present", []string{"lat/lon"}, gazetteer.Listing{Lat: new(48.8), Lon: new(2.3)}, nil},
+		{"iris missing", []inputClause{need("Listing.IRIS")}, gazetteer.Listing{}, []string{"Listing.IRIS"}},
+		{"iris present", []inputClause{need("Listing.IRIS")}, withIRIS, nil},
+		{"INSEE-or-address satisfied by INSEE", []inputClause{need("INSEE", "address")}, withINSEE, nil},
+		{"rooms missing", []inputClause{need("INSEE"), need("rooms")}, withINSEE, []string{"rooms"}},
+		{"all present", []inputClause{need("lat/lon")}, gazetteer.Listing{Lat: new(48.8), Lon: new(2.3)}, nil},
+		{"optional clause never gates", []inputClause{need("INSEE"), optional("for €-total", "surface")}, withINSEE, nil},
+		{"zip satisfies zip-or-INSEE", []inputClause{need("zip", "INSEE")}, gazetteer.Listing{Zip: "93100"}, nil},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -100,3 +100,21 @@ func TestBuildCatalog(t *testing.T) {
 		}
 	}
 }
+
+// TestDescriptorInputTokens validates every descriptor clause against the
+// canonical input vocabulary — a typo'd or unknown token would silently
+// break `query --explain`'s diagnosis, so it fails the build instead.
+func TestDescriptorInputTokens(t *testing.T) {
+	for name, desc := range sourceDescriptors {
+		for _, c := range desc.Inputs {
+			if len(c.AnyOf) == 0 {
+				t.Errorf("%s: input clause with empty AnyOf", name)
+			}
+			for _, tok := range c.AnyOf {
+				if _, ok := inputTokenPresent[tok]; !ok {
+					t.Errorf("%s: input token %q is not in the canonical vocabulary (inputTokenPresent)", name, tok)
+				}
+			}
+		}
+	}
+}
