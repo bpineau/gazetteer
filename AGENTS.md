@@ -193,14 +193,15 @@ Copy a model: `sources/filoiris` (clean dataset-backed source) or `sources/gpe`
 3. `loader.go` + `transform.go` — only if it ships an embedded dataset
    (see [docs/datasets.md](docs/datasets.md); bootstrap via
    `gazetteer refresh --go-embed-update <name>`).
-4. Wire it: `factory/factory.go`, `cmd/gazetteer/sources_registry.go`, a
-   renderer in `cmd/gazetteer/render.go`, and a **catalog descriptor** in
-   `cmd/gazetteer/catalog.go`.
+4. Wire it: one **roster entry** in `internal/roster/roster.go` (feeds both
+   `factory.NewDefault` and the CLI), a renderer in `cmd/gazetteer/render.go`,
+   and a **catalog descriptor** in `cmd/gazetteer/catalog.go`.
 5. Tests + docs (`docs/sources.md`, README, godoc — this is the Definition of
    Done, not a follow-up).
 
-The catalog **completeness test** fails until every registered source has a
-descriptor, so the machine-readable catalog can never silently drift.
+The roster and catalog **completeness tests** fail until every registered
+source has a roster entry and a descriptor, so neither the wiring nor the
+machine-readable catalog can silently drift.
 See [docs/plugins.md](docs/plugins.md) for out-of-tree plugins.
 
 ## Local quality gate (run once)
