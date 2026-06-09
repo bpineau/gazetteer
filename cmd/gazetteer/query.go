@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/proptype"
 )
 
 // runQuery implements `gazetteer query [--source ...] [--json] [--verbose]
@@ -101,17 +102,26 @@ func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 
 // parsePropertyType maps the --property-type flag onto the
 // gazetteer.PropertyType enum. Empty string defaults to apartment
-// (the most common rental-investor case). Unknown values are
-// rejected so the user doesn't silently get an unfiltered run.
+// (the most common rental-investor case). Alias resolution
+// ("appartement", "studio", "maison", "local", …) is delegated to
+// helpers/proptype — the single source of truth for property-type
+// normalization — so the CLI never drifts from the sources (dvf, …)
+// that gate on the same canonical values. Unknown values, and
+// canonical types the Listing enum has no equivalent for (parking,
+// cave, …), are rejected so the user doesn't silently get an
+// unfiltered run.
 func parsePropertyType(s string) (gazetteer.PropertyType, error) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "", "apartment", "appartement", "flat":
+	if strings.TrimSpace(s) == "" {
 		return gazetteer.PropertyApartment, nil
-	case "house", "maison":
+	}
+	switch proptype.Normalize(s) {
+	case proptype.Apartment:
+		return gazetteer.PropertyApartment, nil
+	case proptype.House:
 		return gazetteer.PropertyHouse, nil
-	case "land", "terrain":
+	case proptype.Land:
 		return gazetteer.PropertyLand, nil
-	case "commercial", "commerce", "local":
+	case proptype.Commercial:
 		return gazetteer.PropertyCommercial, nil
 	default:
 		return "", fmt.Errorf("unknown --property-type %q (want apartment | house | land | commercial)", s)
@@ -215,8 +225,8 @@ func printDossierSummary(out io.Writer, d gazetteer.Dossier) {
 	if d.Listing.INSEE != "" {
 		fmt.Fprintf(out, "  insee    %s\n", d.Listing.INSEE)
 	}
-	if d.Listing.Lat != nil && d.Listing.Lon != nil {
-		fmt.Fprintf(out, "  lat,lon  %.6f,%.6f\n", *d.Listing.Lat, *d.Listing.Lon)
+	if lat, lon, ok := d.Listing.Coords(); ok {
+		fmt.Fprintf(out, "  lat,lon  %.6f,%.6f\n", lat, lon)
 	}
 	if d.Listing.PropertyType != "" {
 		fmt.Fprintf(out, "  type     %s\n", d.Listing.PropertyType)

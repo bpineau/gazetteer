@@ -72,6 +72,7 @@ func TestNormalize_AliasCoverage(t *testing.T) {
 
 		// Commercial
 		{"commercial", proptype.Commercial},
+		{"commerce", proptype.Commercial},
 		{"local", proptype.Commercial},
 		{"local commercial", proptype.Commercial},
 		{"bureau", proptype.Commercial},

@@ -20,7 +20,7 @@ type inputCheck struct {
 
 var inputChecks = []inputCheck{
 	{"IRIS", "Listing.IRIS", func(l gazetteer.Listing) bool { return l.IRIS != "" }},
-	{"lat/lon", "lat/lon", func(l gazetteer.Listing) bool { return l.Lat != nil && l.Lon != nil }},
+	{"lat/lon", "lat/lon", func(l gazetteer.Listing) bool { _, _, ok := l.Coords(); return ok }},
 	{"INSEE", "INSEE", func(l gazetteer.Listing) bool { return l.INSEE != "" }},
 	{"surface", "surface", func(l gazetteer.Listing) bool { return l.SurfaceM2 != nil }},
 	{"rooms", "rooms", func(l gazetteer.Listing) bool { return l.Rooms != nil }},
@@ -133,8 +133,8 @@ type labelValue struct{ label, value string }
 // the order the diagnosis reasons about them.
 func listingFields(l gazetteer.Listing) []labelValue {
 	latlon := "—"
-	if l.Lat != nil && l.Lon != nil {
-		latlon = fmt.Sprintf("%.5f,%.5f", *l.Lat, *l.Lon)
+	if lat, lon, ok := l.Coords(); ok {
+		latlon = fmt.Sprintf("%.5f,%.5f", lat, lon)
 	}
 	return []labelValue{
 		{"address", orDash(l.Address)},

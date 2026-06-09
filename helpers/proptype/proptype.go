@@ -88,6 +88,7 @@ var aliases = map[string]PropertyType{
 	// --- Commercial ---------------------------------------------------------
 	"boutique":         Commercial,
 	"bureau":           Commercial,
+	"commerce":         Commercial,
 	"commercial":       Commercial,
 	"local":            Commercial,
 	"local commercial": Commercial,
