@@ -139,7 +139,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	if m, ok := idx.resolve93(insee, l.Lat, l.Lon); ok {
 		var entries []Entry
 		for _, z := range m.zones {
-			entries = append(entries, idx.lookupEPTZone(m.ept, z)...)
+			entries = append(entries, idx.LookupEPTZone(m.ept, z)...)
 		}
 		return collapse(entries, m.commune, m.ept, rooms, Evidence{
 			Zip:    zip,

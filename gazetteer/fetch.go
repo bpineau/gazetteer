@@ -1,0 +1,71 @@
+package gazetteer
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+// FetchSpec configures FetchUpstream. The zero value of every field is
+// meaningful: no Accept header, and 404 treated as a permanent failure.
+type FetchSpec struct {
+	// Prefix prefixes every error message, conventionally the Source name
+	// (optionally with a sub-endpoint, e.g. "cadastre: bati").
+	Prefix string
+
+	// Accept sets the Accept request header when non-empty.
+	Accept string
+
+	// NotFoundBody, when non-nil, is returned verbatim for a 404 response
+	// instead of an error — for APIs where 404 means "no data here" (the
+	// caller supplies the empty payload its parser expects). When nil, 404
+	// maps to ErrUpstreamPermanent like any other 4xx.
+	NotFoundBody []byte
+}
+
+// FetchUpstream performs an HTTP GET against url and translates transport
+// and status-code failures into the gazetteer error taxonomy:
+//
+//   - transport error, 5xx, 429  → ErrUpstreamUnavailable (transient)
+//   - 404                        → spec.NotFoundBody when non-nil, else
+//     ErrUpstreamPermanent
+//   - other 4xx                  → ErrUpstreamPermanent
+//
+// A nil client falls back to HTTPClientFrom(ctx) — the standard per-Source
+// precedence (Options.HTTPClient first, Builder-propagated client second).
+// This is the shared body of every live-HTTP source's fetch helper; only
+// the Accept header and the 404 policy vary per upstream.
+func FetchUpstream(ctx context.Context, client *http.Client, url string, spec FetchSpec) ([]byte, error) {
+	if client == nil {
+		client = HTTPClientFrom(ctx)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("%s: build request: %w", spec.Prefix, err)
+	}
+	if spec.Accept != "" {
+		req.Header.Set("Accept", spec.Accept)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w: %w", spec.Prefix, ErrUpstreamUnavailable, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch {
+	case resp.StatusCode == http.StatusNotFound && spec.NotFoundBody != nil:
+		return spec.NotFoundBody, nil
+	case resp.StatusCode >= 500, resp.StatusCode == http.StatusTooManyRequests:
+		return nil, fmt.Errorf("%s: %w: http %d", spec.Prefix, ErrUpstreamUnavailable, resp.StatusCode)
+	case resp.StatusCode >= 400:
+		return nil, fmt.Errorf("%s: %w: http %d", spec.Prefix, ErrUpstreamPermanent, resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w: read body: %w", spec.Prefix, ErrUpstreamUnavailable, err)
+	}
+	return body, nil
+}

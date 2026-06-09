@@ -2,6 +2,7 @@ package atomicfs
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -19,6 +20,40 @@ func WriteFile(path string, data []byte, perm os.FileMode) error {
 	if err := os.Rename(tmp, path); err != nil {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("atomicfs: rename %s -> %s: %w", tmp, path, err)
+	}
+	return nil
+}
+
+// CopyFile copies src to dst with the same "<dst>.partial" tmpfile +
+// rename(2) discipline as WriteFile: concurrent readers of dst see either
+// the previous content or the complete new copy, never a partial write.
+// The copy is streamed, so src may be arbitrarily large.
+//
+// The caller is expected to have created dst's parent directory.
+func CopyFile(src, dst string, perm os.FileMode) error {
+	in, err := os.Open(src) //nolint:gosec // caller-controlled path by design
+	if err != nil {
+		return fmt.Errorf("atomicfs: open %s: %w", src, err)
+	}
+	defer func() { _ = in.Close() }()
+
+	tmp := dst + ".partial"
+	out, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm) //nolint:gosec // caller-controlled path by design
+	if err != nil {
+		return fmt.Errorf("atomicfs: create %s: %w", tmp, err)
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+		_ = os.Remove(tmp)
+		return fmt.Errorf("atomicfs: copy to %s: %w", tmp, err)
+	}
+	if err := out.Close(); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("atomicfs: close %s: %w", tmp, err)
+	}
+	if err := os.Rename(tmp, dst); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("atomicfs: rename %s -> %s: %w", tmp, dst, err)
 	}
 	return nil
 }

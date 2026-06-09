@@ -2,6 +2,7 @@ package gazetteer
 
 import (
 	"context"
+	"errors"
 )
 
 // Status classifies the outcome of a Source.Query call. The Client sets
@@ -71,6 +72,28 @@ type Source interface {
 	// errors; the framework wraps the (Data, error) pair into a Result
 	// envelope (see Result in result.go).
 	Query(ctx context.Context, listing Listing) (any, error)
+}
+
+// QueryTyped runs src.Query and asserts the returned payload to R — the
+// shared body of every source package's atomic Query helper:
+//
+//	func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
+//		return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
+//	}
+//
+// A payload of the wrong type (a Source whose Query violates its own
+// contract) is an error, prefixed with the source's Name.
+func QueryTyped[R any](ctx context.Context, src Source, l Listing) (R, error) {
+	var zero R
+	data, err := src.Query(ctx, l)
+	if err != nil {
+		return zero, err
+	}
+	r, ok := data.(R)
+	if !ok {
+		return zero, errors.New(src.Name() + ": typed result mismatch")
+	}
+	return r, nil
 }
 
 // EmptyReporter is an optional interface a Source's typed Data MAY

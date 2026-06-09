@@ -32,6 +32,21 @@ type Listing struct {
 	AsOf time.Time `json:"as_of,omitzero"`
 }
 
+// Coords returns the listing's coordinates when both are present and not
+// the (0, 0) null-island placeholder, which no French address resolves
+// to. This is the canonical "does the listing carry usable coordinates"
+// test — spatial sources and renderers should use it rather than
+// hand-checking the Lat/Lon pointers.
+func (l Listing) Coords() (lat, lon float64, ok bool) {
+	if l.Lat == nil || l.Lon == nil {
+		return 0, 0, false
+	}
+	if *l.Lat == 0 && *l.Lon == 0 {
+		return 0, 0, false
+	}
+	return *l.Lat, *l.Lon, true
+}
+
 // PropertyType is a coarse, source-agnostic classification used to gate
 // per-source eligibility (e.g. DVF skips parking lots; residential-only
 // Sources skip commercial).
