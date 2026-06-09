@@ -138,25 +138,13 @@ func (r *Result) PriceEstimate() appraisal.PriceEstimate {
 	}
 	return appraisal.PriceEstimate{
 		EurPerM2Cents: v,
-		Confidence:    mapDVFConfidence(r.Confidence),
-		SampleSize:    r.SampleSize,
+		// DVF's stable labels are exactly the shared parser's arms
+		// ("high"/"medium", anything else → Low).
+		Confidence: appraisal.ParseConfidence(r.Confidence),
+		SampleSize: r.SampleSize,
 		Method: fmt.Sprintf("dvf_%s_%dy",
 			nonEmptyOr(r.Evidence.LevelUsed, "unknown"),
 			r.Evidence.WindowYears),
-	}
-}
-
-// mapDVFConfidence translates DVF's stable confidence strings to the
-// appraisal package's coarse enum. Unknown values map to Low so callers
-// downstream never panic on a future DVF label.
-func mapDVFConfidence(s string) appraisal.Confidence {
-	switch s {
-	case ConfidenceHigh:
-		return appraisal.ConfidenceHigh
-	case ConfidenceMedium:
-		return appraisal.ConfidenceMedium
-	default:
-		return appraisal.ConfidenceLow
 	}
 }
 

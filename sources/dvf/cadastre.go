@@ -207,30 +207,48 @@ func unionBBox(a, b geopoly.BBox) geopoly.BBox {
 
 // accumulateBBox walks a GeoJSON coordinates value of any nesting depth
 // (Polygon = 3 levels, MultiPolygon = 4) and widens b to include every
-// [lon, lat] vertex. It distinguishes a leaf coordinate pair from a nested
-// array by trying to decode a flat []float64 first: a pair like [2.35, 48.86]
-// decodes cleanly, whereas [[...],[...]] does not and falls through to the
-// array branch.
+// [lon, lat] vertex. The raw value is parsed ONCE into the generic JSON
+// tree and then walked: a leaf coordinate pair like [2.35, 48.86] (or
+// [lon, lat, alt]) is recognised by its first element being a number.
+// The previous implementation trial-decoded a flat []float64 at every
+// nesting level, re-parsing each subtree twice per level.
 func accumulateBBox(raw json.RawMessage, b *geopoly.BBox) {
 	if len(raw) == 0 {
 		return
 	}
-	var pair []float64
-	if err := json.Unmarshal(raw, &pair); err == nil {
-		if len(pair) >= 2 {
-			lon, lat := pair[0], pair[1]
-			b.MinLon = math.Min(b.MinLon, lon)
-			b.MinLat = math.Min(b.MinLat, lat)
-			b.MaxLon = math.Max(b.MaxLon, lon)
-			b.MaxLat = math.Max(b.MaxLat, lat)
-		}
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
 		return
 	}
-	var arr []json.RawMessage
-	if err := json.Unmarshal(raw, &arr); err == nil {
-		for _, e := range arr {
-			accumulateBBox(e, b)
+	accumulateBBoxTree(v, b)
+}
+
+// accumulateBBoxTree recursively widens b over a decoded GeoJSON
+// coordinates tree ([]any nesting with float64 leaves). Non-array,
+// non-pair shapes are ignored — same tolerance as the trial-decode
+// approach it replaces.
+func accumulateBBoxTree(v any, b *geopoly.BBox) {
+	arr, ok := v.([]any)
+	if !ok || len(arr) == 0 {
+		return
+	}
+	if lon, ok := arr[0].(float64); ok {
+		// Leaf [lon, lat, ...] coordinate pair.
+		if len(arr) < 2 {
+			return
 		}
+		lat, ok := arr[1].(float64)
+		if !ok {
+			return
+		}
+		b.MinLon = math.Min(b.MinLon, lon)
+		b.MinLat = math.Min(b.MinLat, lat)
+		b.MaxLon = math.Max(b.MaxLon, lon)
+		b.MaxLat = math.Max(b.MaxLat, lat)
+		return
+	}
+	for _, e := range arr {
+		accumulateBBoxTree(e, b)
 	}
 }
 

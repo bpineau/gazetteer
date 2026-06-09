@@ -211,6 +211,11 @@ func (t *cacheTransport) writeMeta(metaPath string, meta *cacheMeta) error {
 }
 
 // writeFileAtomic writes data to path via a sibling .tmp + rename.
+//
+// Deliberately not helpers/atomicfs.WriteFile: the HTTP cache fsyncs
+// before the rename so a crash can't leave a renamed-but-empty cache
+// entry that would later be served as a valid response. atomicfs serves
+// callers whose artifacts are re-derivable and skips the fsync cost.
 func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
 	tmp := path + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode) //nolint:gosec // tmp = path+".tmp"; path is derived from a SHA-256 cache key, not user input

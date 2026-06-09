@@ -143,7 +143,7 @@ func TestSectionsNearPoint_KeepsOnlyNearby(t *testing.T) {
 	defer func() { CadastreSectionsBaseURL = old }()
 
 	s := mustNewSource(t, Options{HTTP: newHTTPClient(t), Geocoder: stubGeocoder{}})
-	secs := s.sectionsNearPoint(context.Background(), "99001", 48.05, 2.05, 500)
+	secs := s.sectionsNearPoint(context.Background(), newQueryMemo(), "99001", 48.05, 2.05, 500)
 	sort.Strings(secs)
 	if len(secs) != 1 || secs[0] != "0000A" {
 		t.Errorf("sectionsNearPoint = %v, want [0000A]", secs)
@@ -172,7 +172,7 @@ func TestSectionsNearPoint_KeepsUnknownGeometry(t *testing.T) {
 	defer func() { CadastreSectionsBaseURL = old }()
 
 	s := mustNewSource(t, Options{HTTP: newHTTPClient(t), Geocoder: stubGeocoder{}})
-	secs := s.sectionsNearPoint(context.Background(), "99001", 48.05, 2.05, 500)
+	secs := s.sectionsNearPoint(context.Background(), newQueryMemo(), "99001", 48.05, 2.05, 500)
 	if len(secs) != 1 || secs[0] != "0000C" {
 		t.Errorf("sectionsNearPoint = %v, want [0000C] (unknown-geometry section kept, far section dropped)", secs)
 	}
@@ -190,7 +190,7 @@ func TestSectionsNearPoint_FallbackOnFetchError(t *testing.T) {
 	defer func() { CadastreSectionsBaseURL = old }()
 
 	s := mustNewSource(t, Options{HTTP: newHTTPClient(t), Geocoder: stubGeocoder{}})
-	if secs := s.sectionsNearPoint(context.Background(), "75056", 48.85, 2.35, 500); secs != nil {
+	if secs := s.sectionsNearPoint(context.Background(), newQueryMemo(), "75056", 48.85, 2.35, 500); secs != nil {
 		t.Errorf("expected nil (fall back) on cadastre 404, got %v", secs)
 	}
 }
