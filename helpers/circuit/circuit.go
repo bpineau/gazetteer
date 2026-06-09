@@ -42,6 +42,38 @@ func recordCircuitTrip(source string) {
 	c.(*atomic.Int64).Add(1)
 }
 
+// tripCircuit flips flag from false to true, bumping the process-wide
+// trip counter on the transition only. Returns true exactly once per
+// flag lifetime — the false→true transition — so callers can attach
+// one-shot side effects (e.g. the warn line) without re-checking the
+// CAS. A nil flag is a no-op that returns false.
+func tripCircuit(flag *atomic.Bool, source string) bool {
+	if flag == nil || !flag.CompareAndSwap(false, true) {
+		return false
+	}
+	recordCircuitTrip(source)
+	return true
+}
+
+// tripAndWarn is tripCircuit plus the single Warn line every streak-style
+// breaker in this package emits at the moment its threshold is crossed.
+// The message and attrs are passed through verbatim (consumers pin the
+// log shapes operationally — do not reword); `source` is always emitted
+// as the first attr. A nil lg falls back to slog.Default(). Idempotent:
+// an already-tripped flag yields neither a counter bump nor a log line.
+func tripAndWarn(flag *atomic.Bool, source, msg string, lg *slog.Logger, attrs ...slog.Attr) {
+	if !tripCircuit(flag, source) {
+		return
+	}
+	if lg == nil {
+		lg = slog.Default()
+	}
+	all := make([]slog.Attr, 0, len(attrs)+1)
+	all = append(all, slog.String("source", source))
+	all = append(all, attrs...)
+	lg.LogAttrs(context.Background(), slog.LevelWarn, msg, all...)
+}
+
 // SnapshotCircuitTripCounts returns a (source → trip_count) snapshot
 // sorted alphabetically by source. Designed for Prometheus / metrics
 // scrapers: sources with a zero count are omitted because they have
@@ -261,6 +293,17 @@ type HTTPFetcher struct {
 	// consecutiveTransportErrors tracks the run of successive transport
 	// failures since the last 2xx. Reset to 0 on each successful Fetch;
 	// reaching Options.MaxConsecutiveTransportErrors trips the circuit.
+	//
+	// NOTE: TransportCircuit implements a sibling pair of streak
+	// counters (consec / consec429) for callers that bypass Fetch.
+	// They share tripAndWarn (same trip + log shape) but are NOT one
+	// machine: this fetcher additionally handles the quota header and
+	// the first-429-trips-immediately default, classifies a single
+	// error into both streaks independently, and re-reads thresholds
+	// from Options on every call — whereas TransportCircuit picks one
+	// streak per error (transport wins), ignores 429s by default, and
+	// is a full no-op without a flag. Unifying them would silently
+	// change one side's semantics; keep edits in sync by hand.
 	consecutiveTransportErrors atomic.Int32
 
 	// consecutive429 tracks the run of successive HTTP 429 responses
@@ -340,27 +383,18 @@ func (h *HTTPFetcher) Fetch(ctx context.Context, url string) ([]byte, error) {
 		// flips, not steady-state "still tripped" calls.
 		switch {
 		case quotaHeader:
-			if circuit.CompareAndSwap(false, true) {
-				recordCircuitTrip(h.Options.ErrPrefix)
-			}
+			tripCircuit(circuit, h.Options.ErrPrefix)
 		case is429 && h.Options.MaxConsecutive429 <= 0:
 			// Historic semantic: first 429 trips immediately.
-			if circuit.CompareAndSwap(false, true) {
-				recordCircuitTrip(h.Options.ErrPrefix)
-			}
+			tripCircuit(circuit, h.Options.ErrPrefix)
 		case is429 && h.Options.MaxConsecutive429 > 0:
 			// Streak-based semantic: only trip after N consecutive
 			// 429s with no intervening 2xx. Sporadic 429s reset on
 			// the next 2xx (see the err == nil branch above).
 			n := h.consecutive429.Add(1)
-			if int(n) >= h.Options.MaxConsecutive429 && circuit.CompareAndSwap(false, true) {
-				recordCircuitTrip(h.Options.ErrPrefix)
-				lg := h.Options.Logger
-				if lg == nil {
-					lg = slog.Default()
-				}
-				lg.Warn("circuit tripped on consecutive 429 responses",
-					slog.String("source", h.Options.ErrPrefix),
+			if int(n) >= h.Options.MaxConsecutive429 {
+				tripAndWarn(circuit, h.Options.ErrPrefix,
+					"circuit tripped on consecutive 429 responses", h.Options.Logger,
 					slog.Int("consecutive_429", int(n)),
 					slog.Int("threshold", h.Options.MaxConsecutive429),
 				)
@@ -372,14 +406,9 @@ func (h *HTTPFetcher) Fetch(ctx context.Context, url string) ([]byte, error) {
 	if h.Options.MaxConsecutiveTransportErrors > 0 {
 		if err != nil && isTransportOrDeadlineErr(err) {
 			n := h.consecutiveTransportErrors.Add(1)
-			if int(n) >= h.Options.MaxConsecutiveTransportErrors && circuit != nil && circuit.CompareAndSwap(false, true) {
-				recordCircuitTrip(h.Options.ErrPrefix)
-				lg := h.Options.Logger
-				if lg == nil {
-					lg = slog.Default()
-				}
-				lg.Warn("circuit tripped on consecutive transport errors",
-					slog.String("source", h.Options.ErrPrefix),
+			if int(n) >= h.Options.MaxConsecutiveTransportErrors {
+				tripAndWarn(circuit, h.Options.ErrPrefix,
+					"circuit tripped on consecutive transport errors", h.Options.Logger,
 					slog.Int("consecutive_errors", int(n)),
 					slog.Int("threshold", h.Options.MaxConsecutiveTransportErrors),
 				)
@@ -473,6 +502,12 @@ func isTransportOrDeadlineErr(err error) bool {
 // The helper registers itself in the process-wide circuit-state map
 // the same way HTTPFetcher does, so SnapshotCircuitStates surfaces a
 // gauge for these callers too.
+//
+// NOTE: the consec / consec429 pair mirrors HTTPFetcher's
+// consecutiveTransportErrors / consecutive429 streaks (same thresholds-
+// trip-warn shape, shared via tripAndWarn) but the gating semantics
+// differ deliberately — see the cross-reference comment on
+// HTTPFetcher.consecutiveTransportErrors before attempting to merge.
 type TransportCircuit struct {
 	source    string
 	threshold int
@@ -561,14 +596,9 @@ func (t *TransportCircuit) Observe(err error) {
 			return
 		}
 		n := t.consec.Add(1)
-		if int(n) >= t.threshold && t.flag.CompareAndSwap(false, true) {
-			recordCircuitTrip(t.source)
-			lg := t.logger
-			if lg == nil {
-				lg = slog.Default()
-			}
-			lg.Warn("circuit tripped on consecutive transport errors",
-				slog.String("source", t.source),
+		if int(n) >= t.threshold {
+			tripAndWarn(t.flag, t.source,
+				"circuit tripped on consecutive transport errors", t.logger,
 				slog.Int("consecutive_errors", int(n)),
 				slog.Int("threshold", t.threshold),
 			)
@@ -578,14 +608,9 @@ func (t *TransportCircuit) Observe(err error) {
 			return
 		}
 		n := t.consec429.Add(1)
-		if int(n) >= t.max429 && t.flag.CompareAndSwap(false, true) {
-			recordCircuitTrip(t.source)
-			lg := t.logger
-			if lg == nil {
-				lg = slog.Default()
-			}
-			lg.Warn("circuit tripped on consecutive 429 responses",
-				slog.String("source", t.source),
+		if int(n) >= t.max429 {
+			tripAndWarn(t.flag, t.source,
+				"circuit tripped on consecutive 429 responses", t.logger,
 				slog.Int("consecutive_429", int(n)),
 				slog.Int("threshold", t.max429),
 			)
