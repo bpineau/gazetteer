@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bpineau/gazetteer/helpers/proptype"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // Confidence values stamped into Result.Confidence by PickConfidence.
@@ -202,40 +203,16 @@ func PerM2Quartiles(in []Mutation) (p25, p50, p75 float64) {
 	return quartiles(values)
 }
 
-// quartiles returns (p25, median, p75) of the input float64 slice. The
-// input is sorted in place. Returns (0, 0, 0) when empty.
+// quartiles returns (p25, median, p75) of the input float64 slice via
+// stats.Percentile (numpy "linear" semantics — identical to the local
+// percentile helper it replaced). The input is sorted in place.
+// Returns (0, 0, 0) when empty.
 func quartiles(values []float64) (p25, median, p75 float64) {
 	if len(values) == 0 {
 		return 0, 0, 0
 	}
 	sort.Float64s(values)
-	return percentile(values, 0.25), percentile(values, 0.50), percentile(values, 0.75)
-}
-
-// percentile returns the p-percentile of a sorted (ascending) float64
-// slice with linear interpolation between adjacent values. p is clamped
-// to [0, 1]. Identical to numpy's default (method="linear").
-func percentile(sorted []float64, p float64) float64 {
-	if len(sorted) == 0 {
-		return 0
-	}
-	if len(sorted) == 1 {
-		return sorted[0]
-	}
-	if p <= 0 {
-		return sorted[0]
-	}
-	if p >= 1 {
-		return sorted[len(sorted)-1]
-	}
-	pos := p * float64(len(sorted)-1)
-	lo := int(pos)
-	hi := lo + 1
-	if hi >= len(sorted) {
-		return sorted[len(sorted)-1]
-	}
-	frac := pos - float64(lo)
-	return sorted[lo]*(1-frac) + sorted[hi]*frac
+	return stats.Percentile(values, 0.25), stats.Percentile(values, 0.50), stats.Percentile(values, 0.75)
 }
 
 // isHighConfidenceLevel returns true for tiers whose granularity is

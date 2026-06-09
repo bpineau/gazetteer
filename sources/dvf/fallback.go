@@ -36,29 +36,32 @@ import (
 )
 
 // tierContext bundles the per-Query inputs that every DVF tier closes
-// over. Source.compute constructs one of these at the start of Query,
+// over. Source.Query constructs one of these at the start of the call,
 // builds the ladder, and walks it.
 type tierContext struct {
 	target string    // type_local filter, e.g. "Appartement"
 	cutoff time.Time // filter date floor (now - CutoffYears)
 
-	// Auction-level inputs the address_radius tier needs. listingID is
-	// only carried for log/telemetry context; auctionLat/auctionLon
-	// are the post-filter anchor — when either is nil the radius tier
-	// returns sample=0 so SkipOn falls through to commune.
-	listingID  string
+	// Auction-level inputs the address_radius tier needs:
+	// auctionLat/auctionLon are the post-filter anchor — when either is
+	// nil the radius tier returns sample=0 so SkipOn falls through to
+	// commune.
 	auctionLat *float64
 	auctionLon *float64
 
-	// Filled in by the winning tier so the caller can shape methodParams
-	// + p25/p75 quartiles without re-running the fan-out. Pointers
-	// because each Try writes them; only the last (winning) write
-	// matters.
-	totalRaw        *int
-	sectionsQueried *int
-	communesQueried *[]string
-	filtered        *[]Mutation
-	radiusM         *float64 // set only by the address_radius tier
+	// memo dedupes the upstream fetches shared by the geographic
+	// superset tiers — see queryMemo. One per Query.
+	memo *queryMemo
+
+	// Filled in by the winning tier so the caller can shape Evidence
+	// + p25/p75 quartiles without re-running the fan-out. Each Try
+	// overwrites them; only the last (winning) write matters —
+	// tierContext is already shared by pointer.
+	totalRaw        int
+	sectionsQueried int
+	communesQueried []string
+	filtered        []Mutation
+	radiusM         float64 // set only by the address_radius tier
 }
 
 // buildLadder returns the 4-tier DVF ladder for the given INSEE.
@@ -124,18 +127,18 @@ func (s *Source) makeTryLevel(communesINSEE []string, tc *tierContext, levelName
 		if err := ctx.Err(); err != nil {
 			return fallback.Output{}, err
 		}
-		muts, secCount := s.fetchMutationsForCommunes(ctx, communesINSEE)
+		muts, secCount := s.fetchMutationsForCommunes(ctx, tc.memo, communesINSEE)
 		filtered := FilterMutations(muts, tc.target, tc.cutoff)
 
-		// Persist the scratch counters so Query's methodParams reflect
+		// Persist the scratch counters so Query's Evidence reflects
 		// the WINNING tier's fan-out — not the cumulative effort across
 		// every tier. (Each tier overwrites; only the last write — the
 		// winner — matters.)
-		*tc.totalRaw = len(muts)
-		*tc.sectionsQueried = secCount
-		*tc.communesQueried = communesINSEE
-		*tc.filtered = filtered
-		*tc.radiusM = 0
+		tc.totalRaw = len(muts)
+		tc.sectionsQueried = secCount
+		tc.communesQueried = communesINSEE
+		tc.filtered = filtered
+		tc.radiusM = 0
 
 		_, p50, _ := PerM2Quartiles(filtered)
 		var perM2 int64
@@ -182,7 +185,7 @@ func (s *Source) makeTryAddressRadius(communesINSEE []string, tc *tierContext) f
 			}, nil
 		}
 
-		muts, secCount := s.fetchAddressRadiusMutations(ctx, communesINSEE, *tc.auctionLat, *tc.auctionLon)
+		muts, secCount := s.fetchAddressRadiusMutations(ctx, tc.memo, communesINSEE, *tc.auctionLat, *tc.auctionLon)
 		communeFiltered := FilterMutations(muts, tc.target, tc.cutoff)
 
 		// Pre-compute the pre-radius median from the same (prefiltered)
@@ -201,14 +204,14 @@ func (s *Source) makeTryAddressRadius(communesINSEE []string, tc *tierContext) f
 			}
 		}
 
-		// Persist the scratch counters so Query's methodParams reflect
+		// Persist the scratch counters so Query's Evidence reflects
 		// the radius tier's fan-out + post-filter. Overwritten by any
 		// later tier that wins.
-		*tc.totalRaw = len(muts)
-		*tc.sectionsQueried = secCount
-		*tc.communesQueried = communesINSEE
-		*tc.filtered = filtered
-		*tc.radiusM = DVFAddressRadiusMeters
+		tc.totalRaw = len(muts)
+		tc.sectionsQueried = secCount
+		tc.communesQueried = communesINSEE
+		tc.filtered = filtered
+		tc.radiusM = DVFAddressRadiusMeters
 
 		p25, p50, p75 := PerM2Quartiles(filtered)
 		var perM2 int64
@@ -218,7 +221,6 @@ func (s *Source) makeTryAddressRadius(communesINSEE []string, tc *tierContext) f
 
 		if len(filtered) >= MinSampleSizeAddressRadius {
 			s.logger().Debug("dvf.address_radius_won",
-				slog.String("listing_id", tc.listingID),
 				slog.String("insee", communesINSEE[0]),
 				slog.Int("sample", len(filtered)),
 				slog.Int("n_unique_parcelles", CountUniqueParcelles(filtered)),

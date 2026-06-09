@@ -20,24 +20,12 @@ func newLadderHarness(t *testing.T, auctionLat, auctionLon *float64) (*Source, *
 		HTTP:     hc,
 		Geocoder: stubGeocoder{res: banx.GeocodeResult{}},
 	})
-	var (
-		filtered        []Mutation
-		totalRaw        int
-		sectionsQueried int
-		primaryCommunes []string
-		radiusM         float64
-	)
 	tc := &tierContext{
-		target:          "Appartement",
-		cutoff:          time.Now().AddDate(-CutoffYears, 0, 0),
-		listingID:       "test",
-		auctionLat:      auctionLat,
-		auctionLon:      auctionLon,
-		totalRaw:        &totalRaw,
-		sectionsQueried: &sectionsQueried,
-		communesQueried: &primaryCommunes,
-		filtered:        &filtered,
-		radiusM:         &radiusM,
+		target:     "Appartement",
+		cutoff:     time.Now().AddDate(-CutoffYears, 0, 0),
+		auctionLat: auctionLat,
+		auctionLon: auctionLon,
+		memo:       newQueryMemo(),
 	}
 	return s, tc
 }

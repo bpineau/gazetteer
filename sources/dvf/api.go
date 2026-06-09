@@ -30,10 +30,16 @@
 // # Section catalog cache
 //
 // Cadastral sections (per INSEE) are looked up via cadastre.data.gouv.fr
-// once and persisted in a kvcache.Cache. The package's SectionDiscoverer
+// once and persisted in a kvcache.Cache — both the section-code list and
+// the reduced per-section geometry (code + bbox) the address_radius
+// prefilter needs, so a warm cache serves coordinate-bearing queries
+// with zero cadastre downloads. The package's SectionDiscoverer
 // (sections.go) is the canonical façade for both production callers
 // (wired against a persistent kvcache.Cache backend) and standalone
-// users (wired against an in-memory cache).
+// users (wired against an in-memory cache). Within one Query, a
+// per-call memo additionally guarantees each (insee, section) mutation
+// list is fetched at most once even when the geographically-nested
+// fallback tiers overlap.
 //
 // # Rhythm
 //

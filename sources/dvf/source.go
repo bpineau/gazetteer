@@ -271,42 +271,25 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	}
 	cutoff := asOf.AddDate(-CutoffYears, 0, 0)
 
-	var (
-		filtered        []Mutation
-		totalRaw        int
-		sectionsQueried int
-		primaryCommunes []string
-		radiusM         float64
-	)
 	tc := &tierContext{
-		target:          target,
-		cutoff:          cutoff,
-		listingID:       "",
-		auctionLat:      l.Lat,
-		auctionLon:      l.Lon,
-		totalRaw:        &totalRaw,
-		sectionsQueried: &sectionsQueried,
-		communesQueried: &primaryCommunes,
-		filtered:        &filtered,
-		radiusM:         &radiusM,
+		target:     target,
+		cutoff:     cutoff,
+		auctionLat: l.Lat,
+		auctionLon: l.Lon,
+		memo:       newQueryMemo(),
 	}
 	ladder := s.buildLadder(insee, tc)
-	walkLogger := s.logger()
-	out, walkErr := fallback.Walk(ctx, walkLogger, ladder, fallback.Input{
-		Address: l.Address,
-		City:    l.City,
-		Zip:     l.Zip,
-		Lat:     l.Lat,
-		Lon:     l.Lon,
-	})
+	// The DVF tiers close over tc + their INSEE lists and ignore the
+	// canonical fallback.Input, so pass the zero value.
+	out, walkErr := fallback.Walk(ctx, s.logger(), ladder, fallback.Input{})
 	if walkErr != nil {
 		return nil, fmt.Errorf("dvf: ladder walk: %w", walkErr)
 	}
 	levelUsed := out.LevelUsed
 
-	confidence := PickConfidence(len(filtered), levelUsed)
+	confidence := PickConfidence(len(tc.filtered), levelUsed)
 
-	p25v, p50, p75v := PerM2Quartiles(filtered)
+	p25v, p50, p75v := PerM2Quartiles(tc.filtered)
 
 	var valuePerM2Cents, valueCents *int64
 	if p50 > 0 {
@@ -333,18 +316,18 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 
 	ev := Evidence{
 		LevelUsed:              levelUsed,
-		CommunesQueried:        primaryCommunes,
+		CommunesQueried:        tc.communesQueried,
 		PrimaryINSEE:           insee,
 		INSEEResolutionSource:  inseeSource,
 		TypeLocalFilter:        target,
 		WindowYears:            CutoffYears,
-		RawMutationsCount:      totalRaw,
-		FilteredMutationsCount: len(filtered),
-		SectionsQueried:        sectionsQueried,
-		NUniqueParcelles:       CountUniqueParcelles(filtered),
+		RawMutationsCount:      tc.totalRaw,
+		FilteredMutationsCount: len(tc.filtered),
+		SectionsQueried:        tc.sectionsQueried,
+		NUniqueParcelles:       CountUniqueParcelles(tc.filtered),
 	}
 	if levelUsed == "address_radius" {
-		ev.RadiusM = radiusM
+		ev.RadiusM = tc.radiusM
 		ev.AuctionLat = l.Lat
 		ev.AuctionLon = l.Lon
 	}
@@ -354,18 +337,23 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		ValueEURCents:      valueCents,
 		P25EURPerM2Cents:   p25c,
 		P75EURPerM2Cents:   p75c,
-		SampleSize:         len(filtered),
+		SampleSize:         len(tc.filtered),
 		Confidence:         confidence,
 		Evidence:           ev,
 	}, nil
 }
 
-// resolveINSEE returns the 5-digit commune code for the listing via
-// the shared INSEE cascade (cf. `helpers/banx/insee_resolver.go`):
+// resolveINSEE returns the 5-digit commune code for the listing: trust
+// Listing.INSEE when set, else run the canonical BAN cascade
+// (banx.ResolveINSEE → INSEEResolver):
 //
 //  1. listing.INSEE when non-empty (trusted).
-//  2. BAN forward on the address (high-confidence trust).
-//  3. BAN reverse on listing.Lat/Lon when present.
+//  2. BAN forward on the address (high-confidence trust). The bare
+//     l.Address is passed (NOT pre-joined with zip/city) —
+//     GeocodeQuery.String() appends zip/city only when absent, and
+//     doubling them was a documented geocode-score regression.
+//  3. BAN reverse on listing.Lat/Lon when present (enabled when the
+//     Geocoder also implements banx.ReverseGeocoder).
 //  4. Error otherwise.
 //
 // Returns (insee, source) where source ∈ {"listing", "ban_forward",
@@ -374,65 +362,37 @@ func (s *Source) resolveINSEE(ctx context.Context, l gazetteer.Listing) (insee, 
 	if i := strings.TrimSpace(l.INSEE); i != "" {
 		return i, "listing", nil
 	}
-
-	addr := l.Address
-	city := l.City
-	zip := l.Zip
-	var auctionLat, auctionLon float64
+	var lat, lon float64
 	if l.Lat != nil {
-		auctionLat = *l.Lat
+		lat = *l.Lat
 	}
 	if l.Lon != nil {
-		auctionLon = *l.Lon
+		lon = *l.Lon
 	}
-	hasText := addr != "" || city != "" || zip != ""
-	hasCoords := auctionLat != 0 && auctionLon != 0
-	if !hasText && !hasCoords {
-		return "", "", errors.New("no address/city/zip/coords to resolve")
-	}
-	if s.opts.Geocoder == nil {
-		return "", "", errors.New("no geocoder configured")
-	}
-
-	var reverseGC banx.ReverseGeocoder
-	if rev, ok := s.opts.Geocoder.(banx.ReverseGeocoder); ok {
-		reverseGC = rev
-	}
-	resolver := &banx.INSEEResolver{
-		Forward: s.opts.Geocoder,
-		Reverse: reverseGC,
-	}
-	res, rerr := resolver.Resolve(ctx, banx.INSEEQuery{
-		Address: addr, // GeocodeQuery.String() appends zip/city only when absent
-		City:    city,
-		Zip:     zip,
-		Lat:     auctionLat,
-		Lon:     auctionLon,
-	})
-	if rerr != nil {
-		return "", "", rerr
-	}
-	return res.INSEE, res.Source, nil
+	return banx.ResolveINSEE(ctx, s.opts.Geocoder, l.Address, l.City, l.Zip, lat, lon)
 }
 
 // fetchMutationsForCommunes fans out across the communes INSEE list,
 // for each one enumerates sections (cached) and collects mutations.
 // Returns the concatenated mutation list + sections queried (cumulative).
+// The counts are LOGICAL per-tier numbers: a memo hit still counts its
+// sections, so Evidence.SectionsQueried is identical with or without
+// the per-Query memo.
 //
 // Per-section errors are swallowed (warn-logged) so a single bad
 // commune in a multi-commune fan-out tier does not break the whole
 // query. The circuit-breaker check inside GetMutations + the outer-loop
 // breaker check below ensure runaway transport failures still abort.
-func (s *Source) fetchMutationsForCommunes(ctx context.Context, communesINSEE []string) ([]Mutation, int) {
+func (s *Source) fetchMutationsForCommunes(ctx context.Context, memo *queryMemo, communesINSEE []string) ([]Mutation, int) {
 	var all []Mutation
 	totalSecs := 0
 	for _, insee := range communesINSEE {
 		if ctx.Err() != nil || s.circuitTripped() {
 			return all, totalSecs
 		}
-		secs := s.resolveSections(ctx, insee)
+		secs := s.resolveSections(ctx, memo, insee)
 		totalSecs += len(secs)
-		all = append(all, s.fetchSections(ctx, insee, secs)...)
+		all = append(all, s.fetchSections(ctx, memo, insee, secs)...)
 	}
 	return all, totalSecs
 }
@@ -443,7 +403,12 @@ func (s *Source) fetchMutationsForCommunes(ctx context.Context, communesINSEE []
 // quantiles) is order-independent. Per-section failures are swallowed
 // (warn-logged) so one bad section never sinks the fan-out; a tripped
 // circuit or cancelled ctx stops launching further fetches.
-func (s *Source) fetchSections(ctx context.Context, insee string, secs []string) []Mutation {
+//
+// Each (insee, section) outcome is memoised in `memo` so the geographic
+// superset tiers of one ladder walk fetch a section at most once per
+// Query; only definitive outcomes (success / 404) are stored, so a
+// transiently-failed section is still retried by a later tier.
+func (s *Source) fetchSections(ctx context.Context, memo *queryMemo, insee string, secs []string) []Mutation {
 	var (
 		mu  sync.Mutex
 		all []Mutation
@@ -453,6 +418,12 @@ func (s *Source) fetchSections(ctx context.Context, insee string, secs []string)
 	for _, sec := range secs {
 		if ctx.Err() != nil || s.circuitTripped() {
 			break
+		}
+		if cached, ok := memo.mutationsFor(insee, sec); ok {
+			mu.Lock() // earlier iterations' goroutines may still append
+			all = append(all, cached...)
+			mu.Unlock()
+			continue
 		}
 		wg.Add(1)
 		sem <- struct{}{}
@@ -465,6 +436,8 @@ func (s *Source) fetchSections(ctx context.Context, insee string, secs []string)
 			r, err := s.api.GetMutations(ctx, insee, sec)
 			if err != nil {
 				if errors.Is(err, ErrSectionNotFound) {
+					// Definitive: the section has no DVF data.
+					memo.storeMutations(insee, sec, nil)
 					return
 				}
 				s.logger().Warn("dvf.mutations_fetch_failed",
@@ -474,6 +447,7 @@ func (s *Source) fetchSections(ctx context.Context, insee string, secs []string)
 				)
 				return
 			}
+			memo.storeMutations(insee, sec, r.Data)
 			mu.Lock()
 			all = append(all, r.Data...)
 			mu.Unlock()
@@ -498,17 +472,17 @@ func (s *Source) circuitTripped() bool {
 //
 // Returns the pooled mutations and the number of sections actually queried
 // (for Evidence.SectionsQueried).
-func (s *Source) fetchAddressRadiusMutations(ctx context.Context, communesINSEE []string, lat, lon float64) ([]Mutation, int) {
+func (s *Source) fetchAddressRadiusMutations(ctx context.Context, memo *queryMemo, communesINSEE []string, lat, lon float64) ([]Mutation, int) {
 	if len(communesINSEE) == 0 {
 		return nil, 0
 	}
 	insee := communesINSEE[0]
-	secs := s.sectionsNearPoint(ctx, insee, lat, lon, DVFAddressRadiusMeters+sectionPrefilterMarginMeters)
+	secs := s.sectionsNearPoint(ctx, memo, insee, lat, lon, DVFAddressRadiusMeters+sectionPrefilterMarginMeters)
 	if len(secs) == 0 {
 		// Prefilter unavailable — preserve the original full-commune behavior.
-		return s.fetchMutationsForCommunes(ctx, communesINSEE[:1])
+		return s.fetchMutationsForCommunes(ctx, memo, communesINSEE[:1])
 	}
-	return s.fetchSections(ctx, insee, secs), len(secs)
+	return s.fetchSections(ctx, memo, insee, secs), len(secs)
 }
 
 // sectionsNearPoint returns the DVF section codes for `insee` whose cadastral
@@ -517,8 +491,8 @@ func (s *Source) fetchAddressRadiusMutations(ctx context.Context, communesINSEE 
 // fetched or yields no codes. The bbox test is conservative (a box never
 // underestimates its geometry's extent), so a section is dropped only when no
 // point inside it can possibly be within the radius.
-func (s *Source) sectionsNearPoint(ctx context.Context, insee string, lat, lon, radiusM float64) []string {
-	geos, err := FetchCadastreSectionGeos(ctx, s.api.http, insee)
+func (s *Source) sectionsNearPoint(ctx context.Context, memo *queryMemo, insee string, lat, lon, radiusM float64) []string {
+	geos, err := s.sectionGeos(ctx, memo, insee)
 	if err != nil {
 		if !errors.Is(err, ErrCadastreCommuneNotFound) {
 			s.logger().Warn("dvf.section_geo_fetch_failed",
@@ -538,6 +512,70 @@ func (s *Source) sectionsNearPoint(ctx context.Context, insee string, lat, lon, 
 		if bboxEmpty(g.Box) || pointToBBoxMeters(lat, lon, g.Box) <= radiusM {
 			out = append(out, g.Code)
 		}
+	}
+	return out
+}
+
+// sectionGeos returns the reduced per-section geometry list (code + bbox)
+// for `insee`, resolving per-Query memo → kvcache (GeosForCommune) → live
+// cadastre GeoJSON download. The raw commune GeoJSON runs hundreds of KB
+// to MB; the reduced []SectionGeo is a few hundred bytes, so that is the
+// form worth caching (cf. SectionDiscoverer.PrimeGeos).
+//
+// A live download also primes the section-CODE list — the geo response
+// contains the codes, filtered and formatted exactly as
+// FetchCadastreSections would return them — into the per-Query memo and
+// the kvcache, so the commune tier's resolveSections never re-downloads
+// the same GeoJSON seconds later. A kvcache hit primes the memo'd code
+// list too, covering the case where the code cache was lost separately.
+func (s *Source) sectionGeos(ctx context.Context, memo *queryMemo, insee string) ([]SectionGeo, error) {
+	if geos, ok := memo.geosFor(insee); ok {
+		return geos, nil
+	}
+	cached, err := s.sections.GeosForCommune(ctx, insee)
+	if err != nil {
+		s.logger().Warn("dvf.section_geos_lookup_failed",
+			slog.String("insee", insee),
+			slog.Any("err", err),
+		)
+		// Fall through — fetch from cadastre below.
+	}
+	if len(cached) > 0 {
+		memo.storeGeos(insee, cached)
+		memo.storeSections(insee, sectionCodes(cached))
+		return cached, nil
+	}
+	geos, ferr := FetchCadastreSectionGeos(ctx, s.api.http, insee)
+	if ferr != nil {
+		return nil, ferr
+	}
+	memo.storeGeos(insee, geos)
+	if perr := s.sections.PrimeGeos(ctx, insee, geos); perr != nil {
+		s.logger().Warn("dvf.section_geos_prime_failed",
+			slog.String("insee", insee),
+			slog.Any("err", perr),
+		)
+	}
+	if codes := sectionCodes(geos); len(codes) > 0 {
+		memo.storeSections(insee, codes)
+		if perr := s.sections.PrimeFromList(ctx, insee, codes); perr != nil {
+			s.logger().Warn("dvf.cadastre_prime_failed",
+				slog.String("insee", insee),
+				slog.Any("err", perr),
+			)
+		}
+	}
+	return geos, nil
+}
+
+// sectionCodes projects geos down to its DVF section-code list. By
+// construction this is the same set FetchCadastreSections returns for
+// the commune — both fetchers apply the same commune/format filters and
+// dedup — so it can safely prime the section-code cache.
+func sectionCodes(geos []SectionGeo) []string {
+	out := make([]string, 0, len(geos))
+	for _, g := range geos {
+		out = append(out, g.Code)
 	}
 	return out
 }
@@ -568,18 +606,22 @@ func pointToBBoxMeters(lat, lon float64, b geopoly.BBox) float64 {
 // resolveSections returns the cadastral section codes (DVF-formatted)
 // for `insee`. Strategy:
 //
-//  1. Read the kv_cache via SectionsForCommune. Trust a non-empty result.
-//  2. On cache miss, query cadastre.data.gouv.fr — which gives the
+//  1. Per-Query memo hit (primed by an earlier tier or by sectionGeos).
+//  2. Read the kv_cache via SectionsForCommune. Trust a non-empty result.
+//  3. On cache miss, query cadastre.data.gouv.fr — which gives the
 //     exact set of sections that exist for the commune, including
 //     1-letter codes (e.g. Stains "0000A"). Re-prime the cache on
 //     success.
-//  3. On cadastre 404 / network failure, return empty — the legacy
-//     000AA..000ZZ brute-force walker was removed since the cadastre
-//     primer covers 100 % of communes.
+//  4. On cadastre 404 / network failure, return empty (NOT memoised, so
+//     a later tier retries) — the legacy 000AA..000ZZ brute-force walker
+//     was removed since the cadastre primer covers 100 % of communes.
 //
 // Empty results bubble up as len==0; the caller (mutation collector)
 // simply records 0 sections queried for that commune.
-func (s *Source) resolveSections(ctx context.Context, insee string) []string {
+func (s *Source) resolveSections(ctx context.Context, memo *queryMemo, insee string) []string {
+	if secs, ok := memo.sectionsFor(insee); ok {
+		return secs
+	}
 	cached, err := s.sections.SectionsForCommune(ctx, insee)
 	if err != nil {
 		s.logger().Warn("dvf.sections_lookup_failed",
@@ -589,6 +631,7 @@ func (s *Source) resolveSections(ctx context.Context, insee string) []string {
 		// Fall through — try cadastre below.
 	}
 	if len(cached) > 0 {
+		memo.storeSections(insee, cached)
 		return cached
 	}
 
@@ -597,6 +640,7 @@ func (s *Source) resolveSections(ctx context.Context, insee string) []string {
 	// consumes), so a non-empty result is authoritative.
 	cad, cerr := FetchCadastreSections(ctx, s.api.http, insee)
 	if cerr == nil && len(cad) > 0 {
+		memo.storeSections(insee, cad)
 		if perr := s.sections.PrimeFromList(ctx, insee, cad); perr != nil {
 			s.logger().Warn("dvf.cadastre_prime_failed",
 				slog.String("insee", insee),
@@ -632,15 +676,7 @@ func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, err
 	if err != nil {
 		return nil, err
 	}
-	data, err := s.Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("dvf: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, s, l)
 }
 
 func init() {

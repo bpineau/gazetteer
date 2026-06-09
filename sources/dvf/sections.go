@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 	"github.com/bpineau/gazetteer/helpers/kvcache"
 	"github.com/bpineau/gazetteer/helpers/safejson"
 )
@@ -20,6 +22,14 @@ const SectionTTL = 90 * 24 * time.Hour
 // exist" caches built before the API contract change was detected.
 // Bump this constant whenever the discovery semantics change.
 const CacheKeyPrefix = "dvf:sections:v2:"
+
+// GeoCacheKeyPrefix is the kv_cache key prefix for the per-commune
+// reduced section-geometry list ([]SectionGeo: code + bbox — a few
+// hundred bytes, versus the hundreds-of-KB raw GeoJSON it is derived
+// from). Built like the SectionDiscoverer's code-list key
+// (prefix + insee), but the version segment embeds the Source Version
+// so any logic bump also invalidates persisted geo entries.
+var GeoCacheKeyPrefix = fmt.Sprintf("dvf:sectiongeos:v%d:", Version)
 
 // SectionDiscoverer manages the per-commune cadastral section cache.
 // Sections are populated by FetchCadastreSections (cadastre.data.gouv.fr)
@@ -78,6 +88,77 @@ func (d *SectionDiscoverer) PrimeFromList(ctx context.Context, insee string, sec
 	return d.cache.Set(ctx, kvcache.Entry{
 		Key:       key,
 		Value:     safejson.MustMarshal(sections),
+		FetchedAt: d.now(),
+		ExpiresAt: &exp,
+	})
+}
+
+// sectionGeoWire is the JSON encoding of one SectionGeo in the kv_cache.
+// A box of unknown extent (the inverted-infinity emptyBBox — ±Inf is not
+// representable in JSON) is flagged via Empty instead of serialising the
+// coordinates, and restored to emptyBBox() on read so the "unknown
+// extent ⇒ keep the section" prefilter semantics survive the round-trip.
+type sectionGeoWire struct {
+	Code   string  `json:"code"`
+	Empty  bool    `json:"empty,omitempty"`
+	MinLon float64 `json:"min_lon"`
+	MinLat float64 `json:"min_lat"`
+	MaxLon float64 `json:"max_lon"`
+	MaxLat float64 `json:"max_lat"`
+}
+
+// GeosForCommune returns the cached reduced section geometries (code +
+// bbox) for the commune with `insee` from the KV cache. Returns
+// (nil, nil) on a cache miss, an expired row or an undecodable value —
+// the caller should re-fetch via FetchCadastreSectionGeos and re-prime
+// with PrimeGeos. Mirrors SectionsForCommune's contract.
+func (d *SectionDiscoverer) GeosForCommune(ctx context.Context, insee string) ([]SectionGeo, error) {
+	row, err := d.cache.Get(ctx, GeoCacheKeyPrefix+insee)
+	if err != nil {
+		if errors.Is(err, kvcache.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if row.ExpiresAt != nil && !d.now().Before(*row.ExpiresAt) {
+		// Expired — treat as a miss so the caller re-fetches from cadastre.
+		return nil, nil
+	}
+	var wire []sectionGeoWire
+	if err := json.Unmarshal(row.Value, &wire); err != nil {
+		return nil, nil
+	}
+	out := make([]SectionGeo, 0, len(wire))
+	for _, w := range wire {
+		g := SectionGeo{Code: w.Code}
+		if w.Empty {
+			g.Box = emptyBBox()
+		} else {
+			g.Box = geopoly.BBox{MinLon: w.MinLon, MinLat: w.MinLat, MaxLon: w.MaxLon, MaxLat: w.MaxLat}
+		}
+		out = append(out, g)
+	}
+	return out, nil
+}
+
+// PrimeGeos seeds the cache with the reduced section geometries for the
+// commune (typically from FetchCadastreSectionGeos). Same TTL as the
+// code list — section geometry changes as rarely as the section set.
+func (d *SectionDiscoverer) PrimeGeos(ctx context.Context, insee string, geos []SectionGeo) error {
+	wire := make([]sectionGeoWire, 0, len(geos))
+	for _, g := range geos {
+		w := sectionGeoWire{Code: g.Code}
+		if bboxEmpty(g.Box) {
+			w.Empty = true
+		} else {
+			w.MinLon, w.MinLat, w.MaxLon, w.MaxLat = g.Box.MinLon, g.Box.MinLat, g.Box.MaxLon, g.Box.MaxLat
+		}
+		wire = append(wire, w)
+	}
+	exp := d.now().Add(SectionTTL)
+	return d.cache.Set(ctx, kvcache.Entry{
+		Key:       GeoCacheKeyPrefix + insee,
+		Value:     safejson.MustMarshal(wire),
 		FetchedAt: d.now(),
 		ExpiresAt: &exp,
 	})
