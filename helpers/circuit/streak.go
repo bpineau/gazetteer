@@ -110,23 +110,7 @@ func (b *ContentStreakBreaker) Observe(body []byte, validator ContentValidator) 
 	if b == nil || b.flag == nil || b.threshold <= 0 {
 		return
 	}
-	if b.signalBearing(body, validator) {
-		b.consec.Store(0)
-		return
-	}
-	n := b.consec.Add(1)
-	if int(n) >= b.threshold && b.flag.CompareAndSwap(false, true) {
-		recordCircuitTrip(b.source)
-		lg := b.logger
-		if lg == nil {
-			lg = slog.Default()
-		}
-		lg.Warn("circuit tripped on consecutive empty-content responses",
-			slog.String("source", b.source),
-			slog.Int("consecutive_empty", int(n)),
-			slog.Int("threshold", b.threshold),
-		)
-	}
+	b.ObserveSignal(b.signalBearing(body, validator))
 }
 
 // ObserveSignal is the low-level entry point: signalBearing == true
@@ -145,14 +129,9 @@ func (b *ContentStreakBreaker) ObserveSignal(signalBearing bool) {
 		return
 	}
 	n := b.consec.Add(1)
-	if int(n) >= b.threshold && b.flag.CompareAndSwap(false, true) {
-		recordCircuitTrip(b.source)
-		lg := b.logger
-		if lg == nil {
-			lg = slog.Default()
-		}
-		lg.Warn("circuit tripped on consecutive empty-content responses",
-			slog.String("source", b.source),
+	if int(n) >= b.threshold {
+		tripAndWarn(b.flag, b.source,
+			"circuit tripped on consecutive empty-content responses", b.logger,
 			slog.Int("consecutive_empty", int(n)),
 			slog.Int("threshold", b.threshold),
 		)

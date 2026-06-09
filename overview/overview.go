@@ -3,7 +3,6 @@ package overview
 import (
 	"math"
 	"sort"
-	"strings"
 
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/geodist"
@@ -201,57 +200,6 @@ func Build(o Options) ([]CommuneOverview, error) {
 	return out, nil
 }
 
-// lineLabel turns a (TransitType, raw ref) pair into the user-visible label
-// surfaced in TransitLines: "Métro 5", "RER A", "T3a", "Transilien J".
-// It normalises the ref so that pre-prefixed values like "RER B" or
-// "Transilien H" from the OSM catalog are not double-prefixed.
-func lineLabel(tt osm.TransitType, ref string) string {
-	// Some OSM contributors store the full label in the ref tag
-	// (e.g. ref="RER B", ref="Transilien H"). Detect that and return as-is.
-	switch {
-	case strings.HasPrefix(ref, "RER "):
-		return ref
-	case strings.HasPrefix(ref, "Transilien "):
-		return ref
-	case strings.HasPrefix(ref, "Métro "):
-		return ref
-	}
-	switch tt {
-	case osm.TransitTypeMetro:
-		if ref == "" {
-			return "Métro"
-		}
-		return "Métro " + ref
-	case osm.TransitTypeRER:
-		if ref == "" {
-			return "RER"
-		}
-		return "RER " + ref
-	case osm.TransitTypeTransilien:
-		if ref == "" {
-			return "Transilien"
-		}
-		return "Transilien " + ref
-	case osm.TransitTypeTram:
-		if ref == "" {
-			return "Tram"
-		}
-		// Tram refs come in two flavours: "T3a" (already prefixed) or bare
-		// numerics like "1", "2" (Lyon/Bordeaux style). Prefix bare numbers
-		// with "T" so the label is consistent.
-		if len(ref) > 0 && ref[0] >= '0' && ref[0] <= '9' {
-			return "T" + ref
-		}
-		return ref // already "T1", "T3a" — self-explanatory
-	case osm.TransitTypeTrain:
-		if ref == "" {
-			return "Train"
-		}
-		return "Train " + ref
-	}
-	return ref
-}
-
 // transitTypeOrder returns a sort key for transit types so Metro < RER <
 // Transilien < Tram < Train in the output slice. Lower = higher priority.
 func transitTypeOrder(tt osm.TransitType) int {
@@ -311,7 +259,7 @@ func transitLinesNear(cat *osm.Catalog, lat, lon float64) []string {
 		// ("Train") adds little value when nearby stations already carry
 		// specific refs, and is noise when they don't.
 		for _, ref := range st.Lines {
-			lbl := lineLabel(st.Type, ref)
+			lbl := osm.LineLabel(st.Type, ref)
 			if _, dup := seen[lbl]; !dup {
 				seen[lbl] = struct{}{}
 				entries = append(entries, entry{lbl, transitTypeOrder(st.Type)})
