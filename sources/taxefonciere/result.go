@@ -52,7 +52,9 @@ type Result struct {
 	TEOMEURPerYear float64 `json:"teom_eur_per_year,omitempty"`
 
 	// TauxTFPBApplied is the voted TFPB rate in percent (e.g. 32.5 =
-	// 32.5 %). Echoed for traceability.
+	// 32.5 %). Echoed for traceability. Zero means no voted rate was
+	// available (a V1-fallback estimate, not a 0 % tax rate) — consumers
+	// must treat 0 as "no reading" for this field specifically.
 	TauxTFPBApplied float64 `json:"taux_tfpb_applied,omitempty"`
 
 	// TauxTEOMApplied is the voted TEOM rate in percent. Zero when

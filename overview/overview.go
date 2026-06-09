@@ -7,6 +7,7 @@ import (
 
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/geodist"
+	"github.com/bpineau/gazetteer/helpers/stats"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/delinquance"
 	"github.com/bpineau/gazetteer/sources/dvfagg"
@@ -144,7 +145,7 @@ func Build(o Options) ([]CommuneOverview, error) {
 		// Commune name + geo fields derived from the centroid.
 		if c, ok := com.Lookup(insee); ok {
 			row.Name = c.Name
-			row.DistanceParisKm = roundKm1(geodist.KmBetween(c.Lat, c.Lon, parisLat, parisLon))
+			row.DistanceParisKm = stats.Round(geodist.KmBetween(c.Lat, c.Lon, parisLat, parisLon), 1)
 			row.TransitLines = transitLinesNear(osmCat, c.Lat, c.Lon)
 		}
 
@@ -198,11 +199,6 @@ func Build(o Options) ([]CommuneOverview, error) {
 		out = append(out, row)
 	}
 	return out, nil
-}
-
-// roundKm1 rounds a kilometre value to one decimal place.
-func roundKm1(km float64) float64 {
-	return math.Round(km*10) / 10
 }
 
 // lineLabel turns a (TransitType, raw ref) pair into the user-visible label
@@ -295,8 +291,18 @@ func transitLinesNear(cat *osm.Catalog, lat, lon float64) []string {
 	seen := make(map[string]struct{}, 8)
 	var entries []entry
 
+	// Degree-space pre-reject before the trig-heavy haversine: Build joins
+	// ~9k communes against ~9k stations and most pairs are nowhere near
+	// each other. The 10 % slack means the box can only over-accept; the
+	// exact metric test below still decides.
+	dLat := transitRadiusM / 111_320.0 * 1.1
+	dLon := dLat / math.Max(math.Cos(lat*math.Pi/180), 0.01)
+
 	for i := range cat.Stations {
 		st := &cat.Stations[i]
+		if math.Abs(st.Lat-lat) > dLat || math.Abs(st.Lon-lon) > dLon {
+			continue
+		}
 		d := geodist.MetersBetween(lat, lon, st.Lat, st.Lon)
 		if d > transitRadiusM {
 			continue
