@@ -1,14 +1,9 @@
 package sitadel
 
 import (
-	"compress/gzip"
 	"embed"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 	"strings"
-	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
@@ -64,11 +59,7 @@ type Index struct {
 	Communes map[string]Entry `json:"communes"`
 }
 
-var (
-	indexOnce  sync.Once
-	indexCache *Index
-	indexErr   error
-)
+var lazyIndex dataset.Lazy[Index]
 
 // Load returns the singleton index, resolving the processed artifact from dir
 // (the datadir) with a fallback to the embedded copy, and parsing it on first
@@ -77,46 +68,19 @@ var (
 // datadir nor embedded yields an empty index (graceful degradation), not an
 // error.
 func Load(dir string) (*Index, error) {
-	indexOnce.Do(func() {
-		rc, err := set.Open(dir)
-		if errors.Is(err, dataset.ErrUnavailable) {
-			indexCache = &Index{}
-			return
-		}
-		if err != nil {
-			indexErr = fmt.Errorf("sitadel: open dataset: %w", err)
-			return
-		}
-		defer func() { _ = rc.Close() }()
-		idx, err := parseIndex(rc)
-		if err != nil {
-			indexErr = err
-			return
-		}
-		indexCache = idx
-	})
-	return indexCache, indexErr
+	return lazyIndex.Load(set, dir, parseIndex)
 }
 
 // parseIndex decodes the gzipped JSON extract into an Index.
 func parseIndex(r io.Reader) (*Index, error) {
-	zr, err := gzip.NewReader(r)
+	idx, err := dataset.ReadGzJSON[Index](r, Name)
 	if err != nil {
-		return nil, fmt.Errorf("sitadel: gunzip: %w", err)
-	}
-	defer func() { _ = zr.Close() }()
-	body, err := io.ReadAll(zr)
-	if err != nil {
-		return nil, fmt.Errorf("sitadel: read gunzipped body: %w", err)
-	}
-	var idx Index
-	if err := json.Unmarshal(body, &idx); err != nil {
-		return nil, fmt.Errorf("sitadel: parse json: %w", err)
+		return nil, err
 	}
 	if idx.Communes == nil {
 		idx.Communes = map[string]Entry{}
 	}
-	return &idx, nil
+	return idx, nil
 }
 
 // Lookup returns the entry for the given INSEE. `ok` is false when the commune

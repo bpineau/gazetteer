@@ -8,7 +8,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
@@ -41,11 +40,7 @@ type Index struct {
 	byInsee map[string]Entry
 }
 
-var (
-	indexOnce  sync.Once
-	indexCache *Index
-	indexErr   error
-)
+var lazyIndex dataset.Lazy[Index]
 
 // Load returns the singleton index, resolving the processed artifact from
 // dir (the datadir) with a fallback to the embedded copy, and parsing it on
@@ -54,25 +49,7 @@ var (
 // neither in the datadir nor embedded yields an empty index (graceful
 // degradation), not an error.
 func Load(dir string) (*Index, error) {
-	indexOnce.Do(func() {
-		rc, err := set.Open(dir)
-		if errors.Is(err, dataset.ErrUnavailable) {
-			indexCache = &Index{}
-			return
-		}
-		if err != nil {
-			indexErr = fmt.Errorf("vacance: open dataset: %w", err)
-			return
-		}
-		defer func() { _ = rc.Close() }()
-		idx, err := parseIndex(rc)
-		if err != nil {
-			indexErr = err
-			return
-		}
-		indexCache = idx
-	})
-	return indexCache, indexErr
+	return lazyIndex.Load(set, dir, parseIndex)
 }
 
 // Lookup returns the vacance entry for the given INSEE. The `ok` flag

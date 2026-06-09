@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/bpineau/gazetteer/sources/cadastre/geom"
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
 func TestDefaultBatiCache_GetPutHappy(t *testing.T) {
@@ -16,8 +16,8 @@ func TestDefaultBatiCache_GetPutHappy(t *testing.T) {
 	}
 	want := []BatiPolygon{
 		{
-			Geometry: geom.MultiPolygon{{{Lon: 0, Lat: 0}}},
-			Centroid: geom.Point{Lon: 0, Lat: 0},
+			Geometry: geopoly.MultiPolygon{{{{Lon: 0, Lat: 0}}}},
+			Centroid: geopoly.Point{Lon: 0, Lat: 0},
 			AreaM2:   42,
 		},
 	}

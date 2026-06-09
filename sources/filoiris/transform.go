@@ -3,21 +3,18 @@ package filoiris
 import (
 	"archive/zip"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/frnorm"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // rawZipName is the datadir filename for the upstream raw input.
@@ -121,10 +118,10 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 			continue // suppressed (ns/nd) or empty
 		}
 		e := Entry{MedianEUR: med}
-		if pct, ok := parseFrenchFloat(at(rec, poverty)); ok {
+		if pct, ok := frnorm.ParseFRFloat(at(rec, poverty)); ok {
 			e.PovertyRatePct = pct
 		}
-		if g, ok := parseFrenchFloat(at(rec, gini)); ok {
+		if g, ok := frnorm.ParseFRFloat(at(rec, gini)); ok {
 			e.Gini = g
 		}
 		idx.IRIS[code] = e
@@ -134,14 +131,12 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		return errors.New("filoiris: transform produced no IRIS rows")
 	}
 	idx.Meta.RowCountIRIS = len(idx.IRIS)
-	idx.Meta.NationalMedianEUR = medianInt(medians)
+	idx.Meta.NationalMedianEUR = stats.MedianInt(medians)
 
-	zw := gzip.NewWriter(dst)
-	if err := json.NewEncoder(zw).Encode(idx); err != nil {
-		_ = zw.Close()
+	if err := dataset.WriteGzJSON(dst, idx); err != nil {
 		return fmt.Errorf("filoiris: encode json: %w", err)
 	}
-	return zw.Close()
+	return nil
 }
 
 // validate gates publication: the rebuilt (gzipped) artifact must gunzip,
@@ -200,45 +195,9 @@ func indexOf(header []string, name string) int {
 // parseEuro parses a euro amount into a rounded integer. ok is false for
 // empty / suppressed ("ns", "nd") cells.
 func parseEuro(s string) (int, bool) {
-	f, ok := parseFrenchFloat(s)
+	f, ok := frnorm.ParseFRFloat(s)
 	if !ok {
 		return 0, false
 	}
 	return int(math.Round(f)), true
-}
-
-// parseFrenchFloat strips spaces (incl. the non-breaking and narrow no-break
-// spaces INSEE uses as thousands separators), accepts a comma decimal mark,
-// and rejects the suppression markers "ns" / "nd". ok is false for an empty
-// or non-numeric cell.
-func parseFrenchFloat(s string) (float64, bool) {
-	s = strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
-			return -1
-		}
-		return r
-	}, s)
-	s = strings.ReplaceAll(s, ",", ".")
-	if s == "" {
-		return 0, false
-	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0, false // "ns", "nd", or any non-numeric marker
-	}
-	return f, true
-}
-
-// medianInt returns the median of xs (copied before sorting).
-func medianInt(xs []int) int {
-	if len(xs) == 0 {
-		return 0
-	}
-	s := append([]int(nil), xs...)
-	sort.Ints(s)
-	n := len(s)
-	if n%2 == 1 {
-		return s[n/2]
-	}
-	return (s[n/2-1] + s[n/2]) / 2
 }

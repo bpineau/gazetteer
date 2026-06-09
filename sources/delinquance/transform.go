@@ -4,7 +4,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/frnorm"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // rawName is the datadir filename for the upstream raw input. The upstream
@@ -183,7 +184,8 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		if p, err := strconv.Atoi(strings.TrimSpace(rec[pop])); err == nil {
 			e.Population = p
 		}
-		e.Rates[handle] = round4(rate)
+		// 4 decimals matches the snapshot's stored precision.
+		e.Rates[handle] = stats.Round(rate, 4)
 		idx.Communes[insee] = e
 		handles[handle] = true
 	}
@@ -194,12 +196,10 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	idx.Meta.RowCountCommunes = len(idx.Communes)
 	idx.Meta.Indicators = sortedKeys(handles)
 
-	zw := gzip.NewWriter(dst)
-	if err := json.NewEncoder(zw).Encode(idx); err != nil {
-		_ = zw.Close()
+	if err := dataset.WriteGzJSON(dst, idx); err != nil {
 		return fmt.Errorf("delinquance: encode: %w", err)
 	}
-	return zw.Close()
+	return nil
 }
 
 // pickRate returns the per-1000 rate for a row: the published
@@ -228,20 +228,7 @@ func parseFR(s string) (float64, bool) {
 	if s == "" || s == "NA" {
 		return 0, false
 	}
-	v, err := strconv.ParseFloat(strings.Replace(s, ",", ".", 1), 64)
-	if err != nil {
-		return 0, false
-	}
-	return v, true
-}
-
-// round4 rounds to 4 decimals (half away from zero), matching the snapshot's
-// stored precision.
-func round4(v float64) float64 {
-	if v < 0 {
-		return -round4(-v)
-	}
-	return float64(int64(v*10000+0.5)) / 10000
+	return frnorm.ParseFRFloat(s)
 }
 
 func sortedKeys(m map[string]bool) []string {

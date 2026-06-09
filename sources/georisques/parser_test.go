@@ -181,20 +181,20 @@ func TestStatutCommuneExisting(t *testing.T) {
 	}
 }
 
-func TestContainsCI_HasPrefixCI_Smoke(t *testing.T) {
+func TestStatutIsExisting_CaseInsensitive(t *testing.T) {
 	t.Parallel()
 
-	if !containsCI("Risque Existant", "existant") {
-		t.Error("containsCI failed")
+	if !statutIsExisting("Risque Existant") {
+		t.Error("mixed-case Existant not detected")
 	}
-	if containsCI("ABC", "z") {
-		t.Error("containsCI false-positive")
+	if statutIsExisting("ABC") {
+		t.Error("unrelated libelle false-positive")
 	}
-	if !hasPrefixCI("Risque non Concerne", "risque non") {
-		t.Error("hasPrefixCI failed")
+	if statutIsExisting("RISQUE NON Concerne") {
+		t.Error("'risque non' prefix must veto, case-insensitively")
 	}
-	if hasPrefixCI("Risque", "risque non") {
-		t.Error("hasPrefixCI false-positive (prefix longer than s)")
+	if statutIsExisting("Risque") {
+		t.Error("bare 'Risque' false-positive")
 	}
 }
 

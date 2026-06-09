@@ -2,7 +2,6 @@ package links
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -66,15 +65,7 @@ func (s *Source) Query(_ context.Context, l gazetteer.Listing) (any, error) {
 
 // Query is the atomic helper for callers who don't want the builder.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("links: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 // build assembles every link whose required inputs are present, in a stable,
@@ -85,9 +76,9 @@ func build(l gazetteer.Listing) []Link {
 		out = append(out, Link{Key: key, Label: label, Category: category, URL: u})
 	}
 
-	if l.Lat != nil && l.Lon != nil {
-		lat := strconv.FormatFloat(*l.Lat, 'f', 6, 64)
-		lon := strconv.FormatFloat(*l.Lon, 'f', 6, 64)
+	if la, lo, ok := l.Coords(); ok {
+		lat := strconv.FormatFloat(la, 'f', 6, 64)
+		lon := strconv.FormatFloat(lo, 'f', 6, 64)
 
 		// map & aerial imagery
 		add("googlemaps", "Google Maps", CategoryMap,

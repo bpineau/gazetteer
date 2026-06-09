@@ -2,7 +2,6 @@ package rnc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -129,15 +128,7 @@ func webURL(imm string) string {
 // Query is the atomic helper for callers who don't want the builder. A
 // successful but empty response returns a non-nil *Result with IsEmpty().
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("rnc: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

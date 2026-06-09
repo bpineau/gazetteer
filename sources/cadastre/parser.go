@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bpineau/gazetteer/sources/cadastre/geom"
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
 // ErrEmptyBody is returned by ParseFeatureCollection when the input is
@@ -77,11 +77,21 @@ func ParseFeatureCollection(body []byte) (*FeatureCollection, error) {
 }
 
 // ParsePolygonGeometry decodes a Feature's geometry into a typed
-// MultiPolygon. The API Carto endpoint always returns "MultiPolygon"
-// today; the "Polygon" arm is a safety net for upstream-schema drift.
-// Other geometry types return an error so callers can skip the
-// feature without misinterpreting it as a parcel polygon.
-func ParsePolygonGeometry(g RawGeometry) (geom.MultiPolygon, error) {
+// geopoly.MultiPolygon. The API Carto endpoint always returns
+// "MultiPolygon" today; the "Polygon" arm is a safety net for
+// upstream-schema drift. Other geometry types return an error so
+// callers can skip the feature without misinterpreting it as a parcel
+// polygon.
+//
+// The decode is deliberately local rather than reusing
+// geoindex.DecodeGeoJSONGeometry: that helper rounds coordinates (for
+// committed embedded artifacts) and retains inner rings, while this
+// runtime path must keep the upstream's full 8-decimal precision and
+// keeps only the OUTER ring of each polygon — cadastre parcels never
+// have holes (per the Etalab documentation), and dropping inner rings
+// also keeps the bâti footprint areas computed downstream stable for
+// courtyard buildings.
+func ParsePolygonGeometry(g RawGeometry) (geopoly.MultiPolygon, error) {
 	switch g.Type {
 	case "MultiPolygon":
 		// GeoJSON MultiPolygon coordinates: [[[[lon,lat], ...]], ...]
@@ -89,19 +99,12 @@ func ParsePolygonGeometry(g RawGeometry) (geom.MultiPolygon, error) {
 		if err := json.Unmarshal(g.Coordinates, &raw); err != nil {
 			return nil, fmt.Errorf("cadastre: decode MultiPolygon coords: %w", err)
 		}
-		mp := make(geom.MultiPolygon, 0, len(raw))
+		mp := make(geopoly.MultiPolygon, 0, len(raw))
 		for _, poly := range raw {
 			if len(poly) == 0 {
 				continue
 			}
-			// The OUTER ring is the first member of each polygon — inner
-			// rings are ignored (cadastre parcels never have holes).
-			outer := poly[0]
-			ring := make(geom.Polygon, 0, len(outer))
-			for _, pt := range outer {
-				ring = append(ring, geom.Point{Lon: pt[0], Lat: pt[1]})
-			}
-			mp = append(mp, ring)
+			mp = append(mp, geopoly.Polygon{outerRing(poly[0])})
 		}
 		return mp, nil
 	case "Polygon":
@@ -112,15 +115,19 @@ func ParsePolygonGeometry(g RawGeometry) (geom.MultiPolygon, error) {
 		if len(raw) == 0 {
 			return nil, nil
 		}
-		outer := raw[0]
-		ring := make(geom.Polygon, 0, len(outer))
-		for _, pt := range outer {
-			ring = append(ring, geom.Point{Lon: pt[0], Lat: pt[1]})
-		}
-		return geom.MultiPolygon{ring}, nil
+		return geopoly.MultiPolygon{geopoly.Polygon{outerRing(raw[0])}}, nil
 	default:
 		return nil, fmt.Errorf("cadastre: unsupported geometry type %q", g.Type)
 	}
+}
+
+// outerRing converts one decoded GeoJSON ring into a geopoly.Ring.
+func outerRing(pts [][2]float64) geopoly.Ring {
+	ring := make(geopoly.Ring, 0, len(pts))
+	for _, pt := range pts {
+		ring = append(ring, geopoly.Point{Lon: pt[0], Lat: pt[1]})
+	}
+	return ring
 }
 
 // PickFeature returns the first feature whose polygon contains the
@@ -135,13 +142,13 @@ func PickFeature(features []Feature, lon, lat float64) (int, bool) {
 	if len(features) == 0 {
 		return -1, false
 	}
-	p := geom.Point{Lon: lon, Lat: lat}
+	p := geopoly.Point{Lon: lon, Lat: lat}
 	for i, f := range features {
 		mp, err := ParsePolygonGeometry(f.Geometry)
 		if err != nil {
 			continue
 		}
-		if geom.PointInMultiPolygon(p, mp) {
+		if mp.Covers(p) {
 			return i, true
 		}
 	}

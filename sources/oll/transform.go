@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/frnorm"
 )
 
 // aggloSpec is one OLL observatory perimeter the Source ingests. Each publishes
@@ -251,13 +252,13 @@ func parseRents(text string) ([]rentRow, error) {
 			pieces, openEnded = p, oe
 		}
 		zone := zoneFromCalcul(field(r, idx["zone_calcul"]))
-		median, ok := parseFrenchFloat(field(r, idx["loyer_median"]))
+		median, ok := frnorm.ParseFRFloat(field(r, idx["loyer_median"]))
 		if zone == "" || !ok {
 			continue
 		}
-		q1, _ := parseFrenchFloat(field(r, idx["loyer_1_quartile"]))
-		q3, _ := parseFrenchFloat(field(r, idx["loyer_3_quartile"]))
-		surf, _ := parseFrenchFloat(field(r, idx["surface_moyenne"]))
+		q1, _ := frnorm.ParseFRFloat(field(r, idx["loyer_1_quartile"]))
+		q3, _ := frnorm.ParseFRFloat(field(r, idx["loyer_3_quartile"]))
+		surf, _ := frnorm.ParseFRFloat(field(r, idx["surface_moyenne"]))
 		n, _ := strconv.Atoi(strings.TrimSpace(field(r, idx["nombre_observations"])))
 		out = append(out, rentRow{
 			Zone: zone, Pieces: pieces, OpenEnded: openEnded,
@@ -267,9 +268,10 @@ func parseRents(text string) ([]rentRow, error) {
 	return out, nil
 }
 
-// readCSV parses a ";"-separated CSV (BOM-tolerant, ragged rows allowed).
+// readCSV parses a ";"-separated CSV (ragged rows allowed). Input text is
+// already BOM-free: decodeText strips the UTF-8 BOM when decoding members.
 func readCSV(text string) ([][]string, error) {
-	r := csv.NewReader(strings.NewReader(strings.TrimPrefix(text, "\ufeff")))
+	r := csv.NewReader(strings.NewReader(text))
 	r.Comma = ';'
 	r.FieldsPerRecord = -1
 	r.LazyQuotes = true
@@ -372,27 +374,6 @@ func parsePiecesHomogene(s string) (int, bool, bool) {
 		return 0, false, false
 	}
 	return n, open, true
-}
-
-// parseFrenchFloat parses a French-formatted decimal ("16,4", "1 234,5"). ok is
-// false for an empty/unparseable cell.
-func parseFrenchFloat(s string) (float64, bool) {
-	s = strings.Map(func(r rune) rune {
-		switch r {
-		case ' ', ' ', ' ':
-			return -1
-		}
-		return r
-	}, strings.TrimSpace(s))
-	s = strings.ReplaceAll(s, ",", ".")
-	if s == "" {
-		return 0, false
-	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0, false
-	}
-	return f, true
 }
 
 // validate gates a freshly-built artifact: it must parse and carry at least one

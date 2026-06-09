@@ -8,13 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
-	"strconv"
 	"strings"
 
 	"github.com/xuri/excelize/v2"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/frnorm"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // ratesRawName / appartRawName are the datadir filenames for the two
@@ -324,7 +324,7 @@ func nationalSeries(zes map[string][]float64, n int) []float64 {
 			}
 		}
 		if count > 0 {
-			out[q] = round2(sum / float64(count))
+			out[q] = stats.Round(sum/float64(count), 2)
 		}
 	}
 	return out
@@ -409,16 +409,6 @@ func isQuarter(s string) bool {
 // parseRate parses a rate cell, tolerating a comma decimal separator and
 // blanks (→ 0).
 func parseRate(s string) float64 {
-	s = strings.TrimSpace(strings.ReplaceAll(s, ",", "."))
-	if s == "" {
-		return 0
-	}
-	v, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0
-	}
+	v, _ := frnorm.ParseFRFloat(s)
 	return v
 }
-
-// round2 rounds to 2 decimal places.
-func round2(x float64) float64 { return math.Round(x*100) / 100 }

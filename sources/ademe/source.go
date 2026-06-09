@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -79,8 +78,8 @@ func (s *Source) Version() int { return sourceVersion }
 //
 //   - Missing address / unresolvable zip / empty query →
 //     gazetteer.ErrInsufficientInputs (wrapped)
-//   - HTTP 5xx, network, parse failure → gazetteer.ErrUpstreamUnavailable (wrapped)
-//   - HTTP 4xx (other than 404) → gazetteer.ErrUpstreamPermanent (wrapped)
+//   - HTTP 5xx / 429, network, parse failure → gazetteer.ErrUpstreamUnavailable (wrapped)
+//   - HTTP 4xx (other than 404 / 429) → gazetteer.ErrUpstreamPermanent (wrapped)
 //   - Successful empty response (results: []) → (*Result, nil) with
 //     IsEmpty()==true; the framework records StatusOKEmpty.
 //
@@ -224,45 +223,16 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	return out, nil
 }
 
-// fetch performs the HTTP GET and translates transport / status-code
-// failures to gazetteer sentinels.
+// fetch performs the HTTP GET via the shared gazetteer.FetchUpstream
+// helper. 404 = no record: data-fair normally returns 200 + empty
+// results for that case, but be defensive and map a rare 404 onto the
+// same canonical empty envelope the ParseList path expects.
 func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
-	client := s.opts.HTTPClient
-	if client == nil {
-		client = gazetteer.HTTPClientFrom(ctx)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, fmt.Errorf("ademe: build request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("ademe: %w: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 500 {
-		return nil, fmt.Errorf("ademe: %w: http %d", gazetteer.ErrUpstreamUnavailable, resp.StatusCode)
-	}
-	if resp.StatusCode == http.StatusNotFound {
-		// 404 = no record. data-fair normally returns 200 + empty
-		// results for that case, but be defensive: treat 404 as
-		// empty body so the parser returns ErrEmptyBody → upstream
-		// transient. The ParseList path is the canonical empty
-		// signal; 404 here is rare.
-		return []byte(`{"total":0,"results":[]}`), nil
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("ademe: %w: http %d", gazetteer.ErrUpstreamPermanent, resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("ademe: %w: read body: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	return body, nil
+	return gazetteer.FetchUpstream(ctx, s.opts.HTTPClient, u, gazetteer.FetchSpec{
+		Prefix:       Name,
+		Accept:       "application/json",
+		NotFoundBody: []byte(`{"total":0,"results":[]}`),
+	})
 }
 
 // resolveZip returns the 5-digit zip for the listing. Preference order:
@@ -297,15 +267,7 @@ func (s *Source) resolveZip(ctx context.Context, l gazetteer.Listing) (string, e
 // The error is non-nil only when the Source failed; a successful but
 // empty response still returns a non-nil *Result with IsEmpty() == true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("ademe: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

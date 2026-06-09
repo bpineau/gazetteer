@@ -2,9 +2,7 @@ package bdnb
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -82,8 +80,8 @@ func (s *Source) Version() int { return sourceVersion }
 //   - Missing address+city+zip → gazetteer.ErrInsufficientInputs (wrapped)
 //   - Geocoder cannot resolve INSEE → gazetteer.ErrInsufficientInputs (wrapped)
 //   - Empty address pattern after fraddr.Parse → gazetteer.ErrInsufficientInputs (wrapped)
-//   - HTTP 5xx / transport / parse failure → gazetteer.ErrUpstreamUnavailable (wrapped)
-//   - HTTP 4xx (other than 404) → gazetteer.ErrUpstreamPermanent (wrapped)
+//   - HTTP 5xx / 429 / transport / parse failure → gazetteer.ErrUpstreamUnavailable (wrapped)
+//   - HTTP 4xx (other than 404 / 429) → gazetteer.ErrUpstreamPermanent (wrapped)
 //   - Successful empty response (rows: []) → (*Result, nil) with
 //     IsEmpty()==true; the framework records StatusOKEmpty.
 //
@@ -218,49 +216,22 @@ func (s *Source) applyBaseURL(u string) string {
 	return s.opts.BaseURL + strings.TrimPrefix(u, BaseURL)
 }
 
-// fetch performs the HTTP GET and translates transport / status-code
-// failures to gazetteer sentinels.
+// fetch performs the HTTP GET via the shared gazetteer.FetchUpstream
+// helper. 404 = no record: PostgREST normally returns 200 + empty []
+// for that case, but be defensive and map a rare 404 onto the empty
+// list so the parser path returns (rows: [], nil) and we render the
+// SkipReasonNoMatch sentinel.
 func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
-	client := s.opts.HTTPClient
-	if client == nil {
-		client = gazetteer.HTTPClientFrom(ctx)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, fmt.Errorf("bdnb: build request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("bdnb: %w: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 500 {
-		return nil, fmt.Errorf("bdnb: %w: http %d", gazetteer.ErrUpstreamUnavailable, resp.StatusCode)
-	}
-	if resp.StatusCode == http.StatusNotFound {
-		// 404 = no record. PostgREST normally returns 200 + empty []
-		// for that case, but be defensive: treat 404 as empty body so
-		// the parser path returns (rows: [], nil) and we render the
-		// SkipReasonNoMatch sentinel. The ParseList path is the
-		// canonical empty signal; 404 here is rare.
-		return []byte(`[]`), nil
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("bdnb: %w: http %d", gazetteer.ErrUpstreamPermanent, resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("bdnb: %w: read body: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	return body, nil
+	return gazetteer.FetchUpstream(ctx, s.opts.HTTPClient, u, gazetteer.FetchSpec{
+		Prefix:       Name,
+		Accept:       "application/json",
+		NotFoundBody: []byte(`[]`),
+	})
 }
 
-// resolveINSEE returns the 5-digit INSEE for the listing via the
-// canonical BAN cascade (`helpers/banx/insee_resolver.go`):
+// resolveINSEE returns the 5-digit INSEE for the listing: trust
+// Listing.INSEE when set, else run the canonical BAN cascade
+// (banx.ResolveINSEE → INSEEResolver):
 //
 //  1. BAN forward on the free-form address — used only when
 //     score ≥ 0.7 AND citycode is non-empty. The score gate is the bug
@@ -269,74 +240,36 @@ func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
 //     zip 22680 Etables-sur-Mer → 75117 Paris on a 0.32-score match).
 //  2. BAN reverse on listing.lat/lon when the structured coords are
 //     present — by construction in the correct commune, independent of
-//     address-text matching.
-//  3. ErrNoINSEE / ErrInsufficientInputs when neither produces an INSEE.
+//     address-text matching. Enabled when the Geocoder also implements
+//     banx.ReverseGeocoder.
 //
-// Returns (insee, source) where source ∈ {"ban_forward", "ban_reverse"}
-// for traceability in Evidence.INSEEResolutionSource.
+// Returns (insee, source) where source ∈ {"listing", "ban_forward",
+// "ban_reverse"} for traceability in Evidence.INSEEResolutionSource.
 func (s *Source) resolveINSEE(ctx context.Context, l gazetteer.Listing) (insee, source string, err error) {
 	// If the listing already carries a usable INSEE, trust it.
 	if i := strings.TrimSpace(l.INSEE); i != "" {
 		return i, "listing", nil
 	}
-	if s.opts.Geocoder == nil {
-		return "", "", errors.New("bdnb: no geocoder configured")
-	}
-
-	var auctionLat, auctionLon float64
+	var lat, lon float64
 	if l.Lat != nil {
-		auctionLat = *l.Lat
+		lat = *l.Lat
 	}
 	if l.Lon != nil {
-		auctionLon = *l.Lon
+		lon = *l.Lon
 	}
-	hasText := l.Address != "" || l.City != "" || l.Zip != ""
-	hasCoords := auctionLat != 0 && auctionLon != 0
-	if !hasText && !hasCoords {
-		return "", "", errors.New("bdnb: no address/city/zip + no coords")
+	insee, source, err = banx.ResolveINSEE(ctx, s.opts.Geocoder,
+		strings.TrimSpace(l.Address+" "+l.Zip+" "+l.City), l.City, l.Zip, lat, lon)
+	if err != nil {
+		return "", "", fmt.Errorf("bdnb: %w", err)
 	}
-
-	// The Geocoder dependency is the BAN forward client (potentially
-	// wrapped by CachedGeocoder). For reverse we accept any geocoder
-	// that also implements ReverseGeocoder; otherwise we skip step 2.
-	var reverseGC banx.ReverseGeocoder
-	if rev, ok := s.opts.Geocoder.(banx.ReverseGeocoder); ok {
-		reverseGC = rev
-	}
-
-	resolver := &banx.INSEEResolver{
-		Forward: s.opts.Geocoder,
-		Reverse: reverseGC,
-	}
-	res, rerr := resolver.Resolve(ctx, banx.INSEEQuery{
-		Address: strings.TrimSpace(l.Address + " " + l.Zip + " " + l.City),
-		City:    l.City,
-		Zip:     l.Zip,
-		Lat:     auctionLat,
-		Lon:     auctionLon,
-	})
-	if rerr != nil {
-		return "", "", rerr
-	}
-	if res.INSEE == "" {
-		return "", "", errors.New("bdnb: no INSEE resolved")
-	}
-	return res.INSEE, res.Source, nil
+	return insee, source, nil
 }
 
 // Query is the atomic helper for callers who don't want the builder.
 // The error is non-nil only when the Source failed; a successful but
 // empty response still returns a non-nil *Result with IsEmpty() == true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("bdnb: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

@@ -167,22 +167,8 @@ func (r *Result) RentEstimate() appraisal.RentEstimate {
 	}
 	return appraisal.RentEstimate{
 		EurPerM2Cents: int64(math.Round(r.LoyerMedEURPerM2CC * ccToHCFactor * 100)),
-		Confidence:    mapCLConfidence(r.Confidence),
+		Confidence:    appraisal.ParseConfidence(r.Confidence),
 		Method:        fmt.Sprintf("carteloyers_%s", nonEmptyTypology(r.Typology)),
-	}
-}
-
-// mapCLConfidence translates carteloyers's stable confidence strings to
-// the appraisal package's coarse enum. Unknown values map to Low so
-// callers downstream never panic on a future carteloyers label.
-func mapCLConfidence(s string) appraisal.Confidence {
-	switch s {
-	case ConfidenceHigh:
-		return appraisal.ConfidenceHigh
-	case ConfidenceMedium:
-		return appraisal.ConfidenceMedium
-	default:
-		return appraisal.ConfidenceLow
 	}
 }
 

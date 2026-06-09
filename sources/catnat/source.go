@@ -2,7 +2,6 @@ package catnat
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -100,15 +99,7 @@ func addCat(m map[string]int, key string, n int) {
 
 // Query is the atomic helper for callers who don't want the builder.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("catnat: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

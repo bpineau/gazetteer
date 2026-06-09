@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 
 	"github.com/bpineau/gazetteer/gazetteer"
-	"github.com/bpineau/gazetteer/sources/cadastre/geom"
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
 // BatiFeatureCollection is the GeoJSON envelope of the per-commune
@@ -61,51 +59,24 @@ func LoadBatiPolygons(body []byte) ([]BatiPolygon, int, error) {
 		}
 		out = append(out, BatiPolygon{
 			Geometry: mp,
-			Centroid: geom.MultiPolygonCentroid(mp),
-			AreaM2:   geom.MultiPolygonAreaM2(mp),
+			Centroid: mp.Centroid(),
+			AreaM2:   mp.AreaM2(),
 		})
 	}
 	return out, raw, nil
 }
 
-// fetchBati performs the HTTP GET on the per-commune building dump.
-// Returns the body or an error wrapped with the appropriate gazetteer
-// sentinel. The caller's HTTP client handles gzip transparently.
+// fetchBati performs the HTTP GET on the per-commune building dump via
+// the shared gazetteer.FetchUpstream helper. 404 → no bâti for this
+// commune: mapped onto an empty dump rather than an error so the
+// caller can populate Bati* with zeros rather than soft-fail. The HTTP
+// client handles gzip transparently.
 func (s *Source) fetchBati(ctx context.Context, u string) ([]byte, error) {
-	client := s.opts.HTTPClient
-	if client == nil {
-		client = gazetteer.HTTPClientFrom(ctx)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, fmt.Errorf("cadastre: bati: build request: %w", err)
-	}
-	req.Header.Set("Accept", "application/vnd.geo+json,application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("cadastre: bati: %w: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		// 404 → no bâti for this commune. Return an empty dump rather
-		// than an error so the caller can populate Bati* with zeros
-		// rather than soft-fail.
-		return []byte(`{"type":"FeatureCollection","features":[]}`), nil
-	}
-	if resp.StatusCode >= 500 {
-		return nil, fmt.Errorf("cadastre: bati: %w: http %d", gazetteer.ErrUpstreamUnavailable, resp.StatusCode)
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("cadastre: bati: %w: http %d", gazetteer.ErrUpstreamPermanent, resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("cadastre: bati: %w: read body: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	return body, nil
+	return gazetteer.FetchUpstream(ctx, s.opts.HTTPClient, u, gazetteer.FetchSpec{
+		Prefix:       "cadastre: bati",
+		Accept:       "application/vnd.geo+json,application/json",
+		NotFoundBody: []byte(`{"type":"FeatureCollection","features":[]}`),
+	})
 }
 
 // applyBatiBaseURL rewrites the upstream root with s.opts.BatiBaseURL
@@ -156,13 +127,13 @@ func (s *Source) resolveBatiPolygons(ctx context.Context, insee string) (polys [
 // `parcel` is the API Carto parcel geometry; using a MultiPolygon
 // directly matches what API Carto actually returns and dodges a
 // Polygon-vs-MultiPolygon split at the call site.
-func filterBatiInParcel(polys []BatiPolygon, parcel geom.MultiPolygon) []BatiPolygon {
+func filterBatiInParcel(polys []BatiPolygon, parcel geopoly.MultiPolygon) []BatiPolygon {
 	if len(polys) == 0 || len(parcel) == 0 {
 		return nil
 	}
 	out := make([]BatiPolygon, 0)
 	for _, p := range polys {
-		if geom.PointInMultiPolygon(p.Centroid, parcel) {
+		if parcel.Covers(p.Centroid) {
 			out = append(out, p)
 		}
 	}

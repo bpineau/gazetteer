@@ -1,18 +1,16 @@
 package rpls
 
 import (
-	"compress/gzip"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-	"strconv"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/frnorm"
 )
 
 // rawName is the datadir filename for the upstream raw input.
@@ -103,12 +101,10 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	}
 	idx.Meta.RowCountCommunes = len(idx.Communes)
 
-	zw := gzip.NewWriter(dst)
-	if err := json.NewEncoder(zw).Encode(idx); err != nil {
-		_ = zw.Close()
+	if err := dataset.WriteGzJSON(dst, idx); err != nil {
 		return fmt.Errorf("rpls: encode json: %w", err)
 	}
-	return zw.Close()
+	return nil
 }
 
 // validate gates publication: the rebuilt (gzipped) artifact must parse and
@@ -139,13 +135,8 @@ func indexOf(header []string, name string) int {
 // parseRate parses a SRU rate ("7.0", "0,0") into a percentage rounded to one
 // decimal. ok is false for an empty/unparseable cell.
 func parseRate(s string) (float64, bool) {
-	s = strings.TrimSpace(s)
-	s = strings.ReplaceAll(s, ",", ".")
-	if s == "" {
-		return 0, false
-	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
+	f, ok := frnorm.ParseFRFloat(s)
+	if !ok {
 		return 0, false
 	}
 	return math.Round(f*10) / 10, true

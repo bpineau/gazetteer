@@ -3,11 +3,9 @@ package chomage
 import (
 	"embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
@@ -62,11 +60,7 @@ type Index struct {
 	Communes              map[string]string    `json:"communes"`
 }
 
-var (
-	indexOnce  sync.Once
-	indexCache *Index
-	indexErr   error
-)
+var lazyIndex dataset.Lazy[Index]
 
 // Load returns the singleton index, resolving the processed artifact from
 // dir (the datadir) with a fallback to the embedded copy, and parsing it on
@@ -75,25 +69,7 @@ var (
 // neither in the datadir nor embedded yields an empty index (graceful
 // degradation), not an error.
 func Load(dir string) (*Index, error) {
-	indexOnce.Do(func() {
-		rc, err := set.Open(dir)
-		if errors.Is(err, dataset.ErrUnavailable) {
-			indexCache = &Index{}
-			return
-		}
-		if err != nil {
-			indexErr = fmt.Errorf("chomage: open dataset: %w", err)
-			return
-		}
-		defer func() { _ = rc.Close() }()
-		idx, err := parseIndex(rc)
-		if err != nil {
-			indexErr = err
-			return
-		}
-		indexCache = idx
-	})
-	return indexCache, indexErr
+	return lazyIndex.Load(set, dir, parseIndex)
 }
 
 // parseIndex decodes the JSON extract into an Index.

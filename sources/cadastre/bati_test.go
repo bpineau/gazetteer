@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/bpineau/gazetteer/sources/cadastre/geom"
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
 func TestParseBatiFeatureCollection_Synthetic(t *testing.T) {
@@ -51,7 +51,7 @@ func TestLoadBatiPolygons_PrecomputesCentroidAndArea(t *testing.T) {
 		}
 		// Centroid must lie inside the polygon — sanity for the
 		// downstream PIP filter.
-		if !geom.PointInMultiPolygon(p.Centroid, p.Geometry) {
+		if !p.Geometry.Covers(p.Centroid) {
 			t.Errorf("polys[%d] centroid %+v not inside its own geometry", i, p.Centroid)
 		}
 	}
@@ -71,13 +71,15 @@ func TestFilterBatiInParcel_CentroidPIP(t *testing.T) {
 	// Parcel polygon enclosing the first two bâti centroids
 	// (around 2.0001/49.0001 + 2.0003/49.0001), excluding the last two
 	// (at 2.01.../49.01... and 2.02.../49.02...).
-	parcel := geom.MultiPolygon{
-		geom.Polygon{
-			{Lon: 1.9999, Lat: 48.9999},
-			{Lon: 2.0004, Lat: 48.9999},
-			{Lon: 2.0004, Lat: 49.0002},
-			{Lon: 1.9999, Lat: 49.0002},
-			{Lon: 1.9999, Lat: 48.9999},
+	parcel := geopoly.MultiPolygon{
+		geopoly.Polygon{
+			geopoly.Ring{
+				{Lon: 1.9999, Lat: 48.9999},
+				{Lon: 2.0004, Lat: 48.9999},
+				{Lon: 2.0004, Lat: 49.0002},
+				{Lon: 1.9999, Lat: 49.0002},
+				{Lon: 1.9999, Lat: 48.9999},
+			},
 		},
 	}
 	got := filterBatiInParcel(polys, parcel)
@@ -93,7 +95,7 @@ func TestFilterBatiInParcel_CentroidPIP(t *testing.T) {
 func TestFilterBatiInParcel_EmptyInputs(t *testing.T) {
 	t.Parallel()
 
-	if got := filterBatiInParcel(nil, geom.MultiPolygon{}); got != nil {
+	if got := filterBatiInParcel(nil, geopoly.MultiPolygon{}); got != nil {
 		t.Errorf("filterBatiInParcel(nil, empty) = %v, want nil", got)
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // apiResponse mirrors the data-fair `values_agg` envelope this Source
@@ -65,10 +67,10 @@ func Parse(body []byte) (*Result, error) {
 
 	out.Shares = make(map[Label]float64, len(out.Counts))
 	for l, n := range out.Counts {
-		out.Shares[l] = round1(100 * float64(n) / float64(out.NbTotal))
+		out.Shares[l] = stats.Round(100*float64(n)/float64(out.NbTotal), 1)
 	}
-	out.PassoireSharePct = round1(out.Shares[LabelF] + out.Shares[LabelG])
-	out.EfficientSharePct = round1(out.Shares[LabelA] + out.Shares[LabelB])
+	out.PassoireSharePct = stats.Round(out.Shares[LabelF]+out.Shares[LabelG], 1)
+	out.EfficientSharePct = stats.Round(out.Shares[LabelA]+out.Shares[LabelB], 1)
 	return out, nil
 }
 
@@ -102,12 +104,4 @@ func foldLabel(v any) Label {
 	default:
 		return LabelN
 	}
-}
-
-// round1 rounds x to one decimal place.
-func round1(x float64) float64 {
-	if x >= 0 {
-		return float64(int64(x*10+0.5)) / 10
-	}
-	return -float64(int64(-x*10+0.5)) / 10
 }

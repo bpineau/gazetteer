@@ -2,7 +2,6 @@ package delinquance
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -157,15 +156,7 @@ func copyRateMap(m map[string]float64) map[string]float64 {
 // The error is non-nil only when the Source failed; a successful but
 // empty response still returns a non-nil *Result with IsEmpty() == true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("delinquance: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
@@ -66,25 +65,12 @@ func (idx *Index) Count() int {
 	return len(idx.byINSEE)
 }
 
-var (
-	once    sync.Once
-	cache   *Index
-	loadErr error
-)
+var lazyIndex dataset.Lazy[Index]
 
 // Load returns the singleton index, resolving the CSV from dir (datadir)
 // with embedded fallback. Sticky: first call's dir and error win.
 func Load(dir string) (*Index, error) {
-	once.Do(func() {
-		rc, err := theSet.Open(dir)
-		if err != nil {
-			loadErr = err
-			return
-		}
-		defer func() { _ = rc.Close() }()
-		cache, loadErr = parseCSV(rc)
-	})
-	return cache, loadErr
+	return lazyIndex.Load(theSet, dir, parseCSV)
 }
 
 func parseCSV(src io.Reader) (*Index, error) {

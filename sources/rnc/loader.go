@@ -1,13 +1,8 @@
 package rnc
 
 import (
-	"compress/gzip"
 	"embed"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
-	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
@@ -70,53 +65,22 @@ type Index struct {
 	ByInsee map[string][]int `json:"-"`
 }
 
-var (
-	indexOnce  sync.Once
-	indexCache *Index
-	indexErr   error
-)
+var lazyIndex dataset.Lazy[Index]
 
 // Load returns the singleton index, resolving from dir (datadir) with a
 // fallback to the embedded artifact, parsing on first call. A missing
 // non-embedded dataset yields an empty index (graceful degradation).
 func Load(dir string) (*Index, error) {
-	indexOnce.Do(func() {
-		rc, err := set.Open(dir)
-		if errors.Is(err, dataset.ErrUnavailable) {
-			indexCache = &Index{}
-			return
-		}
-		if err != nil {
-			indexErr = fmt.Errorf("rnc: open dataset: %w", err)
-			return
-		}
-		defer func() { _ = rc.Close() }()
-		idx, err := parseIndex(rc)
-		if err != nil {
-			indexErr = err
-			return
-		}
-		indexCache = idx
-	})
-	return indexCache, indexErr
+	return lazyIndex.Load(set, dir, parseIndex)
 }
 
 func parseIndex(r io.Reader) (*Index, error) {
-	zr, err := gzip.NewReader(r)
+	idx, err := dataset.ReadGzJSON[Index](r, Name)
 	if err != nil {
-		return nil, fmt.Errorf("rnc: gunzip: %w", err)
-	}
-	defer func() { _ = zr.Close() }()
-	body, err := io.ReadAll(zr)
-	if err != nil {
-		return nil, fmt.Errorf("rnc: read body: %w", err)
-	}
-	var idx Index
-	if err := json.Unmarshal(body, &idx); err != nil {
-		return nil, fmt.Errorf("rnc: parse json: %w", err)
+		return nil, err
 	}
 	idx.buildLookups()
-	return &idx, nil
+	return idx, nil
 }
 
 func (idx *Index) buildLookups() {

@@ -3,11 +3,9 @@ package gpe
 import (
 	"embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"sort"
-	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/helpers/geodist"
@@ -54,11 +52,7 @@ type Index struct {
 	Stations []stationRec `json:"stations"`
 }
 
-var (
-	indexOnce  sync.Once
-	indexCache *Index
-	indexErr   error
-)
+var lazyIndex dataset.Lazy[Index]
 
 // Load returns the singleton catalog, resolving the processed artifact from
 // dir (the datadir) with a fallback to the embedded copy. The dir from the
@@ -66,25 +60,7 @@ var (
 // dataset that is neither in the datadir nor embedded yields an empty catalog
 // (graceful degradation), not an error.
 func Load(dir string) (*Index, error) {
-	indexOnce.Do(func() {
-		rc, err := set.Open(dir)
-		if errors.Is(err, dataset.ErrUnavailable) {
-			indexCache = &Index{}
-			return
-		}
-		if err != nil {
-			indexErr = fmt.Errorf("gpe: open dataset: %w", err)
-			return
-		}
-		defer func() { _ = rc.Close() }()
-		idx, err := parseIndex(rc)
-		if err != nil {
-			indexErr = err
-			return
-		}
-		indexCache = idx
-	})
-	return indexCache, indexErr
+	return lazyIndex.Load(set, dir, parseIndex)
 }
 
 // parseIndex decodes the JSON catalog.

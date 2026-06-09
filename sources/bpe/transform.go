@@ -3,10 +3,8 @@ package bpe
 import (
 	"archive/zip"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -140,12 +138,10 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		return err
 	}
 
-	gz := gzip.NewWriter(dst)
-	if err := json.NewEncoder(gz).Encode(idx); err != nil {
-		_ = gz.Close()
+	if err := dataset.WriteGzJSON(dst, idx); err != nil {
 		return fmt.Errorf("bpe: encode json: %w", err)
 	}
-	return gz.Close()
+	return nil
 }
 
 // buildIndex parses the (already-decompressed) BPE data CSV and aggregates

@@ -2,13 +2,12 @@ package encadrement
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // Name is the canonical Source identifier. Stable; used as the
@@ -222,8 +221,8 @@ func collapse(entries []Entry, label, zoneSource string, rooms int, ev Evidence,
 			Evidence:   ev,
 		}
 	}
-	maj := medianFloat(majs)
-	ref := medianFloat(refs)
+	maj := stats.Median(majs)
+	ref := stats.Median(refs)
 	return &Result{
 		LoyerRefMajEURPerM2HC: maj,
 		LoyerRefEURPerM2HC:    ref,
@@ -296,19 +295,6 @@ func lyonZoneLabel(insee string) string {
 	}
 }
 
-// medianFloat returns the median of xs. xs is sorted in place.
-func medianFloat(xs []float64) float64 {
-	if len(xs) == 0 {
-		return 0
-	}
-	sort.Float64s(xs)
-	mid := len(xs) / 2
-	if len(xs)%2 == 1 {
-		return xs[mid]
-	}
-	return (xs[mid-1] + xs[mid]) / 2
-}
-
 // intDeref dereferences a *int into 0 when nil.
 func intDeref(p *int) int {
 	if p == nil {
@@ -321,15 +307,7 @@ func intDeref(p *int) int {
 // The error is non-nil only when the Source failed; a successful but
 // empty response still returns a non-nil *Result with IsEmpty() == true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("encadrement: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

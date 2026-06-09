@@ -94,8 +94,11 @@ func TestParsePolygonGeometry_MultiPolygon(t *testing.T) {
 	if len(mp) == 0 {
 		t.Fatal("decoded MultiPolygon is empty")
 	}
-	if len(mp[0]) < 3 {
-		t.Errorf("outer ring has %d points, want >=3", len(mp[0]))
+	if len(mp[0]) != 1 {
+		t.Fatalf("decoded polygon has %d rings, want 1 (outer only)", len(mp[0]))
+	}
+	if len(mp[0][0]) < 3 {
+		t.Errorf("outer ring has %d points, want >=3", len(mp[0][0]))
 	}
 }
 
@@ -113,9 +116,9 @@ func TestParsePolygonGeometry_BarePolygon(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParsePolygonGeometry: %v", err)
 	}
-	if len(mp) != 1 || len(mp[0]) != 5 {
-		t.Errorf("MultiPolygon shape = %d polygons / %d points, want 1/5",
-			len(mp), len(mp[0]))
+	if len(mp) != 1 || len(mp[0]) != 1 || len(mp[0][0]) != 5 {
+		t.Errorf("MultiPolygon shape = %d polygons / %d rings / %d points, want 1/1/5",
+			len(mp), len(mp[0]), len(mp[0][0]))
 	}
 }
 

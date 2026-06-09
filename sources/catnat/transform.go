@@ -3,10 +3,8 @@ package catnat
 import (
 	"archive/zip"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -59,11 +57,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		return errors.New("catnat: transform produced no communes")
 	}
 
-	gz := gzip.NewWriter(dst)
-	if err := json.NewEncoder(gz).Encode(p); err != nil {
-		return err
-	}
-	return gz.Close()
+	return dataset.WriteGzJSON(dst, p)
 }
 
 // agg accumulates one commune's decrees during the single CSV pass.
@@ -76,7 +70,7 @@ type agg struct {
 // window is measured against the latest event year in the data, so the output is
 // deterministic (independent of when the transform runs).
 func aggregate(csvBytes []byte) (processed, error) {
-	r := csv.NewReader(bytes.NewReader(csvBytes))
+	r := csv.NewReader(dataset.BOMReader(bytes.NewReader(csvBytes)))
 	r.Comma = ';'
 	r.FieldsPerRecord = -1
 	r.LazyQuotes = true
@@ -87,7 +81,7 @@ func aggregate(csvBytes []byte) (processed, error) {
 	}
 	col := map[string]int{}
 	for i, h := range header {
-		col[strings.ToLower(strings.TrimSpace(strings.TrimPrefix(h, "\ufeff")))] = i
+		col[strings.ToLower(strings.TrimSpace(h))] = i
 	}
 	ciCom, ok1 := col["cod_commune"]
 	ciRisk, ok2 := col["lib_risque_jo"]
@@ -239,14 +233,9 @@ func zipMember(zr *zip.Reader, nameSubstr string) ([]byte, error) {
 // validate gates a freshly-built artifact: it must gunzip, parse, and carry a
 // plausible number of communes with a sane reference year.
 func validate(r io.Reader) error {
-	gz, err := gzip.NewReader(r)
+	p, err := dataset.ReadGzJSON[processed](r, Name)
 	if err != nil {
-		return fmt.Errorf("catnat: validate gunzip: %w", err)
-	}
-	defer func() { _ = gz.Close() }()
-	var p processed
-	if err := json.NewDecoder(gz).Decode(&p); err != nil {
-		return fmt.Errorf("catnat: validate decode: %w", err)
+		return err
 	}
 	if len(p.Communes) < 30000 {
 		return fmt.Errorf("catnat: only %d communes, want ≥ 30000", len(p.Communes))

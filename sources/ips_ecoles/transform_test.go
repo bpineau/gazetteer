@@ -72,37 +72,8 @@ func TestTransform_Golden(t *testing.T) {
 	}
 }
 
-func TestMedian(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		in   []float64
-		want float64
-	}{
-		{[]float64{110.3}, 110.3},
-		{[]float64{95.3, 80.6}, 87.95},  // even, unsorted
-		{[]float64{140, 120, 130}, 130}, // odd
-		{[]float64{1, 2, 3, 4}, 2.5},    // even
-	}
-	for _, c := range cases {
-		if got := median(c.in); !approx(got, c.want) {
-			t.Errorf("median(%v) = %v, want %v", c.in, got, c.want)
-		}
-	}
-}
-
-func TestParseIPS(t *testing.T) {
-	t.Parallel()
-	if v, ok := parseIPS("110.3"); !ok || !approx(v, 110.3) {
-		t.Errorf(`parseIPS("110.3") = (%v,%v)`, v, ok)
-	}
-	if v, ok := parseIPS("99,9"); !ok || !approx(v, 99.9) {
-		t.Errorf(`parseIPS("99,9") = (%v,%v)`, v, ok)
-	}
-	for _, s := range []string{"NS", "", "  ", "n/a"} {
-		if _, ok := parseIPS(s); ok {
-			t.Errorf("parseIPS(%q) unexpectedly ok", s)
-		}
-	}
-}
+// median (even-count averaging) and IPS parsing (NS / blank → dropped) are
+// exercised end-to-end by TestTransform_Golden above; the primitives
+// themselves are owned and tested by helpers/stats and helpers/frnorm.
 
 func approx(a, b float64) bool { return math.Abs(a-b) < 1e-9 }

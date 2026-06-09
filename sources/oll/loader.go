@@ -3,10 +3,8 @@ package oll
 import (
 	"embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
@@ -117,34 +115,20 @@ func (idx *Index) CommuneCount() int {
 	return len(idx.inseeZone)
 }
 
-var (
-	indexOnce  sync.Once
-	indexCache *Index
-	indexErr   error
-)
+var lazyIndex dataset.Lazy[Index]
 
 // Load returns the singleton lookup index, resolving the artifact from dir (the
 // datadir) with a fallback to the embedded snapshot, parsed on first call. The
 // dir from the first call wins for the process lifetime. A missing
 // (non-embedded) artifact yields an empty index rather than an error.
 func Load(dir string) (*Index, error) {
-	indexOnce.Do(func() {
-		indexCache, indexErr = parse(dir)
-	})
-	return indexCache, indexErr
+	return lazyIndex.Load(set, dir, parseIndex)
 }
 
-func parse(dir string) (*Index, error) {
-	rc, err := set.Open(dir)
-	if errors.Is(err, dataset.ErrUnavailable) {
-		return &Index{inseeZone: map[string]zoneRef{}, rents: map[string]rentRow{}}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rc.Close() }()
-
-	raw, err := io.ReadAll(rc)
+// parseIndex decodes the plain-JSON artifact (oll.json is not gzipped) and
+// builds the in-memory lookup maps.
+func parseIndex(r io.Reader) (*Index, error) {
+	raw, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}

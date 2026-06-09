@@ -2,9 +2,7 @@ package education
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -71,8 +69,8 @@ func (s *Source) Version() int { return sourceVersion }
 // gazetteer/source.go):
 //
 //   - Missing INSEE → ErrInsufficientInputs (wrapped)
-//   - HTTP 5xx, network, json decode → ErrUpstreamUnavailable
-//   - HTTP 4xx (other than 404) → ErrUpstreamPermanent
+//   - HTTP 5xx / 429, network, json decode → ErrUpstreamUnavailable
+//   - HTTP 4xx (other than 404 / 429) → ErrUpstreamPermanent
 //   - HTTP 404 → empty Result (the API normally returns 200+empty)
 //
 // Logging: one DEBUG line per query via
@@ -121,57 +119,22 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	return res, nil
 }
 
-// fetch performs the HTTP GET and translates transport / status-code
-// failures to gazetteer sentinels.
+// fetch performs the HTTP GET via the shared gazetteer.FetchUpstream
+// helper. The Opendatasoft API normally responds 200 + empty results
+// for an unknown commune; a rare 404 is defensively mapped onto the
+// same "no rows" envelope so consumers see an empty Result rather than
+// a failure.
 func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
-	client := s.opts.HTTPClient
-	if client == nil {
-		client = gazetteer.HTTPClientFrom(ctx)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, fmt.Errorf("education: build request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("education: %w: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 500 {
-		return nil, fmt.Errorf("education: %w: http %d", gazetteer.ErrUpstreamUnavailable, resp.StatusCode)
-	}
-	if resp.StatusCode == http.StatusNotFound {
-		// The Opendatasoft API normally responds 200 + empty results
-		// for an unknown commune ; treat 404 defensively as "no rows"
-		// so consumers see an empty Result rather than a transient
-		// failure.
-		return []byte(`{"total_count":0,"results":[]}`), nil
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("education: %w: http %d", gazetteer.ErrUpstreamPermanent, resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("education: %w: read body: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	return body, nil
+	return gazetteer.FetchUpstream(ctx, s.opts.HTTPClient, u, gazetteer.FetchSpec{
+		Prefix:       Name,
+		Accept:       "application/json",
+		NotFoundBody: []byte(`{"total_count":0,"results":[]}`),
+	})
 }
 
 // Query is the atomic helper for callers who don't want the builder.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("education: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

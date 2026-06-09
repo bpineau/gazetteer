@@ -155,8 +155,10 @@ func (r *Result) RentEstimate() appraisal.RentEstimate {
 }
 
 // mapEncConfidence translates encadrement's stable confidence strings to
-// the appraisal package's coarse enum. Unknown values map to Low so
-// callers downstream never panic on a future encadrement label.
+// the appraisal package's coarse enum. Deliberately NOT
+// appraisal.ParseConfidence: encadrement never emits "high", so any
+// unknown label — including a future "high" — collapses to Low (the
+// conservative floor pinned by TestResult_RentEstimateConfidenceMapping).
 func mapEncConfidence(s string) appraisal.Confidence {
 	switch s {
 	case ConfidenceMedium:

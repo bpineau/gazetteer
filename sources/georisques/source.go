@@ -2,9 +2,7 @@ package georisques
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -78,8 +76,8 @@ func (s *Source) Version() int { return sourceVersion }
 //   - Missing address+city+zip → gazetteer.ErrInsufficientInputs (wrapped)
 //   - Geocoder cannot resolve lat/lon → gazetteer.ErrInsufficientInputs (wrapped)
 //   - URL builder rejects coords → gazetteer.ErrInsufficientInputs (wrapped)
-//   - HTTP 5xx / transport / parse failure → gazetteer.ErrUpstreamUnavailable (wrapped)
-//   - HTTP 4xx (other than 404) → gazetteer.ErrUpstreamPermanent (wrapped)
+//   - HTTP 5xx / 429 / transport / parse failure → gazetteer.ErrUpstreamUnavailable (wrapped)
+//   - HTTP 4xx (other than 404 / 429) → gazetteer.ErrUpstreamPermanent (wrapped)
 //
 // Successful empty parses (Report parsed but Adresse + Commune empty)
 // are NOT treated as errors — the Source returns a *Result whose
@@ -92,7 +90,7 @@ func (s *Source) Version() int { return sourceVersion }
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	logger := gazetteer.LoggerFrom(ctx).With(slog.String("source", Name))
 
-	if l.Address == "" && l.City == "" && l.Zip == "" && !hasCoords(l) {
+	if _, _, hasCoords := l.Coords(); l.Address == "" && l.City == "" && l.Zip == "" && !hasCoords {
 		return nil, fmt.Errorf("georisques: %w: no address/city/zip/coords", gazetteer.ErrInsufficientInputs)
 	}
 
@@ -152,92 +150,39 @@ func (s *Source) applyBaseURL(u string) string {
 	return s.opts.BaseURL + strings.TrimPrefix(u, BaseURL)
 }
 
-// fetch performs the HTTP GET and translates transport / status-code
-// failures to gazetteer sentinels.
+// fetch performs the HTTP GET via the shared gazetteer.FetchUpstream
+// helper. 404 = no rapport for these coords: BRGM normally returns 200
+// + empty body for that case, but be defensive and map a rare 404 onto
+// `{}` so the parser yields a zero-valued Report — the canonical empty
+// signal.
 func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
-	client := s.opts.HTTPClient
-	if client == nil {
-		client = gazetteer.HTTPClientFrom(ctx)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, fmt.Errorf("georisques: build request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("georisques: %w: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 500 {
-		return nil, fmt.Errorf("georisques: %w: http %d", gazetteer.ErrUpstreamUnavailable, resp.StatusCode)
-	}
-	if resp.StatusCode == http.StatusNotFound {
-		// 404 = no rapport for these coords. BRGM normally returns 200
-		// + empty body for that case, but be defensive: treat 404 as
-		// `{}` so the parser yields a zero-valued Report. The Report
-		// path is the canonical empty signal; 404 here is rare.
-		return []byte(`{}`), nil
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("georisques: %w: http %d", gazetteer.ErrUpstreamPermanent, resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("georisques: %w: read body: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	return body, nil
+	return gazetteer.FetchUpstream(ctx, s.opts.HTTPClient, u, gazetteer.FetchSpec{
+		Prefix:       Name,
+		Accept:       "application/json",
+		NotFoundBody: []byte(`{}`),
+	})
 }
 
-// resolveLatLon returns (lat, lon) for the listing. Preference order:
-//
-//  1. Listing.Lat/Lon when both pointers are non-nil and not (0,0).
-//  2. The Geocoder's result (when configured).
-//  3. An error otherwise.
+// resolveLatLon returns (lat, lon) for the listing: the Listing's own
+// coordinates when usable (Listing.Coords), else the Geocoder fallback
+// via banx.ResolveLatLon.
 func (s *Source) resolveLatLon(ctx context.Context, l gazetteer.Listing) (float64, float64, error) {
-	if l.Lat != nil && l.Lon != nil && (*l.Lat != 0 || *l.Lon != 0) {
-		return *l.Lat, *l.Lon, nil
+	if lat, lon, ok := l.Coords(); ok {
+		return lat, lon, nil
 	}
-	if s.opts.Geocoder == nil {
-		return 0, 0, errors.New("georisques: lat/lon not resolvable (no geocoder configured)")
-	}
-	q := banx.GeocodeQuery{
-		Address: strings.TrimSpace(l.Address + " " + l.Zip + " " + l.City),
-		City:    l.City,
-		Zip:     l.Zip,
-	}
-	res, err := s.opts.Geocoder.Geocode(ctx, q)
+	lat, lon, err := banx.ResolveLatLon(ctx, s.opts.Geocoder,
+		strings.TrimSpace(l.Address+" "+l.Zip+" "+l.City), l.City, l.Zip)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("georisques: %w", err)
 	}
-	if res.Lat == 0 && res.Lon == 0 {
-		return 0, 0, errors.New("georisques: geocoder returned zero coords")
-	}
-	return res.Lat, res.Lon, nil
-}
-
-// hasCoords reports whether the listing carries a non-zero (lat, lon)
-// pair via its pointer fields.
-func hasCoords(l gazetteer.Listing) bool {
-	return l.Lat != nil && l.Lon != nil && (*l.Lat != 0 || *l.Lon != 0)
+	return lat, lon, nil
 }
 
 // Query is the atomic helper for callers who don't want the builder.
 // The error is non-nil only when the Source failed; a successful but
 // empty response still returns a non-nil *Result with IsEmpty() == true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("georisques: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

@@ -3,10 +3,8 @@ package cdsr
 import (
 	"embed"
 	"encoding/json"
-	"errors"
 	"io"
 	"sort"
-	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/helpers/geodist"
@@ -70,34 +68,20 @@ type nearby struct {
 	meters float64
 }
 
-var (
-	catalogOnce  sync.Once
-	catalogCache *Catalog
-	catalogErr   error
-)
+var lazyCatalog dataset.Lazy[Catalog]
 
 // Load returns the singleton CDSR catalog, resolving the artifact from dir (the
 // datadir) with a fallback to the embedded snapshot, parsed on first call. The
 // dir from the first call wins for the process lifetime. A missing
 // (non-embedded) artifact yields an empty catalog rather than an error.
 func Load(dir string) (*Catalog, error) {
-	catalogOnce.Do(func() {
-		catalogCache, catalogErr = parse(dir)
-	})
-	return catalogCache, catalogErr
+	return lazyCatalog.Load(set, dir, parseCatalog)
 }
 
-func parse(dir string) (*Catalog, error) {
-	rc, err := set.Open(dir)
-	if errors.Is(err, dataset.ErrUnavailable) {
-		return &Catalog{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rc.Close() }()
-
-	raw, err := io.ReadAll(rc)
+// parseCatalog decodes the plain-JSON copro list (a zero-byte artifact is an
+// empty catalog).
+func parseCatalog(r io.Reader) (*Catalog, error) {
+	raw, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}

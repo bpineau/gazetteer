@@ -28,6 +28,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // ErrEmptyBody is returned by ParseReport when the input is empty or
@@ -193,57 +194,11 @@ func statutIsExisting(s string) bool {
 	if s == "" {
 		return false
 	}
-	if hasPrefixCI(s, "risque non") {
+	ls := strings.ToLower(s)
+	if strings.HasPrefix(ls, "risque non") {
 		return false
 	}
-	return containsCI(s, "existant") || containsCI(s, "concerne")
-}
-
-// containsCI is a tiny helper to avoid a strings.ToLower allocation on
-// the hot path. The two needles we test are short ASCII substrings.
-func containsCI(s, sub string) bool {
-	// We only ever pass ASCII lowercase substrings (statutIsExisting
-	// callers above), so a manual lower-bound iteration is fine.
-	if len(sub) == 0 {
-		return true
-	}
-	if len(s) < len(sub) {
-		return false
-	}
-	for i := 0; i+len(sub) <= len(s); i++ {
-		match := true
-		for j := 0; j < len(sub); j++ {
-			c := s[i+j]
-			if c >= 'A' && c <= 'Z' {
-				c += 'a' - 'A'
-			}
-			if c != sub[j] {
-				match = false
-				break
-			}
-		}
-		if match {
-			return true
-		}
-	}
-	return false
-}
-
-// hasPrefixCI is the case-insensitive ASCII prefix check.
-func hasPrefixCI(s, prefix string) bool {
-	if len(prefix) > len(s) {
-		return false
-	}
-	for i := range len(prefix) {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		if c != prefix[i] {
-			return false
-		}
-	}
-	return true
+	return strings.Contains(ls, "existant") || strings.Contains(ls, "concerne")
 }
 
 // BuildResult renders a Report into the typed Result blob. Pure
@@ -303,35 +258,9 @@ func BuildResult(r *Report) *Result {
 	naturels := CanonicalNaturels(r)
 	technos := CanonicalTechnos(r)
 
-	naturelsMap := make(map[string]RiskBlob, len(naturels))
-	natPresent := 0
-	for _, nr := range naturels {
-		naturelsMap[nr.Key] = RiskBlob{
-			Present:       nr.Risk.Present,
-			StatutCommune: nr.Risk.LibelleStatutCommune,
-			StatutAdresse: nr.Risk.LibelleStatutAdresse,
-			Specifique:    nr.Risk.Specifique,
-		}
-		if nr.Risk.Present {
-			natPresent++
-		}
-	}
-	out.Naturels = naturelsMap
-
-	technosMap := make(map[string]RiskBlob, len(technos))
-	techPresent := 0
-	for _, tr := range technos {
-		technosMap[tr.Key] = RiskBlob{
-			Present:       tr.Risk.Present,
-			StatutCommune: tr.Risk.LibelleStatutCommune,
-			StatutAdresse: tr.Risk.LibelleStatutAdresse,
-			Specifique:    tr.Risk.Specifique,
-		}
-		if tr.Risk.Present {
-			techPresent++
-		}
-	}
-	out.Technos = technosMap
+	var natPresent, techPresent int
+	out.Naturels, natPresent = riskMap(naturels)
+	out.Technos, techPresent = riskMap(technos)
 
 	// Build red_flags : risks that are reported "Existant" /
 	// "Concerne" at the **address** scale, in canonical order. This is
@@ -368,4 +297,24 @@ func BuildResult(r *Report) *Result {
 	}
 
 	return out
+}
+
+// riskMap projects (key, Risk) pairs onto the persisted RiskBlob map
+// and counts the risks flagged Present — the shared body of the
+// naturels / technos flattening in BuildResult.
+func riskMap(risks []NamedRisk) (map[string]RiskBlob, int) {
+	out := make(map[string]RiskBlob, len(risks))
+	present := 0
+	for _, nr := range risks {
+		out[nr.Key] = RiskBlob{
+			Present:       nr.Risk.Present,
+			StatutCommune: nr.Risk.LibelleStatutCommune,
+			StatutAdresse: nr.Risk.LibelleStatutAdresse,
+			Specifique:    nr.Risk.Specifique,
+		}
+		if nr.Risk.Present {
+			present++
+		}
+	}
+	return out, present
 }

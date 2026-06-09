@@ -1,18 +1,16 @@
 package ips_ecoles
 
 import (
-	"compress/gzip"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/frnorm"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // rawCSVName is the datadir filename for the upstream raw input.
@@ -102,7 +100,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		if insee == "" {
 			continue
 		}
-		ips, ok := parseIPS(rec[ipsCol])
+		ips, ok := frnorm.ParseFRFloat(rec[ipsCol])
 		if !ok {
 			// Non-significant ("NS") or blank IPS: school is dropped.
 			continue
@@ -126,20 +124,17 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	}
 	for insee, xs := range values {
 		idx.Communes[insee] = Entry{
-			IPSMedian:   median(xs),
+			IPSMedian:   stats.Median(xs),
 			IPSMin:      minOf(xs),
 			IPSMax:      maxOf(xs),
 			SchoolCount: len(xs),
 		}
 	}
 
-	zw := gzip.NewWriter(dst)
-	enc := json.NewEncoder(zw)
-	if err := enc.Encode(idx); err != nil {
-		_ = zw.Close()
+	if err := dataset.WriteGzJSON(dst, idx); err != nil {
 		return fmt.Errorf("ips_ecoles: encode json: %w", err)
 	}
-	return zw.Close()
+	return nil
 }
 
 // validate gates publication: the rebuilt gzipped artifact must gunzip,
@@ -153,33 +148,6 @@ func validate(r io.Reader) error {
 		return errors.New("ips_ecoles: validated artifact has no communes")
 	}
 	return nil
-}
-
-// parseIPS reads a French-formatted IPS value. Rows whose IPS is the DEPP
-// "NS" (non significatif) marker — or blank, or otherwise non-numeric —
-// return ok=false and are dropped by the caller.
-func parseIPS(s string) (float64, bool) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return 0, false
-	}
-	v, err := strconv.ParseFloat(strings.ReplaceAll(s, ",", "."), 64)
-	if err != nil {
-		return 0, false
-	}
-	return v, true
-}
-
-// median returns the unweighted median of xs (average of the two central
-// values for an even count). xs is non-empty by construction.
-func median(xs []float64) float64 {
-	s := append([]float64(nil), xs...)
-	sort.Float64s(s)
-	n := len(s)
-	if n%2 == 1 {
-		return s[n/2]
-	}
-	return (s[n/2-1] + s[n/2]) / 2
 }
 
 func minOf(xs []float64) float64 {
