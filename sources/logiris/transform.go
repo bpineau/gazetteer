@@ -3,20 +3,18 @@ package logiris
 import (
 	"archive/zip"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/frnorm"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // rawZipName is the datadir filename for the upstream raw input.
@@ -131,8 +129,8 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		if _, ok := idfDepts[code[:2]]; !ok {
 			continue // outside Île-de-France
 		}
-		logTot, ok1 := parseFrenchFloat(at(rec, logc))
-		rpTot, ok2 := parseFrenchFloat(at(rec, rp))
+		logTot, ok1 := frnorm.ParseFRFloat(at(rec, logc))
+		rpTot, ok2 := frnorm.ParseFRFloat(at(rec, rp))
 		if !ok1 || !ok2 || rpTot <= 0 || logTot < minDwellings {
 			continue // no résidences principales, or too few dwellings to trust
 		}
@@ -151,12 +149,10 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	}
 	idx.Meta.RowCountIRIS = len(idx.IRIS)
 
-	zw := gzip.NewWriter(dst)
-	if err := json.NewEncoder(zw).Encode(idx); err != nil {
-		_ = zw.Close()
+	if err := dataset.WriteGzJSON(dst, idx); err != nil {
 		return fmt.Errorf("logiris: encode json: %w", err)
 	}
-	return zw.Close()
+	return nil
 }
 
 // validate gates publication: the rebuilt artifact must gunzip, parse and be
@@ -175,15 +171,12 @@ func validate(r io.Reader) error {
 // share returns 100 * numerator/denominator rounded to one decimal, or 0
 // when the numerator cell is empty/suppressed. denominator is assumed > 0.
 func share(numCell string, denominator float64) float64 {
-	num, ok := parseFrenchFloat(numCell)
+	num, ok := frnorm.ParseFRFloat(numCell)
 	if !ok {
 		return 0
 	}
-	return round1(num / denominator * 100.0)
+	return stats.Round(num/denominator*100.0, 1)
 }
-
-// round1 rounds to one decimal place.
-func round1(f float64) float64 { return math.Round(f*10) / 10 }
 
 // dataCSVMember returns the single data CSV member of the INSEE zip — the
 // .csv whose name does not start with the "meta_" prefix.
@@ -221,25 +214,4 @@ func indexOf(header []string, name string) int {
 		}
 	}
 	return -1
-}
-
-// parseFrenchFloat strips spaces (incl. the non-breaking and narrow no-break
-// spaces INSEE uses as thousands separators), accepts a comma decimal mark,
-// and rejects empty / non-numeric cells.
-func parseFrenchFloat(s string) (float64, bool) {
-	s = strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
-			return -1
-		}
-		return r
-	}, s)
-	s = strings.ReplaceAll(s, ",", ".")
-	if s == "" {
-		return 0, false
-	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0, false
-	}
-	return f, true
 }

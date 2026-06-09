@@ -1,10 +1,14 @@
-// Package geopoly is a small, dependency-free point-in-polygon kernel for
+// Package geopoly is a small, dependency-free geometry kernel for
 // GeoJSON-style geometries in (lon, lat) decimal degrees.
 //
-// It answers a single question — "is this point inside this area?" — using
+// Its primary question is "is this point inside this area?", answered with
 // the even-odd (ray-casting) rule, with holes handled naturally by
 // accumulating ring crossings. Rings are treated as implicitly closed, so the
-// first and last vertex need not be repeated.
+// first and last vertex need not be repeated. Alongside containment it
+// carries the two measurement helpers spatial sources need: Shoelace
+// centroids (Ring/Polygon/MultiPolygon Centroid — a representative point,
+// not a holed-shape mass centroid) and equirectangular planar areas in m²
+// (AreaM2, honest to ~0.5 % for parcel-sized shapes at French latitudes).
 //
 // The package treats coordinates as a flat Cartesian plane. Over a city-sized
 // footprint the planar approximation is well within geocoding precision, so it

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/frnorm"
 	"github.com/bpineau/gazetteer/helpers/geoindex"
 )
 
@@ -169,9 +170,9 @@ func transformEPTBareme(raw dataset.RawSet, rawName string, dst io.Writer) error
 		if err != nil {
 			return fmt.Errorf("encadrement: %s piece %q: %w", rawName, r.NombrePiece, err)
 		}
-		ref, ok1 := parseFrenchFloat(string(r.PrixMed))
-		mn, ok2 := parseFrenchFloat(string(r.PrixMin))
-		mx, ok3 := parseFrenchFloat(string(r.PrixMax))
+		ref, ok1 := frnorm.ParseFRFloat(string(r.PrixMed))
+		mn, ok2 := frnorm.ParseFRFloat(string(r.PrixMin))
+		mx, ok3 := frnorm.ParseFRFloat(string(r.PrixMax))
 		if !ok1 || !ok2 || !ok3 {
 			return fmt.Errorf("encadrement: %s zone %d: bad price cell (med=%q min=%q max=%q)", rawName, r.Zone, r.PrixMed, r.PrixMin, r.PrixMax)
 		}
@@ -464,28 +465,6 @@ func parsePiece(label, openEndedLabel string) (int, bool, error) {
 		return 0, false, err
 	}
 	return n, false, nil
-}
-
-// parseFrenchFloat parses a French-formatted decimal ("16,4", "1 234,5")
-// into a float64. ok is false for an empty/unparseable cell. Numeric JSON
-// values that already arrived as plain numbers (no comma) parse too.
-func parseFrenchFloat(s string) (float64, bool) {
-	s = strings.Map(func(r rune) rune {
-		switch r {
-		case ' ', ' ', ' ':
-			return -1
-		}
-		return r
-	}, s)
-	s = strings.ReplaceAll(s, ",", ".")
-	if s == "" {
-		return 0, false
-	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0, false
-	}
-	return f, true
 }
 
 // validateParis / validatePlaineCommune / validateLyon gate publication:

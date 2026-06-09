@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/frnorm"
 )
 
 //go:embed data/carte_loyers_appartement.csv data/carte_loyers_maison.csv data/carte_loyers_app12.csv data/carte_loyers_app3.csv
@@ -170,10 +171,10 @@ func parseCSV(src io.Reader) (map[string]Row, error) {
 		if insee == "" {
 			continue
 		}
-		med, err1 := parseCommaFloat(rec[col["loypredm2"]])
-		lo, err2 := parseCommaFloat(rec[col["lwr_IPm2"]])
-		hi, err3 := parseCommaFloat(rec[col["upr_IPm2"]])
-		if err1 != nil || err2 != nil || err3 != nil {
+		med, ok1 := frnorm.ParseFRFloat(rec[col["loypredm2"]])
+		lo, ok2 := frnorm.ParseFRFloat(rec[col["lwr_IPm2"]])
+		hi, ok3 := frnorm.ParseFRFloat(rec[col["upr_IPm2"]])
+		if !ok1 || !ok2 || !ok3 {
 			// Skip malformed rows quietly — the dataset rarely
 			// carries them but we don't want a single bad value
 			// to abort startup.
@@ -191,15 +192,4 @@ func parseCSV(src io.Reader) (map[string]Row, error) {
 		}
 	}
 	return out, nil
-}
-
-// parseCommaFloat parses an INRAE-style decimal ("9,75769") into a
-// float64. Whitespace is trimmed.
-func parseCommaFloat(s string) (float64, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return 0, fmt.Errorf("empty")
-	}
-	s = strings.ReplaceAll(s, ",", ".")
-	return strconv.ParseFloat(s, 64)
 }

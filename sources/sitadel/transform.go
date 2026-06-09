@@ -1,10 +1,8 @@
 package sitadel
 
 import (
-	"compress/gzip"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -166,12 +164,10 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	}
 	idx.Meta.RowCountCommunes = len(idx.Communes)
 
-	zw := gzip.NewWriter(dst)
-	if err := json.NewEncoder(zw).Encode(idx); err != nil {
-		_ = zw.Close()
+	if err := dataset.WriteGzJSON(dst, idx); err != nil {
 		return fmt.Errorf("sitadel: encode json: %w", err)
 	}
-	return zw.Close()
+	return nil
 }
 
 // buildEntry projects an accumulator into a contiguous-year Entry. The year

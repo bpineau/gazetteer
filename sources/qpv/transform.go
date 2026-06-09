@@ -140,11 +140,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		},
 		QPVs: out,
 	}
-	gz := gzip.NewWriter(dst)
-	if err := json.NewEncoder(gz).Encode(p); err != nil {
-		return err
-	}
-	return gz.Close()
+	return dataset.WriteGzJSON(dst, p)
 }
 
 // openGeoJSONMember returns a reader over the WGS84 GeoJSON member of the ZIP.

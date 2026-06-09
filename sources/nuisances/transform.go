@@ -85,11 +85,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		return cells[i].Lon < cells[j].Lon
 	})
 
-	gz := gzip.NewWriter(dst)
-	if err := json.NewEncoder(gz).Encode(processed{Cells: cells}); err != nil {
-		return err
-	}
-	return gz.Close()
+	return dataset.WriteGzJSON(dst, processed{Cells: cells})
 }
 
 // parseLatLon parses an Opendatasoft geo_point_2d field ("48.6084, 3.0169" =

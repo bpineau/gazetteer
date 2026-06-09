@@ -2,14 +2,13 @@ package sitadel
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/communes"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // Name is the canonical Source identifier. Stable; used as the
@@ -175,7 +174,7 @@ func trailingMean(xs []int) float64 {
 	if n == 0 {
 		return 0
 	}
-	return round1(float64(sum) / float64(n))
+	return stats.Round(float64(sum)/float64(n), 1)
 }
 
 // collectifShare is Collectif-authorised over Tous-authorised, summed over the
@@ -197,7 +196,7 @@ func collectifShare(e Entry) float64 {
 	if totAuth <= 0 {
 		return 0
 	}
-	return round1(float64(totColl) / float64(totAuth) * 100)
+	return stats.Round(float64(totColl)/float64(totAuth)*100, 1)
 }
 
 // anyPositive reports whether xs has a non-missing, strictly-positive value.
@@ -221,21 +220,11 @@ func countPresentYears(xs []int) int {
 	return n
 }
 
-func round1(x float64) float64 { return math.Round(x*10) / 10 }
-
 // Query is the atomic helper for callers who don't want the builder. The error
 // is non-nil only when the Source failed; a successful but empty response
 // still returns a non-nil *Result with IsEmpty() == true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("sitadel: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

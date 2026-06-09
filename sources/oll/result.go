@@ -97,20 +97,8 @@ func (r *Result) RentEstimate() appraisal.RentEstimate {
 	}
 	return appraisal.RentEstimate{
 		EurPerM2Cents: int64(math.Round(r.ObservedMedianEURPerM2 * 100)),
-		Confidence:    mapConfidence(r.Confidence),
+		Confidence:    appraisal.ParseConfidence(r.Confidence),
 		Method:        fmt.Sprintf("oll_%s_z%s_p%d", r.Evidence.AggloCode, r.Evidence.ZoneID, r.Pieces),
-	}
-}
-
-// mapConfidence translates OLL's confidence strings to the appraisal enum.
-func mapConfidence(s string) appraisal.Confidence {
-	switch s {
-	case ConfidenceHigh:
-		return appraisal.ConfidenceHigh
-	case ConfidenceMedium:
-		return appraisal.ConfidenceMedium
-	default:
-		return appraisal.ConfidenceLow
 	}
 }
 

@@ -73,11 +73,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	// Deterministic order for byte-stable output.
 	sort.Slice(out, func(i, j int) bool { return out[i].Code < out[j].Code })
 
-	gz := gzip.NewWriter(dst)
-	if err := json.NewEncoder(gz).Encode(processed{Iris: out}); err != nil {
-		return err
-	}
-	return gz.Close()
+	return dataset.WriteGzJSON(dst, processed{Iris: out})
 }
 
 // validate gates a freshly-built artifact: it must gunzip, parse, and carry a

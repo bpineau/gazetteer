@@ -1,12 +1,9 @@
 package nuisances
 
 import (
-	"compress/gzip"
 	"embed"
-	"encoding/json"
-	"errors"
+	"io"
 	"math"
-	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/helpers/geodist"
@@ -95,40 +92,20 @@ func (idx *Index) nearest(lat, lon, maxM float64) (cell, float64, bool) {
 	return bestCell, best, true
 }
 
-var (
-	indexOnce  sync.Once
-	indexCache *Index
-	indexErr   error
-)
+var lazyIndex dataset.Lazy[Index]
 
 // Load returns the singleton grid index, resolving the artifact from dir (the
 // datadir) with a fallback to the embedded snapshot, parsed on first call. A
 // missing (non-embedded) artifact yields an empty index rather than an error.
 func Load(dir string) (*Index, error) {
-	indexOnce.Do(func() {
-		indexCache, indexErr = parse(dir)
-	})
-	return indexCache, indexErr
+	return lazyIndex.Load(set, dir, parseIndex)
 }
 
-func parse(dir string) (*Index, error) {
-	rc, err := set.Open(dir)
-	if errors.Is(err, dataset.ErrUnavailable) {
-		return &Index{buckets: map[bucketKey][]cell{}}, nil
-	}
+// parseIndex decodes the gzipped JSON artifact and buckets the cells for
+// constant-time neighbourhood lookups.
+func parseIndex(r io.Reader) (*Index, error) {
+	p, err := dataset.ReadGzJSON[processed](r, Name)
 	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rc.Close() }()
-
-	gz, err := gzip.NewReader(rc)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = gz.Close() }()
-
-	var p processed
-	if err := json.NewDecoder(gz).Decode(&p); err != nil {
 		return nil, err
 	}
 	idx := &Index{buckets: make(map[bucketKey][]cell), n: len(p.Cells)}

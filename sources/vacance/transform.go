@@ -3,10 +3,8 @@ package vacance
 import (
 	"archive/zip"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -162,12 +160,10 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	}
 	idx.Meta.RowCountCommunes = len(idx.Communes)
 
-	zw := gzip.NewWriter(dst)
-	if err := json.NewEncoder(zw).Encode(idx); err != nil {
-		_ = zw.Close()
+	if err := dataset.WriteGzJSON(dst, idx); err != nil {
 		return fmt.Errorf("vacance: encode json: %w", err)
 	}
-	return zw.Close()
+	return nil
 }
 
 // validate gates publication: the rebuilt (gzipped) artifact must gunzip,

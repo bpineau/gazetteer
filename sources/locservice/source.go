@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -82,8 +81,9 @@ func (s *Source) Version() int { return sourceVersion }
 //   - Missing address+city+zip → gazetteer.ErrInsufficientInputs (wrapped)
 //   - Geocoder cannot resolve INSEE → gazetteer.ErrInsufficientInputs (wrapped)
 //   - URL builder rejects INSEE → gazetteer.ErrInsufficientInputs (wrapped)
-//   - HTTP 5xx / transport / parse failure → gazetteer.ErrUpstreamUnavailable (wrapped)
-//   - HTTP 4xx (other than 404) → gazetteer.ErrUpstreamPermanent (wrapped)
+//   - HTTP 5xx / 429 / transport / parse failure → gazetteer.ErrUpstreamUnavailable (wrapped)
+//   - HTTP 4xx (including 404 = unknown insee/logement, excluding 429) →
+//     gazetteer.ErrUpstreamPermanent (wrapped)
 //
 // Successful "no data" responses (LocService rendered "marché pas
 // suffisamment actif") are NOT treated as errors — the Source returns
@@ -229,44 +229,16 @@ func (s *Source) applyBaseURL(u string) string {
 	return s.opts.BaseURL + strings.TrimPrefix(u, BaseURL)
 }
 
-// fetch performs the HTTP GET and translates transport / status-code
-// failures to gazetteer sentinels.
+// fetch performs the HTTP GET via the shared gazetteer.FetchUpstream
+// helper. 404 = unknown INSEE / unknown logement, surfaced as a
+// permanent upstream error (FetchSpec.NotFoundBody deliberately nil)
+// so the caller does not retry: the listing carried a coherent
+// INSEE/logement combination but LocService rejects it.
 func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
-	client := s.opts.HTTPClient
-	if client == nil {
-		client = gazetteer.HTTPClientFrom(ctx)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, fmt.Errorf("locservice: build request: %w", err)
-	}
-	req.Header.Set("Accept", "text/html")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("locservice: %w: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 500 {
-		return nil, fmt.Errorf("locservice: %w: http %d", gazetteer.ErrUpstreamUnavailable, resp.StatusCode)
-	}
-	if resp.StatusCode == http.StatusNotFound {
-		// 404 = unknown INSEE / unknown logement. Surface as a
-		// permanent upstream error so the caller does not retry; the
-		// listing carried a coherent INSEE/logement combination but
-		// LocService rejects it.
-		return nil, fmt.Errorf("locservice: %w: http 404 (unknown insee/logement)", gazetteer.ErrUpstreamPermanent)
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("locservice: %w: http %d", gazetteer.ErrUpstreamPermanent, resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("locservice: %w: read body: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	return body, nil
+	return gazetteer.FetchUpstream(ctx, s.opts.HTTPClient, u, gazetteer.FetchSpec{
+		Prefix: Name,
+		Accept: "text/html",
+	})
 }
 
 // resolveINSEE returns the 5-digit commune code for the listing.
@@ -302,15 +274,7 @@ func (s *Source) resolveINSEE(ctx context.Context, l gazetteer.Listing) (string,
 // no-data response still returns a non-nil *Result with IsEmpty() ==
 // true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("locservice: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

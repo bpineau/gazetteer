@@ -2,9 +2,7 @@ package dpedist
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -71,8 +69,8 @@ func (s *Source) Version() int { return sourceVersion }
 // gazetteer/source.go):
 //
 //   - Missing INSEE → ErrInsufficientInputs (wrapped)
-//   - HTTP 5xx, network, json decode → ErrUpstreamUnavailable
-//   - HTTP 4xx (other than 404) → ErrUpstreamPermanent
+//   - HTTP 5xx / 429, network, json decode → ErrUpstreamUnavailable
+//   - HTTP 4xx (other than 404 / 429) → ErrUpstreamPermanent
 //   - HTTP 404 → empty Result (the API normally returns 200 with
 //     total=0 for an unknown commune)
 //
@@ -122,60 +120,22 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	return res, nil
 }
 
-// fetch performs the HTTP GET and translates transport / status-code
-// failures to gazetteer sentinels.
+// fetch performs the HTTP GET via the shared gazetteer.FetchUpstream
+// helper. The values_agg API normally responds 200 + zero-totals for
+// an unknown commune; a rare 404 is defensively mapped onto the same
+// "no rows" envelope so consumers see an empty Result rather than a
+// failure. 429 maps to ErrUpstreamUnavailable (retryable).
 func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
-	client := s.opts.HTTPClient
-	if client == nil {
-		client = gazetteer.HTTPClientFrom(ctx)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, fmt.Errorf("dpedist: build request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("dpedist: %w: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 500 {
-		return nil, fmt.Errorf("dpedist: %w: http %d", gazetteer.ErrUpstreamUnavailable, resp.StatusCode)
-	}
-	if resp.StatusCode == http.StatusNotFound {
-		// The values_agg API normally responds 200 + zero-totals for
-		// an unknown commune ; treat 404 defensively as "no rows" so
-		// consumers see an empty Result rather than a transient
-		// failure.
-		return []byte(`{"total":0,"total_other":0,"aggs":[]}`), nil
-	}
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, fmt.Errorf("dpedist: %w: http 429", gazetteer.ErrUpstreamUnavailable)
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("dpedist: %w: http %d", gazetteer.ErrUpstreamPermanent, resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("dpedist: %w: read body: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	return body, nil
+	return gazetteer.FetchUpstream(ctx, s.opts.HTTPClient, u, gazetteer.FetchSpec{
+		Prefix:       Name,
+		Accept:       "application/json",
+		NotFoundBody: []byte(`{"total":0,"total_other":0,"aggs":[]}`),
+	})
 }
 
 // Query is the atomic helper for callers who don't want the builder.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("dpedist: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

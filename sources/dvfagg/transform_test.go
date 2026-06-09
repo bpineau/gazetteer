@@ -48,22 +48,6 @@ func TestAccumulateFinalize(t *testing.T) {
 	}
 }
 
-func TestPercentileLinear(t *testing.T) {
-	xs := []float64{10, 20, 30, 40}
-	if got := percentile(xs, 0.5); math.Abs(got-25) > 1e-9 {
-		t.Fatalf("p50 want 25 got %v", got)
-	}
-	if got := percentile(xs, 0.25); math.Abs(got-17.5) > 1e-9 {
-		t.Fatalf("p25 want 17.5 got %v", got)
-	}
-	if got := percentile([]float64{42}, 0.5); got != 42 {
-		t.Fatalf("n=1 want 42 got %v", got)
-	}
-	if got := percentile(xs, 1.0); math.Abs(got-40) > 1e-9 {
-		t.Fatalf("p=1.0 want 40 got %v", got)
-	}
-}
-
 type fakeRaw map[string][]byte // name -> gzipped bytes
 
 func (f fakeRaw) Open(name string) (io.ReadCloser, error) {

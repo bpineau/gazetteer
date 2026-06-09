@@ -1,11 +1,8 @@
 package iris
 
 import (
-	"compress/gzip"
 	"embed"
-	"encoding/json"
-	"errors"
-	"sync"
+	"io"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/helpers/geoindex"
@@ -87,41 +84,20 @@ func (idx *Index) Count() int {
 	return idx.geo.Len()
 }
 
-var (
-	indexOnce  sync.Once
-	indexCache *Index
-	indexErr   error
-)
+var lazyIndex dataset.Lazy[Index]
 
 // Load returns the singleton contour index, resolving the artifact from dir (the
 // datadir) with a fallback to the embedded snapshot, parsed on first call. The
 // dir from the first call wins for the process lifetime. A missing
 // (non-embedded) artifact yields an empty index rather than an error.
 func Load(dir string) (*Index, error) {
-	indexOnce.Do(func() {
-		indexCache, indexErr = parse(dir)
-	})
-	return indexCache, indexErr
+	return lazyIndex.Load(set, dir, parseIndex)
 }
 
-func parse(dir string) (*Index, error) {
-	rc, err := set.Open(dir)
-	if errors.Is(err, dataset.ErrUnavailable) {
-		return &Index{byCode: map[string]irisID{}}, nil
-	}
+// parseIndex decodes the gzipped JSON artifact and builds the contour index.
+func parseIndex(r io.Reader) (*Index, error) {
+	p, err := dataset.ReadGzJSON[processed](r, Name)
 	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rc.Close() }()
-
-	gz, err := gzip.NewReader(rc)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = gz.Close() }()
-
-	var p processed
-	if err := json.NewDecoder(gz).Decode(&p); err != nil {
 		return nil, err
 	}
 	// The artifact is code-sorted (see transform); building features in order

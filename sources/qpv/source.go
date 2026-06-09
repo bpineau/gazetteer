@@ -2,7 +2,6 @@ package qpv
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -102,9 +101,9 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	}
 
 	// Point-in-polygon path — the authoritative answer when we have
-	// coordinates. (0,0) is the "unset coords" sentinel.
-	if l.Lat != nil && l.Lon != nil && !(*l.Lat == 0 && *l.Lon == 0) {
-		return s.queryPoint(idx, *l.Lat, *l.Lon), nil
+	// coordinates ((0,0) is the "unset coords" sentinel, see Coords).
+	if lat, lon, ok := l.Coords(); ok {
+		return s.queryPoint(idx, lat, lon), nil
 	}
 
 	// Commune-level fallback — no coordinates.
@@ -189,15 +188,7 @@ func copyQPVs(s []QPV) []QPV {
 // The error is non-nil only when the Source failed; a successful but
 // empty response still returns a non-nil *Result with IsEmpty() == true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("qpv: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

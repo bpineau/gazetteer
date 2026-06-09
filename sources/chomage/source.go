@@ -2,13 +2,13 @@ package chomage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/communes"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // Name is the canonical Source identifier. Stable; used as the
@@ -150,13 +150,15 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		national = idx.NationalRatePctSeries[qIdx]
 	}
 
-	delta := round1(rate - national)
+	// Round to one decimal: avoids rendering 7.7999999 in downstream UIs
+	// where the JSON float would surface verbatim.
+	delta := stats.Round(rate-national, 1)
 	return &Result{
 		ZECode:            ze,
 		ZELabel:           zone.Label,
 		QuarterLabel:      qLabel,
-		RatePct:           round1(rate),
-		NationalRatePct:   round1(national),
+		RatePct:           stats.Round(rate, 1),
+		NationalRatePct:   stats.Round(national, 1),
 		DeltaVsNationalPP: delta,
 		Tension:           classify(delta),
 		RecentTrendSeries: cloneFloats(zone.RatePct),
@@ -195,15 +197,6 @@ func classify(deltaPP float64) TensionFlag {
 	}
 }
 
-// round1 rounds x to one decimal place. Avoids rendering 7.7999999 in
-// downstream UIs where the JSON float would surface verbatim.
-func round1(x float64) float64 {
-	if x >= 0 {
-		return float64(int64(x*10+0.5)) / 10
-	}
-	return -float64(int64(-x*10+0.5)) / 10
-}
-
 // cloneFloats returns a defensive copy of in. Avoids aliasing the
 // embedded singleton via the wire Result.
 func cloneFloats(in []float64) []float64 {
@@ -219,15 +212,7 @@ func cloneFloats(in []float64) []float64 {
 // The error is non-nil only when the Source failed; a successful but
 // empty response still returns a non-nil *Result with IsEmpty() == true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("chomage: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

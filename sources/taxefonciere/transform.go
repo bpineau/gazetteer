@@ -6,12 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/communes"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // Raw input filenames (datadir basenames), upstream dataset ids, and the
@@ -104,14 +105,14 @@ func transformV1(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 
 	byDept := map[string][]float64{}
 	for insee, vls := range byCommune {
-		m := medianFloat(vls)
+		m := stats.Median(vls)
 		idx.Communes[insee] = roundDecimals(m, v1RoundDecimal)
 		// The dept-median fallback is computed from the unrounded commune
 		// medians (then rounded once), matching the committed artifact.
 		byDept[v1DeptKey(insee)] = append(byDept[v1DeptKey(insee)], m)
 	}
 	for dept, ms := range byDept {
-		idx.DeptFallback[dept] = roundDecimals(medianFloat(ms), v1RoundDecimal)
+		idx.DeptFallback[dept] = roundDecimals(stats.Median(ms), v1RoundDecimal)
 	}
 
 	return json.NewEncoder(dst).Encode(idx)
@@ -208,10 +209,10 @@ func transformV2(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	for d := range depts {
 		var entry V2Entry
 		if vs := byDeptTFPB[d]; len(vs) > 0 {
-			entry.TFPBPct = roundDecimals(medianFloat(vs), v2RoundDecimal)
+			entry.TFPBPct = roundDecimals(stats.Median(vs), v2RoundDecimal)
 		}
 		if vs := byDeptTEOM[d]; len(vs) > 0 {
-			entry.TEOMPct = roundDecimals(medianFloat(vs), v2RoundDecimal)
+			entry.TEOMPct = roundDecimals(stats.Median(vs), v2RoundDecimal)
 		}
 		idx.DeptFallback[d] = entry
 	}
@@ -283,32 +284,7 @@ func v1DeptKey(insee string) string {
 // INSEE code to its commune-mère INSEE code. DGFiP collects rates only at
 // commune-mère level, so each arrondissement inherits the mère's entry.
 func arrondissementAliases() map[string]string {
-	m := map[string]string{}
-	for i := 1; i <= 16; i++ { // Marseille
-		m[fmt.Sprintf("132%02d", i)] = "13055"
-	}
-	for i := 1; i <= 9; i++ { // Lyon
-		m[fmt.Sprintf("6938%d", i)] = "69123"
-	}
-	for i := 1; i <= 20; i++ { // Paris
-		m[fmt.Sprintf("751%02d", i)] = "75056"
-	}
-	return m
-}
-
-// medianFloat returns the median of xs (copied before sorting). The
-// even-length median is the mean of the two central values.
-func medianFloat(xs []float64) float64 {
-	if len(xs) == 0 {
-		return 0
-	}
-	s := append([]float64(nil), xs...)
-	sort.Float64s(s)
-	n := len(s)
-	if n%2 == 1 {
-		return s[n/2]
-	}
-	return (s[n/2-1] + s[n/2]) / 2
+	return communes.ArrondissementParents()
 }
 
 // roundDecimals rounds x to dp decimal places using correctly-rounded

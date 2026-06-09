@@ -514,29 +514,8 @@ func parseAll(dir string) (*Index, error) {
 	}
 
 	// Plaine Commune.
-	raw, err = readSet(setPlaineCommune, dir)
-	if err != nil {
-		return nil, fmt.Errorf("encadrement: read plaine commune: %w", err)
-	}
-	var pc []eptBaremeRow
-	if err := unmarshalRows(raw, &pc); err != nil {
-		return nil, fmt.Errorf("encadrement: parse plaine commune: %w", err)
-	}
-	for _, r := range pc {
-		zone := fmt.Sprintf("%d", r.Zone)
-		e := Entry{
-			ZoneSource:            ZoneSourcePlaineCommune,
-			ZoneID:                zone,
-			Piece:                 r.Piece,
-			PieceOpenEnded:        r.PieceOpenEnded,
-			Epoque:                r.Epoque,
-			Meuble:                r.Meuble,
-			Maison:                r.Maison,
-			LoyerRefEURPerM2HC:    r.RefEURPerM2,
-			LoyerRefMinEURPerM2HC: r.MinEURPerM2,
-			LoyerRefMaxEURPerM2HC: r.MaxEURPerM2,
-		}
-		idx.byPlaineCommuneZone[zone] = append(idx.byPlaineCommuneZone[zone], e)
+	if err := loadEPTBareme(setPlaineCommune, dir, "plaine commune", ZoneSourcePlaineCommune, idx.byPlaineCommuneZone); err != nil {
+		return nil, err
 	}
 
 	// Lyon / Villeurbanne.
@@ -576,28 +555,8 @@ func parseAll(dir string) (*Index, error) {
 	}
 
 	// Est Ensemble (same processed barème schema as Plaine Commune).
-	raw, err = readSet(setEstEnsemble, dir)
-	if err != nil {
-		return nil, fmt.Errorf("encadrement: read est ensemble: %w", err)
-	}
-	var ee []eptBaremeRow
-	if err := unmarshalRows(raw, &ee); err != nil {
-		return nil, fmt.Errorf("encadrement: parse est ensemble: %w", err)
-	}
-	for _, r := range ee {
-		zone := fmt.Sprintf("%d", r.Zone)
-		idx.byEstEnsembleZone[zone] = append(idx.byEstEnsembleZone[zone], Entry{
-			ZoneSource:            ZoneSourceEstEnsemble,
-			ZoneID:                zone,
-			Piece:                 r.Piece,
-			PieceOpenEnded:        r.PieceOpenEnded,
-			Epoque:                r.Epoque,
-			Meuble:                r.Meuble,
-			Maison:                r.Maison,
-			LoyerRefEURPerM2HC:    r.RefEURPerM2,
-			LoyerRefMinEURPerM2HC: r.MinEURPerM2,
-			LoyerRefMaxEURPerM2HC: r.MaxEURPerM2,
-		})
+	if err := loadEPTBareme(setEstEnsemble, dir, "est ensemble", ZoneSourceEstEnsemble, idx.byEstEnsembleZone); err != nil {
+		return nil, err
 	}
 
 	// Seine-Saint-Denis zonage geometry (Plaine Commune + Est Ensemble).
@@ -622,6 +581,37 @@ func parseAll(dir string) (*Index, error) {
 	idx.finalizeZones(zoneIDs)
 
 	return idx, nil
+}
+
+// loadEPTBareme reads one Seine-Saint-Denis EPT barème artifact (Plaine
+// Commune and Est Ensemble share the eptBaremeRow schema) and projects its
+// rows — stamped with zoneSource — into the per-zone lookup map. label names
+// the EPT in error messages.
+func loadEPTBareme(s dataset.Set, dir, label, zoneSource string, byZone map[string][]Entry) error {
+	raw, err := readSet(s, dir)
+	if err != nil {
+		return fmt.Errorf("encadrement: read %s: %w", label, err)
+	}
+	var rows []eptBaremeRow
+	if err := unmarshalRows(raw, &rows); err != nil {
+		return fmt.Errorf("encadrement: parse %s: %w", label, err)
+	}
+	for _, r := range rows {
+		zone := fmt.Sprintf("%d", r.Zone)
+		byZone[zone] = append(byZone[zone], Entry{
+			ZoneSource:            zoneSource,
+			ZoneID:                zone,
+			Piece:                 r.Piece,
+			PieceOpenEnded:        r.PieceOpenEnded,
+			Epoque:                r.Epoque,
+			Meuble:                r.Meuble,
+			Maison:                r.Maison,
+			LoyerRefEURPerM2HC:    r.RefEURPerM2,
+			LoyerRefMinEURPerM2HC: r.MinEURPerM2,
+			LoyerRefMaxEURPerM2HC: r.MaxEURPerM2,
+		})
+	}
+	return nil
 }
 
 // addZone records one zonage feature's EPT/commune membership in the lookup

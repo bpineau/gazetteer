@@ -2,7 +2,6 @@ package gpe
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/bpineau/gazetteer/dataset"
@@ -90,15 +89,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 
 // Query is the atomic helper for callers who don't want the builder.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("gpe: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 func init() {

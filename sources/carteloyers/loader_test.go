@@ -53,29 +53,6 @@ func TestParseCSV_Negative(t *testing.T) {
 	}
 }
 
-func TestParseCommaFloat(t *testing.T) {
-	ok := []struct {
-		in   string
-		want float64
-	}{
-		{"9,75769", 9.75769},
-		{" 1,5 ", 1.5},
-		{"12.5", 12.5}, // a dot is also accepted
-		{"0", 0},
-	}
-	for _, c := range ok {
-		got, err := parseCommaFloat(c.in)
-		if err != nil || got != c.want {
-			t.Errorf("parseCommaFloat(%q) = %v, %v; want %v, nil", c.in, got, err, c.want)
-		}
-	}
-	for _, bad := range []string{"", "   ", "abc", "1,2,3"} {
-		if _, err := parseCommaFloat(bad); err == nil {
-			t.Errorf("parseCommaFloat(%q): want error", bad)
-		}
-	}
-}
-
 // FuzzParseCSV asserts the parser never panics and that a nil error yields a
 // non-nil map.
 func FuzzParseCSV(f *testing.F) {

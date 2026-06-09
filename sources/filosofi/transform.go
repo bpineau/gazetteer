@@ -8,13 +8,12 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/frnorm"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // rawCSVName is the datadir filename for the upstream raw input.
@@ -103,7 +102,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		return errors.New("filosofi: transform produced no communes")
 	}
 	idx.Meta.RowCountCommunes = len(idx.Communes)
-	idx.Meta.NationalMedianEUR = medianInt(medians)
+	idx.Meta.NationalMedianEUR = stats.MedianInt(medians)
 
 	return json.NewEncoder(dst).Encode(idx)
 }
@@ -135,7 +134,7 @@ func indexOf(header []string, name string) int {
 // parseEuro parses a euro amount ("25820", "25 820", "25 820,0") into a
 // rounded integer. ok is false for empty/suppressed cells.
 func parseEuro(s string) (int, bool) {
-	f, ok := parseFrenchFloat(s)
+	f, ok := frnorm.ParseFRFloat(s)
 	if !ok {
 		return 0, false
 	}
@@ -143,41 +142,4 @@ func parseEuro(s string) (int, bool) {
 }
 
 // parsePct parses a French-formatted percentage; ok is false when empty.
-func parsePct(s string) (float64, bool) { return parseFrenchFloat(s) }
-
-// parseFrenchFloat strips spaces (incl. the non-breaking and narrow
-// no-break spaces INSEE uses as thousands separators) and accepts a comma
-// decimal mark. ok is false for an empty cell.
-func parseFrenchFloat(s string) (float64, bool) {
-	// Drop every Unicode space (regular, non-breaking, narrow no-break — all
-	// used by INSEE as thousands separators) and normalise the decimal mark.
-	s = strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
-			return -1
-		}
-		return r
-	}, s)
-	s = strings.ReplaceAll(s, ",", ".")
-	if s == "" {
-		return 0, false
-	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0, false
-	}
-	return f, true
-}
-
-// medianInt returns the median of xs (unsorted; copied before sorting).
-func medianInt(xs []int) int {
-	if len(xs) == 0 {
-		return 0
-	}
-	s := append([]int(nil), xs...)
-	sort.Ints(s)
-	n := len(s)
-	if n%2 == 1 {
-		return s[n/2]
-	}
-	return (s[n/2-1] + s[n/2]) / 2
-}
+func parsePct(s string) (float64, bool) { return frnorm.ParseFRFloat(s) }

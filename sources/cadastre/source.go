@@ -2,9 +2,7 @@ package cadastre
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -105,8 +103,8 @@ func (s *Source) Version() int { return sourceVersion }
 //
 //   - Missing lat/lon → gazetteer.ErrInsufficientInputs (wrapped)
 //   - URL builder rejects coords → gazetteer.ErrInsufficientInputs (wrapped)
-//   - API Carto HTTP 5xx / transport / parse failure → gazetteer.ErrUpstreamUnavailable (wrapped)
-//   - API Carto HTTP 4xx (other than 404) → gazetteer.ErrUpstreamPermanent (wrapped)
+//   - API Carto HTTP 5xx / 429 / transport / parse failure → gazetteer.ErrUpstreamUnavailable (wrapped)
+//   - API Carto HTTP 4xx (other than 404 / 429) → gazetteer.ErrUpstreamPermanent (wrapped)
 //
 // Successful empty parses (FeatureCollection with no features) are
 // NOT treated as errors — the Source returns a *Result whose
@@ -296,86 +294,39 @@ func (s *Source) applyBaseURL(u string) string {
 	return s.opts.BaseURL + strings.TrimPrefix(u, BaseURL)
 }
 
-// fetch performs the HTTP GET on the parcelle endpoint and translates
-// transport / status-code failures to gazetteer sentinels.
+// fetch performs the HTTP GET on the parcelle endpoint via the shared
+// gazetteer.FetchUpstream helper. 404 → no parcel under these coords:
+// API Carto usually returns 200 + empty features for that case, but be
+// defensive and map a rare 404 onto an empty FeatureCollection so the
+// parser yields a zero-feature result.
 func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
-	client := s.opts.HTTPClient
-	if client == nil {
-		client = gazetteer.HTTPClientFrom(ctx)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, fmt.Errorf("cadastre: build request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("cadastre: %w: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		// 404 → no parcel under these coords. API Carto usually returns
-		// 200 + empty features for that case, but be defensive: treat
-		// 404 as an empty FeatureCollection so the parser yields a
-		// zero-feature result.
-		return []byte(`{"type":"FeatureCollection","features":[]}`), nil
-	}
-	if resp.StatusCode >= 500 {
-		return nil, fmt.Errorf("cadastre: %w: http %d", gazetteer.ErrUpstreamUnavailable, resp.StatusCode)
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("cadastre: %w: http %d", gazetteer.ErrUpstreamPermanent, resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("cadastre: %w: read body: %w", gazetteer.ErrUpstreamUnavailable, err)
-	}
-	return body, nil
+	return gazetteer.FetchUpstream(ctx, s.opts.HTTPClient, u, gazetteer.FetchSpec{
+		Prefix:       Name,
+		Accept:       "application/json",
+		NotFoundBody: []byte(`{"type":"FeatureCollection","features":[]}`),
+	})
 }
 
-// resolveLatLon returns (lat, lon) for the listing. Preference order:
-//
-//  1. Listing.Lat/Lon when both pointers are non-nil and not (0,0).
-//  2. The Geocoder's result (when configured).
-//  3. An error otherwise.
+// resolveLatLon returns (lat, lon) for the listing: the Listing's own
+// coordinates when usable (Listing.Coords), else the Geocoder fallback
+// via banx.ResolveLatLon.
 func (s *Source) resolveLatLon(ctx context.Context, l gazetteer.Listing) (float64, float64, error) {
-	if l.Lat != nil && l.Lon != nil && (*l.Lat != 0 || *l.Lon != 0) {
-		return *l.Lat, *l.Lon, nil
+	if lat, lon, ok := l.Coords(); ok {
+		return lat, lon, nil
 	}
-	if s.opts.Geocoder == nil {
-		return 0, 0, errors.New("cadastre: lat/lon not resolvable (no geocoder configured)")
-	}
-	q := banx.GeocodeQuery{
-		Address: strings.TrimSpace(l.Address + " " + l.Zip + " " + l.City),
-		City:    l.City,
-		Zip:     l.Zip,
-	}
-	res, err := s.opts.Geocoder.Geocode(ctx, q)
+	lat, lon, err := banx.ResolveLatLon(ctx, s.opts.Geocoder,
+		strings.TrimSpace(l.Address+" "+l.Zip+" "+l.City), l.City, l.Zip)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("cadastre: %w", err)
 	}
-	if res.Lat == 0 && res.Lon == 0 {
-		return 0, 0, errors.New("cadastre: geocoder returned zero coords")
-	}
-	return res.Lat, res.Lon, nil
+	return lat, lon, nil
 }
 
 // Query is the atomic helper for callers who don't want the builder.
 // The error is non-nil only when the Source failed; a successful but
 // empty response still returns a non-nil *Result with IsEmpty() == true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	data, err := NewSource(opts).Query(ctx, l)
-	if err != nil {
-		return nil, err
-	}
-	res, ok := data.(*Result)
-	if !ok {
-		return nil, errors.New("cadastre: typed result mismatch")
-	}
-	return res, nil
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 // Ensure the Source satisfies the gazetteer.Source interface at compile

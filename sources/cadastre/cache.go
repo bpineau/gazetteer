@@ -3,7 +3,7 @@ package cadastre
 import (
 	"sync"
 
-	"github.com/bpineau/gazetteer/sources/cadastre/geom"
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
 // BatiPolygon is the cached shape of one building footprint. Stored
@@ -13,12 +13,12 @@ import (
 type BatiPolygon struct {
 	// Geometry is the typed building footprint. Always at least one
 	// polygon — empty geometries are dropped at cache-load time.
-	Geometry geom.MultiPolygon
+	Geometry geopoly.MultiPolygon
 
 	// Centroid is the area-weighted centroid of the first polygon —
 	// the point we test for parcel containment. Cached for cheap
 	// repeated lookups.
-	Centroid geom.Point
+	Centroid geopoly.Point
 
 	// AreaM2 is the planar area of the whole MultiPolygon in m². Cached
 	// for cheap sum during the in-parcel filter.

@@ -414,36 +414,41 @@ func BuildResult(r Row) *Result {
 func buildDistribution(r Row) map[string]int {
 	use2021 := firstNonZero(r.NbClasseBilanDPEA, r.NbClasseBilanDPEB, r.NbClasseBilanDPEC,
 		r.NbClasseBilanDPED, r.NbClasseBilanDPEE, r.NbClasseBilanDPEF, r.NbClasseBilanDPEG) > 0
+	type bucket struct {
+		label string
+		count *int
+	}
+	buckets := []bucket{
+		{"A", r.NbClasseBilanDPEA},
+		{"B", r.NbClasseBilanDPEB},
+		{"C", r.NbClasseBilanDPEC},
+		{"D", r.NbClasseBilanDPED},
+		{"E", r.NbClasseBilanDPEE},
+		{"F", r.NbClasseBilanDPEF},
+		{"G", r.NbClasseBilanDPEG},
+	}
+	if !use2021 {
+		buckets = []bucket{
+			{"A", r.NbClasseConsoEnergieArrete2012A},
+			{"B", r.NbClasseConsoEnergieArrete2012B},
+			{"C", r.NbClasseConsoEnergieArrete2012C},
+			{"D", r.NbClasseConsoEnergieArrete2012D},
+			{"E", r.NbClasseConsoEnergieArrete2012E},
+			{"F", r.NbClasseConsoEnergieArrete2012F},
+			{"G", r.NbClasseConsoEnergieArrete2012G},
+			{"NC", r.NbClasseConsoEnergieArrete2012NC},
+		}
+	}
 	out := map[string]int{}
-	if use2021 {
-		setIfNonNil(out, "A", r.NbClasseBilanDPEA)
-		setIfNonNil(out, "B", r.NbClasseBilanDPEB)
-		setIfNonNil(out, "C", r.NbClasseBilanDPEC)
-		setIfNonNil(out, "D", r.NbClasseBilanDPED)
-		setIfNonNil(out, "E", r.NbClasseBilanDPEE)
-		setIfNonNil(out, "F", r.NbClasseBilanDPEF)
-		setIfNonNil(out, "G", r.NbClasseBilanDPEG)
-	} else {
-		setIfNonNil(out, "A", r.NbClasseConsoEnergieArrete2012A)
-		setIfNonNil(out, "B", r.NbClasseConsoEnergieArrete2012B)
-		setIfNonNil(out, "C", r.NbClasseConsoEnergieArrete2012C)
-		setIfNonNil(out, "D", r.NbClasseConsoEnergieArrete2012D)
-		setIfNonNil(out, "E", r.NbClasseConsoEnergieArrete2012E)
-		setIfNonNil(out, "F", r.NbClasseConsoEnergieArrete2012F)
-		setIfNonNil(out, "G", r.NbClasseConsoEnergieArrete2012G)
-		setIfNonNil(out, "NC", r.NbClasseConsoEnergieArrete2012NC)
+	for _, b := range buckets {
+		if b.count != nil {
+			out[b.label] = *b.count
+		}
 	}
 	if len(out) == 0 {
 		return nil
 	}
 	return out
-}
-
-func setIfNonNil(m map[string]int, k string, v *int) {
-	if v == nil {
-		return
-	}
-	m[k] = *v
 }
 
 func firstNonZero(vals ...*int) int {

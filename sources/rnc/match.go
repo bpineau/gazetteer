@@ -35,14 +35,14 @@ func (idx *Index) match(l gazetteer.Listing) (*Entry, MatchMethod, string, float
 	cands := idx.ByInsee[insee]
 
 	// 1) geo-proximity (primary), street as a confidence booster.
-	if l.Lat != nil && l.Lon != nil {
+	if lat, lon, ok := l.Coords(); ok {
 		bestIdx, bestD := -1, geoMaxMeters
 		for _, i := range cands {
 			e := &idx.Copros[i]
 			if e.Lat == 0 && e.Lon == 0 {
 				continue
 			}
-			d := geodist.MetersBetween(*l.Lat, *l.Lon, e.Lat, e.Lon)
+			d := geodist.MetersBetween(lat, lon, e.Lat, e.Lon)
 			if d < bestD {
 				bestIdx, bestD = i, d
 			}

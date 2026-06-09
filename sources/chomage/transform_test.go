@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/xuri/excelize/v2"
+
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // memRawSet serves named in-memory raw inputs, implementing dataset.RawSet
@@ -225,7 +227,7 @@ func TestTransform_Golden(t *testing.T) {
 	// Derived national series: per-quarter unweighted mean across the 3
 	// ZEs, rounded to 2 dp.
 	for q := 0; q < keptQuarters; q++ {
-		mean := round2((zeA[2+q] + zeB[2+q] + zeC[2+q]) / 3.0)
+		mean := stats.Round((zeA[2+q]+zeB[2+q]+zeC[2+q])/3.0, 2)
 		if math.Abs(idx.NationalRatePctSeries[q]-mean) > 1e-9 {
 			t.Errorf("national[%d] = %v, want %v", q, idx.NationalRatePctSeries[q], mean)
 		}

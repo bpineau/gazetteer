@@ -212,25 +212,3 @@ func TestClampPiece(t *testing.T) {
 		}
 	}
 }
-
-// TestMedianFloat pins the median helper.
-func TestMedianFloat(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		in   []float64
-		want float64
-	}{
-		{nil, 0},
-		{[]float64{}, 0},
-		{[]float64{1}, 1},
-		{[]float64{1, 2, 3}, 2},
-		{[]float64{3, 1, 2}, 2},
-		{[]float64{1, 2, 3, 4}, 2.5},
-	}
-	for _, c := range cases {
-		got := medianFloat(append([]float64(nil), c.in...))
-		if got != c.want {
-			t.Errorf("medianFloat(%v) = %v, want %v", c.in, got, c.want)
-		}
-	}
-}

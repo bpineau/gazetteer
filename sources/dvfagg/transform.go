@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // sanity bounds, identical to the validated screening methodology.
@@ -119,7 +120,8 @@ func accumulate(src io.Reader, m map[string]*acc) error {
 	return nil
 }
 
-// finalize turns the accumulators into per-commune Results (percentiles).
+// finalize turns the accumulators into per-commune Results (percentiles,
+// numpy-linear on the sorted €/m² samples, rounded to 2 dp).
 func finalize(m map[string]*acc) map[string]Result {
 	out := make(map[string]Result, len(m))
 	for ins, e := range m {
@@ -129,38 +131,16 @@ func finalize(m map[string]*acc) map[string]Result {
 			Dept:             e.dept,
 			N:                len(e.all),
 			NSmall:           len(e.small),
-			PriceP25EURM2:    round2(percentile(e.all, 0.25)),
-			PriceMedianEURM2: round2(percentile(e.all, 0.50)),
-			PriceP75EURM2:    round2(percentile(e.all, 0.75)),
+			PriceP25EURM2:    stats.Round(stats.Percentile(e.all, 0.25), 2),
+			PriceMedianEURM2: stats.Round(stats.Percentile(e.all, 0.50), 2),
+			PriceP75EURM2:    stats.Round(stats.Percentile(e.all, 0.75), 2),
 		}
 		if len(e.small) > 0 {
-			r.PriceMedianSmallEURM2 = round2(percentile(e.small, 0.50))
+			r.PriceMedianSmallEURM2 = stats.Round(stats.Percentile(e.small, 0.50), 2)
 		}
 		out[ins] = r
 	}
 	return out
-}
-
-// percentile uses linear interpolation on a pre-sorted slice (matches numpy
-// 'linear' / the validated python). Empty ⇒ 0.
-func percentile(sorted []float64, p float64) float64 {
-	n := len(sorted)
-	if n == 0 {
-		return 0
-	}
-	if n == 1 {
-		return sorted[0]
-	}
-	k := p * float64(n-1)
-	f := int(k)
-	if f >= n-1 {
-		return sorted[n-1]
-	}
-	return sorted[f] + (sorted[f+1]-sorted[f])*(k-float64(f))
-}
-
-func round2(v float64) float64 {
-	return float64(int64(v*100+0.5)) / 100
 }
 
 // Vintage: the 3 most recent full DVF years. Bump on refresh.
