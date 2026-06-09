@@ -36,3 +36,25 @@ func TestFoldArrondissement(t *testing.T) {
 		}
 	}
 }
+
+func TestArrondissementParents(t *testing.T) {
+	m := ArrondissementParents()
+	if len(m) != 45 {
+		t.Fatalf("len = %d, want 45 (20 Paris + 9 Lyon + 16 Marseille)", len(m))
+	}
+	for alias, parent := range m {
+		// The enumerable map and the query-time fold must agree.
+		if got := FoldArrondissement(alias); got != parent {
+			t.Errorf("FoldArrondissement(%s) = %s, want %s", alias, got, parent)
+		}
+	}
+	for _, probe := range []struct{ alias, parent string }{
+		{"75101", "75056"}, {"75120", "75056"},
+		{"69381", "69123"}, {"69389", "69123"},
+		{"13201", "13055"}, {"13216", "13055"},
+	} {
+		if m[probe.alias] != probe.parent {
+			t.Errorf("m[%s] = %s, want %s", probe.alias, m[probe.alias], probe.parent)
+		}
+	}
+}

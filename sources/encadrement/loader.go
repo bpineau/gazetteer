@@ -315,9 +315,33 @@ func (idx *Index) CountEstEnsemble() int {
 	return n
 }
 
-// lookupEPTZone returns the barème cells for a (EPT, zone) pair. Zone numbers
-// are not unique across EPTs, so the EPT must scope the lookup.
-func (idx *Index) lookupEPTZone(ept, zone string) []Entry {
+// ZonesForINSEE returns the encadrement zone identifiers covering the
+// given EPT commune (Plaine Commune / Est Ensemble) and the owning
+// dataset (ZoneSourcePlaineCommune | ZoneSourceEstEnsemble), straight
+// from the embedded zonage artifacts — so batch consumers (overview)
+// track perimeter revisions without hand-maintained commune tables.
+// A multi-zone commune (Saint-Denis, Montreuil) returns several zones,
+// sorted. ok is false for communes outside both EPTs (Paris and Lyon are
+// keyed by arrondissement / IRIS instead — see LookupParis, LookupLyonInsee).
+func (idx *Index) ZonesForINSEE(insee string) (zones []string, zoneSource string, ok bool) {
+	if idx == nil {
+		return nil, "", false
+	}
+	ept, ok := idx.inseeEPT[insee]
+	if !ok {
+		return nil, "", false
+	}
+	return idx.inseeZones[insee], ept, true
+}
+
+// LookupEPTZone returns the barème cells for a (EPT, zone) pair, where
+// ept is ZoneSourcePlaineCommune or ZoneSourceEstEnsemble. Zone numbers
+// are not unique across EPTs, so the EPT must scope the lookup. Empty
+// for an unknown pair.
+func (idx *Index) LookupEPTZone(ept, zone string) []Entry {
+	if idx == nil {
+		return nil
+	}
 	switch ept {
 	case ZoneSourcePlaineCommune:
 		return idx.byPlaineCommuneZone[zone]

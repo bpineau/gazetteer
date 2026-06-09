@@ -80,3 +80,32 @@ func TestNonEmpty(t *testing.T) {
 		t.Error("NonEmpty(2 bytes, min=1) = false, want true")
 	}
 }
+
+func TestCopyFile(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src.bin")
+	dst := filepath.Join(dir, "dst.bin")
+	if err := os.WriteFile(src, []byte("payload"), 0o644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := atomicfs.CopyFile(src, dst, 0o644); err != nil {
+		t.Fatalf("CopyFile: %v", err)
+	}
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("read dst: %v", err)
+	}
+	if string(got) != "payload" {
+		t.Errorf("dst content = %q, want %q", got, "payload")
+	}
+	if atomicfs.Exists(dst + ".partial") {
+		t.Error("tmpfile left behind after successful copy")
+	}
+	// Missing source: dst untouched, no tmpfile.
+	if err := atomicfs.CopyFile(filepath.Join(dir, "missing"), dst, 0o644); err == nil {
+		t.Error("CopyFile(missing src) = nil error, want error")
+	}
+	if got, _ := os.ReadFile(dst); string(got) != "payload" {
+		t.Errorf("dst clobbered by failed copy: %q", got)
+	}
+}
