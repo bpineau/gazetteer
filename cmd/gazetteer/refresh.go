@@ -14,6 +14,7 @@ import (
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/atomicfs"
 )
 
 // runRefresh implements `gazetteer refresh`: download each selected
@@ -227,7 +228,10 @@ func copyToEmbed(report dataset.Report, dir string) error {
 			continue
 		}
 		dst := filepath.Join(root, "sources", r.Source, "data", r.Processed)
-		if err := copyFile(src, dst); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil { //nolint:gosec // in-repo data dir
+			return fmt.Errorf("--go-embed-update: copy %s: %w", r.Processed, err)
+		}
+		if err := atomicfs.CopyFile(src, dst, 0o644); err != nil {
 			return fmt.Errorf("--go-embed-update: copy %s: %w", r.Processed, err)
 		}
 		fmt.Fprintf(os.Stdout, "embed-update: %s -> %s\n", r.Processed, relTo(root, dst))
@@ -247,32 +251,6 @@ func moduleRoot() (string, error) {
 		return "", fmt.Errorf("not inside a Go module checkout")
 	}
 	return filepath.Dir(gomod), nil
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src) //nolint:gosec // src is a datadir artifact we just wrote
-	if err != nil {
-		return err
-	}
-	defer func() { _ = in.Close() }()
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil { //nolint:gosec // in-repo data dir
-		return err
-	}
-	tmp := dst + ".tmp"
-	out, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644) //nolint:gosec // in-repo data file
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(out, in); err != nil {
-		_ = out.Close()
-		_ = os.Remove(tmp)
-		return err
-	}
-	if err := out.Close(); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	return os.Rename(tmp, dst)
 }
 
 func relTo(root, p string) string {

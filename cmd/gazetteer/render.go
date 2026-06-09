@@ -121,50 +121,65 @@ func truncate(s string, max int) string {
 // missing renderer falls back to printing just the Status.
 type sourceRenderer func(data any) (headline string, extra []string)
 
-var sourceRenderers = map[string]sourceRenderer{
-	ademe.Name:        renderAdeme,
-	anct.Name:         renderAnct,
-	bdnb.Name:         renderBDNB,
-	bpe.Name:          renderBPE,
-	cadastre.Name:     renderCadastre,
-	carteloyers.Name:  renderCarteloyers,
-	cartofriches.Name: renderCartofriches,
-	catnat.Name:       renderCatnat,
-	cdsr.Name:         renderCDSR,
-	chomage.Name:      renderChomage,
-	delinquance.Name:  renderDelinquance,
-	dpedist.Name:      renderDPEDist,
-	dvf.Name:          renderDVF,
-	dvfagg.Name:       renderDVFAgg,
-	education.Name:    renderEducation,
-	encadrement.Name:  renderEncadrement,
-	filoiris.Name:     renderFiloIris,
-	filosofi.Name:     renderFilosofi,
-	georisques.Name:   renderGeorisques,
-	gpe.Name:          renderGPE,
-	iris.Name:         renderIRIS,
-	ipsecoles.Name:    renderIPSEcoles,
-	locservice.Name:   renderLocservice,
-	logiris.Name:      renderLogiris,
-	lovac.Name:        renderLovac,
-	nuisances.Name:    renderNuisances,
-	oll.Name:          renderOLL,
-	gzosm.Name:        renderOSM,
-	qpv.Name:          renderQPV,
-	rnc.Name:          renderRNC,
-	rpls.Name:         renderRPLS,
-	sitadel.Name:      renderSitadel,
-	taxefonciere.Name: renderTaxeFonciere,
-	vacance.Name:      renderVacance,
-	zonageabc.Name:    renderZonageABC,
-	zonetendue.Name:   renderZoneTendue,
+// typed adapts a strongly-typed formatting func into a sourceRenderer,
+// centralising the guard every renderer needs: a wrong-type / nil
+// payload or an IsEmpty() Result short-circuits to the source's
+// "nothing here" message; only real data reaches f. Renderers whose
+// guard deviates from this exact preamble (cadastre, zonetendue) stay
+// bespoke — see their registration comments below.
+func typed[E any, P interface {
+	*E
+	IsEmpty() bool
+}](empty string, f func(P) (headline string, extra []string)) sourceRenderer {
+	return func(data any) (string, []string) {
+		r, ok := data.(P)
+		if !ok || r == nil || r.IsEmpty() {
+			return empty, nil
+		}
+		return f(r)
+	}
 }
 
-func renderDVF(data any) (string, []string) {
-	r, ok := data.(*dvf.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no comparable transactions", nil
-	}
+var sourceRenderers = map[string]sourceRenderer{
+	ademe.Name:        typed[ademe.Result]("no DPE found", renderAdeme),
+	anct.Name:         typed[anct.Result]("no ANCT programme", renderAnct),
+	bdnb.Name:         typed[bdnb.Result]("no building data", renderBDNB),
+	bpe.Name:          typed[bpe.Result]("no facilities indexed", renderBPE),
+	cadastre.Name:     renderCadastre, // bespoke guard: also empty when len(Parcels)==0
+	carteloyers.Name:  typed[carteloyers.Result]("no rent reading", renderCarteloyers),
+	cartofriches.Name: typed[cartofriches.Result]("no referenced sites", renderCartofriches),
+	catnat.Name:       typed[catnat.Result]("no CatNat decree on record", renderCatnat),
+	cdsr.Name:         typed[cdsr.Result]("no distressed copro within range", renderCDSR),
+	chomage.Name:      typed[chomage.Result]("no unemployment reading", renderChomage),
+	delinquance.Name:  typed[delinquance.Result]("absent from SSMSI dataset", renderDelinquance),
+	dpedist.Name:      typed[dpedist.Result]("no DPE in this commune", renderDPEDist),
+	dvf.Name:          typed[dvf.Result]("no comparable transactions", renderDVF),
+	dvfagg.Name:       typed[dvfagg.Result]("no commune-level DVF aggregate", renderDVFAgg),
+	education.Name:    typed[education.Result]("no schools registered", renderEducation),
+	encadrement.Name:  typed[encadrement.Result]("outside any encadrement zone", renderEncadrement),
+	filoiris.Name:     typed[filoiris.Result]("no IRIS-level income (outside the ≥5000-hab perimeter)", renderFiloIris),
+	filosofi.Name:     typed[filosofi.Result]("absent from Filosofi", renderFilosofi),
+	georisques.Name:   typed[georisques.Result]("no risk data for these coords", renderGeorisques),
+	gpe.Name:          typed[gpe.Result]("no future GPE station within range", renderGPE),
+	iris.Name:         typed[iris.Result]("outside covered IRIS perimeter", renderIRIS),
+	ipsecoles.Name:    typed[ipsecoles.Result]("no école primaire IPS on record", renderIPSEcoles),
+	locservice.Name:   typed[locservice.Result]("no tension reading", renderLocservice),
+	logiris.Name:      typed[logiris.Result]("no IRIS housing data (outside IDF)", renderLogiris),
+	lovac.Name:        typed[lovac.Result]("absent from LOVAC", renderLovac),
+	nuisances.Name:    typed[nuisances.Result]("outside the nuisance grid", renderNuisances),
+	oll.Name:          typed[oll.Result]("no observed-rent cell (Paris intra-muros is out of OLL scope)", renderOLL),
+	gzosm.Name:        typed[gzosm.Result]("no transit in range", renderOSM),
+	qpv.Name:          typed[qpv.Result]("address not in a QPV", renderQPV),
+	rnc.Name:          typed[rnc.Result]("no copropriété matched in the RNC", renderRNC),
+	rpls.Name:         typed[rpls.Result]("absent from the SRU inventory", renderRPLS),
+	sitadel.Name:      typed[sitadel.Result]("no construction data for this commune", renderSitadel),
+	taxefonciere.Name: typed[taxefonciere.Result]("no estimate", renderTaxeFonciere),
+	vacance.Name:      typed[vacance.Result]("absent from the census vacancy dataset", renderVacance),
+	zonageabc.Name:    typed[zonageabc.Result]("absent from zonage ABC dataset", renderZonageABC),
+	zonetendue.Name:   renderZoneTendue, // bespoke guard: renders even when IsEmpty (the tier is always meaningful)
+}
+
+func renderDVF(r *dvf.Result) (string, []string) {
 	parts := []string{}
 	if r.ValueEURPerM2Cents != nil {
 		parts = append(parts, fmt.Sprintf("%.0f €/m²", float64(*r.ValueEURPerM2Cents)/100))
@@ -181,11 +196,7 @@ func renderDVF(data any) (string, []string) {
 	return strings.Join(parts, ", "), nil
 }
 
-func renderDVFAgg(data any) (string, []string) {
-	r, ok := data.(*dvfagg.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no commune-level DVF aggregate", nil
-	}
+func renderDVFAgg(r *dvfagg.Result) (string, []string) {
 	headline := fmt.Sprintf("%.0f €/m² médian (%d ventes)", r.PriceMedianEURM2, r.N)
 	var extra []string
 	if r.PriceP25EURM2 > 0 && r.PriceP75EURM2 > 0 {
@@ -197,11 +208,7 @@ func renderDVFAgg(data any) (string, []string) {
 	return headline, extra
 }
 
-func renderAdeme(data any) (string, []string) {
-	r, ok := data.(*ademe.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no DPE found", nil
-	}
+func renderAdeme(r *ademe.Result) (string, []string) {
 	parts := []string{}
 	if r.DPE != nil {
 		if r.DPE.EtiquetteDPE != "" {
@@ -228,11 +235,7 @@ func renderAdeme(data any) (string, []string) {
 	return strings.Join(parts, ", "), nil
 }
 
-func renderBDNB(data any) (string, []string) {
-	r, ok := data.(*bdnb.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no building data", nil
-	}
+func renderBDNB(r *bdnb.Result) (string, []string) {
 	parts := []string{}
 	if r.Building != nil {
 		if r.Building.AnneeConstruction != nil {
@@ -251,11 +254,7 @@ func renderBDNB(data any) (string, []string) {
 	return strings.Join(parts, ", "), nil
 }
 
-func renderCarteloyers(data any) (string, []string) {
-	r, ok := data.(*carteloyers.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no rent reading", nil
-	}
+func renderCarteloyers(r *carteloyers.Result) (string, []string) {
 	headline := fmt.Sprintf("%.2f €/m²/mois CC (IC %.2f-%.2f, %d obs, %s)",
 		r.LoyerMedEURPerM2CC,
 		r.LoyerLowEURPerM2CC, r.LoyerHighEURPerM2CC,
@@ -266,21 +265,13 @@ func renderCarteloyers(data any) (string, []string) {
 	return headline, nil
 }
 
-func renderEncadrement(data any) (string, []string) {
-	r, ok := data.(*encadrement.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "outside any encadrement zone", nil
-	}
+func renderEncadrement(r *encadrement.Result) (string, []string) {
 	headline := fmt.Sprintf("loyer ref %.2f €/m²/mois HC, majoré %.2f (zone %s)",
 		r.LoyerRefEURPerM2HC, r.LoyerRefMajEURPerM2HC, r.Zone)
 	return headline, nil
 }
 
-func renderLocservice(data any) (string, []string) {
-	r, ok := data.(*locservice.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no tension reading", nil
-	}
+func renderLocservice(r *locservice.Result) (string, []string) {
 	headline := "tension: " + r.TensionLabel
 	if r.TensionScore != nil {
 		headline += fmt.Sprintf(" (supply tightness %d/8", *r.TensionScore)
@@ -292,11 +283,7 @@ func renderLocservice(data any) (string, []string) {
 	return headline, nil
 }
 
-func renderFiloIris(data any) (string, []string) {
-	r, ok := data.(*filoiris.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no IRIS-level income (outside the ≥5000-hab perimeter)", nil
-	}
+func renderFiloIris(r *filoiris.Result) (string, []string) {
 	parts := []string{fmt.Sprintf("revenu médian IRIS %d €/an", r.MedianEUR)}
 	if r.PovertyRatePct > 0 {
 		parts = append(parts, fmt.Sprintf("pauvreté %.1f%%", r.PovertyRatePct))
@@ -310,11 +297,7 @@ func renderFiloIris(data any) (string, []string) {
 	return strings.Join(parts, ", "), nil
 }
 
-func renderFilosofi(data any) (string, []string) {
-	r, ok := data.(*filosofi.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "absent from Filosofi", nil
-	}
+func renderFilosofi(r *filosofi.Result) (string, []string) {
 	parts := []string{}
 	if r.MedianEUR > 0 {
 		parts = append(parts, fmt.Sprintf("median revenu %d €/an", r.MedianEUR))
@@ -328,11 +311,7 @@ func renderFilosofi(data any) (string, []string) {
 	return strings.Join(parts, ", "), nil
 }
 
-func renderLogiris(data any) (string, []string) {
-	r, ok := data.(*logiris.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no IRIS housing data (outside IDF)", nil
-	}
+func renderLogiris(r *logiris.Result) (string, []string) {
 	parts := []string{fmt.Sprintf("locataires %.0f%%", r.RenterSharePct)}
 	if r.SocialHousingSharePct > 0 {
 		parts = append(parts, fmt.Sprintf("HLM %.0f%%", r.SocialHousingSharePct))
@@ -341,11 +320,7 @@ func renderLogiris(data any) (string, []string) {
 	return strings.Join(parts, ", "), nil
 }
 
-func renderLovac(data any) (string, []string) {
-	r, ok := data.(*lovac.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "absent from LOVAC", nil
-	}
+func renderLovac(r *lovac.Result) (string, []string) {
 	headline := fmt.Sprintf("vacance %.1f%%", r.VacancePct)
 	if r.VacanceLongPct > 0 {
 		headline += fmt.Sprintf(" (long-term %.1f%%)", r.VacanceLongPct)
@@ -353,11 +328,7 @@ func renderLovac(data any) (string, []string) {
 	return headline, nil
 }
 
-func renderTaxeFonciere(data any) (string, []string) {
-	r, ok := data.(*taxefonciere.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no estimate", nil
-	}
+func renderTaxeFonciere(r *taxefonciere.Result) (string, []string) {
 	headline := fmt.Sprintf("TF estimée %.0f €/an", r.EstimatedEURPerYear)
 	parts := []string{}
 	if r.TauxTFPBApplied > 0 {
@@ -375,11 +346,7 @@ func renderTaxeFonciere(data any) (string, []string) {
 	return headline, nil
 }
 
-func renderAnct(data any) (string, []string) {
-	r, ok := data.(*anct.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no ANCT programme", nil
-	}
+func renderAnct(r *anct.Result) (string, []string) {
 	parts := []string{}
 	if r.ACV {
 		parts = append(parts, "Action Cœur de Ville")
@@ -397,11 +364,7 @@ func renderAnct(data any) (string, []string) {
 	return strings.Join(parts, ", "), nil
 }
 
-func renderCartofriches(data any) (string, []string) {
-	r, ok := data.(*cartofriches.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no referenced sites", nil
-	}
+func renderCartofriches(r *cartofriches.Result) (string, []string) {
 	headline := fmt.Sprintf("%d sites", r.SiteCount)
 	if r.TotalSurfaceM2 > 0 {
 		headline += fmt.Sprintf(" (%d m²)", r.TotalSurfaceM2)
@@ -416,11 +379,7 @@ func renderCartofriches(data any) (string, []string) {
 	return headline, extra
 }
 
-func renderBPE(data any) (string, []string) {
-	r, ok := data.(*bpe.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no facilities indexed", nil
-	}
+func renderBPE(r *bpe.Result) (string, []string) {
 	headline := fmt.Sprintf("%d facilities in curated subset", r.TotalFacilities)
 	// Stable label order from AllBuckets so the CLI output is reproducible.
 	parts := []string{}
@@ -436,21 +395,13 @@ func renderBPE(data any) (string, []string) {
 	return headline, extra
 }
 
-func renderChomage(data any) (string, []string) {
-	r, ok := data.(*chomage.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no unemployment reading", nil
-	}
+func renderChomage(r *chomage.Result) (string, []string) {
 	headline := fmt.Sprintf("chômage %.1f%% en ZE %s (%s, national %.1f%%, écart %+.1f pp, %s)",
 		r.RatePct, r.ZECode, r.ZELabel, r.NationalRatePct, r.DeltaVsNationalPP, r.Tension)
 	return headline, nil
 }
 
-func renderDPEDist(data any) (string, []string) {
-	r, ok := data.(*dpedist.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no DPE in this commune", nil
-	}
+func renderDPEDist(r *dpedist.Result) (string, []string) {
 	headline := fmt.Sprintf("%d DPE issued (F+G %.1f%%, A+B %.1f%%, conf %s)",
 		r.NbTotal, r.PassoireSharePct, r.EfficientSharePct, r.Confidence)
 	parts := []string{}
@@ -466,11 +417,7 @@ func renderDPEDist(data any) (string, []string) {
 	return headline, extra
 }
 
-func renderDelinquance(data any) (string, []string) {
-	r, ok := data.(*delinquance.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "absent from SSMSI dataset", nil
-	}
+func renderDelinquance(r *delinquance.Result) (string, []string) {
 	parts := []string{}
 	if r.Population > 0 {
 		parts = append(parts, fmt.Sprintf("pop %d", r.Population))
@@ -491,7 +438,7 @@ func renderDelinquance(data any) (string, []string) {
 		if len(top) > 4 {
 			top = top[:4]
 		}
-		buf := []string{}
+		buf := make([]string, 0, len(top))
 		for _, k := range top {
 			buf = append(buf, fmt.Sprintf("%s %.1f", k, r.Rates[k]))
 		}
@@ -500,11 +447,7 @@ func renderDelinquance(data any) (string, []string) {
 	return headline, extra
 }
 
-func renderEducation(data any) (string, []string) {
-	r, ok := data.(*education.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no schools registered", nil
-	}
+func renderEducation(r *education.Result) (string, []string) {
 	parts := []string{fmt.Sprintf("%d schools", r.NbTotal)}
 	buckets := []struct {
 		label string
@@ -525,11 +468,7 @@ func renderEducation(data any) (string, []string) {
 	return strings.Join(parts, " "), nil
 }
 
-func renderQPV(data any) (string, []string) {
-	r, ok := data.(*qpv.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "address not in a QPV", nil
-	}
+func renderQPV(r *qpv.Result) (string, []string) {
 	headline := fmt.Sprintf("has_qpv=%t (%s, %d QPV)", r.HasQPV, r.MatchLevel, r.QPVCount)
 	extra := make([]string, 0, len(r.QPVs)+1)
 	for _, q := range r.QPVs {
@@ -541,11 +480,7 @@ func renderQPV(data any) (string, []string) {
 	return headline, extra
 }
 
-func renderZonageABC(data any) (string, []string) {
-	r, ok := data.(*zonageabc.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "absent from zonage ABC dataset", nil
-	}
+func renderZonageABC(r *zonageabc.Result) (string, []string) {
 	return fmt.Sprintf("zone %s (tension %d/4)", r.Zone, r.TensionScore), nil
 }
 
@@ -561,11 +496,7 @@ func renderZoneTendue(data any) (string, []string) {
 	return strings.Join(parts, ", "), nil
 }
 
-func renderOSM(data any) (string, []string) {
-	r, ok := data.(*gzosm.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no transit in range", nil
-	}
+func renderOSM(r *gzosm.Result) (string, []string) {
 	headline := fmt.Sprintf("nearest %s: %s (%d min walk",
 		r.NearestTransitType, r.NearestTransitName, r.NearestTransitWalkMin)
 	if len(r.NearestTransitLines) > 0 {
@@ -575,11 +506,7 @@ func renderOSM(data any) (string, []string) {
 	return headline, nil
 }
 
-func renderGPE(data any) (string, []string) {
-	r, ok := data.(*gpe.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no future GPE station within range", nil
-	}
+func renderGPE(r *gpe.Result) (string, []string) {
 	headline := fmt.Sprintf("future GPE: %s (%s, %d m)", r.Nearest.Name, r.Nearest.Line, r.Nearest.DistanceM)
 	if r.Within1500m > 0 {
 		headline += fmt.Sprintf(", %d à ≤1.5 km", r.Within1500m)
@@ -587,11 +514,7 @@ func renderGPE(data any) (string, []string) {
 	return headline, nil
 }
 
-func renderGeorisques(data any) (string, []string) {
-	r, ok := data.(*georisques.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no risk data for these coords", nil
-	}
+func renderGeorisques(r *georisques.Result) (string, []string) {
 	headline := fmt.Sprintf("%d natural + %d techno risks",
 		r.Summary.NaturelsPresentCount, r.Summary.TechnosPresentCount)
 	extra := []string{}
@@ -610,11 +533,7 @@ func renderGeorisques(data any) (string, []string) {
 	return headline, extra
 }
 
-func renderIRIS(data any) (string, []string) {
-	r, ok := data.(*iris.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "outside covered IRIS perimeter", nil
-	}
+func renderIRIS(r *iris.Result) (string, []string) {
 	headline := "IRIS " + r.CodeIRIS
 	if r.NomIRIS != "" {
 		headline += " — " + r.NomIRIS
@@ -641,11 +560,7 @@ func irisTypeLabel(t string) string {
 	}
 }
 
-func renderCatnat(data any) (string, []string) {
-	r, ok := data.(*catnat.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no CatNat decree on record", nil
-	}
+func renderCatnat(r *catnat.Result) (string, []string) {
 	headline := fmt.Sprintf("%d arrêtés CatNat (%d récents", r.TotalArretes, r.RecentCount)
 	if r.LastEventYear > 0 {
 		headline += fmt.Sprintf(", dernier %d", r.LastEventYear)
@@ -661,11 +576,7 @@ func renderCatnat(data any) (string, []string) {
 	return headline, extra
 }
 
-func renderNuisances(data any) (string, []string) {
-	r, ok := data.(*nuisances.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "outside the nuisance grid", nil
-	}
+func renderNuisances(r *nuisances.Result) (string, []string) {
 	headline := fmt.Sprintf("cadre de vie: %s (%d nuisance(s) superposée(s)", r.Tier, r.NuisanceCount)
 	if r.PointNoir {
 		headline += ", point noir environnemental"
@@ -674,14 +585,10 @@ func renderNuisances(data any) (string, []string) {
 	return headline, nil
 }
 
-func renderCDSR(data any) (string, []string) {
-	r, ok := data.(*cdsr.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no distressed copro within range", nil
-	}
+func renderCDSR(r *cdsr.Result) (string, []string) {
 	headline := fmt.Sprintf("%d copro(s) en difficulté ≤3 km (plus proche %d m, %d ≤500 m)",
 		r.Within3km, r.NearestM, r.Within500m)
-	var extra []string
+	extra := make([]string, 0, len(r.Nearest))
 	for _, it := range r.Nearest {
 		label := it.Name
 		if label == "" {
@@ -692,11 +599,7 @@ func renderCDSR(data any) (string, []string) {
 	return headline, extra
 }
 
-func renderOLL(data any) (string, []string) {
-	r, ok := data.(*oll.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no observed-rent cell (Paris intra-muros is out of OLL scope)", nil
-	}
+func renderOLL(r *oll.Result) (string, []string) {
 	headline := fmt.Sprintf("loyer observé %.1f €/m²/mois", r.ObservedMedianEURPerM2)
 	parts := []string{}
 	if r.ObservedQ1EURPerM2 > 0 && r.ObservedQ3EURPerM2 > 0 {
@@ -721,11 +624,7 @@ func renderOLL(data any) (string, []string) {
 	return headline, nil
 }
 
-func renderRPLS(data any) (string, []string) {
-	r, ok := data.(*rpls.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "absent from the SRU inventory", nil
-	}
+func renderRPLS(r *rpls.Result) (string, []string) {
 	headline := fmt.Sprintf("%.1f%% logements sociaux (SRU)", r.LLSRate)
 	if r.Tier != "" {
 		headline += " — " + string(r.Tier)
@@ -733,11 +632,7 @@ func renderRPLS(data any) (string, []string) {
 	return headline, nil
 }
 
-func renderVacance(data any) (string, []string) {
-	r, ok := data.(*vacance.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "absent from the census vacancy dataset", nil
-	}
+func renderVacance(r *vacance.Result) (string, []string) {
 	headline := fmt.Sprintf("vacance INSEE %.1f%%", r.VacancyRate)
 	if r.VacantCount > 0 && r.TotalLogements > 0 {
 		headline += fmt.Sprintf(" (%d/%d logements", r.VacantCount, r.TotalLogements)
@@ -751,11 +646,7 @@ func renderVacance(data any) (string, []string) {
 	return headline, nil
 }
 
-func renderSitadel(data any) (string, []string) {
-	r, ok := data.(*sitadel.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no construction data for this commune", nil
-	}
+func renderSitadel(r *sitadel.Result) (string, []string) {
 	headline := fmt.Sprintf("%d logts autorisés (%d)", r.AuthorizedLatest, r.LatestYear)
 	if r.StartedLatestYear > 0 {
 		headline += fmt.Sprintf(", %d commencés (%d)", r.StartedLatest, r.StartedLatestYear)
@@ -767,11 +658,7 @@ func renderSitadel(data any) (string, []string) {
 	return headline, lines
 }
 
-func renderRNC(data any) (string, []string) {
-	r, ok := data.(*rnc.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no copropriété matched in the RNC", nil
-	}
+func renderRNC(r *rnc.Result) (string, []string) {
 	headline := "RNC " + r.Immatriculation
 	if r.Attention {
 		headline += " — à vérifier: " + strings.Join(r.Signals, ", ")
@@ -793,11 +680,7 @@ func renderRNC(data any) (string, []string) {
 	return headline, lines
 }
 
-func renderIPSEcoles(data any) (string, []string) {
-	r, ok := data.(*ipsecoles.Result)
-	if !ok || r == nil || r.IsEmpty() {
-		return "no école primaire IPS on record", nil
-	}
+func renderIPSEcoles(r *ipsecoles.Result) (string, []string) {
 	headline := fmt.Sprintf("IPS médian %.0f", r.IPSMedian)
 	if r.SchoolCount > 0 {
 		headline += fmt.Sprintf(" sur %d école(s)", r.SchoolCount)

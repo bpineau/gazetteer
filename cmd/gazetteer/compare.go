@@ -7,11 +7,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/bpineau/gazetteer/appraisal/zonescore"
 	"github.com/bpineau/gazetteer/gazetteer"
 )
+
+// maxParallelNormalize bounds how many BAN normalize calls `compare` has in
+// flight at once, mirroring zonescore's maxParallelListings cap on the
+// collect side (same N-addresses fan-out, same upstream courtesy).
+const maxParallelNormalize = 8
 
 // runCompare implements `gazetteer compare [flags] <addr1> <addr2> [...]`.
 // It normalises each (separately-quoted) address, collects every candidate in
@@ -56,22 +62,43 @@ func runCompare(ctx context.Context, args []string) error {
 		return fmt.Errorf("build gazetteer client: %w", err)
 	}
 
-	listings := make([]gazetteer.Listing, 0, len(addrs))
-	for _, a := range addrs {
-		l, err := deps.Normalizer.Normalize(ctx, a)
+	// Normalize the candidates in parallel — each is a live BAN HTTP
+	// round-trip, so a serial loop costs one RTT per address. The fan-out is
+	// bounded like zonescore's maxParallelListings collect; listings[i] keeps
+	// the input order, and (as in the serial version) the run aborts on the
+	// first failing address (lowest index, for determinism).
+	listings := make([]gazetteer.Listing, len(addrs))
+	normErrs := make([]error, len(addrs))
+	sem := make(chan struct{}, maxParallelNormalize)
+	var wg sync.WaitGroup
+	for i, a := range addrs {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, a string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			l, err := deps.Normalizer.Normalize(ctx, a)
+			if err != nil {
+				normErrs[i] = fmt.Errorf("normalize %q: %w", a, err)
+				return
+			}
+			l.PropertyType = pt
+			if cf.surface > 0 {
+				s := cf.surface
+				l.SurfaceM2 = &s
+			}
+			if cf.rooms > 0 {
+				r := cf.rooms
+				l.Rooms = &r
+			}
+			listings[i] = l
+		}(i, a)
+	}
+	wg.Wait()
+	for _, err := range normErrs {
 		if err != nil {
-			return fmt.Errorf("normalize %q: %w", a, err)
+			return err
 		}
-		l.PropertyType = pt
-		if cf.surface > 0 {
-			s := cf.surface
-			l.SurfaceM2 = &s
-		}
-		if cf.rooms > 0 {
-			r := cf.rooms
-			l.Rooms = &r
-		}
-		listings = append(listings, l)
 	}
 
 	if cf.timeout > 0 {

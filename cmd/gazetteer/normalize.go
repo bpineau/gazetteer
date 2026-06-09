@@ -74,7 +74,7 @@ func printListing(out *os.File, l gazetteer.Listing) {
 	if l.INSEE != "" {
 		fmt.Fprintf(out, "insee    %s\n", l.INSEE)
 	}
-	if l.Lat != nil && l.Lon != nil {
-		fmt.Fprintf(out, "lat,lon  %.6f,%.6f\n", *l.Lat, *l.Lon)
+	if lat, lon, ok := l.Coords(); ok {
+		fmt.Fprintf(out, "lat,lon  %.6f,%.6f\n", lat, lon)
 	}
 }
