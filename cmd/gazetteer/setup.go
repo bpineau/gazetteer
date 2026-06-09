@@ -23,7 +23,7 @@ type commonFlags struct {
 	verbose bool
 }
 
-// registerVerbose installs --verbose. Other flags (--dump, --json, …)
+// registerVerbose installs --verbose. Other flags (--json, …)
 // are owned by the sub-command that uses them.
 func (c *commonFlags) registerVerbose(fs *flag.FlagSet) {
 	fs.BoolVar(&c.verbose, "verbose", false, "Enable DEBUG-level slog output to stderr")

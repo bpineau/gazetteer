@@ -30,7 +30,7 @@ func (q *queryFlags) zonescoreOptions() ([]zonescore.Options, error) {
 }
 
 // runAppraise implements `gazetteer appraise [--source ...] [--json]
-// [--verbose] [--dump] <addr>`. Reuses the query pipeline (normalize +
+// [--verbose] <addr>`. Reuses the query pipeline (normalize +
 // Collect) and then folds the Dossier through the three appraisal
 // synthesisers: PricePerM2, RentValue, HazardProfile.
 func runAppraise(ctx context.Context, args []string) error {

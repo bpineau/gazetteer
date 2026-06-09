@@ -159,30 +159,14 @@ override. `Client.Collect` always calls plain `Query` — `QueryWith` is
 a side-entry path. Implementations should treat unrecognised args as
 a fallback to the Listing-only path.
 
-### `BaseURLer`
-
-```go
-type BaseURLer interface {
-    BaseURL() string
-}
-```
-
-Used by test harnesses to assert which upstream a Source instance is
-pointed at, and by operator-side diagnostics. Return the effective URL
-(after `Options.BaseURL` vs. package-level default resolution).
-
 ## Reading shared infrastructure from context
 
-The Client propagates HTTP client, logger and debug-dump flag via
-`ctx`. Read them with the helpers in `gazetteer/context.go`:
+The Client propagates HTTP client and logger via `ctx`. Read them with the helpers in `gazetteer/context.go`:
 
 ```go
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
     logger := gazetteer.LoggerFrom(ctx).With(slog.String("source", Name))
     httpClient := gazetteer.HTTPClientFrom(ctx)
-    if gazetteer.DebugDumpFrom(ctx) {
-        // ...
-    }
     // ...
 }
 ```

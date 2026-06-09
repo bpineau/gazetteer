@@ -55,7 +55,7 @@ func (s Status) String() string {
 // Source is the central abstraction. A Source is a named, versioned data
 // origin that produces a typed Data payload for a given Listing.
 //
-// Shared infrastructure (HTTP client, logger, debug-dump flag, cache) is
+// Shared infrastructure (HTTP client, logger, cache) is
 // propagated via ctx — see context.go — so Sources never need to receive
 // these as constructor parameters. Implementations must respect ctx.Done().
 type Source interface {
@@ -102,28 +102,6 @@ func QueryTyped[R any](ctx context.Context, src Source, l Listing) (R, error) {
 // framework records Status == StatusOKEmpty instead of StatusOK.
 type EmptyReporter interface {
 	IsEmpty() bool
-}
-
-// BaseURLer is an opt-in interface a Source MAY implement to expose
-// its effective remote-endpoint root, typically captured from
-// Options.BaseURL (or its source-specific equivalent) at construction
-// time.
-//
-// Use cases:
-//   - Test harnesses that want to assert "this Source instance was
-//     pointed at httptest.NewServer.URL"; they type-assert
-//     `if u, ok := src.(gazetteer.BaseURLer); ok { ... }`.
-//   - Operator diagnostics ("which upstream is dvf hitting in this
-//     process?") without reading the Options struct.
-//
-// The convention across shipped Sources is to expose a BaseURL string
-// (or a domain-specific equivalent when one upstream root is not
-// enough) on the Options struct. Sources that implement BaseURLer
-// return the *effective* URL — i.e. the one the Source will actually
-// use for outgoing requests, after Options-vs-package-var fallback
-// resolution.
-type BaseURLer interface {
-	BaseURL() string
 }
 
 // Evidencer is an opt-in interface a Source's typed Data MAY implement

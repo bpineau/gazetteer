@@ -38,16 +38,3 @@ func TestLoggerFrom_Set(t *testing.T) {
 		t.Errorf("LoggerFrom returned a different logger")
 	}
 }
-
-func TestDebugDumpFrom_DefaultsFalse(t *testing.T) {
-	if DebugDumpFrom(context.Background()) {
-		t.Errorf("DebugDumpFrom default = true, want false")
-	}
-}
-
-func TestDebugDumpFrom_Set(t *testing.T) {
-	ctx := WithDebugDump(context.Background(), true)
-	if !DebugDumpFrom(ctx) {
-		t.Errorf("DebugDumpFrom after WithDebugDump(true) = false")
-	}
-}

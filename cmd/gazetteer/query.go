@@ -15,7 +15,7 @@ import (
 )
 
 // runQuery implements `gazetteer query [--source ...] [--json] [--verbose]
-// [--dump] [--explain] <addr>`. Normalises the address, fires the selected
+// [--explain] <addr>`. Normalises the address, fires the selected
 // Sources in parallel via the gazetteer Client, then prints either a
 // per-source human summary, the full Dossier as JSON (--json), or a
 // per-source why-empty/why-failed diagnosis (--explain).
@@ -53,7 +53,6 @@ type queryFlags struct {
 	rooms        int           // 0 ⇒ unset
 	timeout      time.Duration // overall budget for the Collect; 0 ⇒ no deadline
 	jsonOut      bool
-	dump         bool
 	explain      bool   // diagnose per-source why-empty/why-failed (query only)
 	profile      string // ZoneScore weight preset (appraise / compare only)
 	addr         string
@@ -68,7 +67,7 @@ func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 	fs.SetOutput(os.Stderr)
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(),
-			"Usage: gazetteer %s [--property-type apartment|house|land|commercial] [--surface m²] [--rooms N] [--source dvf,osm_transit,...] [--json] [--verbose] [--dump] <addr>\n", cmd)
+			"Usage: gazetteer %s [--property-type apartment|house|land|commercial] [--surface m²] [--rooms N] [--source dvf,osm_transit,...] [--json] [--verbose] <addr>\n", cmd)
 		fmt.Fprintln(fs.Output())
 		fmt.Fprintf(fs.Output(), "Available sources: %s\n", strings.Join(allSourceNames(), ", "))
 		fmt.Fprintln(fs.Output())
@@ -85,7 +84,6 @@ func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 	fs.DurationVar(&q.timeout, "timeout", 30*time.Second,
 		"Overall budget for the Collect (deadline propagated via ctx). Slow Sources past this point return ctx.DeadlineExceeded → StatusFailedTransient. 0 disables the deadline.")
 	fs.BoolVar(&q.jsonOut, "json", false, "Emit the full Dossier as indented JSON")
-	fs.BoolVar(&q.dump, "dump", false, "Log raw HTTP request/response payloads (sources that honour it)")
 	fs.BoolVar(&q.explain, "explain", false, "Diagnose per source WHY it returned nothing (missing input vs no data for this address)")
 	fs.StringVar(&q.profile, "profile", "",
 		"ZoneScore weight preset for appraise/compare: yield (default) | balanced | patrimoine | transport.")
@@ -162,8 +160,7 @@ func executeQuery(ctx context.Context, q *queryFlags) (gazetteer.Dossier, error)
 
 	builder := gazetteer.NewBuilder().
 		WithHTTPClient(deps.HTTP.HTTPClient()).
-		WithLogger(logger).
-		WithDebugDump(q.dump)
+		WithLogger(logger)
 	for _, s := range sources {
 		builder = builder.With(s)
 	}

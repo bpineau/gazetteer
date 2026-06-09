@@ -34,17 +34,6 @@ func TestSource_NameVersion(t *testing.T) {
 	}
 }
 
-func TestSource_BaseURL(t *testing.T) {
-	t.Parallel()
-	if got := NewSource(Options{}).BaseURL(); got != DefaultBaseURL {
-		t.Errorf("BaseURL() default = %q, want %q", got, DefaultBaseURL)
-	}
-	s := NewSource(Options{BaseURL: "https://example.invalid/api"})
-	if got := s.BaseURL(); got != "https://example.invalid/api" {
-		t.Errorf("BaseURL() override = %q", got)
-	}
-}
-
 func TestSource_HappyPath(t *testing.T) {
 	t.Parallel()
 	body := mustReadFixture(t, "bourg.json")

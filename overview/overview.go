@@ -7,7 +7,6 @@ import (
 
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/geodist"
-	"github.com/bpineau/gazetteer/sources/anct"
 	"github.com/bpineau/gazetteer/sources/carteloyers"
 	"github.com/bpineau/gazetteer/sources/delinquance"
 	"github.com/bpineau/gazetteer/sources/dvfagg"
@@ -104,7 +103,6 @@ func Build(o Options) ([]CommuneOverview, error) {
 	va, _ := vacance.Load(o.DataDir)
 	tf, _ := taxefonciere.Load(o.DataDir)
 	qp, _ := qpv.Load(o.DataDir)
-	_, _ = anct.Load(o.DataDir) // loaded but not yet surfaced as fields
 	fi, _ := filosofi.Load(o.DataDir)
 	za, _ := zonageabc.Load(o.DataDir)
 	zt, _ := zonetendue.Load(o.DataDir)

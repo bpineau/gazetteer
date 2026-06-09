@@ -11,7 +11,6 @@ type ctxKey int
 const (
 	ctxKeyHTTPClient ctxKey = iota
 	ctxKeyLogger
-	ctxKeyDebugDump
 )
 
 // WithHTTPClient stores an HTTP client in ctx for Sources to read with
@@ -58,16 +57,4 @@ func LoggerFrom(ctx context.Context) *slog.Logger {
 		return l
 	}
 	return slog.Default()
-}
-
-// WithDebugDump enables raw request/response logging for sources that
-// honour the flag.
-func WithDebugDump(ctx context.Context, on bool) context.Context {
-	return context.WithValue(ctx, ctxKeyDebugDump, on)
-}
-
-// DebugDumpFrom reports whether debug dump is enabled. Default: false.
-func DebugDumpFrom(ctx context.Context) bool {
-	v, _ := ctx.Value(ctxKeyDebugDump).(bool)
-	return v
 }

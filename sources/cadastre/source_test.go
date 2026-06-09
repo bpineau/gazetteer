@@ -78,9 +78,6 @@ func TestSource_NameVersion(t *testing.T) {
 	if s.Version() != sourceVersion {
 		t.Errorf("Version() = %d, want %d", s.Version(), sourceVersion)
 	}
-	if s.BaseURL() != BaseURL {
-		t.Errorf("BaseURL() = %q, want %q", s.BaseURL(), BaseURL)
-	}
 }
 
 func TestSource_HappyPath_NoBati(t *testing.T) {

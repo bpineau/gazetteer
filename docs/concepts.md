@@ -212,9 +212,8 @@ Client.Collect(ctx, listing)
                               gathered into Dossier ◄┘
 ```
 
-- `Collect` propagates the configured HTTP client, logger and
-  debug-dump flag via the context-key helpers (`gazetteer.WithHTTPClient`,
-  `WithLogger`, `WithDebugDump`).
+- `Collect` propagates the configured HTTP client and logger via the
+  context-key helpers (`gazetteer.WithHTTPClient`, `WithLogger`).
 - Sources read these via the `*From(ctx)` helpers — see
   `gazetteer/context.go`.
 - A Source MAY override the HTTP client per-instance via its own
