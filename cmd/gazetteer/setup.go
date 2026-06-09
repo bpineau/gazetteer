@@ -11,8 +11,8 @@ import (
 	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/httpx"
+	"github.com/bpineau/gazetteer/internal/roster"
 
-	"github.com/bpineau/gazetteer/sources/dvf"
 	"github.com/bpineau/gazetteer/sources/iris"
 )
 
@@ -48,7 +48,7 @@ func (c *commonFlags) setupLogger() *slog.Logger {
 // per process via newRuntimeDeps and reused across calls.
 type runtimeDeps struct {
 	HTTP       *httpx.Client
-	BAN        *banx.BANClient
+	BAN        banx.Geocoder
 	Communes   communes.Communes
 	Normalizer gazetteer.Normalizer
 
@@ -59,19 +59,22 @@ type runtimeDeps struct {
 	DataDir string
 }
 
+// rosterDeps projects the CLI bundle onto the shared roster bundle that
+// every Source constructor draws from (see internal/roster).
+func (d *runtimeDeps) rosterDeps() roster.Deps {
+	return roster.Deps{HTTP: d.HTTP, Geocoder: d.BAN, Communes: d.Communes, DataDir: d.DataDir}
+}
+
 // newRuntimeDeps builds the shared httpx.Client, the BAN client, and
 // the embedded communes table, plus a BAN-backed Normalizer ready to
 // be wired into gazetteer.Builder.WithNormalizer (or called directly
 // via Normalizer.Normalize).
 func newRuntimeDeps() (*runtimeDeps, error) {
-	// Grant the data.gouv.fr DVF + cadastre endpoints a higher per-host rate
-	// than the polite default: DVF fans out one call per cadastral section,
-	// so the default 2 req/s serializes a dense-commune lookup into 20 s+.
-	hc, err := httpx.New(httpx.Options{PerHost: dvf.HostRateLimits()})
+	hc, err := roster.NewHTTPClient()
 	if err != nil {
-		return nil, fmt.Errorf("httpx: %w", err)
+		return nil, fmt.Errorf("%w", err)
 	}
-	ban := banx.NewBANClient(hc)
+	ban := roster.NewGeocoder(hc)
 	com := communes.MustDefault()
 	// A failure to resolve the user cache dir is non-fatal: block sources
 	// fall back to their embedded copies when DataDir is empty.

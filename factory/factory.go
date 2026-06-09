@@ -26,47 +26,10 @@ import (
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
-	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/httpx"
-	"github.com/bpineau/gazetteer/helpers/kvcache/memcache"
-	"github.com/bpineau/gazetteer/sources/ademe"
-	"github.com/bpineau/gazetteer/sources/anct"
-	"github.com/bpineau/gazetteer/sources/bdnb"
-	"github.com/bpineau/gazetteer/sources/bpe"
-	"github.com/bpineau/gazetteer/sources/cadastre"
-	"github.com/bpineau/gazetteer/sources/carteloyers"
-	"github.com/bpineau/gazetteer/sources/cartofriches"
-	"github.com/bpineau/gazetteer/sources/catnat"
-	"github.com/bpineau/gazetteer/sources/cdsr"
-	"github.com/bpineau/gazetteer/sources/chomage"
-	"github.com/bpineau/gazetteer/sources/delinquance"
-	"github.com/bpineau/gazetteer/sources/dpedist"
-	"github.com/bpineau/gazetteer/sources/dvf"
-	"github.com/bpineau/gazetteer/sources/dvfagg"
-	"github.com/bpineau/gazetteer/sources/education"
-	"github.com/bpineau/gazetteer/sources/encadrement"
-	"github.com/bpineau/gazetteer/sources/filoiris"
-	"github.com/bpineau/gazetteer/sources/filosofi"
-	"github.com/bpineau/gazetteer/sources/georisques"
-	"github.com/bpineau/gazetteer/sources/gpe"
-	"github.com/bpineau/gazetteer/sources/ips_ecoles"
+	"github.com/bpineau/gazetteer/internal/roster"
 	"github.com/bpineau/gazetteer/sources/iris"
-	"github.com/bpineau/gazetteer/sources/links"
-	"github.com/bpineau/gazetteer/sources/locservice"
-	"github.com/bpineau/gazetteer/sources/logiris"
-	"github.com/bpineau/gazetteer/sources/lovac"
-	"github.com/bpineau/gazetteer/sources/nuisances"
-	"github.com/bpineau/gazetteer/sources/oll"
-	gzosm "github.com/bpineau/gazetteer/sources/osm"
-	"github.com/bpineau/gazetteer/sources/qpv"
-	"github.com/bpineau/gazetteer/sources/rnc"
-	"github.com/bpineau/gazetteer/sources/rpls"
-	"github.com/bpineau/gazetteer/sources/sitadel"
-	"github.com/bpineau/gazetteer/sources/taxefonciere"
-	"github.com/bpineau/gazetteer/sources/vacance"
-	"github.com/bpineau/gazetteer/sources/zonageabc"
-	"github.com/bpineau/gazetteer/sources/zonetendue"
 )
 
 // Options tunes the defaults wired by NewDefault.
@@ -105,15 +68,11 @@ type Options struct {
 }
 
 // NewDefault builds a *gazetteer.Client wired with every stable
-// in-tree Source: dvf, ademe, anct, bdnb, bpe, cadastre, carteloyers,
-// cartofriches, catnat, cdsr, georisques, gpe, iris, ips_ecoles, locservice,
-// oll, nuisances, chomage, delinquance, dpedist, education, encadrement, filosofi,
-// filoiris, logiris, qpv, rnc, rpls, sitadel, taxefonciere, lovac, vacance, zonageabc,
-// zonetendue, links, osm_transit.
-//
-// osm_transit ships an embedded baseline station catalog (overridable
-// from the datadir) and a live Overpass fallback for points the catalog
-// does not cover, so it works out of the box.
+// in-tree Source — one per sources/<name> package (run `gazetteer
+// sources list`, or see docs/sources.md, for the roster). All of them
+// work out of the box: offline sources ship embedded datasets, and
+// osm_transit pairs its embedded station catalog with a live Overpass
+// fallback.
 //
 // On any wiring failure (httpx, BAN, communes, Source construction)
 // NewDefault returns a non-nil error and a nil *Client.
@@ -143,80 +102,44 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 	_ = ctx // reserved for future ctx-scoped configuration
 	hc := opts.HTTPClient
 	if hc == nil {
-		// Grant the data.gouv.fr DVF + cadastre endpoints a higher per-host
-		// rate than the polite default: DVF fans out one call per cadastral
-		// section, so the default 2 req/s serializes a dense-commune lookup
-		// into 20 s+.
-		built, err := httpx.New(httpx.Options{PerHost: dvf.HostRateLimits()})
+		built, err := roster.NewHTTPClient()
 		if err != nil {
-			return nil, fmt.Errorf("factory: httpx: %w", err)
+			return nil, fmt.Errorf("factory: %w", err)
 		}
 		hc = built
 	}
-	// Process-lifetime in-memory geocode cache: within one Collect, up to
-	// ~6 live sources independently geocode the same address when the
-	// listing was not pre-normalized; without the cache each pays a BAN
-	// round-trip at the polite per-host rate. The cache also applies the
-	// banx dept-coherence guards, so a drifted BAN homonyme can't fan out.
-	ban := banx.NewCachedGeocoder(banx.NewBANClient(hc), memcache.New(), 0)
 	com := opts.Communes
 	if com == nil {
 		com = communes.MustDefault()
 	}
-
-	dataDir := resolveDataDir(opts.DataDir)
-
-	dvfSrc, err := dvf.NewSource(dvf.Options{HTTP: hc, Geocoder: ban, Communes: com})
-	if err != nil {
-		return nil, fmt.Errorf("factory: dvf: %w", err)
+	deps := roster.Deps{
+		HTTP:     hc,
+		Geocoder: roster.NewGeocoder(hc),
+		Communes: com,
+		DataDir:  resolveDataDir(opts.DataDir),
 	}
-
-	// The IRIS source doubles as the Normalizer's IRISResolver, so build it once
-	// and use it for both roles.
-	irisSrc := iris.NewSource(iris.Options{DataDir: dataDir})
 
 	b := gazetteer.NewBuilder().
 		WithHTTPClient(hc.HTTPClient())
-	if !opts.SkipNormalizer {
-		b = b.WithNormalizer(gazetteer.NewBANNormalizer(ban, com).WithIRIS(irisSrc))
+
+	// One Source per roster entry — the same single roster the CLI
+	// consumes, so the two wirings cannot drift.
+	var irisSrc *iris.Source
+	for _, e := range roster.Entries() {
+		src, err := e.Build(deps)
+		if err != nil {
+			return nil, fmt.Errorf("factory: %s: %w", e.Name, err)
+		}
+		b = b.With(src)
+		// The IRIS source doubles as the Normalizer's IRISResolver.
+		if ir, ok := src.(*iris.Source); ok {
+			irisSrc = ir
+		}
 	}
-	b = b.With(dvfSrc).
-		With(ademe.NewSource(ademe.Options{Geocoder: ban})).
-		With(anct.NewSource(anct.Options{})).
-		With(bdnb.NewSource(bdnb.Options{Geocoder: ban})).
-		With(bpe.NewSource(bpe.Options{})).
-		With(cadastre.NewSource(cadastre.Options{Geocoder: ban})).
-		With(georisques.NewSource(georisques.Options{Geocoder: ban})).
-		With(gpe.NewSource(gpe.Options{DataDir: dataDir})).
-		With(locservice.NewSource(locservice.Options{Geocoder: ban})).
-		With(oll.NewSource(oll.Options{DataDir: dataDir})).
-		With(carteloyers.NewSource(carteloyers.Options{DataDir: dataDir})).
-		With(dvfagg.NewSource(dvfagg.Options{DataDir: dataDir})).
-		With(cartofriches.NewSource(cartofriches.Options{DataDir: dataDir})).
-		With(cdsr.NewSource(cdsr.Options{DataDir: dataDir})).
-		With(catnat.NewSource(catnat.Options{DataDir: dataDir})).
-		With(nuisances.NewSource(nuisances.Options{DataDir: dataDir})).
-		With(irisSrc).
-		With(chomage.NewSource(chomage.Options{DataDir: dataDir})).
-		With(delinquance.NewSource(delinquance.Options{DataDir: dataDir})).
-		With(dpedist.NewSource(dpedist.Options{})).
-		With(education.NewSource(education.Options{})).
-		With(encadrement.NewSource(encadrement.Options{DataDir: dataDir})).
-		With(filosofi.NewSource(filosofi.Options{DataDir: dataDir})).
-		With(filoiris.NewSource(filoiris.Options{DataDir: dataDir})).
-		With(logiris.NewSource(logiris.Options{DataDir: dataDir})).
-		With(qpv.NewSource(qpv.Options{DataDir: dataDir})).
-		With(rpls.NewSource(rpls.Options{DataDir: dataDir})).
-		With(sitadel.NewSource(sitadel.Options{DataDir: dataDir})).
-		With(taxefonciere.NewSource(taxefonciere.Options{DataDir: dataDir})).
-		With(lovac.NewSource(lovac.Options{DataDir: dataDir})).
-		With(vacance.NewSource(vacance.Options{DataDir: dataDir})).
-		With(rnc.NewSource(rnc.Options{DataDir: dataDir})).
-		With(ips_ecoles.NewSource(ips_ecoles.Options{DataDir: dataDir})).
-		With(zonageabc.NewSource(zonageabc.Options{DataDir: dataDir})).
-		With(zonetendue.NewSource(zonetendue.Options{DataDir: dataDir})).
-		With(links.NewSource(links.Options{})).
-		With(gzosm.NewSource(gzosm.Options{DataDir: dataDir, Fetcher: gzosm.NewHTTPOverpassFetcher(hc, "")}))
+
+	if !opts.SkipNormalizer {
+		b = b.WithNormalizer(gazetteer.NewBANNormalizer(deps.Geocoder, com).WithIRIS(irisSrc))
+	}
 
 	// Apply the deny-list last, once the full roster is assembled, so a
 	// caller's Exclude prunes Sources regardless of wiring order and
