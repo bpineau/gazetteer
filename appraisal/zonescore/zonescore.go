@@ -1,10 +1,9 @@
 package zonescore
 
 import (
-	"math"
-
 	"github.com/bpineau/gazetteer/appraisal"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // Axis names. Stable identifiers used as the DefaultWeights / Options.Weights
@@ -117,7 +116,7 @@ func Compute(d gazetteer.Dossier, opts ...Options) Score {
 		w := weightFor(spec.name, o)
 		r := spec.scorer(d)
 		axes = append(axes, Axis{
-			Name: spec.name, Value: round1(r.value), Weight: w,
+			Name: spec.name, Value: stats.Round(r.value, 1), Weight: w,
 			Present: r.present, Reason: r.reason, Sources: r.sources,
 		})
 		if r.present && w > 0 {
@@ -135,7 +134,7 @@ func Compute(d gazetteer.Dossier, opts ...Options) Score {
 		composite = sumWV / sumW
 	}
 	return Score{
-		Composite:  round1(composite),
+		Composite:  stats.Round(composite, 1),
 		Axes:       axes,
 		Confidence: confidenceFor(presentW, totalWeight(o), rendementPresent),
 	}
@@ -199,8 +198,6 @@ func clamp01to100(v float64) float64 {
 	}
 	return v
 }
-
-func round1(v float64) float64 { return math.Round(v*10) / 10 }
 
 // mean averages the present sub-scores; ok is false when none were present.
 func mean(vals ...*float64) (float64, bool) {

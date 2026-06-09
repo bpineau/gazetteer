@@ -1,7 +1,6 @@
 package appraisal
 
 import (
-	"math"
 	"sort"
 
 	"github.com/bpineau/gazetteer/gazetteer"
@@ -120,7 +119,7 @@ func PricePerM2(d gazetteer.Dossier, opts ...PriceOptions) PriceConsolidated {
 		inputs = append(inputs, PriceInput{
 			Source:   name,
 			Estimate: e,
-			Weight:   weightFor(name, o),
+			Weight:   lookupWeight(name, o.Weights, DefaultPriceWeights, o.DefaultWeight),
 		})
 	}
 
@@ -128,29 +127,25 @@ func PricePerM2(d gazetteer.Dossier, opts ...PriceOptions) PriceConsolidated {
 		return PriceConsolidated{Confidence: ConfidenceLow}
 	}
 
-	// 2. Outlier rejection (MAD z-score), only meaningful with ≥ 3 sources.
-	if len(inputs) >= 3 {
-		flagPriceOutliers(inputs, o.OutlierZScore)
+	// 2-4. Shared kernel: MAD outlier rejection, weighted mean, confidence.
+	vals := make([]float64, len(inputs))
+	weights := make([]float64, len(inputs))
+	confs := make([]Confidence, len(inputs))
+	for i, in := range inputs {
+		vals[i] = float64(in.Estimate.EurPerM2Cents)
+		weights[i] = in.Weight
+		confs[i] = in.Estimate.Confidence
 	}
-
-	// 3. Weighted mean across non-excluded inputs.
-	var sumW, sumWV float64
-	var contributing int
-	for _, in := range inputs {
-		if in.Excluded {
-			continue
+	mean, mask, conf, ok := synthesizeCents(vals, weights, confs, o.MinSources, o.OutlierZScore)
+	for i := range inputs {
+		if mask[i] {
+			inputs[i].Excluded = true
+			inputs[i].ExcludedWhy = "outlier_z_score"
 		}
-		sumW += in.Weight
-		sumWV += in.Weight * float64(in.Estimate.EurPerM2Cents)
-		contributing++
 	}
-	if sumW == 0 || contributing == 0 {
+	if !ok {
 		return PriceConsolidated{Confidence: ConfidenceLow, Inputs: inputs}
 	}
-	mean := int64(sumWV / sumW)
-
-	// 4. Confidence derived from contributing count and per-input confidences.
-	conf := computePriceConfidence(inputs, contributing, o.MinSources)
 
 	return PriceConsolidated{
 		EurPerM2Cents: mean,
@@ -181,70 +176,4 @@ func mergePriceOpts(base, override PriceOptions) PriceOptions {
 		base.OutlierZScore = override.OutlierZScore
 	}
 	return base
-}
-
-func weightFor(name string, o PriceOptions) float64 {
-	if o.Weights != nil {
-		if w, ok := o.Weights[name]; ok {
-			return w
-		}
-	}
-	if w, ok := DefaultPriceWeights[name]; ok {
-		return w
-	}
-	return o.DefaultWeight
-}
-
-// flagPriceOutliers marks any contribution whose MAD-based z-score
-// exceeds zThreshold as Excluded.
-func flagPriceOutliers(inputs []PriceInput, zThreshold float64) {
-	vals := make([]float64, 0, len(inputs))
-	for _, in := range inputs {
-		vals = append(vals, float64(in.Estimate.EurPerM2Cents))
-	}
-	sort.Float64s(vals)
-	median := vals[len(vals)/2]
-
-	devs := make([]float64, 0, len(vals))
-	for _, v := range vals {
-		devs = append(devs, math.Abs(v-median))
-	}
-	sort.Float64s(devs)
-	mad := devs[len(devs)/2]
-	if mad == 0 {
-		return // all identical, nothing to flag
-	}
-
-	// 1.4826 makes MAD a consistent estimator of σ for Gaussian data.
-	scale := 1.4826 * mad
-	for i := range inputs {
-		v := float64(inputs[i].Estimate.EurPerM2Cents)
-		z := math.Abs(v-median) / scale
-		if z > zThreshold {
-			inputs[i].Excluded = true
-			inputs[i].ExcludedWhy = "outlier_z_score"
-		}
-	}
-}
-
-func computePriceConfidence(inputs []PriceInput, contributing, minSources int) Confidence {
-	if contributing < minSources {
-		return ConfidenceLow
-	}
-	var sumConf int
-	for _, in := range inputs {
-		if in.Excluded {
-			continue
-		}
-		sumConf += int(in.Estimate.Confidence)
-	}
-	avg := float64(sumConf) / float64(contributing)
-	switch {
-	case avg >= 1.5:
-		return ConfidenceHigh
-	case avg >= 0.5:
-		return ConfidenceMedium
-	default:
-		return ConfidenceLow
-	}
 }

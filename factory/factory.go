@@ -29,6 +29,7 @@ import (
 	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/httpx"
+	"github.com/bpineau/gazetteer/helpers/kvcache/memcache"
 	"github.com/bpineau/gazetteer/sources/ademe"
 	"github.com/bpineau/gazetteer/sources/anct"
 	"github.com/bpineau/gazetteer/sources/bdnb"
@@ -152,7 +153,12 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		}
 		hc = built
 	}
-	ban := banx.NewBANClient(hc)
+	// Process-lifetime in-memory geocode cache: within one Collect, up to
+	// ~6 live sources independently geocode the same address when the
+	// listing was not pre-normalized; without the cache each pays a BAN
+	// round-trip at the polite per-host rate. The cache also applies the
+	// banx dept-coherence guards, so a drifted BAN homonyme can't fan out.
+	ban := banx.NewCachedGeocoder(banx.NewBANClient(hc), memcache.New(), 0)
 	com := opts.Communes
 	if com == nil {
 		com = communes.MustDefault()

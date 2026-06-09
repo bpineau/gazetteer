@@ -25,6 +25,9 @@ const (
 type Result struct {
 	// RenterSharePct is the share of résidences principales occupied by
 	// tenants (P21_RP_LOC / P21_RP, %). High = a rental-oriented zone.
+	// A value of 0 means INSEE suppressed the cell (secret statistique on
+	// small IRIS), not a zone with zero tenants — consumers must treat 0
+	// as "no reading" for this field specifically.
 	RenterSharePct float64 `json:"renter_share_pct"`
 
 	// SocialHousingSharePct is the share of résidences principales that are

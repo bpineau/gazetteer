@@ -7,6 +7,7 @@ import (
 
 	"github.com/bpineau/gazetteer/appraisal"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
 // Collector is the subset of *gazetteer.Client that Compare needs: aggregate one
@@ -94,7 +95,7 @@ func Compare(ctx context.Context, c Collector, listings []gazetteer.Listing, opt
 			e.RentEURPerM2 = float64(rent.EurPerM2Cents) / 100
 		}
 		if e.PriceEURPerM2 > 0 && e.RentEURPerM2 > 0 {
-			e.YieldPct = round1(e.RentEURPerM2 * 12 / e.PriceEURPerM2 * 100)
+			e.YieldPct = stats.Round(e.RentEURPerM2*12/e.PriceEURPerM2*100, 1)
 		}
 		entries[i] = e
 	}

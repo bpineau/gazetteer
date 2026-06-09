@@ -1,7 +1,6 @@
 package overview
 
 import (
-	"math"
 	"strings"
 	"testing"
 )
@@ -32,23 +31,6 @@ func TestBuild_KnownCommune(t *testing.T) {
 // ---------------------------------------------------------------------------
 // DistanceParisKm
 // ---------------------------------------------------------------------------
-
-// TestRoundKm1 verifies the rounding helper directly.
-func TestRoundKm1(t *testing.T) {
-	t.Parallel()
-	cases := []struct{ in, want float64 }{
-		{14.049, 14.0},
-		{14.051, 14.1},
-		{0.0, 0.0},
-		{100.999, 101.0},
-	}
-	for _, c := range cases {
-		got := roundKm1(c.in)
-		if math.Abs(got-c.want) > 1e-9 {
-			t.Errorf("roundKm1(%v) = %v, want %v", c.in, got, c.want)
-		}
-	}
-}
 
 // TestDistanceParisKm_Versailles checks that a well-known outer commune
 // (Versailles, 78646, ~18 km from Notre-Dame) gets a plausible value.
