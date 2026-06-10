@@ -564,6 +564,7 @@
       "lat/lon"
     ],
     "coverage": "France (QRR national, ORCOD-IN Île-de-France)",
+    "batch": true,
     "result_schema": {
       "sensitive": false
     }

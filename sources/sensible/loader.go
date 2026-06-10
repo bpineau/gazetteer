@@ -4,8 +4,11 @@ import (
 	"embed"
 	"io"
 	"math"
+	"slices"
+	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/geodist"
 	"github.com/bpineau/gazetteer/helpers/geoindex"
 	"github.com/bpineau/gazetteer/helpers/geopoly"
@@ -56,7 +59,8 @@ type processed struct {
 // A plain slice (not a geoindex.Index) because this source reports EVERY
 // containing/nearby zone, not just the first cover / single nearest.
 type feature struct {
-	zone Zone // DistanceM left 0; filled per-query
+	code string // QRR code, the zoneCommunes key
+	zone Zone   // DistanceM left 0; filled per-query
 	mp   geopoly.MultiPolygon
 	bbox geopoly.BBox
 }
@@ -88,6 +92,7 @@ func parseIndex(r io.Reader) (*Index, error) {
 	for _, z := range p.Zones {
 		mp := z.G.MultiPolygon()
 		idx.feats = append(idx.feats, feature{
+			code: z.Code,
 			zone: Zone{Name: z.Name, Kind: KindQRR, Dep: z.Dep, Vague: z.Vague},
 			mp:   mp,
 			bbox: mp.Bound(),
@@ -157,6 +162,35 @@ func (idx *Index) resolve(lat, lon float64) (in, nearby []Zone) {
 		}
 	}
 	return in, nearby
+}
+
+// ZonesForCommune is the commune-grain batch view: every zone (QRR polygon or
+// curated circle) whose perimeter intersects the commune identified by its
+// INSEE code. The mapping comes from zoneCommunes / curatedZone.INSEE (see
+// communes.go for the construction); arrondissements fold to the parent
+// commune. DistanceM is 0 on every returned Zone — at this grain the question
+// is "does the commune host such a zone?", not "how far is this address?".
+// Intended for batch screens (one row per commune) alongside qpv.HasQPV.
+func (idx *Index) ZonesForCommune(insee string) []Zone {
+	if idx == nil {
+		return nil
+	}
+	insee = communes.FoldArrondissement(strings.TrimSpace(insee))
+	if insee == "" {
+		return nil
+	}
+	var out []Zone
+	for _, f := range idx.feats {
+		if slices.Contains(zoneCommunes[f.code], insee) {
+			out = append(out, f.zone)
+		}
+	}
+	for _, c := range curatedZones {
+		if slices.Contains(c.INSEE, insee) {
+			out = append(out, Zone{Name: c.Name, Kind: c.Kind, Dep: c.Dep, Note: c.Note})
+		}
+	}
+	return out
 }
 
 // expand grows a bbox by m metres on every side (planar approximation at the

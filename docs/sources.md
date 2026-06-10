@@ -769,6 +769,7 @@ you can read **many communes without building a `Listing` or running `Query`**
 |---|---|
 | `dvfagg.Load(dir)` → `*Index`      | `.Codes()` (every INSEE with price data), `.Lookup(insee)` → `Result` |
 | `qpv.Load(dir)` → `*Index`         | `.HasQPV(insee)` — coordinate-free, commune-level (NOT point-in-polygon) |
+| `sensible.Load(dir)` → `*Index`    | `.ZonesForCommune(insee)` — QRR/ORCOD perimeters intersecting the commune (commune-grain) |
 | `delinquance.Load(dir)` → `*Index` | `.Level(insee)` → coarse `RiskFlag` |
 | `carteloyers.Load(dir)` → `*Index` | `.Lookup(insee, typology)` → `Row`; `Row.HCEURPerM2()` converts the CC median to hors-charges |
 | `communes.Default()` → `Table`     | `.All()` (every commune row), `.Lookup(insee)` |
