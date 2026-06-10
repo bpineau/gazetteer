@@ -10,7 +10,42 @@ import (
 
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/banx"
+	"github.com/bpineau/gazetteer/helpers/circuit"
 )
+
+// TestSource_InjectedFetcher pins the Options.Fetcher seam: when set,
+// the Source's whole fetch path goes through it — no HTTP server, no
+// HTTPClient — while URL building and parsing stay the Source's.
+func TestSource_InjectedFetcher(t *testing.T) {
+	t.Parallel()
+
+	body := mustReadFixture(t, "paris11.json")
+	var fetched []string
+	fetcher := circuit.FuncFetcher(func(_ context.Context, u string) ([]byte, error) {
+		fetched = append(fetched, u)
+		return body, nil
+	})
+
+	lat, lon := 48.860874, 2.370245
+	s := NewSource(Options{Fetcher: fetcher})
+	data, err := s.Query(context.Background(), gazetteer.Listing{Lat: &lat, Lon: &lon})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	res := data.(*Result)
+	if len(fetched) != 1 {
+		t.Fatalf("fetcher called %d times, want 1", len(fetched))
+	}
+	if !strings.Contains(fetched[0], BaseURL) {
+		t.Errorf("fetched URL %q not rooted at the package BaseURL", fetched[0])
+	}
+	if res.IsEmpty() {
+		t.Error("IsEmpty() = true, want false (canned body not consumed)")
+	}
+	if res.Commune == nil || res.Commune.Insee != "75056" {
+		t.Errorf("Commune = %+v, want Insee 75056", res.Commune)
+	}
+}
 
 // stubGeocoder returns a fixed lat/lon. Used by tests that don't care
 // about geocoding mechanics.

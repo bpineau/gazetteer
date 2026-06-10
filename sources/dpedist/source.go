@@ -37,6 +37,15 @@ type Options struct {
 	// HTTPClient overrides the per-query HTTP client. When nil, the
 	// Source uses gazetteer.HTTPClientFrom(ctx).
 	HTTPClient *http.Client
+
+	// Fetcher, when non-nil, replaces the built-in HTTP fetch path for
+	// every upstream GET — the seam for injecting circuit breakers, quota
+	// trippers or recorded fixtures (helpers/circuit.HTTPFetcher implements
+	// it). NOTE: an injected Fetcher takes over the whole fetch contract,
+	// including this source's 404→empty-payload default (the values_agg
+	// zero-rows envelope `{"total":0,"total_other":0,"aggs":[]}`) and the
+	// Accept header — see gazetteer.Fetcher for the full contract.
+	Fetcher gazetteer.Fetcher
 }
 
 // Source implements gazetteer.Source for the ADEME DPE distribution
@@ -126,6 +135,9 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 // "no rows" envelope so consumers see an empty Result rather than a
 // failure. 429 maps to ErrUpstreamUnavailable (retryable).
 func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
+	if s.opts.Fetcher != nil {
+		return s.opts.Fetcher.Fetch(ctx, u)
+	}
 	return gazetteer.FetchUpstream(ctx, s.opts.HTTPClient, u, gazetteer.FetchSpec{
 		Prefix:       Name,
 		Accept:       "application/json",
@@ -136,6 +148,13 @@ func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
 // Query is the atomic helper for callers who don't want the builder.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
 	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
+}
+
+// QueryResult is Query with the package's typed Result — for callers
+// holding a constructed Source instance. Equivalent to the package-level
+// Query helper without rebuilding the Source per call.
+func (s *Source) QueryResult(ctx context.Context, l gazetteer.Listing) (*Result, error) {
+	return gazetteer.QueryTyped[*Result](ctx, s, l)
 }
 
 func init() {

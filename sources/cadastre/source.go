@@ -59,6 +59,16 @@ type Options struct {
 	// Source uses gazetteer.HTTPClientFrom(ctx).
 	HTTPClient *http.Client
 
+	// Fetcher, when non-nil, replaces the built-in HTTP fetch path for
+	// every upstream GET — both the parcelle and the bâti endpoints —
+	// the seam for injecting circuit breakers, quota trippers or recorded
+	// fixtures (helpers/circuit.HTTPFetcher implements it). NOTE: an
+	// injected Fetcher takes over the whole fetch contract, including this
+	// source's 404→empty-payload default (an empty GeoJSON
+	// `{"type":"FeatureCollection","features":[]}` on both endpoints) and
+	// the Accept header — see gazetteer.Fetcher for the full contract.
+	Fetcher gazetteer.Fetcher
+
 	// BatiCache overrides the in-process building-polygon cache. When
 	// nil, the Source uses a private sync.Map per Source instance — no
 	// TTL, no eviction (a process is short-lived enough for the
@@ -300,6 +310,9 @@ func (s *Source) applyBaseURL(u string) string {
 // defensive and map a rare 404 onto an empty FeatureCollection so the
 // parser yields a zero-feature result.
 func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
+	if s.opts.Fetcher != nil {
+		return s.opts.Fetcher.Fetch(ctx, u)
+	}
 	return gazetteer.FetchUpstream(ctx, s.opts.HTTPClient, u, gazetteer.FetchSpec{
 		Prefix:       Name,
 		Accept:       "application/json",
@@ -327,6 +340,13 @@ func (s *Source) resolveLatLon(ctx context.Context, l gazetteer.Listing) (float6
 // empty response still returns a non-nil *Result with IsEmpty() == true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
 	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
+}
+
+// QueryResult is Query with the package's typed Result — for callers
+// holding a constructed Source instance. Equivalent to the package-level
+// Query helper without rebuilding the Source per call.
+func (s *Source) QueryResult(ctx context.Context, l gazetteer.Listing) (*Result, error) {
+	return gazetteer.QueryTyped[*Result](ctx, s, l)
 }
 
 // Ensure the Source satisfies the gazetteer.Source interface at compile
