@@ -54,8 +54,8 @@ Most of your work here is "which source gives dimension X, and what does each
 field mean (units!)". The answers, easiest first:
 
 1. **`gazetteer sources catalog --json`** (or `docs/sources.json`) — every
-   source's summary, required inputs, coverage, the dimension it covers, and its
-   `result_schema` (field names). Start here to pick a source; it's ~15 KB, so
+   source's summary, required inputs, coverage, what it feeds, batch
+   capability, and its `result_schema` (field names). Start here to pick a source; it's ~15 KB, so
    filter (`jq '.[] | select(.name=="dvf")'` or `del(.[].result_schema)`)
    instead of ingesting it whole. Browsing by
    intent ("which source gives rental-demand data?") →
@@ -83,11 +83,11 @@ one source you've used all of them:
 |---|---|
 | `const Name` | the registry key, e.g. `dvf.Name == "dvf"` |
 | `const Version` | bumps when logic changes |
-| `type Options struct{ …; DataDir string }` | config; zero value is usually valid |
-| `func NewSource(Options) *Source` | constructor |
+| `type Options struct{ … }` | config; zero value is usually valid; offline sources carry `DataDir` |
+| `func NewSource(Options) *Source` | constructor (dvf alone also returns an error) |
 | `func Query(ctx, Options, Listing) (*Result, error)` | **atomic helper** — run one source without the builder |
 | `func (s *Source) QueryResult(ctx, Listing) (*Result, error)` | typed Query on a held instance (no `any` assertion) |
-| `Options.Fetcher gazetteer.Fetcher` (live sources) | inject circuit breakers / fixtures into the fetch path |
+| `Options.Fetcher gazetteer.Fetcher` (live HTTP sources) | inject circuit breakers / fixtures into the fetch path (dvf and osm_transit have their own seams: `HTTP`/`CircuitTripped`, `OverpassFetcher`) |
 | `type Result struct{ …; Evidence Evidence }` | the typed payload; `Evidence` is a `json:"-"` provenance sidecar |
 | `func (*Result) IsEmpty() bool` | true ⇒ "ran fine, no data for this address" |
 
@@ -207,9 +207,9 @@ Two patterns sit alongside the per-address `Collect`:
   commune (price, market rent, encadrement cap, income, vacancy, taxe foncière,
   QPV, zonage, transit lines) with **no network I/O** — the inverse of the
   per-address Dossier. It rides on per-Source **batch-read helpers** that skip
-  the `Listing`/`Query` path: `dvfagg.Load(dir).Codes()` / `.Lookup(insee)`,
-  `qpv.Load(dir).HasQPV(insee)`, `delinquance.Load(dir).Level(insee)`,
-  `communes.Default().All()` — reach for these whenever you need many communes
+  the `Listing`/`Query` path (error handling elided): `dvfagg.Load(dir).Codes()`
+  / `.Lookup(insee)`, `qpv.Load(dir).HasQPV(insee)`,
+  `delinquance.Load(dir).Level(insee)`, `communes.Default().All()` — reach for these whenever you need many communes
   at once instead of one address. Batch-capable sources are flagged `batch`
   in the catalog. Rank/filter on the row's derived methods
   (`EffectivePriceEURM2`, `EffectiveRentEURM2HC` = min(market, legal cap),
@@ -283,9 +283,10 @@ never disables corporate secret-scanning.
   social housing — ~64 % of communes; a count of 0) — distinct from "no data".
   `IsEmpty()` (⇒ `StatusOKEmpty`) is the only correct "did this source find
   anything" test; comparing a field to zero silently drops real zeros.
-- **Rent basis — CC vs HC.** `carteloyers` rents are *charges comprises* (CC,
-  field suffix `…CC`); `oll` and `encadrement` are *hors charges* (HC, `…HC`).
-  Don't compare the raw fields across sources — different bases. Use
+- **Rent basis — CC vs HC.** `carteloyers` rents are *charges comprises*
+  (field suffix `…CC`); `oll` and `encadrement` are *hors charges* (suffix
+  `…HC` on encadrement; documented HC on oll's `Observed…` fields). Don't
+  compare the raw fields across sources — different bases. Use
   `appraisal.RentValue`, which converts CC→HC (≈0.90) before blending.
 - `taxefonciere.EstimatedEURPerYear` is an **order-of-magnitude estimate, not
   the exact bill** — a valeur-locative proxy understates high-value communes
@@ -305,6 +306,7 @@ sources/<name>/       one package per source (uniform shape, see above)
 appraisal/            PricePerM2 / RentValue / HazardProfile consolidation
 appraisal/zonescore/  the 0–100 zone score + Compare + Personas
 overview/             offline per-commune batch join (CommuneOverview) for screening
+dataset/              embed+datadir+refresh pipeline (ship your own datasets)
 helpers/<name>/       standalone building blocks (docs/helpers.md): banx, httpx, …
 cmd/gazetteer/        the CLI (+ the source catalog)
 docs/                 long-form reference (start at docs/readme.md)

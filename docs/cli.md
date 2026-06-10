@@ -51,7 +51,7 @@ $ gazetteer query --json "1 rue de Rivoli, 75001 Paris" | jq .
   locservice to pick the typology bucket.
 - `--source` — comma-separated Source names. Default: every Source
   the CLI knows how to instantiate (every `Default: true` entry in the
-  registry — `bdnb` and `osm_transit` are opt-in, see below).
+  registry — only `bdnb` is opt-in, see below).
 - `--json` — emit the full Dossier as indented JSON instead of the
   human summary.
 - `--profile` — (appraise / compare only) the ZoneScore weight preset:
@@ -187,8 +187,8 @@ registered factory:
 $ gazetteer sources doc dvf
 {
   "value_eur_per_m2_centimes": null,
-  "value_eur_centimes": null,
-  ...
+  "sample_size": 0,
+  "confidence": ""
 }
 ```
 
@@ -261,7 +261,8 @@ Prints the binary's build version (from
   absent, Sources fall back to their embedded datasets.
 
 HTTP behaviour is `httpx.New` with a polite per-host rate limit of
-2 req/s by default, raised to 10 req/s for the data.gouv.fr DVF and
-cadastre endpoints (via `dvf.HostRateLimits()`) because DVF fans out one
-call per cadastral section. No HTTP cache directory, no snapshot
+2 req/s by default, overridden per upstream by the production-tuned
+`factory.HostRateLimits()` table (DVF/cadastre 10 req/s — DVF fans out
+one call per cadastral section — BAN 20, locservice 5, polite .gouv.fr
+APIs 2, bdnb and Overpass 1). No HTTP cache directory, no snapshot
 directory.

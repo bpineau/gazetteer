@@ -141,7 +141,7 @@ Market data:
 |----------------|------------------------------------------------------------------|
 | `dvf`          | Demandes de Valeurs Foncières — historical transaction prices    |
 | `dvfagg`       | Per-commune DVF price aggregate (median €/m² + dispersion, offline) — the batch complement to `dvf` |
-| `locservice`   | Rental market reference data (tension, médiane €/m²)             |
+| `locservice`   | Rental-market tension (supply tightness + tenant-budget scores)  |
 | `carteloyers`  | National rent observatory tiers                                  |
 | `oll`          | Observed market rents by zone (Observatoires Locaux des Loyers)  |
 | `encadrement`  | Rent control caps (Paris, Plaine Commune + Est Ensemble 93, Lyon) |
@@ -256,6 +256,8 @@ Sub-commands:
 
 ```
 gazetteer sources list                  # list every registered Source + version
+gazetteer sources catalog [--json]      # full capability map (inputs/coverage/feeds/batch)
+gazetteer sources dimensions            # sources grouped by investor dimension
 gazetteer sources doc <name>            # print a Source's typed Result skeleton
 gazetteer query     [flags] <addr>      # run every Source against an address
 gazetteer appraise  [flags] <addr>      # query + consolidated price/rent/hazard + zone score

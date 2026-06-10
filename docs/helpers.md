@@ -15,7 +15,7 @@ is the authoritative reference; this page is the map.
 | Package | What it gives you | Reach for it when |
 |---|---|---|
 | [`helpers/httpx`](../helpers/httpx) | A polite production HTTP client: per-host token-bucket rate limits, Retry-After-honouring backoff, an on-disk ETag/Last-Modified-revalidating response cache, atomic snapshot downloads, a shared User-Agent. | Any scraper or open-data client. Start per-host limits from `factory.HostRateLimits()` (production-tuned values for BAN, data.gouv.fr, ADEME, …) and extend. |
-| [`helpers/circuit`](../helpers/circuit) | Circuit breakers for unreliable upstreams: consecutive-failure streaks, 429/quota tripping, sliding-window failure ratios (`RateWindow`), content-shape streaks, plus `Fetcher`/`HTTPFetcher` — the fetch abstraction that plugs into every live Source's `Options.Fetcher`. See [circuit_breakers.md](circuit_breakers.md). | An upstream that throttles, crashes for minutes at a time, or serves anti-bot interstitials — and you want the whole run to stop paying for it after the Nth failure. |
+| [`helpers/circuit`](../helpers/circuit) | Circuit breakers for unreliable upstreams: consecutive-failure streaks, 429/quota tripping, sliding-window failure ratios (`RateWindow`), content-shape streaks, plus `Fetcher`/`HTTPFetcher` — the fetch abstraction that plugs into the live HTTP sources' `Options.Fetcher` (dvf and osm_transit carry their own seams). See [circuit_breakers.md](circuit_breakers.md). | An upstream that throttles, crashes for minutes at a time, or serves anti-bot interstitials — and you want the whole run to stop paying for it after the Nth failure. |
 | [`helpers/kvcache`](../helpers/kvcache) (+ `kvcache/memcache`, `kvcache/kvcachetest`) | A minimal persistent key-value cache **interface** with TTL semantics, an in-memory implementation, and a conformance test suite for your own backend (consumers run SQLite/bun adapters through it). See [caching.md](caching.md). | You need "cache this geocode/section list across process restarts" with a backend you own. |
 | [`helpers/fallback`](../helpers/fallback) | A tiered fallback ladder (`Walk`): try tiers in order, classify outcomes, stop at the first success — with per-tier provenance. Drives DVF's address→commune→neighbors→department ladder. | Any "try the precise thing, then progressively coarser things" lookup. |
 | [`helpers/atomicfs`](../helpers/atomicfs) | Atomic file writes/copies via tmpfile+rename (`WriteFile`, `CopyFile`, `Exists`, `NonEmpty`). | Artifacts that must never be observed half-written. |
@@ -44,7 +44,7 @@ is the authoritative reference; this page is the map.
 
 | Package | What it gives you | Reach for it when |
 |---|---|---|
-| [`helpers/scrape`](../helpers/scrape) (+ `scrape/antibot`) | goquery-based HTML parsing helpers and anti-bot interstitial detection (DataDome and friends) that maps to `gazetteer.ErrAntiBot`. | Scraping French property sites without re-discovering the anti-bot signatures. |
+| [`helpers/scrape`](../helpers/scrape) (+ `scrape/antibot`) | goquery-based HTML parsing helpers and anti-bot interstitial detection (DataDome and friends); map its verdicts to `gazetteer.ErrAntiBot` in your fetch path. | Scraping French property sites without re-discovering the anti-bot signatures. |
 
 ## Shipping your own datasets — `dataset`
 
@@ -65,10 +65,11 @@ Useful even if you never build a Dossier:
   error taxonomy baked in (transport/5xx/429 → transient, 4xx → permanent,
   404 → your empty payload). The shared fetch body of every live source;
   use it in plugins so your errors classify correctly.
-- **`gazetteer.Fetcher`** — the inverse seam: every live source's
+- **`gazetteer.Fetcher`** — the inverse seam: the live HTTP sources'
   `Options.Fetcher` accepts your implementation (circuit breakers, quota
-  trippers, recorded fixtures) while keeping the source's URL building and
-  parsing. `helpers/circuit.HTTPFetcher` implements it.
+  trippers, recorded fixtures) while keeping the source's URL building
+  and parsing. `helpers/circuit.HTTPFetcher` implements it. (dvf has its
+  own `HTTP`/`CircuitTripped` machinery; osm_transit its OverpassFetcher.)
 - **`gazetteer.QueryTyped[T]`** — typed wrapper over any `Source.Query`;
   each source also exposes it pre-instantiated as `(*Source).QueryResult`.
 - **The error sentinels** (`ErrUpstreamUnavailable`, `ErrAntiBot`,

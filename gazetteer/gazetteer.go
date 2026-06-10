@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"sort"
 	"sync"
 	"time"
@@ -248,8 +249,37 @@ func runOne(ctx context.Context, s Source, l Listing) Result {
 	}
 	if ev, ok := data.(Evidencer); ok {
 		r.Evidence = ev.Evidence()
+	} else {
+		// The shipped convention is an `Evidence` FIELD on the typed
+		// Result (tagged json:"-"), which by Go's rules cannot coexist
+		// with an `Evidence()` method — so a conventional Result can
+		// never satisfy Evidencer. Pick the field up reflectively so
+		// the envelope slot (and the Dossier JSON "evidence" key) works
+		// for every source, not just custom Evidencer implementations.
+		r.Evidence = evidenceField(data)
 	}
 	return r
+}
+
+// evidenceField returns the value of an exported, non-zero `Evidence`
+// struct field on data (a pointer to struct, per the Source contract),
+// or nil. One FieldByName per Result — negligible next to a Query.
+func evidenceField(data any) any {
+	v := reflect.ValueOf(data)
+	if v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+	f := v.FieldByName("Evidence")
+	if !f.IsValid() || !f.CanInterface() || f.IsZero() {
+		return nil
+	}
+	return f.Interface()
 }
 
 // classifyErr maps a Source-returned error to the public Status taxonomy.
