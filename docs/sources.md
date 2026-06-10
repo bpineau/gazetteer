@@ -57,6 +57,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `gpe`            | lat/lon                                        | offline Grand Paris Express stations (SGP) |
 | `qpv`            | INSEE + lat/lon (point-in-polygon)             | offline ANCT QPV 2024 contours |
 | `rpls`           | INSEE                                          | offline data.gouv SRU 2024  |
+| `sensible`       | lat/lon                                        | offline QRR contours (min. Intérieur) + ORCOD-IN décrets |
 | `sitadel`        | INSEE (arrondissement-folding)                 | offline SDES Sitadel 2026-06 |
 | `taxefonciere`   | INSEE + surface_m2                             | offline DGFiP rates         |
 | `lovac`          | INSEE                                          | offline LOVAC 2025 (fiscal) |
@@ -674,6 +675,26 @@ is the listing **inside** a QPV? Answered by point-in-polygon over the QPV
   confidence.
 - **Backend**: offline gzipped polygon contours under `data/` (ANCT,
   data.gouv.fr, WGS84 GeoJSON, métropole + outre-mer, ~1 584 QPV).
+
+## `sources/sensible`
+
+The State's hardest-neighbourhood perimeters — far more selective than the
+~1 500 QPV: is the listing **inside** (or within 400 m of) one of the 62
+**QRR** "quartiers de reconquête républicaine" (police-priority perimeters
+designated by the ministère de l'Intérieur against entrenched trafficking,
+2018–2021, official polygons) or one of the 4 **ORCOD-IN** copropriétés
+dégradées d'intérêt national (décrets en Conseil d'État — the classic
+judicial-auction trap)? The lists are administrative snapshots (QRR frozen
+since 2021): a stable photo of structurally distressed areas, not a live feed.
+
+- **Needs**: Lat/Lon (no commune-level fallback — that grain is `qpv`'s job).
+- **Result**: `sensible.Result` with `Sensitive` (inside ≥ 1 zone), `In`
+  (containing zones) and `Nearby` (boundary within 400 m — absorbs geocoding
+  imprecision), each a `Zone{Name, Kind (qrr|orcod|curated), Dep, Vague,
+  DistanceM, Note}`. ORCOD/curated entries cite their décret in `Note`.
+- **Backend**: offline gzipped QRR polygons under `data/` (ministère de
+  l'Intérieur via data.gouv.fr, WGS84, 62 zones) + an in-code curated circle
+  overlay (`curated.go` — official designations only, source required).
 
 ## `sources/zonageabc`
 

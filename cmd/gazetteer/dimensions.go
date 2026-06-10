@@ -17,7 +17,7 @@ var sourceDimensions = []struct {
 	{"Offre / construction", []string{"sitadel"}},
 	{"Solvabilité des locataires", []string{"filoiris", "filosofi", "chomage"}},
 	{"Fiscalité", []string{"taxefonciere"}},
-	{"Sécurité", []string{"delinquance"}},
+	{"Sécurité", []string{"delinquance", "sensible"}},
 	{"Transports", []string{"osm_transit", "gpe"}},
 	{"Risques & nuisances", []string{"georisques", "catnat", "nuisances"}},
 	{"Bâti & énergie", []string{"ademe", "bdnb", "dpedist"}},

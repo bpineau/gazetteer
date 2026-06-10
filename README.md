@@ -162,6 +162,7 @@ Commune-level signals for the investor:
 | `zonetendue`   | "Zone tendue" + TLV-2013 + tendue-touristique flags              |
 | `anct`         | Action Cœur de Ville / Petites Villes de Demain / ORT membership |
 | `qpv`          | Quartiers Prioritaires de la politique de la Ville — point-in-polygon (is the address inside a QPV?), commune fallback |
+| `sensible`     | The State's hardest-neighbourhood perimeters: inside / near a QRR police-priority zone or an ORCOD-IN copro dégradée (point-in-polygon, far more selective than QPV) |
 | `cartofriches` | Cerema brownfield inventory aggregated per commune               |
 | `education`    | Count of open schools per commune (live API)                     |
 | `bpe`          | INSEE BPE — curated commerce / health / services counts          |
