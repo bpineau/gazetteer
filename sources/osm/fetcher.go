@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bpineau/gazetteer/helpers/httpx"
@@ -41,6 +42,16 @@ type HTTPOverpassFetcher struct {
 	endpoint  string
 	fallbacks []string
 	logger    *slog.Logger
+
+	// mu guards streaks/skips. A mirror with mirrorSkipThreshold
+	// consecutive failures is skipped (a hung mirror must not tax every
+	// one of the ~96 refresh sub-queries with a full attempt timeout),
+	// but every mirrorProbeEvery-th skip lets a probe through so a
+	// recovered mirror rejoins — long-lived fetchers (the live Source's
+	// fallback path) must not blacklist a mirror forever.
+	mu      sync.Mutex
+	streaks map[string]int
+	skips   map[string]int
 }
 
 // NewHTTPOverpassFetcher returns a fetcher bound to c. `endpoint` may
@@ -57,7 +68,49 @@ func NewHTTPOverpassFetcher(c *httpx.Client, endpoint string) *HTTPOverpassFetch
 		endpoint:  endpoint,
 		fallbacks: OverpassFallbackEndpoints,
 		logger:    slog.Default(),
+		streaks:   map[string]int{},
+		skips:     map[string]int{},
 	}
+}
+
+// overpassMirrorTimeout is the per-MIRROR time slice inside Query. A
+// healthy per-department response takes 2-5 s; 20 s cuts a hung mirror's
+// tax without starving the next mirror — each attempt gets its own slice
+// instead of all attempts sharing one deadline (the old shape let a hung
+// primary consume the whole budget, so the fallback never effectively
+// engaged on hangs). A var so tests can shrink it.
+var overpassMirrorTimeout = 20 * time.Second
+
+const (
+	// mirrorSkipThreshold is the consecutive-failure streak after which
+	// a mirror is skipped; mirrorProbeEvery lets every Nth skip probe
+	// the mirror again so recovery is detected.
+	mirrorSkipThreshold = 3
+	mirrorProbeEvery    = 10
+)
+
+// shouldSkip reports whether ep is currently in the skip state, allowing
+// a probe through every mirrorProbeEvery-th call.
+func (f *HTTPOverpassFetcher) shouldSkip(ep string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.streaks[ep] < mirrorSkipThreshold {
+		return false
+	}
+	f.skips[ep]++
+	return f.skips[ep]%mirrorProbeEvery != 0
+}
+
+// observe folds one attempt outcome into the mirror's streak.
+func (f *HTTPOverpassFetcher) observe(ep string, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err == nil {
+		f.streaks[ep] = 0
+		f.skips[ep] = 0
+		return
+	}
+	f.streaks[ep]++
 }
 
 // SetLogger overrides the default slog logger. Used by tests to capture
@@ -100,7 +153,22 @@ func (f *HTTPOverpassFetcher) Query(ctx context.Context, ql string) ([]byte, err
 
 	var lastErr error
 	for i, ep := range endpoints {
-		body, err := f.queryOne(ctx, ep, ql)
+		if f.shouldSkip(ep) {
+			logger.Warn("osm.mirror_skipped",
+				slog.String("endpoint", ep),
+				slog.Int("consecutive_failures", f.streak(ep)),
+			)
+			if lastErr == nil {
+				lastErr = fmt.Errorf("osm: mirror %s skipped after %d consecutive failures", ep, f.streak(ep))
+			}
+			continue
+		}
+		// Per-mirror slice: a hung mirror must not consume the caller's
+		// whole deadline and starve the remaining mirrors.
+		attemptCtx, cancel := context.WithTimeout(ctx, overpassMirrorTimeout)
+		body, err := f.queryOne(attemptCtx, ep, ql)
+		cancel()
+		f.observe(ep, err)
 		if err == nil {
 			return body, nil
 		}
@@ -123,6 +191,13 @@ func (f *HTTPOverpassFetcher) Query(ctx context.Context, ql string) ([]byte, err
 		slog.Any("last_err", lastErr),
 	)
 	return nil, lastErr
+}
+
+// streak reads the current consecutive-failure count for ep.
+func (f *HTTPOverpassFetcher) streak(ep string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.streaks[ep]
 }
 
 // queryOne performs a single POST against `endpoint` and returns the body
