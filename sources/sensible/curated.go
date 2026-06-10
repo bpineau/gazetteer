@@ -54,4 +54,17 @@ var curatedZones = []curatedZone{
 		Lat:  48.9580, Lon: 2.5407, RadiusM: 450,
 		Note: "ORCOD-IN — copropriétés très dégradées, expropriation publique en cours (décret n° 2021-638 du 20 mai 2021)",
 	},
+
+	// The QRR "La Courneuve" perimeter covers the south-east of the commune
+	// (Quatre-Routes), NOT the cité des 4000 to the west — one of France's
+	// largest distressed estates, in deep urban renewal for two decades. The
+	// official anchors here are the NPNRU national-interest designation and
+	// the QPV decree; the circle spans 4000 Nord + 4000 Ouest (La Tour).
+	{
+		Name: "La Courneuve — Les 4000 (Nord / Ouest)",
+		Kind: KindCurated,
+		Dep:  "93",
+		Lat:  48.9305, Lon: 2.3845, RadiusM: 700,
+		Note: "grand ensemble en rénovation urbaine lourde — quartier NPNRU d'intérêt national (arrêté du 29 avril 2015) et QPV (décret n° 2023-1314)",
+	},
 }
