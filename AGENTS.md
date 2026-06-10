@@ -84,6 +84,8 @@ one source you've used all of them:
 | `type Options struct{ …; DataDir string }` | config; zero value is usually valid |
 | `func NewSource(Options) *Source` | constructor |
 | `func Query(ctx, Options, Listing) (*Result, error)` | **atomic helper** — run one source without the builder |
+| `func (s *Source) QueryResult(ctx, Listing) (*Result, error)` | typed Query on a held instance (no `any` assertion) |
+| `Options.Fetcher gazetteer.Fetcher` (live sources) | inject circuit breakers / fixtures into the fetch path |
 | `type Result struct{ …; Evidence Evidence }` | the typed payload; `Evidence` is a `json:"-"` provenance sidecar |
 | `func (*Result) IsEmpty() bool` | true ⇒ "ran fine, no data for this address" |
 
@@ -155,11 +157,28 @@ high-level API, not the project's purpose.
 - `appraisal.PricePerM2`, `RentValue`, `HazardProfile` consolidate a few
   dimensions across sources (a source opts in by implementing
   `appraisal.PriceEstimator` / `RentEstimator` / `HazardReporter`).
+  `appraisal.Price/Rent/HazardSourceNames()` list which registered sources
+  feed each synthesis (plugins included); estimates expose `EURPerM2()`
+  accessors over the integer-cents fields.
 - `appraisal/zonescore.Compute(dossier, opts…)` → a 0–100 score over 6 axes
   (rendement, tension, solvabilité, sécurité, fiscalité, accès);
   `zonescore.Compare(...)` ranks several addresses; weight presets via
   `zonescore.Personas` / the CLI `--profile`. The catalog's `feeds` field says
   which source drives which axis.
+
+## Standalone building blocks — the library beneath the library
+
+`helpers/*` and `dataset` are supported public API, usable without ever
+building a Dossier: `httpx` (rate-limited HTTP client + disk cache), `banx`
+(BAN geocoding, cached + dept-guarded; `NewDefaultGeocoder` is the canonical
+production stack), `communes` (35k-commune table; offline
+`ResolveINSEE(city, zip)` with PLM rules), `frnorm`/`fraddr`/`proptype`
+(French parsing; `proptype.ToListingType` bridges to `gazetteer.PropertyType`),
+`circuit` (breakers; `HTTPFetcher` implements the `gazetteer.Fetcher`
+injection seam), `kvcache`, `geodist`/`geopoly`/`geoindex`, `scrape`,
+`stats`, `fallback`, `atomicfs`, `safejson` — and `dataset` lets any app ship
+its own embedded+refreshable datasets. **[docs/helpers.md](docs/helpers.md)
+is the map**; each package's godoc is the reference.
 
 ## Batch & subset access — beyond one-address-at-a-time
 
@@ -169,9 +188,16 @@ Two patterns sit alongside the per-address `Collect`:
   the full default roster (e.g. `Exclude: []string{"bdnb"}` drops the live BDNB
   API); `Builder.Without(names…)` prunes a pre-populated Builder before
   `.Build()`; `Client.CollectSome(ctx, listing, names…)` collects only a named
-  subset on an existing Client (cheap embedded Sources first, before slow live
-  APIs). Sources run independently, so dropping an unconsumed one never affects
-  the others.
+  subset on an existing Client. `Client.SourceNames()` enumerates what a Client
+  will run; `factory.OfflineSourceNames()` / `LiveSourceNames()` split the
+  roster into instant embedded Sources vs network ones — collect the offline
+  set first for a fast partial answer, then pay for the live APIs. Sources run
+  independently, so dropping an unconsumed one never affects the others.
+- **Tune one Source, keep the roster.** `factory.Options.SourceOverrides`
+  swaps a single Source's constructor while sharing the factory's deps
+  (rate-limited HTTP client, cached geocoder) — e.g. give dvf a persistent
+  `SectionCache` or inject an `Options.Fetcher` circuit breaker. Typo'd names
+  error. To *add* a source, use `BuilderDefault(...).With(plugin)`.
 - **Screen every commune offline.** `overview.Build(overview.Options{Depts…})`
   joins the embedded, commune-keyed Sources into one `CommuneOverview` row per
   commune (price, market rent, encadrement cap, income, vacancy, taxe foncière,
@@ -180,7 +206,11 @@ Two patterns sit alongside the per-address `Collect`:
   the `Listing`/`Query` path: `dvfagg.Load(dir).Codes()` / `.Lookup(insee)`,
   `qpv.Load(dir).HasQPV(insee)`, `delinquance.Load(dir).Level(insee)`,
   `communes.Default().All()` — reach for these whenever you need many communes
-  at once instead of one address.
+  at once instead of one address. Batch-capable sources are flagged `batch`
+  in the catalog. Rank/filter on the row's derived methods
+  (`EffectivePriceEURM2`, `EffectiveRentEURM2HC` = min(market, legal cap),
+  `GrossYieldPct`, `PriceReliable`), not on raw fields — those rules live in
+  the library so consumers don't re-derive them.
 
 ## Adding a new Source (checklist)
 
@@ -220,7 +250,9 @@ never disables corporate secret-scanning.
 ## Invariants & footguns
 
 - `zonescore.Options.Weights` **replaces** the default weight set wholesale — a
-  partial map means "score only these axes", not "tweak a few".
+  partial map means "score only these axes", not "tweak a few". To tweak,
+  use `zonescore.WeightsWith(profile, overrides)` (merges, validates axis
+  names).
 - `gazetteer refresh` is **idempotent** (a current dataset is skipped); safe on boot.
 - IRIS coverage is **Île-de-France only in practice**: the `iris` resolver and
   `logiris` are IDF-scoped datasets. `filoiris`'s dataset is *national*, but it
@@ -231,6 +263,10 @@ never disables corporate secret-scanning.
   future transit must not distort the yield-first-today score.
 - Datasets ship **embedded in the binary**; the datadir (`~/.cache/gazetteer`)
   is an *optional* override populated by `refresh`, never required.
+- **Evidence survives Dossier JSON as raw JSON only.** `Result.Evidence` is
+  marshaled, but un-marshal restores it as `json.RawMessage` (no factory for
+  evidence types); `Result.Err` round-trips as a plain string (Status
+  survives — gate retries on it, not on `errors.Is` after a round-trip).
 - **Gate a Result on `IsEmpty()`, never on `field != 0`.** Many numeric Result
   fields are plain values where `0` is a *legitimate* reading (e.g. `rpls` 0 %
   social housing — ~64 % of communes; a count of 0) — distinct from "no data".
@@ -251,18 +287,21 @@ never disables corporate secret-scanning.
 
 ```
 gazetteer/            core types: Builder, Client, Source, Result, Dossier, Get[T]
-factory/              one-call wiring of every stable source (NewDefault)
+factory/              one-call wiring of every stable source (NewDefault,
+                      SourceOverrides, HostRateLimits, Offline/LiveSourceNames)
+internal/roster/      THE single source roster (one entry wires factory + CLI)
 sources/<name>/       one package per source (uniform shape, see above)
 appraisal/            PricePerM2 / RentValue / HazardProfile consolidation
 appraisal/zonescore/  the 0–100 zone score + Compare + Personas
 overview/             offline per-commune batch join (CommuneOverview) for screening
-helpers/<name>/       banx, httpx, geopoly, geodist, communes, circuit, kvcache…
+helpers/<name>/       standalone building blocks (docs/helpers.md): banx, httpx, …
 cmd/gazetteer/        the CLI (+ the source catalog)
 docs/                 long-form reference (start at docs/readme.md)
 ```
 
 ## Full reference
 
-[docs/concepts.md](docs/concepts.md) · [docs/sources.md](docs/sources.md) ·
+[docs/concepts.md](docs/concepts.md) · [docs/helpers.md](docs/helpers.md) ·
+[docs/sources.md](docs/sources.md) ·
 [docs/cli.md](docs/cli.md) · [docs/datasets.md](docs/datasets.md) ·
 [docs/plugins.md](docs/plugins.md) · [docs/testing.md](docs/testing.md)

@@ -21,6 +21,7 @@ godoc found via `go doc github.com/bpineau/gazetteer/...`.
 | [concepts.md](concepts.md)              | New users — mental model of the API   |
 | [sources.md](sources.md)                | What each Source provides             |
 | [datasets.md](datasets.md)              | Offline datasets + `refresh` / datadir|
+| [helpers.md](helpers.md)                | **Standalone building blocks** (httpx, banx, communes, …) for any FR real-estate/geo app |
 | [plugins.md](plugins.md)                | Source authors                        |
 | [circuit_breakers.md](circuit_breakers.md) | Source authors                     |
 | [caching.md](caching.md)                | Source authors                        |
@@ -41,16 +42,18 @@ appraisal/         consolidation across Sources (price/rent/hazard)
 appraisal/zonescore/  yield-first 0–100 zone score + multi-zone Compare
 overview/          offline per-commune batch join (CommuneOverview) for screening
 sources/<name>/    one package per data source
-helpers/<name>/    reusable utilities (banx, httpx, kvcache, circuit, ...)
+helpers/<name>/    standalone building blocks (see helpers.md) — public API
 cmd/gazetteer/     command-line front-end
 internal/          implementation detail; no public API
 ```
 
 ## Status
 
-Alpha. The API may break before v1; releases are deferred until the
-surface stabilises. New `Source` plugins land out-of-tree under any
-import path and are wired via `Builder.With`.
+Pre-v1, tagged releases consumed by pinning applications — see the
+stability tiers in the top-level [README](../README.md#status--stability).
+New `Source` plugins land out-of-tree under any import path and are wired
+via `Builder.With` (or `factory.Options.SourceOverrides` to swap a roster
+source).
 
 ## License
 

@@ -23,6 +23,7 @@
       "INSEE"
     ],
     "coverage": "national",
+    "batch": true,
     "result_schema": {
       "acv": false,
       "pvd": false,
@@ -54,6 +55,7 @@
       "INSEE"
     ],
     "coverage": "national",
+    "batch": true,
     "result_schema": {
       "total_facilities": 0,
       "confidence": ""
@@ -85,6 +87,7 @@
     "feeds": [
       "appraisal.RentValue"
     ],
+    "batch": true,
     "result_schema": {
       "loyer_med_eur_per_m2_cc": 0,
       "loyer_low_eur_per_m2_cc": 0,
@@ -102,6 +105,7 @@
       "INSEE"
     ],
     "coverage": "national",
+    "batch": true,
     "result_schema": {
       "site_count": 0,
       "confidence": ""
@@ -119,6 +123,7 @@
     "feeds": [
       "appraisal.HazardProfile"
     ],
+    "batch": true,
     "result_schema": {
       "total_arretes": 0,
       "recent_count": 0
@@ -133,6 +138,7 @@
       "lat/lon"
     ],
     "coverage": "Île-de-France",
+    "batch": true,
     "result_schema": {
       "nearest_m": 0,
       "within_500m": 0,
@@ -151,6 +157,7 @@
     "feeds": [
       "zonescore: solvabilité (employment)"
     ],
+    "batch": true,
     "result_schema": {
       "rate_pct": 0,
       "confidence": ""
@@ -168,6 +175,7 @@
     "feeds": [
       "zonescore: sécurité"
     ],
+    "batch": true,
     "result_schema": {
       "confidence": ""
     }
@@ -221,6 +229,7 @@
     "feeds": [
       "prospection: commune-level price benchmark"
     ],
+    "batch": true,
     "result_schema": {
       "price_median_eur_m2": 0,
       "price_p25_eur_m2": 0,
@@ -263,6 +272,7 @@
     "feeds": [
       "appraisal.RentValue"
     ],
+    "batch": true,
     "result_schema": {
       "loyer_ref_maj_eur_per_m2_hc": 0,
       "loyer_ref_eur_per_m2_hc": 0,
@@ -281,6 +291,7 @@
     "feeds": [
       "zonescore: solvabilité (IRIS income, preferred over filosofi)"
     ],
+    "batch": true,
     "result_schema": {
       "median_eur": 0,
       "confidence": ""
@@ -298,6 +309,7 @@
     "feeds": [
       "zonescore: solvabilité (commune income)"
     ],
+    "batch": true,
     "result_schema": {
       "median_eur": 0,
       "confidence": ""
@@ -333,6 +345,7 @@
       "lat/lon"
     ],
     "coverage": "Île-de-France",
+    "batch": true,
     "result_schema": {
       "within_1500m": 0,
       "within_3000m": 0
@@ -347,6 +360,7 @@
       "INSEE"
     ],
     "coverage": "national",
+    "batch": true,
     "result_schema": {
       "ips_median": 0,
       "confidence": ""
@@ -361,6 +375,7 @@
       "lat/lon"
     ],
     "coverage": "Île-de-France",
+    "batch": true,
     "result_schema": {}
   },
   {
@@ -408,6 +423,7 @@
     "feeds": [
       "zonescore: tension (IRIS vacancy + renter depth, preferred over vacance)"
     ],
+    "batch": true,
     "result_schema": {
       "renter_share_pct": 0,
       "vacancy_rate_pct": 0,
@@ -423,6 +439,7 @@
       "INSEE"
     ],
     "coverage": "national",
+    "batch": true,
     "result_schema": {
       "vacance_pct": 0,
       "confidence": ""
@@ -440,6 +457,7 @@
     "feeds": [
       "zonescore: accès (livability)"
     ],
+    "batch": true,
     "result_schema": {
       "nuisance_count": 0,
       "point_noir": false
@@ -459,6 +477,7 @@
       "appraisal.RentValue",
       "zonescore: rendement (rent)"
     ],
+    "batch": true,
     "result_schema": {
       "observed_median_eur_per_m2": 0,
       "sample_size": 0
@@ -476,6 +495,7 @@
     "feeds": [
       "zonescore: accès (transit walk)"
     ],
+    "batch": true,
     "result_schema": {
       "nearest_transit_name": "",
       "nearest_transit_type": "",
@@ -495,6 +515,7 @@
       "lat/lon (polygon containment + nearest-QPV hint)"
     ],
     "coverage": "France métropole + outre-mer (≈1660 QPV 2024 polygons, WGS84)",
+    "batch": true,
     "result_schema": {
       "has_qpv": false,
       "confidence": ""
@@ -513,6 +534,7 @@
     "feeds": [
       "buyer due-diligence: copropriété context (fiche only)"
     ],
+    "batch": true,
     "result_schema": {
       "attention": false,
       "confidence": ""
@@ -527,6 +549,7 @@
       "INSEE"
     ],
     "coverage": "national",
+    "batch": true,
     "result_schema": {
       "lls_rate": 0,
       "confidence": ""
@@ -544,6 +567,7 @@
     "feeds": [
       "supply-side signal: new-housing pipeline (rents/prices headwind)"
     ],
+    "batch": true,
     "result_schema": {
       "authorized_latest": 0,
       "started_latest": 0,
@@ -566,6 +590,7 @@
     "feeds": [
       "zonescore: fiscalité"
     ],
+    "batch": true,
     "result_schema": {
       "estimated_eur_per_year": 0,
       "vl_eur_per_m2": 0,
@@ -584,6 +609,7 @@
     "feeds": [
       "zonescore: tension (commune vacancy, fallback for logiris)"
     ],
+    "batch": true,
     "result_schema": {
       "vacancy_rate": 0,
       "confidence": ""
@@ -598,6 +624,7 @@
       "INSEE"
     ],
     "coverage": "national",
+    "batch": true,
     "result_schema": {
       "tension_score": 0,
       "confidence": ""
@@ -612,6 +639,7 @@
       "INSEE"
     ],
     "coverage": "national",
+    "batch": true,
     "result_schema": {
       "tier": "",
       "is_tendue": false,
