@@ -205,11 +205,11 @@ Two patterns sit alongside the per-address `Collect`:
 - **Screen every commune offline.** `overview.Build(overview.Options{Depts…})`
   joins the embedded, commune-keyed Sources into one `CommuneOverview` row per
   commune (price, market rent, encadrement cap, income, vacancy, taxe foncière,
-  QPV, zonage, transit lines) with **no network I/O** — the inverse of the
+  QPV, sensitive-zone perimeters, zonage, transit lines) with **no network I/O** — the inverse of the
   per-address Dossier. It rides on per-Source **batch-read helpers** that skip
   the `Listing`/`Query` path (error handling elided): `dvfagg.Load(dir).Codes()`
   / `.Lookup(insee)`, `qpv.Load(dir).HasQPV(insee)`,
-  `delinquance.Load(dir).Level(insee)`, `communes.Default().All()` — reach for these whenever you need many communes
+  `delinquance.Load(dir).Level(insee)`, `sensible.Load(dir).ZonesForCommune(insee)`, `communes.Default().All()` — reach for these whenever you need many communes
   at once instead of one address. Batch-capable sources are flagged `batch`
   in the catalog. Rank/filter on the row's derived methods
   (`EffectivePriceEURM2`, `EffectiveRentEURM2HC` = min(market, legal cap),

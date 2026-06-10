@@ -14,6 +14,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/filosofi"
 	"github.com/bpineau/gazetteer/sources/osm"
 	"github.com/bpineau/gazetteer/sources/qpv"
+	"github.com/bpineau/gazetteer/sources/sensible"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
 	"github.com/bpineau/gazetteer/sources/zonageabc"
@@ -63,6 +64,10 @@ type CommuneOverview struct {
 	TFPBPct          *float64 `json:"tfpb_pct,omitempty"`
 	QPV              bool     `json:"qpv"`
 	IncomeMedianEUR  *int     `json:"income_median_eur,omitempty"`
+	// SensibleZones lists the very-hard-neighbourhood perimeters (QRR police
+	// zones, ORCOD-IN copros, curated) intersecting the commune — far more
+	// selective than the QPV flag. Empty for the vast majority of communes.
+	SensibleZones []sensible.Zone `json:"sensible_zones,omitempty"`
 
 	// Regulatory / location
 	ZonageABC  string `json:"zonage_abc"`
@@ -103,6 +108,7 @@ func Build(o Options) ([]CommuneOverview, error) {
 	va, _ := vacance.Load(o.DataDir)
 	tf, _ := taxefonciere.Load(o.DataDir)
 	qp, _ := qpv.Load(o.DataDir)
+	sb, _ := sensible.Load(o.DataDir)
 	fi, _ := filosofi.Load(o.DataDir)
 	za, _ := zonageabc.Load(o.DataDir)
 	zt, _ := zonetendue.Load(o.DataDir)
@@ -178,6 +184,9 @@ func Build(o Options) ([]CommuneOverview, error) {
 
 		// QPV.
 		row.QPV = qp.HasQPV(insee)
+
+		// Very-hard-neighbourhood perimeters (QRR / ORCOD-IN / curated).
+		row.SensibleZones = sb.ZonesForCommune(insee)
 
 		// Filosofi (income median).
 		if e, ok := fi.Lookup(insee); ok {

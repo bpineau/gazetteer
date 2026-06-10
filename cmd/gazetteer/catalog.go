@@ -237,6 +237,7 @@ var sourceDescriptors = map[string]sourceDescriptor{
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 	},
 	"sensible": {
+		Batch: true,
 		Summary: "Flags addresses inside (or within 400 m of) the State's hardest-neighbourhood " +
 			"perimeters: the 62 QRR police-priority zones (official polygons, far more selective " +
 			"than QPV), the 4 ORCOD-IN copropriétés dégradées (décrets) and a small documented " +
