@@ -127,6 +127,11 @@ func (f *HTTPOverpassFetcher) Query(ctx context.Context, ql string) ([]byte, err
 
 // queryOne performs a single POST against `endpoint` and returns the body
 // on success or an error (including non-2xx responses).
+// overpassUserAgent identifies this client to Overpass mirrors, as the
+// OSMF usage policy requires (anonymous/browser-mimicking agents are
+// rejected with 406). Keep it honest: tool name + contact URL.
+const overpassUserAgent = "gazetteer/1.0 (+https://github.com/bpineau/gazetteer)"
+
 func (f *HTTPOverpassFetcher) queryOne(ctx context.Context, endpoint, ql string) ([]byte, error) {
 	form := url.Values{}
 	form.Set("data", ql)
@@ -136,12 +141,12 @@ func (f *HTTPOverpassFetcher) queryOne(ctx context.Context, endpoint, ql string)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
-	// Some Overpass mirrors reject requests that do not carry a
-	// recognisable User-Agent (Go-http-client/* may be blocked).
-	// We must set this header ourselves because HTTPClient().Do() bypasses
-	// httpx.Client.applyDefaultHeaders — that helper is only wired up
-	// through GetBytes/GetJSON.
-	req.Header.Set("User-Agent", httpx.DefaultUserAgent)
+	// Overpass requires an HONEST, identifying User-Agent (OSMF usage
+	// policy); overpass-api.de now answers 406 to browser-impersonating
+	// UAs like httpx.DefaultUserAgent (observed 2026-06-10, all 96
+	// refresh sub-queries rejected). We must set the header ourselves
+	// because HTTPClient().Do() bypasses httpx's default-header path.
+	req.Header.Set("User-Agent", overpassUserAgent)
 	resp, err := f.http.HTTPClient().Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("osm: overpass POST: %w", err)

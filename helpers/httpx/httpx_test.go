@@ -1142,3 +1142,41 @@ func TestGuessExt(t *testing.T) {
 		}
 	}
 }
+
+// Downloads must survive bodies that stream longer than the client-wide
+// request Timeout — that deadline spans the full body read, which is
+// wrong for large raw files (the bug aborted >60s dataset downloads).
+func TestDownload_OutlivesClientTimeout(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fl, _ := w.(http.Flusher)
+		for range 4 {
+			_, _ = w.Write([]byte("chunk-"))
+			if fl != nil {
+				fl.Flush()
+			}
+			time.Sleep(120 * time.Millisecond) // total ~480ms > client timeout
+		}
+	}))
+	defer srv.Close()
+
+	c, err := New(Options{})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	c.http.Timeout = 200 * time.Millisecond // simulate the client-wide deadline
+	dest := filepath.Join(t.TempDir(), "big.bin")
+	res, err := c.Download(context.Background(), srv.URL, dest, DownloadOptions{})
+	if err != nil {
+		t.Fatalf("Download aborted by client timeout: %v", err)
+	}
+	if res.Bytes != int64(len("chunk-")*4) {
+		t.Errorf("Bytes = %d, want %d", res.Bytes, len("chunk-")*4)
+	}
+
+	// And the per-download deadline still bounds it.
+	dest2 := filepath.Join(t.TempDir(), "slow.bin")
+	if _, err := c.Download(context.Background(), srv.URL, dest2, DownloadOptions{Timeout: 100 * time.Millisecond}); err == nil {
+		t.Error("Download with a 100ms per-download timeout must fail on a ~480ms body")
+	}
+}

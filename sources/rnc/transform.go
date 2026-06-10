@@ -16,9 +16,11 @@ import (
 const rawName = "rnc.raw.csv"
 
 // rawURL is the data.gouv "RNIC - Actualisation quotidienne" CSV (the daily
-// "with-qpv" extract). The dated path rotates; `gazetteer refresh` resolves
-// the latest resource. Bump dataVintage when refreshing.
-const rawURL = "https://static.data.gouv.fr/resources/registre-national-dimmatriculation-des-coproprietes/20260530-060505/20260530-rnc-data-gouv-with-qpv.csv"
+// "with-qpv" extract), via the STABLE resource permalink: the underlying
+// dated static.data.gouv.fr path rotates every day, so pinning a dated
+// URL 404s within days (it did). The permalink always redirects to the
+// current file. Bump dataVintage when refreshing.
+const rawURL = "https://www.data.gouv.fr/fr/datasets/r/3ea8e2c3-0038-464a-b17e-cd5c91f65ce2"
 
 const (
 	metaSource  = "Registre National d'Immatriculation des Copropriétés (ANAH, data.gouv.fr, with-qpv)"

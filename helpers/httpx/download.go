@@ -93,13 +93,27 @@ func (c *Client) Download(ctx context.Context, url, destPath string, opts Downlo
 		return DownloadResult{}, fmt.Errorf("httpx: mkdir %s: %w", filepath.Dir(destPath), err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	// Downloads stream arbitrarily large bodies, so the client-wide
+	// request Timeout (which covers the FULL body read) must not apply —
+	// it would abort any file slower than ~60 s mid-stream. Use a
+	// timeout-free shallow copy of the client (same transport: rate
+	// limits, retries, headers) under a per-download deadline instead.
+	timeout := opts.Timeout
+	if timeout <= 0 {
+		timeout = defaultDownloadTimeout
+	}
+	dlCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	dlClient := *c.http
+	dlClient.Timeout = 0
+
+	req, err := http.NewRequestWithContext(dlCtx, http.MethodGet, url, nil)
 	if err != nil {
 		return DownloadResult{}, fmt.Errorf("httpx: build request for %s: %w", url, err)
 	}
 	c.applyDefaultHeaders(req, nil)
 
-	resp, err := c.http.Do(req)
+	resp, err := dlClient.Do(req)
 	if err != nil {
 		return DownloadResult{}, err
 	}
