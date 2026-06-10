@@ -19,8 +19,27 @@
 // An empty Options.Depts covers every commune nationally. Missing data for a
 // given source degrades to a zero / nil field rather than failing the row.
 //
-// Build sits on the per-source batch-read helpers (dvfagg.Load().Codes()/
-// Lookup(), qpv.Load().HasQPV(), delinquance.Load().Level(), communes.All(),
-// carteloyers Row.HCEURPerM2()); reach for those directly when you need a single
-// dimension across many communes.
+// Decision-grade projections over a row live as methods so their rules
+// have one home: EffectivePriceEURM2 (small-unit median else all-unit),
+// EffectiveRentEURM2HC (market capped by encadrement — the legally
+// chargeable rent), GrossYieldPct, and PriceReliable (thin-sample /
+// bimodality flag). Rank and filter on those, not on the raw fields.
+//
+// # Extending the row
+//
+// CommuneOverview is a fixed struct; to add your own column, join on the
+// INSEE key against any source's batch-read helper — Build itself is just
+// that join:
+//
+//	chom, _ := chomage.Load(dataDir)
+//	for _, row := range rows {
+//	    if e, ok := chom.Lookup(row.INSEE); ok { /* your column */ }
+//	}
+//
+// Every batch-capable source is flagged `batch` in the catalog
+// (`gazetteer sources catalog --json`); the pattern is documented in
+// docs/helpers.md. Reach for the per-source helpers directly when you
+// need a single dimension across many communes: dvfagg.Load().Codes()/
+// Lookup(), qpv.Load().HasQPV(), delinquance.Load().Level(),
+// communes.All(), carteloyers Row.HCEURPerM2(), …
 package overview

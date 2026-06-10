@@ -145,6 +145,34 @@ type Result struct {
 func (r *Result) Evidence() any { return r.Evidence }
 ```
 
+## Fetching: use the shared seams
+
+Don't hand-roll the HTTP body of your `Query`:
+
+- **`gazetteer.FetchUpstream(ctx, client, url, spec)`** is the shared GET
+  with the error taxonomy baked in — transport errors / 5xx / 429 wrap
+  `ErrUpstreamUnavailable` (→ `failed_transient`), other 4xx wrap
+  `ErrUpstreamPermanent`, and `FetchSpec.NotFoundBody` maps 404 to your
+  "empty payload" so a no-data answer parses instead of failing. Every
+  in-tree live source uses it; using it makes your plugin's failures
+  classify identically.
+- **Expose `Fetcher gazetteer.Fetcher` on your Options** (and consult it
+  before FetchUpstream, like the in-tree live sources do): callers inject
+  circuit breakers, quota trippers or recorded fixtures through it.
+- **`gazetteer.QueryTyped[*Result]`** is the body of your package-level
+  `Query` helper and of the `QueryResult` instance method — see any
+  in-tree source.go.
+- Prefer `Options.BaseURL` fields over mutable package-level URL vars:
+  package vars cannot be re-exported by consumer wrappers (writes through
+  an alias don't reach your package) and mutate globally.
+
+For **spatial plugins** (point-in-zone datasets), build on
+[`helpers/geoindex`](../helpers/geoindex): it owns the compact polygon
+wire format, GeoJSON decoding, and the bbox-prefiltered resolve/nearest
+index that iris/qpv/encadrement share. For **tiered lookups** (precise →
+coarse fallbacks), use [`helpers/fallback`](../helpers/fallback). The full
+building-blocks map is [helpers.md](helpers.md).
+
 ## Reading shared infrastructure from context
 
 The Client propagates HTTP client and logger via `ctx`. Read them with the helpers in `gazetteer/context.go`:

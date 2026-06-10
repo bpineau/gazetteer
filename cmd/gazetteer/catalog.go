@@ -33,6 +33,12 @@ type sourceDescriptor struct {
 
 	// Feeds names the appraisal / zonescore contributions, if any.
 	Feeds []string `json:"feeds,omitempty"`
+
+	// Batch reports that the source package exports a batch-read path
+	// (`Load(dir)` returning a per-process index with direct lookups,
+	// e.g. dvfagg.Load(dir).Lookup(insee)) that skips the Listing/Query
+	// machinery — for whole-territory screening. See docs/helpers.md.
+	Batch bool `json:"batch,omitempty"`
 }
 
 // inputClause is one typed requirement on the Listing: satisfied when ANY
@@ -80,52 +86,62 @@ var sourceDescriptors = map[string]sourceDescriptor{
 		Coverage: "national", Feeds: []string{"appraisal.PricePerM2", "zonescore: rendement (price)"},
 	},
 	"oll": {
+		Batch:   true,
 		Summary: "Observed market rents (Observatoires Locaux des Loyers), median €/m²/month by zone × rooms.",
 		Inputs:  []inputClause{need("INSEE"), need("rooms")}, Coverage: "17 agglomérations (Paris intra-muros excluded)",
 		Feeds: []string{"appraisal.RentValue", "zonescore: rendement (rent)"},
 	},
 	"carteloyers": {
+		Batch:   true,
 		Summary: "National rent-observatory reference tiers (médiane €/m²/month CC + IC band).",
 		Inputs:  []inputClause{need("INSEE"), need("rooms")}, Coverage: "national",
 		Feeds: []string{"appraisal.RentValue"},
 	},
 	"dvfagg": {
+		Batch:   true,
 		Summary: "Per-commune DVF aggregate — median €/m² + quartiles (3-year window, apartment sales, offline).",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 		Feeds: []string{"prospection: commune-level price benchmark"},
 	},
 	"encadrement": {
+		Batch:    true,
 		Summary:  "Legal rent-control caps (loyer de référence + majoré).",
 		Inputs:   []inputClause{need("zip", "INSEE"), need("property_type"), need("rooms"), optional("for 93", "lat/lon")},
 		Coverage: "Paris + Plaine Commune & Est Ensemble (93) + Lyon/Villeurbanne",
 		Feeds:    []string{"appraisal.RentValue"},
 	},
 	"taxefonciere": {
+		Batch:   true,
 		Summary: "Estimated annual taxe foncière (DGFiP voted TFPB/TEOM rates × valeur locative proxy × surface).",
 		Inputs:  []inputClause{need("INSEE"), need("surface")}, Coverage: "national",
 		Feeds: []string{"zonescore: fiscalité"},
 	},
 	"filosofi": {
+		Batch:   true,
 		Summary: "INSEE Filosofi income — median revenu disponible + minima-sociaux %, by commune.",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 		Feeds: []string{"zonescore: solvabilité (commune income)"},
 	},
 	"filoiris": {
+		Batch:   true,
 		Summary: "INSEE Filosofi income at IRIS (sub-commune) level — median + taux de pauvreté + Gini.",
 		Inputs:  []inputClause{need("Listing.IRIS")}, Coverage: "Île-de-France (IRIS of communes ≥5000 hab)",
 		Feeds: []string{"zonescore: solvabilité (IRIS income, preferred over filosofi)"},
 	},
 	"logiris": {
+		Batch:   true,
 		Summary: "INSEE census housing structure at IRIS — renter share, social-housing share, vacancy.",
 		Inputs:  []inputClause{need("Listing.IRIS")}, Coverage: "Île-de-France",
 		Feeds: []string{"zonescore: tension (IRIS vacancy + renter depth, preferred over vacance)"},
 	},
 	"chomage": {
+		Batch:   true,
 		Summary: "INSEE local unemployment rate by zone d'emploi vs national (quarterly).",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 		Feeds: []string{"zonescore: solvabilité (employment)"},
 	},
 	"delinquance": {
+		Batch:   true,
 		Summary: "SSMSI État 4001 per-commune crime indicators + a coarse risk flag.",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 		Feeds: []string{"zonescore: sécurité"},
@@ -136,30 +152,36 @@ var sourceDescriptors = map[string]sourceDescriptor{
 		Feeds: []string{"zonescore: tension (rental tension)"},
 	},
 	"vacance": {
+		Batch:   true,
 		Summary: "INSEE census demographic vacancy rate per commune/arrondissement.",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 		Feeds: []string{"zonescore: tension (commune vacancy, fallback for logiris)"},
 	},
 	"rnc": {
+		Batch:   true,
 		Summary: "Copropriété context from the Registre National d'Immatriculation (syndic type, mandate status, lots, construction period, QPV, ANAH-aided). Low-confidence 'à vérifier' triage hint; NO hard distress flag — procedures/arrêtés are redacted upstream.",
 		Inputs:  []inputClause{need("INSEE"), optional("improves unit matching", "lat/lon", "address")}, Coverage: "national",
 		Feeds: []string{"buyer due-diligence: copropriété context (fiche only)"},
 	},
 	"lovac": {
+		Batch:   true,
 		Summary: "Per-commune fiscal vacancy rate from the LOVAC file (TLV perimeter).",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 	},
 	"nuisances": {
+		Batch:   true,
 		Summary: "IDF cumulative environmental-nuisance grid (noise + air, 500 m cells), tier + point-noir.",
 		Inputs:  []inputClause{need("lat/lon")}, Coverage: "Île-de-France",
 		Feeds: []string{"zonescore: accès (livability)"},
 	},
 	"osm_transit": {
+		Batch:   true,
 		Summary: "Walking distance to the nearest métro / RER / tram / Transilien station.",
 		Inputs:  []inputClause{need("lat/lon")}, Coverage: "national (embedded catalog + live Overpass fallback)",
 		Feeds: []string{"zonescore: accès (transit walk)"},
 	},
 	"gpe": {
+		Batch:   true,
 		Summary: "Nearest FUTURE Grand Paris Express station + line + distance (informational, not scored).",
 		Inputs:  []inputClause{need("lat/lon")}, Coverage: "Île-de-France",
 	},
@@ -169,11 +191,13 @@ var sourceDescriptors = map[string]sourceDescriptor{
 		Feeds: []string{"appraisal.HazardProfile"},
 	},
 	"catnat": {
+		Batch:   true,
 		Summary: "Per-commune history of recognised natural-disaster (CatNat) decrees + recent-frequency tier.",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 		Feeds: []string{"appraisal.HazardProfile"},
 	},
 	"cdsr": {
+		Batch:   true,
 		Summary: "Nearby region-flagged distressed condominiums (IDF copro-difficulty signal).",
 		Inputs:  []inputClause{need("lat/lon")}, Coverage: "Île-de-France",
 	},
@@ -182,6 +206,7 @@ var sourceDescriptors = map[string]sourceDescriptor{
 		Inputs:  []inputClause{need("lat/lon")}, Coverage: "national (live API)",
 	},
 	"iris": {
+		Batch:   true,
 		Summary: "INSEE IRIS code/name/type at the address; also resolves Listing.IRIS for downstream sources.",
 		Inputs:  []inputClause{need("lat/lon")}, Coverage: "Île-de-France",
 	},
@@ -198,6 +223,7 @@ var sourceDescriptors = map[string]sourceDescriptor{
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 	},
 	"bpe": {
+		Batch:   true,
 		Summary: "INSEE BPE — curated commerce / health / services facility counts per commune.",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 	},
@@ -206,37 +232,45 @@ var sourceDescriptors = map[string]sourceDescriptor{
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national (live API)",
 	},
 	"ips_ecoles": {
+		Batch:   true,
 		Summary: "DEPP median IPS (social index) over a commune's écoles primaires + heterogeneity band.",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 	},
 	"rpls": {
+		Batch:   true,
 		Summary: "Share of logements locatifs sociaux (loi SRU) per commune.",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 	},
 	"sitadel": {
+		Batch:   true,
 		Summary: "Per-commune housing-construction dynamics from SDES Sitadel: dwellings authorised (permits) + started, latest year, 5-year mean, collectif share and the per-year authorised series.",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national (metropole + DOM)",
 		Feeds: []string{"supply-side signal: new-housing pipeline (rents/prices headwind)"},
 	},
 	"qpv": {
+		Batch: true,
 		Summary: "With coordinates, answers via point-in-polygon whether THIS address is inside " +
 			"a Quartier Prioritaire (QPV 2024 contours). Without coordinates, falls back to the " +
 			"commune-level QPV list (lower confidence).",
 		Inputs: []inputClause{need("INSEE"), optional("polygon containment + nearest-QPV hint", "lat/lon")}, Coverage: "France métropole + outre-mer (≈1660 QPV 2024 polygons, WGS84)",
 	},
 	"anct": {
+		Batch:   true,
 		Summary: "ANCT programmes — Action Cœur de Ville / Petites Villes de Demain / ORT (Denormandie).",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 	},
 	"cartofriches": {
+		Batch:   true,
 		Summary: "Cerema brownfield (friches) inventory aggregated per commune.",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 	},
 	"zonageabc": {
+		Batch:   true,
 		Summary: "Official A bis / A / B1 / B2 / C tension zoning (Pinel/PTZ).",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 	},
 	"zonetendue": {
+		Batch:   true,
 		Summary: "\"Zone tendue\" + TLV-2013 + tendue-touristique fiscal flags.",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 	},
@@ -253,6 +287,7 @@ type catalogEntry struct {
 	Inputs       []inputClause   `json:"inputs"`
 	Coverage     string          `json:"coverage"`
 	Feeds        []string        `json:"feeds,omitempty"`
+	Batch        bool            `json:"batch,omitempty"`
 	ResultSchema json.RawMessage `json:"result_schema"`
 }
 
@@ -281,6 +316,7 @@ func buildCatalog() []catalogEntry {
 			Inputs:   desc.Inputs,
 			Coverage: desc.Coverage,
 			Feeds:    desc.Feeds,
+			Batch:    desc.Batch,
 		}
 		if f, ok := byName[name]; ok {
 			e.Default = f.Default

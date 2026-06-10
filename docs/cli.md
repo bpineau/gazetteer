@@ -198,7 +198,9 @@ the source.
 ### `sources catalog [--json]`
 
 The complete capability map of every source in one shot: its inputs,
-coverage, what it returns, and which appraisal/zonescore axis it feeds.
+coverage, what it returns, which appraisal/zonescore axis it feeds, and
+whether it has a batch-read path (`batch: true` ⇒ a `Load(dir)` helper
+for whole-territory screening, see [helpers.md](helpers.md)).
 `--json` is the form an AI agent should ingest — the same content is
 committed at [sources.json](sources.json) so it can be read straight from
 the repo. A build-failing test keeps both in sync with the registry.

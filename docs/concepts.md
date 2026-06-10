@@ -80,7 +80,6 @@ type Result struct {
     Name      string
     Version   int
     Status    Status
-    InputHash string
     FetchedAt time.Time
     Err       error
     Data      any   // typed payload
@@ -93,6 +92,12 @@ package-defined typed struct (`*dvf.Result`, `*osm.Result`, …).
 `Evidence`, when populated, captures input fingerprint, ladder tier
 used, resolver provenance — anything that helps a downstream consumer
 reproduce the answer.
+
+JSON round-trip caveats: `Data` is restored typed (via the registered
+factory); `Evidence` is marshaled but restored as raw
+`json.RawMessage` (no factory exists for evidence types); `Err`
+round-trips as its message string, so gate retry logic on `Status`,
+which survives, not on `errors.Is` chains.
 
 ### `Status` — outcome taxonomy
 
@@ -154,6 +159,9 @@ dossier := client.Collect(ctx, listing)
 `Collect` runs every Source in parallel (bounded by
 `WithMaxConcurrency` if set). Per-Source errors land on the `Result`
 envelope; `Collect` itself never returns an error.
+`Client.SourceNames()` enumerates what this Client will run — use it to
+validate `CollectSome` subsets or compute "all but X" lists (contrast
+with `gazetteer.RegisteredNames()`, the process-wide payload registry).
 
 #### Running a subset
 

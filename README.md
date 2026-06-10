@@ -15,10 +15,21 @@ consolidates a few dimensions and composites them into an high-level score .
 > `CLAUDE.md`), then run `gazetteer sources catalog --json`. Run `make hooks`
 > once to install the pre-commit gate (`make precommit`).
 
-## Status
+## Status & stability
 
-Alpha. The API may change before v1. Tagging and stable releases are
-deferred until the surface stabilises.
+Pre-v1: tagged releases (`v0.x`), consumed by real applications that pin
+tags. Stability tiers, most stable first:
+
+1. **Core contract** (`gazetteer`, `factory`): the Source/Result/Dossier
+   shapes, error sentinels and factory entry points evolve additively;
+   breaking changes are deliberate, called out in release notes, and
+   coordinated with downstream consumers.
+2. **`helpers/*`, `dataset`, `appraisal`, `overview`**: supported public
+   API (see [docs/helpers.md](docs/helpers.md)); additive evolution
+   strongly preferred.
+3. **Per-source `Result` fields**: shaped by the upstream data; fields are
+   added freely and renamed only with a Version bump. Treat field lists as
+   data schemas, not frozen Go API.
 
 ## Quick start
 
@@ -162,7 +173,7 @@ Transport:
 
 | Source         | What it provides                                                 |
 |----------------|------------------------------------------------------------------|
-| `osm`          | Walking distance to nearest métro / RER / tram / train station   |
+| `osm_transit`  | Walking distance to nearest métro / RER / tram / train station   |
 | `gpe`          | Nearest *future* Grand Paris Express station + line + distance    |
 
 External links:
@@ -182,6 +193,19 @@ and selectable weight presets (`yield` / `balanced` / `patrimoine` /
 `transport`, via the CLI `--profile`). The IRIS-level income (`filoiris`) and
 housing (`logiris`) sources sharpen the solvabilité and tension axes where
 neighbourhoods diverge within a commune.
+
+## Reusable building blocks
+
+The packages the sources are made of are usable standalone — a polite
+rate-limited HTTP client with disk cache (`helpers/httpx`), circuit
+breakers (`helpers/circuit`), BAN geocoding with caching and coherence
+guards (`helpers/banx`), the embedded commune table with offline INSEE
+resolution (`helpers/communes`), French text/number/address parsing
+(`helpers/frnorm`, `helpers/fraddr`, `helpers/proptype`), geometry kernels
+(`helpers/geodist`, `geopoly`, `geoindex`), scraping + anti-bot detection
+(`helpers/scrape`), a pluggable KV cache (`helpers/kvcache`), and the
+embed-and-refresh dataset pipeline (`dataset`) — even for apps that never
+build a Dossier. **[docs/helpers.md](docs/helpers.md) is the map.**
 
 ## Batch / commune-level data
 
