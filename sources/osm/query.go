@@ -38,11 +38,11 @@ const OverpassTimeoutSeconds = 180
 const OverpassMaxSizeMB = 64
 
 // OverpassDeptTimeout is the per-department context deadline used by
-// RefreshCatalogFromOverpassByDepts. A healthy Overpass response for
-// a single department takes 2-5 s; 25 s is a generous ceiling that still
-// cuts the ~60 s httpx-retry wait incurred on transport-error or hung
-// mirrors down to a manageable per-dept penalty.
-const OverpassDeptTimeout = 25 * time.Second
+// RefreshCatalogFromOverpassByDepts. It must cover a full mirror walk:
+// each mirror gets its own ~20 s slice inside HTTPOverpassFetcher.Query
+// (so a hung primary cannot starve the fallback), so the dept budget is
+// sized at slices × mirrors + slack. A healthy response takes 2-5 s.
+const OverpassDeptTimeout = 45 * time.Second
 
 // MinExpectedStations is the absolute floor below which a France-wide
 // refresh is considered failed even when every per-dept HTTP call returned
