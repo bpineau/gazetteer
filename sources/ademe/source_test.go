@@ -14,7 +14,44 @@ import (
 
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/banx"
+	"github.com/bpineau/gazetteer/helpers/circuit"
 )
+
+// TestSource_InjectedFetcher pins the Options.Fetcher seam: when set,
+// the Source's whole fetch path goes through it — no HTTP server, no
+// HTTPClient — while URL building and parsing stay the Source's.
+func TestSource_InjectedFetcher(t *testing.T) {
+	t.Parallel()
+
+	body := mustReadFixture(t, "list_paris11.json")
+	var fetched []string
+	fetcher := circuit.FuncFetcher(func(_ context.Context, u string) ([]byte, error) {
+		fetched = append(fetched, u)
+		return body, nil
+	})
+
+	s := NewSource(Options{Fetcher: fetcher})
+	data, err := s.Query(context.Background(), newListingParis11())
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	res := data.(*Result)
+	if len(fetched) != 1 {
+		t.Fatalf("fetcher called %d times, want 1", len(fetched))
+	}
+	if !strings.Contains(fetched[0], DefaultBaseURL) {
+		t.Errorf("fetched URL %q not rooted at DefaultBaseURL", fetched[0])
+	}
+	if !strings.Contains(fetched[0], "75011") {
+		t.Errorf("fetched URL %q missing zip 75011", fetched[0])
+	}
+	if res.IsEmpty() {
+		t.Error("IsEmpty() = true, want false (canned body not consumed)")
+	}
+	if res.SampleSize != 1 {
+		t.Errorf("SampleSize = %d, want 1", res.SampleSize)
+	}
+}
 
 // mustReadFixture reads a JSON fixture from the testdata/ directory.
 func mustReadFixture(t *testing.T, name string) []byte {

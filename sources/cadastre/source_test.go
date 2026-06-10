@@ -12,7 +12,55 @@ import (
 	"testing"
 
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/circuit"
 )
+
+// TestSource_InjectedFetcher pins the Options.Fetcher seam: when set,
+// BOTH fetch paths — the parcelle endpoint and the bâti dump — go
+// through it; no HTTP server, no HTTPClient. URL building and parsing
+// stay the Source's.
+func TestSource_InjectedFetcher(t *testing.T) {
+	t.Parallel()
+
+	parcelleBody := mustReadFixture(t, "parcelle_small_commune.json")
+	batiBody := buildSyntheticBatiAroundSmallCommune(t)
+	var fetched []string
+	fetcher := circuit.FuncFetcher(func(_ context.Context, u string) ([]byte, error) {
+		fetched = append(fetched, u)
+		if strings.HasSuffix(u, "/geojson/batiments") {
+			return batiBody, nil
+		}
+		return parcelleBody, nil
+	})
+
+	s := NewSource(Options{Fetcher: fetcher, IncludeBati: true})
+	data, err := s.Query(context.Background(), listingAt(49.01795, 1.99016))
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	res := data.(*Result)
+	if len(fetched) != 2 {
+		t.Fatalf("fetcher called %d times (%v), want 2 (parcelle + bati)", len(fetched), fetched)
+	}
+	if !strings.Contains(fetched[0], BaseURL) {
+		t.Errorf("parcelle URL %q not rooted at the package BaseURL", fetched[0])
+	}
+	if !strings.Contains(fetched[1], BatiBaseURL) || !strings.HasSuffix(fetched[1], "/geojson/batiments") {
+		t.Errorf("bati URL %q not rooted at the package BatiBaseURL", fetched[1])
+	}
+	if res.IsEmpty() {
+		t.Fatal("IsEmpty() = true, want false (canned bodies not consumed)")
+	}
+	if len(res.Parcels) != 1 {
+		t.Errorf("len(Parcels) = %d, want 1", len(res.Parcels))
+	}
+	if res.BatiCount == nil || *res.BatiCount == 0 {
+		t.Errorf("BatiCount = %v, want >0 (bati path not served by fetcher)", res.BatiCount)
+	}
+	if res.Evidence.BatiError != "" {
+		t.Errorf("Evidence.BatiError = %q, want empty", res.Evidence.BatiError)
+	}
+}
 
 // mustReadFixture reads a JSON fixture from the testdata/ directory.
 func mustReadFixture(t *testing.T, name string) []byte {

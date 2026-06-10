@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/circuit"
 )
 
 func mustReadFixture(t *testing.T, name string) []byte {
@@ -320,6 +321,36 @@ func TestURLForINSEE(t *testing.T) {
 	}
 	if _, err := URLForINSEE("", "75056"); err == nil {
 		t.Error("URLForINSEE(empty base) returned nil error")
+	}
+}
+
+// TestSource_InjectedFetcher pins the Options.Fetcher seam: when set,
+// the Source's whole fetch path goes through it — no HTTP server, no
+// HTTPClient — while URL building and parsing stay the Source's.
+func TestSource_InjectedFetcher(t *testing.T) {
+	t.Parallel()
+	body := mustReadFixture(t, "bourg.json")
+	var fetched []string
+	fetcher := circuit.FuncFetcher(func(_ context.Context, u string) ([]byte, error) {
+		fetched = append(fetched, u)
+		return body, nil
+	})
+
+	res, err := Query(context.Background(), Options{Fetcher: fetcher}, gazetteer.Listing{INSEE: "01053"})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if len(fetched) != 1 {
+		t.Fatalf("fetcher called %d times, want 1", len(fetched))
+	}
+	if !strings.Contains(fetched[0], DefaultBaseURL) {
+		t.Errorf("fetched URL %q not rooted at DefaultBaseURL", fetched[0])
+	}
+	if !strings.Contains(fetched[0], "01053") {
+		t.Errorf("fetched URL %q missing INSEE 01053", fetched[0])
+	}
+	if res.NbTotal != 13537 {
+		t.Errorf("NbTotal = %d, want 13537 (canned body not consumed)", res.NbTotal)
 	}
 }
 

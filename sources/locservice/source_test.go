@@ -11,7 +11,44 @@ import (
 
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/banx"
+	"github.com/bpineau/gazetteer/helpers/circuit"
 )
+
+// TestSource_InjectedFetcher pins the Options.Fetcher seam: when set,
+// the Source's whole fetch path goes through it — no HTTP server, no
+// HTTPClient — while URL building and parsing stay the Source's.
+func TestSource_InjectedFetcher(t *testing.T) {
+	t.Parallel()
+
+	body := mustReadFixture(t, "paris7_all.html")
+	var fetched []string
+	fetcher := circuit.FuncFetcher(func(_ context.Context, u string) ([]byte, error) {
+		fetched = append(fetched, u)
+		return body, nil
+	})
+
+	// Listing carries INSEE directly so no Geocoder is needed either.
+	l := newListingParis7()
+	l.INSEE = "75107"
+	s := NewSource(Options{Fetcher: fetcher})
+	data, err := s.Query(context.Background(), l)
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	res := data.(*Result)
+	if len(fetched) != 1 {
+		t.Fatalf("fetcher called %d times, want 1", len(fetched))
+	}
+	if !strings.Contains(fetched[0], "tensiometre-75107.html") {
+		t.Errorf("fetched URL %q, want the tensiometre-75107.html page", fetched[0])
+	}
+	if res.IsEmpty() {
+		t.Error("IsEmpty() = true, want false (canned body not consumed)")
+	}
+	if res.TensionScore == nil || *res.TensionScore != 8 {
+		t.Errorf("TensionScore = %v, want 8", res.TensionScore)
+	}
+}
 
 // stubGeocoder returns a fixed CityCode. Used by tests that don't care
 // about geocoding mechanics.

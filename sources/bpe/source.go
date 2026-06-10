@@ -136,6 +136,13 @@ func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, err
 	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
+// QueryResult is Query with the package's typed Result — for callers
+// holding a constructed Source instance. Equivalent to the package-level
+// Query helper without rebuilding the Source per call.
+func (s *Source) QueryResult(ctx context.Context, l gazetteer.Listing) (*Result, error) {
+	return gazetteer.QueryTyped[*Result](ctx, s, l)
+}
+
 func init() {
 	gazetteer.Register(Name, func() any { return &Result{} })
 }

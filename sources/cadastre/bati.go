@@ -72,6 +72,9 @@ func LoadBatiPolygons(body []byte) ([]BatiPolygon, int, error) {
 // caller can populate Bati* with zeros rather than soft-fail. The HTTP
 // client handles gzip transparently.
 func (s *Source) fetchBati(ctx context.Context, u string) ([]byte, error) {
+	if s.opts.Fetcher != nil {
+		return s.opts.Fetcher.Fetch(ctx, u)
+	}
 	return gazetteer.FetchUpstream(ctx, s.opts.HTTPClient, u, gazetteer.FetchSpec{
 		Prefix:       "cadastre: bati",
 		Accept:       "application/vnd.geo+json,application/json",
