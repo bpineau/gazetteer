@@ -236,6 +236,12 @@ var sourceDescriptors = map[string]sourceDescriptor{
 		Summary: "DEPP median IPS (social index) over a commune's écoles primaires + heterogeneity band.",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
 	},
+	"sensible": {
+		Summary: "Flags addresses inside (or within 400 m of) the State's hardest-neighbourhood " +
+			"perimeters: the 62 QRR police-priority zones (official polygons, far more selective " +
+			"than QPV) and the 4 ORCOD-IN copropriétés dégradées (décrets). Informational, not scored.",
+		Inputs: []inputClause{need("lat/lon")}, Coverage: "France (QRR national, ORCOD-IN Île-de-France)",
+	},
 	"rpls": {
 		Batch:   true,
 		Summary: "Share of logements locatifs sociaux (loi SRU) per commune.",

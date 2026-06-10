@@ -48,6 +48,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/qpv"
 	"github.com/bpineau/gazetteer/sources/rnc"
 	"github.com/bpineau/gazetteer/sources/rpls"
+	"github.com/bpineau/gazetteer/sources/sensible"
 	"github.com/bpineau/gazetteer/sources/sitadel"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
@@ -244,6 +245,9 @@ func Entries() []Entry {
 		}},
 		{Name: qpv.Name, Build: func(d Deps) (gazetteer.Source, error) {
 			return qpv.NewSource(qpv.Options{DataDir: d.DataDir}), nil
+		}},
+		{Name: sensible.Name, Build: func(d Deps) (gazetteer.Source, error) {
+			return sensible.NewSource(sensible.Options{DataDir: d.DataDir}), nil
 		}},
 		{Name: rpls.Name, Build: func(d Deps) (gazetteer.Source, error) {
 			return rpls.NewSource(rpls.Options{DataDir: d.DataDir}), nil

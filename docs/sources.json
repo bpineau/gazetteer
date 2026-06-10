@@ -556,6 +556,19 @@
     }
   },
   {
+    "name": "sensible",
+    "version": 1,
+    "default": true,
+    "summary": "Flags addresses inside (or within 400 m of) the State's hardest-neighbourhood perimeters: the 62 QRR police-priority zones (official polygons, far more selective than QPV) and the 4 ORCOD-IN copropriétés dégradées (décrets). Informational, not scored.",
+    "inputs": [
+      "lat/lon"
+    ],
+    "coverage": "France (QRR national, ORCOD-IN Île-de-France)",
+    "result_schema": {
+      "sensitive": false
+    }
+  },
+  {
     "name": "sitadel",
     "version": 1,
     "default": true,

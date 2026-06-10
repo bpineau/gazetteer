@@ -37,6 +37,7 @@ import (
 	"github.com/bpineau/gazetteer/sources/qpv"
 	"github.com/bpineau/gazetteer/sources/rnc"
 	"github.com/bpineau/gazetteer/sources/rpls"
+	"github.com/bpineau/gazetteer/sources/sensible"
 	"github.com/bpineau/gazetteer/sources/sitadel"
 	"github.com/bpineau/gazetteer/sources/taxefonciere"
 	"github.com/bpineau/gazetteer/sources/vacance"
@@ -172,6 +173,7 @@ var sourceRenderers = map[string]sourceRenderer{
 	qpv.Name:          typed[qpv.Result]("address not in a QPV", renderQPV),
 	rnc.Name:          typed[rnc.Result]("no copropriété matched in the RNC", renderRNC),
 	rpls.Name:         typed[rpls.Result]("absent from the SRU inventory", renderRPLS),
+	sensible.Name:     typed[sensible.Result]("no sensitive-zone perimeter here", renderSensible),
 	sitadel.Name:      typed[sitadel.Result]("no construction data for this commune", renderSitadel),
 	taxefonciere.Name: typed[taxefonciere.Result]("no estimate", renderTaxeFonciere),
 	vacance.Name:      typed[vacance.Result]("absent from the census vacancy dataset", renderVacance),
@@ -504,6 +506,28 @@ func renderOSM(r *gzosm.Result) (string, []string) {
 	}
 	headline += ")"
 	return headline, nil
+}
+
+func renderSensible(r *sensible.Result) (string, []string) {
+	extra := make([]string, 0, len(r.In)+len(r.Nearby))
+	for _, z := range r.In {
+		extra = append(extra, fmt.Sprintf("inside %s [%s]%s", z.Name, z.Kind, noteSuffix(z.Note)))
+	}
+	for _, z := range r.Nearby {
+		extra = append(extra, fmt.Sprintf("%d m from %s [%s]%s", z.DistanceM, z.Name, z.Kind, noteSuffix(z.Note)))
+	}
+	headline := fmt.Sprintf("⚠ %d zone(s) sensible(s)", len(r.In))
+	if len(r.In) == 0 {
+		headline = fmt.Sprintf("near %d zone(s) sensible(s)", len(r.Nearby))
+	}
+	return headline, extra
+}
+
+func noteSuffix(note string) string {
+	if note == "" {
+		return ""
+	}
+	return " — " + note
 }
 
 func renderGPE(r *gpe.Result) (string, []string) {
