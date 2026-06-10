@@ -55,7 +55,9 @@ field mean (units!)". The answers, easiest first:
 
 1. **`gazetteer sources catalog --json`** (or `docs/sources.json`) — every
    source's summary, required inputs, coverage, the dimension it covers, and its
-   `result_schema` (field names). Start here to pick a source. Browsing by
+   `result_schema` (field names). Start here to pick a source; it's ~15 KB, so
+   filter (`jq '.[] | select(.name=="dvf")'` or `del(.[].result_schema)`)
+   instead of ingesting it whole. Browsing by
    intent ("which source gives rental-demand data?") →
    **`gazetteer sources dimensions`** groups them by investor-evaluation
    dimension (price, rents, demand, solvency, taxes, transport, hazards, …).
@@ -145,9 +147,10 @@ empty, the usual cause is a **missing input** or **out-of-coverage** address.
   `gazetteer query --verbose --source X "<addr>"`.
 - **"the number looks wrong"** → every Result has an `Evidence` sidecar with
   provenance (which tier/zone/dataset year it used). Inspect it.
-- **"it's slow"** → only the *live-HTTP* sources cost latency (dvf, georisques,
-  education, ademe, cadastre). Offline sources are instant. DVF is the usual
-  culprit; it's already optimised (section prefilter + `dvf.HostRateLimits()`).
+- **"it's slow"** → only the *live-HTTP* sources cost latency
+  (`factory.LiveSourceNames()` lists them); offline sources are instant. DVF
+  is the usual culprit; it's already optimised (per-Query memo + section-geo
+  cache + tuned `factory.HostRateLimits()`).
 
 ## Optional convenience layer (appraisal + zonescore)
 
@@ -255,6 +258,13 @@ never disables corporate secret-scanning.
   use `zonescore.WeightsWith(profile, overrides)` (merges, validates axis
   names).
 - `gazetteer refresh` is **idempotent** (a current dataset is skipped); safe on boot.
+- **Dataset loaders are process-global and first-`Load(dir)`-wins**: the dir
+  from the first call is cached for the process lifetime (dataset.Lazy). Two
+  components disagreeing on DataDir silently share the first one's data.
+- **The atomic `Query`/`QueryResult` path has no built-in politeness**: outside
+  `Collect`, the ctx fallback is `http.DefaultClient` — no rate limits, no
+  retries, no cache. For live sources, pass `Options.HTTPClient` (start from
+  `factory.HostRateLimits()`) or use a factory-built Client.
 - IRIS coverage is **Île-de-France only in practice**: the `iris` resolver and
   `logiris` are IDF-scoped datasets. `filoiris`'s dataset is *national*, but it
   only fires where `Listing.IRIS` is set — and `iris` (IDF-only) is the sole
