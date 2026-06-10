@@ -280,8 +280,11 @@ var sourceDescriptors = map[string]sourceDescriptor{
 // descriptor merged with the registry's version/default and the reflected
 // Result schema.
 type catalogEntry struct {
-	Name         string          `json:"name"`
-	Version      int             `json:"version"`
+	Name    string `json:"name"`
+	Version int    `json:"version"`
+	// Default reports whether a default CLI run (no --source flag)
+	// includes this source. CLI policy ONLY: factory.NewDefault wires
+	// every source regardless (prune with factory.Options.Exclude).
 	Default      bool            `json:"default"`
 	Summary      string          `json:"summary"`
 	Inputs       []inputClause   `json:"inputs"`
