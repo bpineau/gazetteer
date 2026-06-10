@@ -39,17 +39,22 @@ const OverpassMaxSizeMB = 64
 
 // OverpassDeptTimeout is the per-department context deadline used by
 // RefreshCatalogFromOverpassByDepts. It must cover a full mirror walk:
-// each mirror gets its own ~20 s slice inside HTTPOverpassFetcher.Query
+// each mirror gets its own ~60 s slice inside HTTPOverpassFetcher.Query
 // (so a hung primary cannot starve the fallback), so the dept budget is
-// sized at slices × mirrors + slack. A healthy response takes 2-5 s.
-const OverpassDeptTimeout = 45 * time.Second
+// sized at slices × mirrors + slack. A healthy response takes 2-5 s;
+// loaded mirrors take tens of seconds on dense departments.
+const OverpassDeptTimeout = 150 * time.Second
 
 // MinExpectedStations is the absolute floor below which a France-wide
 // refresh is considered failed even when every per-dept HTTP call returned
-// 200 OK. Empirically the full metropolitan catalog carries ~9 000 stations;
-// 2 000 is a conservative ~22 % of that — well below the variance of OSM
-// tag churn but well above any scenario where most departments
-// legitimately returned data.
+// 200 OK. Empirically the full metropolitan catalog carries ~9 100
+// stations. The floor is 8 000 (~12 % tolerance for OSM tag churn): the
+// refreshed artifact OVERRIDES the ~9 100-station embedded catalog, so a
+// partial refresh (mirrors timing out on a subset of departments —
+// observed 2026-06-10 at 5 895/9 140) must fail loudly and leave the
+// fuller embedded copy active, not silently degrade coverage. "Partial
+// beats nothing" stopped being true the day a full catalog shipped
+// embedded.
 //
 // Below this floor the refresh aborts WITHOUT overwriting the on-disk
 // catalog, so the operator can investigate (mirror outage, silent empty
@@ -59,7 +64,7 @@ const OverpassDeptTimeout = 45 * time.Second
 // Exposed as `var` so tests can lower it for the duration of a single
 // case (the synthetic Overpass fixtures only produce a handful of
 // stations). Production callers never mutate this value.
-var MinExpectedStations = 2000 //nolint:gochecknoglobals // intentional test-override knob
+var MinExpectedStations = 8000 //nolint:gochecknoglobals // intentional test-override knob
 
 // DeptBBox is one entry in the FranceDepartmentBBoxes table.
 // Code is the INSEE department code (01-95, 2A/2B for Corsica).

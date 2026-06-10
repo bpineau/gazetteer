@@ -73,13 +73,15 @@ func NewHTTPOverpassFetcher(c *httpx.Client, endpoint string) *HTTPOverpassFetch
 	}
 }
 
-// overpassMirrorTimeout is the per-MIRROR time slice inside Query. A
-// healthy per-department response takes 2-5 s; 20 s cuts a hung mirror's
-// tax without starving the next mirror — each attempt gets its own slice
-// instead of all attempts sharing one deadline (the old shape let a hung
-// primary consume the whole budget, so the fallback never effectively
-// engaged on hangs). A var so tests can shrink it.
-var overpassMirrorTimeout = 20 * time.Second
+// overpassMirrorTimeout is the per-MIRROR time slice inside Query. Each
+// attempt gets its own slice instead of all attempts sharing one deadline
+// (the old shape let a hung primary consume the whole budget, so the
+// fallback never effectively engaged on hangs). 60 s because the QL
+// advertises [timeout:180] to the server and a loaded-but-healthy mirror
+// legitimately takes tens of seconds on dense departments (observed
+// 2026-06-10: a 20 s slice dropped 48/96 departments); the 3-strike skip
+// bounds what a truly hung mirror can cost. A var so tests can shrink it.
+var overpassMirrorTimeout = 60 * time.Second
 
 const (
 	// mirrorSkipThreshold is the consecutive-failure streak after which
