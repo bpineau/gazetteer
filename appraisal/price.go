@@ -23,6 +23,11 @@ type PriceEstimate struct {
 	Method        string // short human-readable label, e.g. "dvf_median_5y_750m"
 }
 
+// EURPerM2 returns the estimate in euros per m² (the cents field ÷ 100)
+// — for callers that render or compare without caring about the
+// integer-cents convention.
+func (e PriceEstimate) EURPerM2() float64 { return float64(e.EurPerM2Cents) / 100 }
+
 // PriceOptions configures PricePerM2's synthesis logic. Zero-valued
 // fields fall back to library defaults — pass an empty value to opt into
 // every default.
@@ -53,6 +58,9 @@ type PriceConsolidated struct {
 	Confidence    Confidence
 	Inputs        []PriceInput
 }
+
+// EURPerM2 returns the consolidated value in euros per m² (cents ÷ 100).
+func (c PriceConsolidated) EURPerM2() float64 { return float64(c.EurPerM2Cents) / 100 }
 
 // PriceInput is one source's contribution after weighting and outlier
 // detection. Excluded entries are kept in the slice so callers can

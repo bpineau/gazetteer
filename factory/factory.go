@@ -23,9 +23,11 @@ package factory
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/httpx"
 	"github.com/bpineau/gazetteer/internal/roster"
@@ -65,6 +67,89 @@ type Options struct {
 	// rest of the roster stays auto-updated as in-tree Sources are added,
 	// so this is a deny-list, not an allow-list.
 	Exclude []string
+
+	// SourceOverrides swaps the constructor for individual roster
+	// Sources while keeping everything else default — the way to tune
+	// one Source's Options (a persistent dvf.Options.SectionCache, an
+	// injected Fetcher, a custom BaseURL) without abandoning the
+	// factory. The override receives the same shared Deps bundle the
+	// default constructors use, so the Source shares the rate-limited
+	// HTTP client and the cached geocoder with the rest of the roster:
+	//
+	//	factory.Options{SourceOverrides: map[string]func(factory.Deps) (gazetteer.Source, error){
+	//		dvf.Name: func(d factory.Deps) (gazetteer.Source, error) {
+	//			return dvf.NewSource(dvf.Options{
+	//				HTTP: d.HTTP, Geocoder: d.Geocoder, Communes: d.Communes,
+	//				SectionCache: myPersistentKV,
+	//			})
+	//		},
+	//	}}
+	//
+	// A name that matches no roster Source is a configuration error
+	// (BuilderDefault returns it) — unlike Exclude, an override typo
+	// would otherwise silently leave the default in place. To ADD a
+	// source (a plugin), use Builder.With instead.
+	SourceOverrides map[string]func(Deps) (gazetteer.Source, error)
+}
+
+// Deps is the shared dependency bundle the factory hands to every
+// Source constructor — the default roster's and SourceOverrides alike.
+// Reuse these instances in overrides (rather than building parallel
+// clients/geocoders) so caching and rate limiting stay process-wide.
+type Deps struct {
+	// HTTP is the shared rate-limited client (see HostRateLimits).
+	HTTP *httpx.Client
+
+	// Geocoder is the cache-wrapped, dept-guarded BAN geocoder
+	// (banx.NewDefaultGeocoder) shared by every geocoding Source and
+	// the Normalizer.
+	Geocoder banx.Geocoder
+
+	// Communes is the embedded commune table.
+	Communes communes.Communes
+
+	// DataDir is the resolved gazetteer data directory ("" = embedded
+	// only).
+	DataDir string
+}
+
+// HostRateLimits returns the recommended per-host rate-limit table for
+// every upstream the default roster talks to (DVF/cadastre high-rate,
+// BAN, bdnb quota, polite .gouv.fr defaults, Overpass, …). Custom
+// wirings that pass Options.HTTPClient should start from this table and
+// extend it rather than rediscover each host's tolerance:
+//
+//	limits := factory.HostRateLimits()
+//	limits["my.upstream.example"] = httpx.HostOptions{…}
+//	hc, _ := httpx.New(httpx.Options{PerHost: limits})
+func HostRateLimits() map[string]httpx.HostOptions {
+	return roster.HostRateLimits()
+}
+
+// LiveSourceNames returns the names of the default-roster Sources that
+// may perform network I/O during Query (dvf, georisques, …, and
+// osm_transit whose Overpass fallback can go live). Sorted.
+func LiveSourceNames() []string { return liveNames(true) }
+
+// OfflineSourceNames returns the names of the default-roster Sources
+// that answer from embedded datasets only — instant, no network
+// dependency. Use it to collect a fast first phase before paying for
+// the live APIs:
+//
+//	quick := client.CollectSome(ctx, listing, factory.OfflineSourceNames()...)
+//
+// Sorted.
+func OfflineSourceNames() []string { return liveNames(false) }
+
+func liveNames(live bool) []string {
+	var out []string
+	for _, e := range roster.Entries() {
+		if e.Live == live {
+			out = append(out, e.Name)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // NewDefault builds a *gazetteer.Client wired with every stable
@@ -112,21 +197,31 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 	if com == nil {
 		com = communes.MustDefault()
 	}
-	deps := roster.Deps{
+	deps := Deps{
 		HTTP:     hc,
-		Geocoder: roster.NewGeocoder(hc),
+		Geocoder: banx.NewDefaultGeocoder(hc),
 		Communes: com,
 		DataDir:  resolveDataDir(opts.DataDir),
 	}
+	rdeps := roster.Deps{HTTP: deps.HTTP, Geocoder: deps.Geocoder, Communes: deps.Communes, DataDir: deps.DataDir}
 
 	b := gazetteer.NewBuilder().
 		WithHTTPClient(hc.HTTPClient())
 
 	// One Source per roster entry — the same single roster the CLI
-	// consumes, so the two wirings cannot drift.
+	// consumes, so the two wirings cannot drift. SourceOverrides swap
+	// individual constructors; a typo'd override name is an error.
+	overridden := make(map[string]bool, len(opts.SourceOverrides))
 	var irisSrc *iris.Source
 	for _, e := range roster.Entries() {
-		src, err := e.Build(deps)
+		var src gazetteer.Source
+		var err error
+		if build, ok := opts.SourceOverrides[e.Name]; ok {
+			overridden[e.Name] = true
+			src, err = build(deps)
+		} else {
+			src, err = e.Build(rdeps)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("factory: %s: %w", e.Name, err)
 		}
@@ -134,6 +229,11 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		// The IRIS source doubles as the Normalizer's IRISResolver.
 		if ir, ok := src.(*iris.Source); ok {
 			irisSrc = ir
+		}
+	}
+	for name := range opts.SourceOverrides {
+		if !overridden[name] {
+			return nil, fmt.Errorf("factory: SourceOverrides[%q] matches no roster Source (use Builder.With to add new sources)", name)
 		}
 	}
 

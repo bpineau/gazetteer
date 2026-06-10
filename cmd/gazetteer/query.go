@@ -114,18 +114,10 @@ func parsePropertyType(s string) (gazetteer.PropertyType, error) {
 	if strings.TrimSpace(s) == "" {
 		return gazetteer.PropertyApartment, nil
 	}
-	switch proptype.Normalize(s) {
-	case proptype.Apartment:
-		return gazetteer.PropertyApartment, nil
-	case proptype.House:
-		return gazetteer.PropertyHouse, nil
-	case proptype.Land:
-		return gazetteer.PropertyLand, nil
-	case proptype.Commercial:
-		return gazetteer.PropertyCommercial, nil
-	default:
-		return "", fmt.Errorf("unknown --property-type %q (want apartment | house | land | commercial)", s)
+	if pt, ok := proptype.ToListingType(s); ok {
+		return pt, nil
 	}
+	return "", fmt.Errorf("unknown --property-type %q (want apartment | house | land | commercial)", s)
 }
 
 // executeQuery is the shared collect pipeline used by `query` and

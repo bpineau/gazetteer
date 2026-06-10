@@ -16,7 +16,6 @@ import (
 	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/httpx"
-	"github.com/bpineau/gazetteer/helpers/kvcache/memcache"
 	"github.com/bpineau/gazetteer/sources/ademe"
 	"github.com/bpineau/gazetteer/sources/anct"
 	"github.com/bpineau/gazetteer/sources/bdnb"
@@ -87,31 +86,61 @@ type Entry struct {
 	// burn interactive CLI wall-clock on a result most callers don't need.
 	CLIOptIn bool
 
+	// Live marks sources that may perform network I/O during Query.
+	// Offline (!Live) sources answer from embedded datasets only —
+	// instant and dependency-free. osm_transit counts as Live: its
+	// embedded catalog answers most points, but the Overpass fallback
+	// can go to the network when a Fetcher is configured.
+	Live bool
+
 	// Build constructs the configured Source. Errors are rare (typically
 	// only constructors that validate required deps, e.g. dvf).
 	Build func(Deps) (gazetteer.Source, error)
 }
 
+// HostRateLimits is the recommended per-host rate-limit table covering
+// every upstream the default roster talks to. Values are operationally
+// proven (tuned in production against each endpoint's observed
+// throttling behaviour):
+//
+//   - DVF + cadastre (data.gouv.fr CDN): high — DVF fans out one call
+//     per cadastral section, so the polite default 2 req/s would
+//     serialize a dense-commune lookup into 20 s+ (see dvf.HostRateLimits).
+//   - BAN (api-adresse.data.gouv.fr): advertises 50 req/s; 20 is ample.
+//   - api.bdnb.io: 10 000 req/month quota — 1 req/s stays well under it.
+//   - Public .gouv.fr APIs (georisques, ADEME data-fair, éducation,
+//     API Carto): no documented quota; 2 req/s is polite.
+//   - Overpass (overpass-api.de): community-funded, ~2 concurrent slots
+//     per IP; 1 req/s (catalog refresh is the only caller).
+//   - locservice.fr: scraped HTML; 5 req/s observed safe.
+//
+// Custom wirings (factory.Options.HTTPClient, standalone Sources)
+// should start from this table — exposed as factory.HostRateLimits —
+// and extend it rather than rediscover each host's tolerance.
+func HostRateLimits() map[string]httpx.HostOptions {
+	lim := func(rate float64, burst int) httpx.HostOptions {
+		return httpx.HostOptions{RateLimit: &rate, Burst: &burst}
+	}
+	m := dvf.HostRateLimits() // dvf-api.data.gouv.fr + cadastre, high rate
+	m["api-adresse.data.gouv.fr"] = lim(20, 30)
+	m["api.bdnb.io"] = lim(1, 2)
+	m["georisques.gouv.fr"] = lim(2, 4)
+	m["data.ademe.fr"] = lim(2, 4)
+	m["data.education.gouv.fr"] = lim(2, 4)
+	m["apicarto.ign.fr"] = lim(2, 4)
+	m["overpass-api.de"] = lim(1, 1)
+	m["www.locservice.fr"] = lim(5, 10)
+	return m
+}
+
 // NewHTTPClient builds the shared httpx client both the factory and the
-// CLI use. It grants the data.gouv.fr DVF + cadastre endpoints a higher
-// per-host rate than the polite default: DVF fans out one call per
-// cadastral section, so the default 2 req/s would serialize a
-// dense-commune lookup into 20 s+.
+// CLI use, pre-configured with HostRateLimits.
 func NewHTTPClient() (*httpx.Client, error) {
-	hc, err := httpx.New(httpx.Options{PerHost: dvf.HostRateLimits()})
+	hc, err := httpx.New(httpx.Options{PerHost: HostRateLimits()})
 	if err != nil {
 		return nil, fmt.Errorf("httpx: %w", err)
 	}
 	return hc, nil
-}
-
-// NewGeocoder wraps a BAN client over hc in a process-lifetime in-memory
-// cache: within one Collect, several live sources independently geocode
-// the same address when the listing was not pre-normalized; the cache
-// makes that one BAN round-trip, and adds the banx dept-coherence guards
-// so a drifted BAN homonyme can't fan out.
-func NewGeocoder(hc *httpx.Client) banx.Geocoder {
-	return banx.NewCachedGeocoder(banx.NewBANClient(hc), memcache.New(), 0)
 }
 
 // Entries returns one Entry per in-tree Source, in the CLI's curated
@@ -123,28 +152,28 @@ func NewGeocoder(hc *httpx.Client) banx.Geocoder {
 // with the same registry), so this roster cannot silently drift.
 func Entries() []Entry {
 	return []Entry{
-		{Name: dvf.Name, Build: func(d Deps) (gazetteer.Source, error) {
+		{Name: dvf.Name, Live: true, Build: func(d Deps) (gazetteer.Source, error) {
 			return dvf.NewSource(dvf.Options{HTTP: d.HTTP, Geocoder: d.Geocoder, Communes: d.Communes})
 		}},
-		{Name: ademe.Name, Build: func(d Deps) (gazetteer.Source, error) {
+		{Name: ademe.Name, Live: true, Build: func(d Deps) (gazetteer.Source, error) {
 			return ademe.NewSource(ademe.Options{Geocoder: d.Geocoder}), nil
 		}},
-		{Name: bdnb.Name, CLIOptIn: true, Build: func(d Deps) (gazetteer.Source, error) {
+		{Name: bdnb.Name, CLIOptIn: true, Live: true, Build: func(d Deps) (gazetteer.Source, error) {
 			return bdnb.NewSource(bdnb.Options{Geocoder: d.Geocoder}), nil
 		}},
-		{Name: cadastre.Name, Build: func(d Deps) (gazetteer.Source, error) {
+		{Name: cadastre.Name, Live: true, Build: func(d Deps) (gazetteer.Source, error) {
 			return cadastre.NewSource(cadastre.Options{Geocoder: d.Geocoder}), nil
 		}},
-		{Name: georisques.Name, Build: func(d Deps) (gazetteer.Source, error) {
+		{Name: georisques.Name, Live: true, Build: func(d Deps) (gazetteer.Source, error) {
 			return georisques.NewSource(georisques.Options{Geocoder: d.Geocoder}), nil
 		}},
-		{Name: locservice.Name, Build: func(d Deps) (gazetteer.Source, error) {
+		{Name: locservice.Name, Live: true, Build: func(d Deps) (gazetteer.Source, error) {
 			return locservice.NewSource(locservice.Options{Geocoder: d.Geocoder}), nil
 		}},
 		// OSM transit ships an embedded baseline catalog (overridable from
 		// the datadir via `refresh osm_transit`) plus a live Overpass
 		// fallback for points the catalog doesn't cover.
-		{Name: gzosm.Name, Build: func(d Deps) (gazetteer.Source, error) {
+		{Name: gzosm.Name, Live: true, Build: func(d Deps) (gazetteer.Source, error) {
 			return gzosm.NewSource(gzosm.Options{
 				DataDir: d.DataDir,
 				Fetcher: gzosm.NewHTTPOverpassFetcher(d.HTTP, ""),
@@ -204,13 +233,13 @@ func Entries() []Entry {
 		{Name: bpe.Name, Build: func(d Deps) (gazetteer.Source, error) {
 			return bpe.NewSource(bpe.Options{DataDir: d.DataDir}), nil
 		}},
-		{Name: dpedist.Name, Build: func(Deps) (gazetteer.Source, error) {
+		{Name: dpedist.Name, Live: true, Build: func(Deps) (gazetteer.Source, error) {
 			return dpedist.NewSource(dpedist.Options{}), nil
 		}},
 		{Name: delinquance.Name, Build: func(d Deps) (gazetteer.Source, error) {
 			return delinquance.NewSource(delinquance.Options{DataDir: d.DataDir}), nil
 		}},
-		{Name: education.Name, Build: func(Deps) (gazetteer.Source, error) {
+		{Name: education.Name, Live: true, Build: func(Deps) (gazetteer.Source, error) {
 			return education.NewSource(education.Options{}), nil
 		}},
 		{Name: qpv.Name, Build: func(d Deps) (gazetteer.Source, error) {

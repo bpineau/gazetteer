@@ -31,10 +31,15 @@ type Result struct {
 	Name      string // == Source.Name()
 	Version   int    // == Source.Version() at the time of Query
 	Status    Status
-	InputHash string
 	FetchedAt time.Time
-	Err       error // non-nil iff Status is a failure status
-	Data      any   // typed payload struct; may be non-nil even for StatusOKEmpty
+
+	// Err is non-nil iff Status is a failure status. JSON round-trip
+	// caveat: Err is serialised as its message string, so after a
+	// Dossier round-trip errors.Is/As matching stops working — gate
+	// retry logic on Status (which survives), not on the error chain.
+	Err error
+
+	Data any // typed payload struct; may be non-nil even for StatusOKEmpty
 
 	// Evidence is the reproducibility sidecar — input fingerprint,
 	// ladder tier used, resolver provenance, sample-size hints. The
@@ -48,6 +53,12 @@ type Result struct {
 	// typed Data MAY still carry its own Evidence field — the
 	// framework slot is a uniform-access convenience, not a
 	// replacement for the per-Source typed shape.
+	//
+	// JSON round-trip caveat: Evidence is marshaled into the wire form
+	// (under "evidence"), but there is no per-source factory to restore
+	// the concrete type, so after unmarshal Evidence holds the raw
+	// json.RawMessage. Audit consumers can persist or display it;
+	// typed access only exists in the process that ran the Query.
 	Evidence any
 }
 
@@ -71,23 +82,24 @@ func (r Result) IsEmpty() bool {
 }
 
 // MarshalJSON emits a stable wire representation. Err is serialised as a
-// plain string (Go's error type does not implement json.Marshaler), and
-// Data is delegated to the typed payload's own marshaler.
+// plain string (Go's error type does not implement json.Marshaler), Data
+// is delegated to the typed payload's own marshaler, and Evidence is
+// marshaled from the typed sidecar (restored as raw JSON on unmarshal —
+// see the Evidence field doc).
 func (r Result) MarshalJSON() ([]byte, error) {
 	type wire struct {
 		Name      string          `json:"name"`
 		Version   int             `json:"version"`
 		Status    Status          `json:"status"`
-		InputHash string          `json:"input_hash,omitempty"`
 		FetchedAt time.Time       `json:"fetched_at,omitzero"`
 		Err       string          `json:"err,omitempty"`
 		Data      json.RawMessage `json:"data,omitempty"`
+		Evidence  json.RawMessage `json:"evidence,omitempty"`
 	}
 	w := wire{
 		Name:      r.Name,
 		Version:   r.Version,
 		Status:    r.Status,
-		InputHash: r.InputHash,
 		FetchedAt: r.FetchedAt,
 	}
 	if r.Err != nil {
@@ -99,6 +111,13 @@ func (r Result) MarshalJSON() ([]byte, error) {
 			return nil, err
 		}
 		w.Data = raw
+	}
+	if r.Evidence != nil {
+		raw, err := json.Marshal(r.Evidence)
+		if err != nil {
+			return nil, err
+		}
+		w.Evidence = raw
 	}
 	return json.Marshal(w)
 }

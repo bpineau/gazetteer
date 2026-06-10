@@ -69,10 +69,10 @@ func (d *Dossier) UnmarshalJSON(b []byte) error {
 		Name      string          `json:"name"`
 		Version   int             `json:"version"`
 		Status    string          `json:"status"`
-		InputHash string          `json:"input_hash"`
 		FetchedAt time.Time       `json:"fetched_at"`
 		Err       string          `json:"err"`
 		Data      json.RawMessage `json:"data"`
+		Evidence  json.RawMessage `json:"evidence"`
 	}
 	type wireDossier struct {
 		Listing    Listing               `json:"listing"`
@@ -93,11 +93,16 @@ func (d *Dossier) UnmarshalJSON(b []byte) error {
 			Name:      r.Name,
 			Version:   r.Version,
 			Status:    Status(r.Status),
-			InputHash: r.InputHash,
 			FetchedAt: r.FetchedAt,
 		}
 		if r.Err != "" {
 			out.Err = fmt.Errorf("%s", r.Err)
+		}
+		if len(r.Evidence) > 0 {
+			// No factory exists for Evidence types; preserve the raw
+			// JSON so audit data survives the round-trip (see the
+			// Result.Evidence doc for the typed-access caveat).
+			out.Evidence = r.Evidence
 		}
 		if len(r.Data) > 0 {
 			if factory := Lookup(r.Name); factory != nil {

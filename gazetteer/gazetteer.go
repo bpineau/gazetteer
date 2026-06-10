@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 )
@@ -145,6 +146,21 @@ type Client struct {
 // receive it via their own Options field instead of a framework slot.
 func (c *Client) Collect(ctx context.Context, l Listing) Dossier {
 	return c.collect(ctx, l, c.sources)
+}
+
+// SourceNames returns the names of every Source configured on this
+// Client, sorted. Use it to validate CollectSome subsets up front, to
+// compute "everything except X" allow-lists, or to render what a Collect
+// will run. (Contrast with gazetteer.RegisteredNames, which lists every
+// Result type registered process-wide — including Sources this Client
+// was built without.)
+func (c *Client) SourceNames() []string {
+	names := make([]string, 0, len(c.sources))
+	for _, s := range c.sources {
+		names = append(names, s.Name())
+	}
+	sort.Strings(names)
+	return names
 }
 
 // CollectSome runs only the configured Sources whose Name is in names, in

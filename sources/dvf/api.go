@@ -59,8 +59,12 @@ import (
 	"github.com/bpineau/gazetteer/helpers/httpx"
 )
 
-// APIBaseURL is the base URL of the DVF mutations endpoint.
-// Exposed as a var so tests can swap it.
+// APIBaseURL is the default base URL of the DVF mutations endpoint.
+// Prefer Options.APIBaseURL (or API.WithBaseURL) for per-instance
+// overrides: a package-level var cannot be re-exported or aliased by
+// wrappers (writes through an alias are not seen here), and mutating it
+// races concurrent Sources. The var remains the process-wide default
+// for back-compat and quick test swaps.
 var APIBaseURL = "https://dvf-api.data.gouv.fr/mutations"
 
 // APICallTimeout caps the wall-clock duration of a single
@@ -133,6 +137,7 @@ func (m Mutation) Surface() float64 {
 type API struct {
 	http    *httpx.Client
 	circuit *circuit.TransportCircuit
+	baseURL string // empty ⇒ the package-level APIBaseURL default
 }
 
 // NewAPI wraps an httpx client. When tc is non-nil, every
@@ -140,6 +145,14 @@ type API struct {
 // circuit's rolling counter (cf. circuit.TransportCircuit.Observe).
 func NewAPI(c *httpx.Client, tc *circuit.TransportCircuit) *API {
 	return &API{http: c, circuit: tc}
+}
+
+// WithBaseURL overrides the mutations endpoint for this API instance
+// (tests, mirrors, wrappers). Returns the receiver for chaining. An
+// empty value falls back to the package default APIBaseURL.
+func (a *API) WithBaseURL(u string) *API {
+	a.baseURL = u
+	return a
 }
 
 // MutationsResponse is the envelope returned by the DVF API.
@@ -174,8 +187,12 @@ func (a *API) GetMutations(ctx context.Context, insee, section string) (Mutation
 	if a.circuit != nil && a.circuit.Tripped() {
 		return MutationsResponse{}, fmt.Errorf("dvf: %w", circuit.ErrCircuitOpen)
 	}
+	base := a.baseURL
+	if base == "" {
+		base = APIBaseURL
+	}
 	u := fmt.Sprintf("%s/%s/%s",
-		APIBaseURL,
+		base,
 		url.PathEscape(insee),
 		url.PathEscape(section),
 	)

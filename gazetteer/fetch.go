@@ -7,6 +7,28 @@ import (
 	"net/http"
 )
 
+// Fetcher is the injectable fetch seam every live-HTTP Source exposes on
+// its Options (conventionally as an `Fetcher gazetteer.Fetcher` field,
+// consulted before the built-in FetchUpstream path). Injecting one lets a
+// caller put its own machinery between the Source and the network —
+// circuit breakers, quota trippers, request mirroring, recorded fixtures
+// — while keeping the Source's URL building and response parsing.
+// helpers/circuit.HTTPFetcher and helpers/circuit.FuncFetcher implement
+// it.
+//
+// Contract for implementations:
+//   - Return the response body for 2xx answers.
+//   - Map failures onto the gazetteer error taxonomy (wrap
+//     ErrUpstreamUnavailable / ErrUpstreamPermanent / ErrAntiBot /
+//     a CircuitTrippedError) when Status classification matters to you;
+//     unwrapped errors classify as StatusFailedTransient.
+//   - An injected Fetcher fully replaces FetchUpstream, including each
+//     Source's 404→empty-payload mapping (see the Source's fetch godoc
+//     for its default NotFoundBody) — handle 404 accordingly.
+type Fetcher interface {
+	Fetch(ctx context.Context, url string) ([]byte, error)
+}
+
 // FetchSpec configures FetchUpstream. The zero value of every field is
 // meaningful: no Accept header, and 404 treated as a permanent failure.
 type FetchSpec struct {

@@ -1,6 +1,9 @@
 package zonescore
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+)
 
 // Persona profile names. Stable identifiers, selectable via the CLI
 // --profile flag and resolvable with WeightsForProfile.
@@ -62,6 +65,40 @@ var Personas = map[string]map[string]float64{
 func WeightsForProfile(name string) (map[string]float64, bool) {
 	w, ok := Personas[name]
 	return w, ok
+}
+
+// WeightsWith returns a fresh weight set: the named persona's preset
+// (or DefaultWeights when profile is empty) with overrides applied on
+// top. This is the safe way to "tweak one axis": Options.Weights
+// REPLACES the default set wholesale, so passing a partial map directly
+// means "score only these axes" — WeightsWith merges instead.
+//
+//	w, err := zonescore.WeightsWith(zonescore.ProfileBalanced,
+//		map[string]float64{zonescore.AxisSecurite: 0.30})
+//	score := zonescore.Compute(dossier, zonescore.Options{Weights: w})
+//
+// Unknown profile or axis names are errors (a typo'd axis would
+// otherwise silently score an axis that doesn't exist).
+func WeightsWith(profile string, overrides map[string]float64) (map[string]float64, error) {
+	base := DefaultWeights
+	if profile != "" {
+		w, ok := Personas[profile]
+		if !ok {
+			return nil, fmt.Errorf("zonescore: unknown profile %q (have: %v)", profile, ProfileNames())
+		}
+		base = w
+	}
+	out := make(map[string]float64, len(base))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range overrides {
+		if _, ok := DefaultWeights[k]; !ok {
+			return nil, fmt.Errorf("zonescore: unknown axis %q in overrides", k)
+		}
+		out[k] = v
+	}
+	return out, nil
 }
 
 // ProfileNames returns the persona names in sorted order (for CLI help and
