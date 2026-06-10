@@ -186,7 +186,8 @@ Two patterns sit alongside the per-address `Collect`:
 
 - **Run fewer Sources.** `factory.Options.Exclude` is a deny-list applied to
   the full default roster (e.g. `Exclude: []string{"bdnb"}` drops the live BDNB
-  API); `Builder.Without(names…)` prunes a pre-populated Builder before
+  API — note: the catalog's `default: false` on bdnb is the *CLI's* opt-in
+  policy; the factory wires every source regardless); `Builder.Without(names…)` prunes a pre-populated Builder before
   `.Build()`; `Client.CollectSome(ctx, listing, names…)` collects only a named
   subset on an existing Client. `Client.SourceNames()` enumerates what a Client
   will run; `factory.OfflineSourceNames()` / `LiveSourceNames()` split the
