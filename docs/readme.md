@@ -29,8 +29,8 @@ godoc found via `go doc github.com/bpineau/gazetteer/...`.
 | [cli.md](cli.md)                        | End users of `cmd/gazetteer`          |
 
 For runnable examples, look at `gazetteer/example_test.go` and
-`appraisal/zonescore/example_test.go`; they are reachable via
-`go doc -examples ./...`.
+`appraisal/zonescore/example_test.go` (run them with
+`go test -run Example ./gazetteer/ ./appraisal/zonescore/`).
 
 ## Project layout
 
@@ -43,6 +43,7 @@ appraisal/zonescore/  yield-first 0–100 zone score + multi-zone Compare
 overview/          offline per-commune batch join (CommuneOverview) for screening
 sources/<name>/    one package per data source
 helpers/<name>/    standalone building blocks (see helpers.md) — public API
+dataset/           embed+datadir+refresh pipeline (ship your own datasets)
 cmd/gazetteer/     command-line front-end
 internal/          implementation detail; no public API
 ```

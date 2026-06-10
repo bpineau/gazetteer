@@ -125,7 +125,7 @@ var sourceDescriptors = map[string]sourceDescriptor{
 	"filoiris": {
 		Batch:   true,
 		Summary: "INSEE Filosofi income at IRIS (sub-commune) level — median + taux de pauvreté + Gini.",
-		Inputs:  []inputClause{need("Listing.IRIS")}, Coverage: "Île-de-France (IRIS of communes ≥5000 hab)",
+		Inputs:  []inputClause{need("Listing.IRIS")}, Coverage: "national dataset; effective coverage Île-de-France (the only IRIS resolver is IDF-scoped)",
 		Feeds: []string{"zonescore: solvabilité (IRIS income, preferred over filosofi)"},
 	},
 	"logiris": {

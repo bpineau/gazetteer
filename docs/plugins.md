@@ -132,18 +132,22 @@ type Evidencer interface {
 }
 ```
 
-When `Data.Evidence()` is implemented, the framework stamps
-`Result.Evidence` with what it returns. Consumers then read
-`dossier.Results["myplugin"].Evidence` without type-asserting on
-`Data`. Typical implementation:
+You normally do NOT implement this. The shipped convention is an
+`Evidence` **field** on the typed Result:
 
 ```go
 type Result struct {
     Score    float64  `json:"score"`
     Evidence Evidence `json:"-"`
 }
-func (r *Result) Evidence() any { return r.Evidence }
 ```
+
+and the framework picks that field up reflectively, stamping
+`Result.Evidence` on the envelope (and the Dossier JSON `evidence` key)
+for you. Implement the `Evidencer` interface only when your provenance
+is NOT a plain `Evidence` field — note a type with an `Evidence` field
+cannot also have an `Evidence()` method (duplicate name), so the two
+mechanisms are mutually exclusive by construction.
 
 ## Fetching: use the shared seams
 

@@ -171,7 +171,8 @@ fewer of them freely:
 ```go
 // On the Builder: prune a pre-populated roster (e.g. factory.BuilderDefault)
 // before Build(). A deny-list; call it after the With chain.
-client, _ := factory.BuilderDefault(ctx, factory.Options{}).Without("bdnb").Build()
+b, _ := factory.BuilderDefault(ctx, factory.Options{})
+client, _ := b.Without("bdnb").Build()
 
 // factory shortcut for the same deny-list:
 client, _ = factory.NewDefaultWith(ctx, factory.Options{Exclude: []string{"bdnb"}})

@@ -106,3 +106,38 @@ func TestResult_EvidenceJSONRoundTrip(t *testing.T) {
 		t.Errorf("Evidence payload = %s (%v), want tier=commune n=42", raw, err)
 	}
 }
+
+type evFieldPayload struct {
+	V        int
+	Evidence evFieldEvidence `json:"-"`
+}
+
+type evFieldEvidence struct {
+	Tier string `json:"tier"`
+}
+
+func (p *evFieldPayload) IsEmpty() bool { return false }
+
+// The shipped convention is an Evidence FIELD (which cannot coexist with
+// an Evidence() method) — the framework must surface it on the envelope.
+func TestRunOne_EvidenceFieldPickedUp(t *testing.T) {
+	v := evidenceField(&evFieldPayload{V: 1, Evidence: evFieldEvidence{Tier: "commune"}})
+	ev, ok := v.(evFieldEvidence)
+	if !ok || ev.Tier != "commune" {
+		t.Errorf("evidenceField = %#v, want the Evidence field value", v)
+	}
+	// Zero-valued Evidence stays nil (no noise on sources that didn't fill it).
+	if v := evidenceField(&evFieldPayload{V: 1}); v != nil {
+		t.Errorf("zero Evidence picked up: %#v", v)
+	}
+	// Non-struct / nil-safe.
+	if v := evidenceField(nil); v != nil {
+		t.Errorf("nil data: %#v", v)
+	}
+	if v := evidenceField((*evFieldPayload)(nil)); v != nil {
+		t.Errorf("typed nil: %#v", v)
+	}
+	if v := evidenceField("not a struct"); v != nil {
+		t.Errorf("non-struct: %#v", v)
+	}
+}
