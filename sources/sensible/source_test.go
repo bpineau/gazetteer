@@ -122,4 +122,17 @@ func TestEmbeddedArtifactKnownPoints(t *testing.T) {
 	if len(in) != 0 || len(nearby) != 0 {
 		t.Fatalf("Notre-Dame should match nothing, got in=%+v nearby=%+v", in, nearby)
 	}
+
+	// Les 4000 (mail Maurice de Fontenay) sit OUTSIDE the La Courneuve QRR
+	// (which covers Quatre-Routes) — the curated circle must catch them.
+	in, _ = idx.resolve(48.9284, 2.3785)
+	found = false
+	for _, z := range in {
+		if z.Kind == KindCurated && z.Dep == "93" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("mail de Fontenay should sit in the curated 4000 circle, got %+v", in)
+	}
 }

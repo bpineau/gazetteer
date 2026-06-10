@@ -694,7 +694,9 @@ since 2021): a stable photo of structurally distressed areas, not a live feed.
   DistanceM, Note}`. ORCOD/curated entries cite their décret in `Note`.
 - **Backend**: offline gzipped QRR polygons under `data/` (ministère de
   l'Intérieur via data.gouv.fr, WGS84, 62 zones) + an in-code curated circle
-  overlay (`curated.go` — official designations only, source required).
+  overlay (`curated.go` — official designations only, source required: the 4
+  ORCOD-IN décrets, plus documented additions such as Les 4000 à La Courneuve,
+  NPNRU d'intérêt national, which the QRR perimeter misses).
 
 ## `sources/zonageabc`
 

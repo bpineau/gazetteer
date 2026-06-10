@@ -239,7 +239,8 @@ var sourceDescriptors = map[string]sourceDescriptor{
 	"sensible": {
 		Summary: "Flags addresses inside (or within 400 m of) the State's hardest-neighbourhood " +
 			"perimeters: the 62 QRR police-priority zones (official polygons, far more selective " +
-			"than QPV) and the 4 ORCOD-IN copropriétés dégradées (décrets). Informational, not scored.",
+			"than QPV), the 4 ORCOD-IN copropriétés dégradées (décrets) and a small documented " +
+			"curated overlay (e.g. Les 4000, NPNRU). Informational, not scored.",
 		Inputs: []inputClause{need("lat/lon")}, Coverage: "France (QRR national, ORCOD-IN Île-de-France)",
 	},
 	"rpls": {

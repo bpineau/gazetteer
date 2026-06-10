@@ -559,7 +559,7 @@
     "name": "sensible",
     "version": 1,
     "default": true,
-    "summary": "Flags addresses inside (or within 400 m of) the State's hardest-neighbourhood perimeters: the 62 QRR police-priority zones (official polygons, far more selective than QPV) and the 4 ORCOD-IN copropriétés dégradées (décrets). Informational, not scored.",
+    "summary": "Flags addresses inside (or within 400 m of) the State's hardest-neighbourhood perimeters: the 62 QRR police-priority zones (official polygons, far more selective than QPV), the 4 ORCOD-IN copropriétés dégradées (décrets) and a small documented curated overlay (e.g. Les 4000, NPNRU). Informational, not scored.",
     "inputs": [
       "lat/lon"
     ],
