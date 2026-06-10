@@ -45,6 +45,9 @@ type RentEstimate struct {
 	Method string
 }
 
+// EURPerM2 returns the estimate in euros per m² per month (cents ÷ 100).
+func (e RentEstimate) EURPerM2() float64 { return float64(e.EurPerM2Cents) / 100 }
+
 // RentOptions configures RentValue's synthesis logic. Zero-valued
 // fields fall back to library defaults — pass an empty value to opt into
 // every default.
@@ -90,6 +93,10 @@ type RentConsolidated struct {
 	// Empty when no source implements RentEstimator.
 	Inputs []RentInput
 }
+
+// EURPerM2 returns the consolidated value in euros per m² per month
+// (cents ÷ 100).
+func (c RentConsolidated) EURPerM2() float64 { return float64(c.EurPerM2Cents) / 100 }
 
 // RentInput is one source's contribution after weighting and outlier
 // detection. Excluded entries are kept in the slice so callers can

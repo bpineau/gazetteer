@@ -150,6 +150,11 @@ type Options struct {
 	// Logger overrides slog.Default(). Optional.
 	Logger *slog.Logger
 
+	// APIBaseURL overrides the DVF mutations endpoint for this Source
+	// (empty ⇒ the package default). Prefer this over mutating the
+	// package-level APIBaseURL var.
+	APIBaseURL string
+
 	// CircuitTripped, when non-nil, is a process-local circuit breaker
 	// shared with the API. The API observes its GetMutations outcomes
 	// through this atomic via the embedded TransportCircuit; once the
@@ -208,7 +213,7 @@ func NewSource(opts Options) (*Source, error) {
 	tc.SetMax429(MaxConsecutive429)
 	return &Source{
 		opts:     opts,
-		api:      NewAPI(opts.HTTP, tc),
+		api:      NewAPI(opts.HTTP, tc).WithBaseURL(opts.APIBaseURL),
 		sections: NewSectionDiscoverer(opts.SectionCache, opts.Logger),
 		communes: opts.Communes,
 	}, nil

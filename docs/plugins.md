@@ -145,20 +145,6 @@ type Result struct {
 func (r *Result) Evidence() any { return r.Evidence }
 ```
 
-### `QueryWither`
-
-```go
-type QueryWither interface {
-    QueryWith(ctx context.Context, listing Listing, args ...any) (any, error)
-}
-```
-
-For direct callers that need to pass extras beyond `Listing` — a
-pre-resolved upstream id, a session token, a per-call timeout
-override. `Client.Collect` always calls plain `Query` — `QueryWith` is
-a side-entry path. Implementations should treat unrecognised args as
-a fallback to the Listing-only path.
-
 ## Reading shared infrastructure from context
 
 The Client propagates HTTP client and logger via `ctx`. Read them with the helpers in `gazetteer/context.go`:

@@ -11,7 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bpineau/gazetteer/helpers/httpx"
 	"github.com/bpineau/gazetteer/helpers/kvcache"
+	"github.com/bpineau/gazetteer/helpers/kvcache/memcache"
 )
 
 // ErrIncoherentBANResponse is returned by validateCoherence when the
@@ -82,6 +84,23 @@ type CachedGeocoder struct {
 	ttl      time.Duration
 	now      func() time.Time
 	logger   *slog.Logger
+}
+
+// NewDefaultGeocoder returns the canonical production geocoder wiring —
+// the same one factory.NewDefault and the CLI use: a BAN client over hc,
+// wrapped in a process-lifetime in-memory cache with the dept-coherence
+// guards. Within one Collect several live sources independently geocode
+// the same address when the listing was not pre-normalized; the cache
+// makes that one BAN round-trip, and the guards stop a drifted BAN
+// homonyme from fanning out.
+//
+// Callers that wire their own sources (factory.Options.SourceOverrides,
+// custom Builders) should reuse this instead of hand-assembling the
+// stack, so their sources share the recipe — and pass the SAME instance
+// everywhere so the cache actually dedupes. For a persistent cache (a
+// DB-backed kvcache), assemble NewCachedGeocoder directly.
+func NewDefaultGeocoder(hc *httpx.Client) Geocoder {
+	return NewCachedGeocoder(NewBANClient(hc), memcache.New(), 0)
 }
 
 // NewCachedGeocoder wraps delegate with a kvcache.Cache-backed cache.

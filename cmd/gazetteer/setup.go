@@ -74,7 +74,7 @@ func newRuntimeDeps() (*runtimeDeps, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w", err)
 	}
-	ban := roster.NewGeocoder(hc)
+	ban := banx.NewDefaultGeocoder(hc)
 	com := communes.MustDefault()
 	// A failure to resolve the user cache dir is non-fatal: block sources
 	// fall back to their embedded copies when DataDir is empty.

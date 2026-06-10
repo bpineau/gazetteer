@@ -49,3 +49,43 @@ func TestProfile_ShiftsComposite(t *testing.T) {
 			tr.Composite, def.Composite)
 	}
 }
+
+func TestWeightsWith(t *testing.T) {
+	t.Parallel()
+
+	// Default base, one axis tweaked: every other axis keeps its default.
+	w, err := WeightsWith("", map[string]float64{AxisSecurite: 0.42})
+	if err != nil {
+		t.Fatalf("WeightsWith: %v", err)
+	}
+	if w[AxisSecurite] != 0.42 {
+		t.Errorf("override not applied: %v", w[AxisSecurite])
+	}
+	if w[AxisRendement] != DefaultWeights[AxisRendement] {
+		t.Errorf("non-overridden axis drifted: %v", w[AxisRendement])
+	}
+	if len(w) != len(DefaultWeights) {
+		t.Errorf("weight set size = %d, want %d (complete set)", len(w), len(DefaultWeights))
+	}
+	// The shared presets must never be mutated.
+	if DefaultWeights[AxisSecurite] == 0.42 {
+		t.Error("WeightsWith mutated DefaultWeights")
+	}
+
+	// Persona base.
+	w, err = WeightsWith(ProfileBalanced, nil)
+	if err != nil {
+		t.Fatalf("WeightsWith(balanced): %v", err)
+	}
+	if w[AxisRendement] != Personas[ProfileBalanced][AxisRendement] {
+		t.Errorf("persona base not used")
+	}
+
+	// Errors on typos.
+	if _, err := WeightsWith("nope", nil); err == nil {
+		t.Error("unknown profile must error")
+	}
+	if _, err := WeightsWith("", map[string]float64{"securite_typo": 1}); err == nil {
+		t.Error("unknown axis must error")
+	}
+}

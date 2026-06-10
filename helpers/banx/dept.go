@@ -1,6 +1,6 @@
 package banx
 
-import "strings"
+import "github.com/bpineau/gazetteer/helpers/communes"
 
 // DeptFromZip returns the canonical French département code derived from a
 // 5-digit postal code. Returns "" when the input is not a 5-digit
@@ -27,30 +27,10 @@ import "strings"
 // Corsican zip as belonging to a single département so cross-island
 // matching still folds.
 func DeptFromZip(zip string) string {
-	zip = strings.TrimSpace(zip)
-	if len(zip) != 5 {
-		return ""
-	}
-	for i := range 5 {
-		c := zip[i]
-		if c < '0' || c > '9' {
-			return ""
-		}
-	}
-	prefix := zip[:2]
-	switch prefix {
-	case "20":
-		// 2A vs 2B split — see godoc above.
-		if zip[2] == '0' || zip[2] == '1' {
-			return "2A"
-		}
-		return "2B"
-	case "97", "98":
-		// DOM-TOM: 3-digit dept.
-		return zip[:3]
-	default:
-		return prefix
-	}
+	// Delegates to the canonical implementation in helpers/communes —
+	// administrative-geography knowledge has one home; this alias stays
+	// for banx's existing callers.
+	return communes.DeptFromZip(zip)
 }
 
 // deptMatchKey returns the prefix used to test cross-zip département

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/communes"
 )
 
@@ -44,7 +45,7 @@ func TestRosterBuildAll(t *testing.T) {
 	}
 	deps := Deps{
 		HTTP:     hc,
-		Geocoder: NewGeocoder(hc),
+		Geocoder: banx.NewDefaultGeocoder(hc),
 		Communes: communes.MustDefault(),
 		DataDir:  "", // embedded-only
 	}
@@ -75,5 +76,22 @@ func TestRosterCLIOptIn(t *testing.T) {
 	}
 	if len(optIn) != 1 || optIn[0] != "bdnb" {
 		t.Errorf("CLIOptIn set = %v, want [bdnb]", optIn)
+	}
+}
+
+// TestRosterLiveSet pins which sources count as live (may do network
+// I/O in Query) — widening or narrowing it changes what
+// factory.OfflineSourceNames callers collect, so make it an explicit
+// test edit.
+func TestRosterLiveSet(t *testing.T) {
+	want := map[string]bool{
+		"dvf": true, "ademe": true, "bdnb": true, "cadastre": true,
+		"georisques": true, "locservice": true, "dpedist": true,
+		"education": true, "osm_transit": true,
+	}
+	for _, e := range Entries() {
+		if e.Live != want[e.Name] {
+			t.Errorf("%s: Live = %v, want %v", e.Name, e.Live, want[e.Name])
+		}
 	}
 }

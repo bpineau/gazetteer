@@ -43,7 +43,6 @@ func TestResult_MarshalJSON_OmitsErr(t *testing.T) {
 		Name:      "dvf",
 		Version:   7,
 		Status:    StatusFailedTransient,
-		InputHash: "abc123",
 		FetchedAt: time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC),
 		Err:       errors.New("boom"),
 	}
@@ -67,4 +66,43 @@ func contains(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+type evTestPayload struct{ V int }
+
+func (p *evTestPayload) IsEmpty() bool { return false }
+
+func TestResult_EvidenceJSONRoundTrip(t *testing.T) {
+	type evidence struct {
+		Tier string `json:"tier"`
+		N    int    `json:"n"`
+	}
+	Register("evroundtrip", func() any { return &evTestPayload{} })
+	d := Dossier{Results: map[string]Result{
+		"evroundtrip": {
+			Name:     "evroundtrip",
+			Status:   StatusOK,
+			Data:     &evTestPayload{V: 1},
+			Evidence: &evidence{Tier: "commune", N: 42},
+		},
+	}}
+	b, err := json.Marshal(d)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if !contains(string(b), `"evidence":{"tier":"commune","n":42}`) {
+		t.Fatalf("wire form lacks evidence: %s", b)
+	}
+	var back Dossier
+	if err := json.Unmarshal(b, &back); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	raw, ok := back.Results["evroundtrip"].Evidence.(json.RawMessage)
+	if !ok {
+		t.Fatalf("round-tripped Evidence = %T, want json.RawMessage", back.Results["evroundtrip"].Evidence)
+	}
+	var ev evidence
+	if err := json.Unmarshal(raw, &ev); err != nil || ev.Tier != "commune" || ev.N != 42 {
+		t.Errorf("Evidence payload = %s (%v), want tier=commune n=42", raw, err)
+	}
 }
