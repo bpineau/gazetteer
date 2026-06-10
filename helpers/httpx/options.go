@@ -26,6 +26,7 @@ const (
 	DefaultTTLFallback        = 6 * time.Hour
 	DefaultMaxResponseBytes   = int64(50 * 1024 * 1024)
 	defaultClientTimeout      = 60 * time.Second
+	defaultDownloadTimeout    = 15 * time.Minute
 	defaultErrBodySnippetSize = 4 * 1024
 )
 
@@ -234,6 +235,13 @@ type DownloadOptions struct {
 	SkipIfExists bool
 	// MaxBytes guards against bombs (0 = unlimited / inherit Options).
 	MaxBytes int64
+	// Timeout caps the whole download (connect + full body stream).
+	// 0 = the 15-minute default. Downloads deliberately bypass the
+	// client-wide request Timeout (60 s by default): that deadline spans
+	// the entire body read, which is wrong for arbitrarily large raw
+	// files — a multi-hundred-MB CSV on a slow mirror is healthy long
+	// past 60 s.
+	Timeout time.Duration
 }
 
 // DownloadResult is what Client.Download returns on success.
