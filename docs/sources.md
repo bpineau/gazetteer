@@ -18,7 +18,7 @@ canonical pattern:
 - `const Name`         — registry key
 - `const Version`      — bumped when logic changes
 - `type Options`       — constructor parameters
-- `func NewSource(...) (*Source, error)` (or `*Source` when infallible)
+- `func NewSource(Options) *Source` — infallible, zero-value Options usable
 - `type Result`        — typed payload returned via `Source.Query`
 - `type Evidence`      — reproducibility sidecar (when present)
 - `Result.IsEmpty()`   — satisfies `gazetteer.EmptyReporter`

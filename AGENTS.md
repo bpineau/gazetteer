@@ -84,7 +84,7 @@ one source you've used all of them:
 | `const Name` | the registry key, e.g. `dvf.Name == "dvf"` |
 | `const Version` | bumps when logic changes |
 | `type Options struct{ … }` | config; zero value is usually valid; offline sources carry `DataDir` |
-| `func NewSource(Options) *Source` | constructor (dvf alone also returns an error) |
+| `func NewSource(Options) *Source` | constructor (uniform: none returns an error) |
 | `func Query(ctx, Options, Listing) (*Result, error)` | **atomic helper** — run one source without the builder |
 | `func (s *Source) QueryResult(ctx, Listing) (*Result, error)` | typed Query on a held instance (no `any` assertion) |
 | `Options.Fetcher gazetteer.Fetcher` (live HTTP sources) | inject circuit breakers / fixtures into the fetch path (dvf and osm_transit have their own seams: `HTTP`/`CircuitTripped`, `OverpassFetcher`) |

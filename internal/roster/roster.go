@@ -154,7 +154,7 @@ func NewHTTPClient() (*httpx.Client, error) {
 func Entries() []Entry {
 	return []Entry{
 		{Name: dvf.Name, Live: true, Build: func(d Deps) (gazetteer.Source, error) {
-			return dvf.NewSource(dvf.Options{HTTP: d.HTTP, Geocoder: d.Geocoder, Communes: d.Communes})
+			return dvf.NewSource(dvf.Options{HTTP: d.HTTP, Geocoder: d.Geocoder, Communes: d.Communes}), nil
 		}},
 		{Name: ademe.Name, Live: true, Build: func(d Deps) (gazetteer.Source, error) {
 			return ademe.NewSource(ademe.Options{Geocoder: d.Geocoder}), nil

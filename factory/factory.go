@@ -81,7 +81,7 @@ type Options struct {
 	//			return dvf.NewSource(dvf.Options{
 	//				HTTP: d.HTTP, Geocoder: d.Geocoder, Communes: d.Communes,
 	//				SectionCache: myPersistentKV,
-	//			})
+	//			}), nil
 	//		},
 	//	}}
 	//
