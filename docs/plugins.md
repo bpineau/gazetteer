@@ -106,6 +106,12 @@ return nil, fmt.Errorf("myplugin: %w: <detail>", gazetteer.ErrAntiBot)
 
 See [concepts.md](concepts.md) for the full `Status` × sentinel table.
 
+A `Query` that panics does not take down the host process: `Collect`
+recovers it into a `StatusFailedPermanent` Result carrying the panic
+message (permanent because a retry would only reproduce the bug), logs
+the stack, and lets the other Sources complete. Treat that as a crash
+pad, not a channel: return errors, don't panic.
+
 ## Optional interfaces
 
 Implement any subset. The framework type-asserts at runtime — there's

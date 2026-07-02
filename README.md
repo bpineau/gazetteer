@@ -1,15 +1,15 @@
 # gazetteer
 
 A Go library that, given a French address, brings back **rich, typed,
-well-extracted data across dimension that matters when evaluating a
-property as an investment**:  price, rents, rental demand, tenant solvency,
+well-extracted data across every dimension that matters when evaluating a
+property as an investment**: price, rents, rental demand, tenant solvency,
 taxes, safety, transport, hazards, building quality, the social and regulatory
 context, and more. Each dimension comes from a dedicated `Source` as a
 fully-typed `Result` with [documented, unit-bearing fields](docs/sources.md);
 a `Client.Collect` runs them in parallel and returns a typed `Dossier`.
 
 An optional, thin convenience layer (`appraisal` + `appraisal/zonescore`)
-consolidates a few dimensions and composites them into an high-level score .
+consolidates a few dimensions and composites them into a high-level score.
 
 > **AI coding agents:** read [AGENTS.md](AGENTS.md) first (also linked as
 > `CLAUDE.md`), then run `gazetteer sources catalog --json`. Run `make hooks`

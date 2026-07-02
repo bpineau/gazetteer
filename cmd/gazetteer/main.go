@@ -1,3 +1,8 @@
+// Command gazetteer explores the library's data from the terminal: it
+// lists and documents the Sources (sources list / catalog / dimensions /
+// doc), runs them against real addresses (query, appraise, compare,
+// normalize), and maintains the offline datasets (refresh). Run
+// `gazetteer help` or see docs/cli.md for the full reference.
 package main
 
 import (
