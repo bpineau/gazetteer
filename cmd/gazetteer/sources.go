@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -39,7 +40,7 @@ func runSources(ctx context.Context, args []string) error {
 	}
 }
 
-func printSourcesUsage(w *os.File) {
+func printSourcesUsage(w io.Writer) {
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  gazetteer sources list           List every Source registered with the lib (name + version).")
 	fmt.Fprintln(w, "  gazetteer sources doc <name>     Print a JSON schema example of <name>'s typed Result.")
