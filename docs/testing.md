@@ -135,7 +135,7 @@ func (f fakeGeocoder) Geocode(_ context.Context, q banx.GeocodeQuery) (banx.Geoc
     }, nil
 }
 
-src, _ := dvf.NewSource(dvf.Options{
+src := dvf.NewSource(dvf.Options{
     HTTP:     httpClient,
     Geocoder: fakeGeocoder{insee: "75101", label: "1 rue X 75001 Paris"},
 })

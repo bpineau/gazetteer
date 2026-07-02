@@ -64,17 +64,12 @@ func newHTTPClient(t *testing.T) *httpx.Client {
 	return c
 }
 
-// mustNewSource is a test-only convenience that fails the test
-// (rather than returning an error) when NewSource cannot build the
-// Source. Tests that *want* to assert on the construction error
-// continue to call NewSource directly.
+// mustNewSource is a historical test-only alias of NewSource, kept so
+// the many call sites below read unchanged now that NewSource is
+// infallible.
 func mustNewSource(t *testing.T, opts Options) *Source {
 	t.Helper()
-	s, err := NewSource(opts)
-	if err != nil {
-		t.Fatalf("NewSource: %v", err)
-	}
-	return s
+	return NewSource(opts)
 }
 
 func TestSource_NameVersion(t *testing.T) {
@@ -88,13 +83,12 @@ func TestSource_NameVersion(t *testing.T) {
 	}
 }
 
-func TestNewSource_NilHTTPClientReturnsError(t *testing.T) {
-	_, err := NewSource(Options{})
-	if err == nil {
-		t.Fatal("NewSource(Options{}) returned nil error, want non-nil")
-	}
-	if !strings.Contains(err.Error(), "nil HTTP client") {
-		t.Errorf("err = %q, want mention of nil HTTP client", err)
+func TestNewSource_ZeroOptionsIsUsable(t *testing.T) {
+	// The uniform per-source contract: the zero-value Options builds a
+	// working Source (a fresh polite HTTP client, embedded communes).
+	s := NewSource(Options{})
+	if s == nil || s.api == nil || s.communes == nil {
+		t.Fatalf("NewSource(Options{}) must wire every dependency, got %+v", s)
 	}
 }
 
@@ -406,7 +400,7 @@ func TestSource_TransportCircuit_TripsOnDeadline(t *testing.T) {
 	tc := circuit.NewTransportCircuit(Name, 2, tripped, nil)
 	api := NewAPI(hc, tc)
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, _ = api.GetMutations(context.Background(), "75107", "000AD")
 	}
 	if !tripped.Load() {
@@ -551,7 +545,7 @@ func TestSource_FractionalSurfaceNotTruncated(t *testing.T) {
 	// we don't have coords, so the commune tier will win (MinSample 10).
 	// 12 rows ensures we're well above both floors.
 	var rows []map[string]any
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		rows = append(rows, map[string]any{
 			"id_mutation":         "x" + string(rune('a'+i)),
 			"date_mutation":       "2025-01-01",

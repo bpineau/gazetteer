@@ -120,15 +120,17 @@ func HostRateLimits() map[string]httpx.HostOptions {
 	}
 }
 
-// Options configures a dvf Source.
-//
-// The zero value is NOT usable: the Source needs an *httpx.Client to
-// drive the per-call timeout and (optionally) per-host rate-limiting.
-// Geocoder is also required in practice unless the Listing carries a
-// usable Listing.INSEE (Listing.INSEE is populated only when callers
+// Options configures a dvf Source. The zero value is usable: a nil
+// HTTP defaults to a fresh polite client (see the HTTP field), and
+// Geocoder is only required when Listings arrive without a usable
+// Listing.INSEE (Listing.INSEE is populated only when callers
 // pre-resolve the commune themselves).
 type Options struct {
-	// HTTP is the production HTTP client. Mandatory.
+	// HTTP is the production HTTP client. When nil, NewSource builds a
+	// rate-limited httpx client seeded with HostRateLimits() — polite
+	// but per-Source (no shared cache, no cross-Source rate-limit
+	// pooling). Production wiring should pass the factory's shared
+	// client instead.
 	HTTP *httpx.Client
 
 	// Geocoder resolves a free-form address to a 5-digit INSEE via the
@@ -182,29 +184,29 @@ type Source struct {
 // for cross-source diagnostics.
 var ErrCircuitTripped = gazetteer.NewCircuitTrippedError(Name)
 
-// NewSource builds a dvf Source. Returns a non-nil error when a
-// required dependency is missing (opts.HTTP) or when the embedded
-// communes table cannot be loaded.
+// NewSource builds a dvf Source. The zero-value Options is valid — a
+// nil HTTP gets a fresh rate-limited client (see Options.HTTP) — so the
+// constructor matches the uniform per-source contract:
 //
-// Callers wiring a Builder chain typically check the error once at
-// startup:
-//
-//	src, err := dvf.NewSource(dvf.Options{HTTP: hc, Geocoder: ban})
-//	if err != nil { return err }
+//	src := dvf.NewSource(dvf.Options{HTTP: hc, Geocoder: ban})
 //	client, _ := gazetteer.NewBuilder().With(src).Build()
-func NewSource(opts Options) (*Source, error) {
+//
+// A corrupted embedded communes table (a build-time invariant) panics
+// via communes.MustDefault rather than surfacing as a runtime error.
+func NewSource(opts Options) *Source {
 	if opts.HTTP == nil {
-		return nil, errors.New("dvf.NewSource: nil HTTP client")
+		// Never errors today (httpx.New normalises bad options); a nil
+		// client is still guarded so a future validating httpx cannot
+		// hand us one silently.
+		if hc, err := httpx.New(httpx.Options{PerHost: HostRateLimits()}); err == nil {
+			opts.HTTP = hc
+		}
 	}
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
 	if opts.Communes == nil {
-		t, err := communes.Default()
-		if err != nil {
-			return nil, fmt.Errorf("dvf.NewSource: load communes: %w", err)
-		}
-		opts.Communes = t
+		opts.Communes = communes.MustDefault()
 	}
 	if opts.SectionCache == nil {
 		opts.SectionCache = memcache.New()
@@ -216,7 +218,7 @@ func NewSource(opts Options) (*Source, error) {
 		api:      NewAPI(opts.HTTP, tc).WithBaseURL(opts.APIBaseURL),
 		sections: NewSectionDiscoverer(opts.SectionCache, opts.Logger),
 		communes: opts.Communes,
-	}, nil
+	}
 }
 
 // Name implements gazetteer.Source.
@@ -673,15 +675,10 @@ func (s *Source) resolveSections(ctx context.Context, memo *queryMemo, insee str
 func (s *Source) Sections() *SectionDiscoverer { return s.sections }
 
 // Query is the atomic helper for callers who don't want the builder.
-// The error is non-nil only when the Source failed or could not be
-// constructed; a successful but empty response still returns a
-// non-nil *Result with IsEmpty() == true.
+// The error is non-nil only when the Source failed; a successful but
+// empty response still returns a non-nil *Result with IsEmpty() == true.
 func Query(ctx context.Context, opts Options, l gazetteer.Listing) (*Result, error) {
-	s, err := NewSource(opts)
-	if err != nil {
-		return nil, err
-	}
-	return gazetteer.QueryTyped[*Result](ctx, s, l)
+	return gazetteer.QueryTyped[*Result](ctx, NewSource(opts), l)
 }
 
 // QueryResult is Query with the package's typed Result — for callers

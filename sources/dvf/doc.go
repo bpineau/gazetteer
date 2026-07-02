@@ -27,12 +27,11 @@
 // Example — wire the Source, query a Listing, and read the typed
 // payload:
 //
-//	src, err := dvf.NewSource(dvf.Options{
+//	src := dvf.NewSource(dvf.Options{
 //	    HTTP:     hc,                    // *httpx.Client
 //	    Geocoder: ban,                   // banx.Geocoder
 //	    Communes: communes.MustDefault(),// optional, embedded default
 //	})
-//	if err != nil { log.Fatal(err) }
 //	data, err := src.Query(ctx, gazetteer.Listing{
 //	    Address: "10 rue de Rivoli", Zip: "75001",
 //	    PropertyType: gazetteer.PropertyApartment,

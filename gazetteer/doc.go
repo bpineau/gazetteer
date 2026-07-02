@@ -27,8 +27,7 @@
 //
 // # Quick start
 //
-//	dvfSrc, err := dvf.NewSource(dvf.Options{HTTP: hc, Geocoder: ban})
-//	if err != nil { /* handle */ }
+//	dvfSrc := dvf.NewSource(dvf.Options{HTTP: hc, Geocoder: ban})
 //	osmSrc := osm.NewSource(osm.Options{}) // call UpdateCatalog later
 //	client, _ := gazetteer.NewBuilder().With(dvfSrc).With(osmSrc).Build()
 //
