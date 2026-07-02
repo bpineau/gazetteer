@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/bpineau/gazetteer/gazetteer"
@@ -63,7 +64,7 @@ func runNormalize(ctx context.Context, args []string) error {
 // printListing renders the human-friendly summary for `normalize`.
 // Kept package-local so query / appraise can reuse it when they print
 // the resolved listing as part of their header.
-func printListing(out *os.File, l gazetteer.Listing) {
+func printListing(out io.Writer, l gazetteer.Listing) {
 	fmt.Fprintf(out, "address  %s\n", l.Address)
 	if l.City != "" {
 		fmt.Fprintf(out, "city     %s\n", l.City)
