@@ -13,7 +13,7 @@
 //
 // Example:
 //
-//	pt := proptype.Parse("Appartement")
+//	pt := proptype.Normalize("Appartement")
 //	if pt == proptype.Apartment {
 //	    // ...
 //	}
