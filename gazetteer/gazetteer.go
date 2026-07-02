@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"reflect"
+	"runtime/debug"
 	"sort"
 	"sync"
 	"time"
@@ -139,7 +140,10 @@ type Client struct {
 // Collect runs every configured Source in parallel, populates a Dossier
 // with one Result per Source, and returns. Errors from individual
 // Sources are translated to Result.Status via classifyErr; Collect
-// itself does not return an error.
+// itself does not return an error. A Source that panics (typically an
+// out-of-tree plugin bug) is recovered: its Result carries
+// StatusFailedPermanent and the panic message, and the other Sources
+// complete normally.
 //
 // Concurrency is unlimited unless WithMaxConcurrency was set. The shared
 // ctx propagates HTTP client / logger to each Source via the context-key
@@ -230,12 +234,26 @@ func (c *Client) collect(ctx context.Context, l Listing, sources []Source) Dossi
 	}
 }
 
-func runOne(ctx context.Context, s Source, l Listing) Result {
-	r := Result{
+func runOne(ctx context.Context, s Source, l Listing) (r Result) {
+	r = Result{
 		Name:      s.Name(),
 		Version:   s.Version(),
 		FetchedAt: time.Now(),
 	}
+	// A panicking Source (typically an out-of-tree plugin bug) must not
+	// take down the host process mid-Collect: convert the panic into a
+	// permanent failure on this Source's Result and let the siblings
+	// finish. Permanent, not transient: a panic is a programming error
+	// that a retry will only reproduce.
+	defer func() {
+		if v := recover(); v != nil {
+			r.Err = fmt.Errorf("source %s panicked: %v", s.Name(), v)
+			r.Status = StatusFailedPermanent
+			r.Data = nil
+			LoggerFrom(ctx).Error("source panicked; recovered",
+				"source", s.Name(), "panic", v, "stack", string(debug.Stack()))
+		}
+	}()
 	data, err := s.Query(ctx, l)
 	if err != nil {
 		r.Err = err

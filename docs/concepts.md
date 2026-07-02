@@ -112,7 +112,9 @@ which survives, not on `errors.Is` chains.
 | `failed_permanent`  | upstream broken in a way the source can't fix |
 
 The Client translates each Source error to one of these via the sentinel
-table in `gazetteer/errors.go`.
+table in `gazetteer/errors.go`. A Source that panics is recovered by the
+Client into `failed_permanent` (a retry would only reproduce the bug);
+the other Sources complete normally.
 
 ### `Dossier` — the aggregated output
 

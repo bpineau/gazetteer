@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -185,6 +186,37 @@ func TestCollect_RespectsContextCancellation(t *testing.T) {
 		t.Errorf("Status = OK after immediate cancel; want failure")
 	}
 }
+
+func TestCollect_RecoversSourcePanic(t *testing.T) {
+	// A panicking Source (typically an out-of-tree plugin bug) must not
+	// take down the host process: Collect converts the panic into a
+	// StatusFailedPermanent Result and the other Sources still complete.
+	c, _ := NewBuilder().
+		With(&panicSource{}).
+		With(namedSource("steady")).
+		Build()
+	d := c.Collect(context.Background(), Listing{})
+
+	r, ok := d.Results["panicky"]
+	if !ok {
+		t.Fatal("panicking Source produced no Result")
+	}
+	if r.Status != StatusFailedPermanent {
+		t.Errorf("Status = %v, want %v", r.Status, StatusFailedPermanent)
+	}
+	if r.Err == nil || !strings.Contains(r.Err.Error(), "boom") {
+		t.Errorf("Err = %v, want the panic value surfaced", r.Err)
+	}
+	if d.Results["steady"].Status != StatusOK {
+		t.Errorf("sibling Source Status = %v, want %v", d.Results["steady"].Status, StatusOK)
+	}
+}
+
+type panicSource struct{}
+
+func (p *panicSource) Name() string                                { return "panicky" }
+func (p *panicSource) Version() int                                { return 1 }
+func (p *panicSource) Query(context.Context, Listing) (any, error) { panic("boom") }
 
 type slowSource struct{ delay time.Duration }
 
