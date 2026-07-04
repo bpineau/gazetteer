@@ -24,29 +24,37 @@ const rawURL = "https://www.data.gouv.fr/fr/datasets/r/3ea8e2c3-0038-464a-b17e-c
 
 const (
 	metaSource  = "Registre National d'Immatriculation des Copropriétés (ANAH, data.gouv.fr, with-qpv)"
-	dataVintage = "2026-05"
+	dataVintage = "2026-07"
 )
 
 // Upstream column headers (data.gouv "with-qpv" daily file, confirmed).
 const (
-	colImm     = "numero_immatriculation"
-	colNom     = "nom_usage_copropriete"
-	colSyndic  = "type_syndic"
-	colMandat  = "mandat_en_cours"
-	colVoie    = "numero_voie_adresse"
-	colComp1   = "adresse_complementaire_1"
-	colComp2   = "adresse_complementaire_2"
-	colComp3   = "adresse_complementaire_3"
-	colLon     = "longitude"
-	colLat     = "latitude"
-	colCoop    = "syndicat_cooperatif"
-	colResServ = "residence_service"
-	colLots    = "nombre_total_lots"
-	colLotsH   = "nombre_lots_habitation"
-	colConstr  = "periode_construction"
-	colAidee   = "copro_aidee"
-	colQpvCode = "code_qp_2024"
-	colQpvNom  = "nom_qp_2024"
+	colImm       = "numero_immatriculation"
+	colNom       = "nom_usage_copropriete"
+	colSyndic    = "type_syndic"
+	colMandat    = "mandat_en_cours"
+	colMandatFin = "date_fin_dernier_mandat"
+	colVoie      = "numero_voie_adresse"
+	colComp1     = "adresse_complementaire_1"
+	colComp2     = "adresse_complementaire_2"
+	colComp3     = "adresse_complementaire_3"
+	colLon       = "longitude"
+	colLat       = "latitude"
+	colCoop      = "syndicat_cooperatif"
+	colResServ   = "residence_service"
+	colLots      = "nombre_total_lots"
+	colLotsH     = "nombre_lots_habitation"
+	colLotsP     = "nombre_lots_stationnement"
+	colConstr    = "periode_construction"
+	colCad1      = "reference_cadastrale_1"
+	colCad2      = "reference_cadastrale_2"
+	colCad3      = "reference_cadastrale_3"
+	colAidee     = "copro_aidee"
+	colACV       = "copro_dans_acv"
+	colPVD       = "copro_dans_pvd"
+	colPDP       = "copro_dans_pdp"
+	colQpvCode   = "code_qp_2024"
+	colQpvNom    = "nom_qp_2024"
 
 	// colInsee is the real Code Officiel Géographique (INSEE) of the commune —
 	// and, for Paris/Lyon/Marseille, of the arrondissement (e.g. 75110 for
@@ -65,8 +73,10 @@ func oui(s string) bool { return strings.EqualFold(strings.TrimSpace(s), "oui") 
 
 // transform rebuilds the processed RNC artifact from the upstream daily CSV.
 // It keeps every row carrying a 5-digit official commune code, normalizes the
-// reference + complementary streets, and emits a gzipped JSON Index. Financial
-// and procedure columns are absent upstream and therefore not read.
+// reference + complementary streets, reads the cadastral parcelles, the last
+// mandate end date and the public-programme flags, and emits a gzipped JSON
+// Index. The financial declarations and the legal-procedure/arrêté columns are
+// redacted from the open-data export and therefore cannot be read.
 func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	rc, err := raw.Open(rawName)
 	if err != nil {
@@ -113,11 +123,19 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		lon, _ := strconv.ParseFloat(get(rec, colLon), 64)
 		lots, _ := strconv.Atoi(get(rec, colLots))
 		lotsH, _ := strconv.Atoi(get(rec, colLotsH))
+		lotsP, _ := strconv.Atoi(get(rec, colLotsP))
 
 		var comp []string
 		for _, c := range []string{colComp1, colComp2, colComp3} {
 			if v := normVoie(get(rec, c)); v != "" {
 				comp = append(comp, v)
+			}
+		}
+
+		var parcelles []string
+		for _, c := range []string{colCad1, colCad2, colCad3} {
+			if v := get(rec, c); v != "" {
+				parcelles = append(parcelles, v)
 			}
 		}
 
@@ -131,12 +149,18 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 			VoiesComp:          comp,
 			TypeSyndic:         get(rec, colSyndic),
 			MandatEnCours:      get(rec, colMandat),
+			MandatFin:          get(rec, colMandatFin),
 			CoproAidee:         oui(get(rec, colAidee)),
 			SyndicatCooperatif: oui(get(rec, colCoop)),
 			ResidenceService:   oui(get(rec, colResServ)),
 			LotsTotal:          lots,
 			LotsHabitation:     lotsH,
+			LotsStationnement:  lotsP,
 			ConstructionPeriod: get(rec, colConstr),
+			Parcelles:          parcelles,
+			DansACV:            oui(get(rec, colACV)),
+			DansPVD:            oui(get(rec, colPVD)),
+			DansPDP:            oui(get(rec, colPDP)),
 			QPVCode:            get(rec, colQpvCode),
 			QPVName:            get(rec, colQpvNom),
 		})

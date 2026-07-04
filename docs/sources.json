@@ -523,16 +523,16 @@
   },
   {
     "name": "rnc",
-    "version": 1,
+    "version": 2,
     "default": true,
-    "summary": "Copropriété context from the Registre National d'Immatriculation (syndic type, mandate status, lots, construction period, QPV, ANAH-aided). Low-confidence 'à vérifier' triage hint; NO hard distress flag — procedures/arrêtés are redacted upstream.",
+    "summary": "Copropriété context from the Registre National d'Immatriculation (syndic type, mandate status, lots, construction period, cadastral parcelles, QPV, ANAH-aided, ACV/PVD programme perimeters). Low-confidence 'à vérifier' triage hint (governance vacuum, non-pro syndic on a large copro, large+old+QPV fragile archetype); NO hard distress flag — financials/procedures/arrêtés are redacted upstream.",
     "inputs": [
       "INSEE",
       "lat/lon or address (improves unit matching)"
     ],
     "coverage": "national",
     "feeds": [
-      "buyer due-diligence: copropriété context (fiche only)"
+      "buyer due-diligence: copropriété context + fragility triage (fiche only)"
     ],
     "batch": true,
     "result_schema": {

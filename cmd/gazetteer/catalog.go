@@ -159,9 +159,9 @@ var sourceDescriptors = map[string]sourceDescriptor{
 	},
 	"rnc": {
 		Batch:   true,
-		Summary: "Copropriété context from the Registre National d'Immatriculation (syndic type, mandate status, lots, construction period, QPV, ANAH-aided). Low-confidence 'à vérifier' triage hint; NO hard distress flag — procedures/arrêtés are redacted upstream.",
+		Summary: "Copropriété context from the Registre National d'Immatriculation (syndic type, mandate status, lots, construction period, cadastral parcelles, QPV, ANAH-aided, ACV/PVD programme perimeters). Low-confidence 'à vérifier' triage hint (governance vacuum, non-pro syndic on a large copro, large+old+QPV fragile archetype); NO hard distress flag — financials/procedures/arrêtés are redacted upstream.",
 		Inputs:  []inputClause{need("INSEE"), optional("improves unit matching", "lat/lon", "address")}, Coverage: "national",
-		Feeds: []string{"buyer due-diligence: copropriété context (fiche only)"},
+		Feeds: []string{"buyer due-diligence: copropriété context + fragility triage (fiche only)"},
 	},
 	"lovac": {
 		Batch:   true,

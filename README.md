@@ -132,7 +132,7 @@ Building / energy / risk:
 | `georisques`   | Natural and technological hazards (flood, soil, industrial)      |
 | `catnat`       | Per-commune history of recognised natural-disaster decrees        |
 | `cdsr`         | Nearby region-flagged distressed condominiums (IDF copro risk)   |
-| `rnc`          | Copropriété context from the Registre National d'Immatriculation (syndic, lots, QPV; triage hint, no distress verdict) |
+| `rnc`          | Copropriété context from the Registre National d'Immatriculation (syndic, lots, cadastral parcelles, QPV, ANAH-aided; fragility triage hint, no distress verdict) |
 | `nuisances`    | IDF environmental-nuisance grid (noise + air, 500 m cells)         |
 
 Market data:
