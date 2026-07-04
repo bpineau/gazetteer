@@ -48,6 +48,25 @@ func TestQuery_StubCoarseGranularity(t *testing.T) {
 	}
 }
 
+// TestIsPre1975 guards the pre-1975 archetype classifier against the two
+// construction-period vocabularies the upstream mixes: the dominant enum
+// tokens and the free-form labels.
+func TestIsPre1975(t *testing.T) {
+	t.Parallel()
+	old := []string{"AVANT_1949", "DE_1949_A_1960", "DE_1961_A_1974", "Avant 1949", "De 1949 à 1974"}
+	notOld := []string{"DE_1975_A_1993", "APRES_2010", "De 1975 à 1977", "De 1978 à 1982", "À compter de 2022", ""}
+	for _, p := range old {
+		if !isPre1975(p) {
+			t.Errorf("isPre1975(%q) = false, want true", p)
+		}
+	}
+	for _, p := range notOld {
+		if isPre1975(p) {
+			t.Errorf("isPre1975(%q) = true, want false", p)
+		}
+	}
+}
+
 // TestLoad_Embedded smokes the embedded artifact. With the committed
 // placeholder it is empty; after `gazetteer refresh --go-embed-update rnc`
 // it must be a large national dataset.

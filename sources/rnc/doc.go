@@ -2,27 +2,43 @@
 // recorded in the Registre National d'Immatriculation des Copropriétés
 // (RNC, published by the ANAH on data.gouv.fr) for a building address.
 //
-// IMPORTANT — what this Source does NOT do. The public RNC open-data file
-// REDACTS both the financial declarations (impayés, charges, fonds de
-// travaux) AND the legal-procedure columns (administration provisoire
-// art. 29-1, mandataire ad hoc art. 29-1A, plan de sauvegarde / carence,
-// arrêtés de péril / insalubrité). This Source therefore CANNOT emit a hard
-// "copropriété en difficulté" verdict. It exposes the context fields that
-// ARE published, plus a deliberately low-confidence `Attention` triage hint
-// (see Result.Signals) — never a verdict.
+// IMPORTANT — what this Source does NOT do. The RNC open-data export REDACTS
+// both the financial declarations (impayés, charges, fonds de travaux) AND the
+// legal-procedure/arrêté columns (administration provisoire art. 29-1,
+// mandataire ad hoc art. 29-1A, plan de sauvegarde / carence, arrêtés de péril
+// / insalubrité) — the ANAH notice documents them, but they are stripped from
+// the published files. This Source therefore CANNOT emit a hard "copropriété
+// en difficulté" verdict. It exposes the fields that ARE published, plus a
+// deliberately low-confidence `Attention` triage hint — never a verdict.
 //
-// Signal value for a buyer: the context (lots, construction period, syndic
-// type, QPV) plus the weak governance hints (no active syndic mandate,
-// unknown/amateur syndic, ANAH-subsidized) flag a lot as "worth checking the
-// cahier des conditions de vente / consulting the registre" before bidding.
-// The hard distress check stays a manual step.
+// Triage value for a buyer (Result.Signals, stable keys):
+//
+//   - no_active_mandate — no mandate, or one expired with no successor
+//     declared (a governance vacuum; a normal handover does not fire it).
+//   - syndic_unknown / syndic_benevole — a non-professional or undeclared
+//     syndic, but ONLY on a large copropriété (>= largeCoproLots lots), where
+//     it is a red flag; on a small copro a bénévole syndic is normal.
+//   - copro_aidee — an engaged ANAH subsidy (weak: since 2020 this includes
+//     MaPrimeRénov' Copropriété, open to healthy copropriétés).
+//   - fragile_profile — the "grand ensemble dégradé" archetype: large +
+//     pre-1975 + inside a quartier prioritaire.
+//
+// Any present signal flags a lot as "worth checking the cahier des conditions
+// de vente / the annuaire" before bidding; the hard distress check stays a
+// manual step. A consumer (e.g. locador) can surface Attention per address the
+// way it surfaces a rotten-zone flag.
+//
+// Cadastral parcelles: each Result carries the copropriété's cadastral parcel
+// identifiers (Result.Cadastre, canonical 14-char refs). They are the reliable
+// key for a building-level join — verifying or overriding the match below
+// against DVF, the cadastre source, or an auction fiche's parsed parcelles.
 //
 // Granularity is the copropriété (a building / set of addresses), NOT the
 // commune. A Listing is matched to a copro by GEO-PROXIMITY (the dataset
 // geocodes each copro) plus NORMALIZED STREET name, scoped to the commune
-// (INSEE). No cadastral parcelle is used: the dataset's own lat/long is the
-// matching key, so the Source is self-contained and needs no external
-// geocoding or parcelle resolution.
+// (INSEE); the Source is self-contained and needs no external geocoding. (The
+// cadastral parcelles it now exposes let a caller tighten that match itself,
+// but the Source does not consume a parcelle input.)
 //
 // The Source is fully offline: the processed dataset ships embedded under
 // `data/rnc_coproprietes.json.gz`.

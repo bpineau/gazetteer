@@ -14,7 +14,7 @@ var embedFS embed.FS
 const Name = "rnc"
 
 // Version bumps when the Source's logic or payload shape changes.
-const Version = 1
+const Version = 2
 
 // set binds the embedded artifact to the datadir/refresh pipeline. Refresh
 // downloads the upstream daily CSV and rebuilds the gzipped JSON via
@@ -29,8 +29,9 @@ var set = dataset.Set{
 	Validate:  validate,
 }
 
-// Entry is one copropriété row. The upstream omits financial and procedure
-// fields, so they are absent here by construction.
+// Entry is one copropriété row. The upstream open-data export omits the
+// financial declarations and the legal-procedure/arrêté columns, so they are
+// absent here by construction (see the package godoc).
 type Entry struct {
 	Immatriculation    string   `json:"imm"`
 	NomUsage           string   `json:"nom,omitempty"`
@@ -41,14 +42,23 @@ type Entry struct {
 	VoiesComp          []string `json:"voies_c,omitempty"` // normalized complementary streets
 	TypeSyndic         string   `json:"syndic,omitempty"`
 	MandatEnCours      string   `json:"mandat,omitempty"`
+	MandatFin          string   `json:"mandatfin,omitempty"` // date_fin_dernier_mandat (ISO YYYY-MM-DD)
 	CoproAidee         bool     `json:"aidee,omitempty"`
 	SyndicatCooperatif bool     `json:"coop,omitempty"`
 	ResidenceService   bool     `json:"resserv,omitempty"`
 	LotsTotal          int      `json:"lots,omitempty"`
 	LotsHabitation     int      `json:"lotsh,omitempty"`
+	LotsStationnement  int      `json:"lotsp,omitempty"`
 	ConstructionPeriod string   `json:"constr,omitempty"`
-	QPVCode            string   `json:"qpv,omitempty"`
-	QPVName            string   `json:"qpvn,omitempty"`
+	// Parcelles are the copropriété's cadastral parcel identifiers, each the
+	// canonical 14-char French reference (INSEE+préfixe+section+numéro, e.g.
+	// "75056102AG0011"). Newly published in the RNC export.
+	Parcelles []string `json:"parc,omitempty"`
+	DansACV   bool     `json:"acv,omitempty"` // copro_dans_acv (Action cœur de ville)
+	DansPVD   bool     `json:"pvd,omitempty"` // copro_dans_pvd (Petites villes de demain)
+	DansPDP   bool     `json:"pdp,omitempty"` // copro_dans_pdp
+	QPVCode   string   `json:"qpv,omitempty"`
+	QPVName   string   `json:"qpvn,omitempty"`
 }
 
 // Meta carries the manifest metadata for the embedded extract.

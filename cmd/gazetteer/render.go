@@ -700,6 +700,26 @@ func renderRNC(r *rnc.Result) (string, []string) {
 	if r.ConstructionPeriod != "" {
 		lines = append(lines, "construction: "+r.ConstructionPeriod)
 	}
+	if len(r.Cadastre) > 0 {
+		refs := make([]string, len(r.Cadastre))
+		for i, p := range r.Cadastre {
+			refs[i] = string(p)
+		}
+		lines = append(lines, "cadastre: "+strings.Join(refs, ", "))
+	}
+	var progs []string
+	if r.CoproACV {
+		progs = append(progs, "ACV")
+	}
+	if r.CoproPVD {
+		progs = append(progs, "PVD")
+	}
+	if r.CoproPDP {
+		progs = append(progs, "PDP")
+	}
+	if len(progs) > 0 {
+		lines = append(lines, "programme: "+strings.Join(progs, ", "))
+	}
 	lines = append(lines, "match: "+string(r.MatchMethod)+"/"+r.Confidence)
 	return headline, lines
 }
