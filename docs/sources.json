@@ -219,7 +219,7 @@
   },
   {
     "name": "dvfagg",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "Per-commune DVF aggregate — median €/m² + quartiles (3-year window, apartment sales, offline).",
     "inputs": [
@@ -227,6 +227,7 @@
     ],
     "coverage": "national",
     "feeds": [
+      "appraisal.PricePerM2",
       "prospection: commune-level price benchmark"
     ],
     "batch": true,

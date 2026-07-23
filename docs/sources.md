@@ -159,10 +159,15 @@ offline batch complement to the live, per-address `dvf` source.
   bimodal commune), `PriceMedianSmallEURM2` (18–55 m², to pair with a
   T1–T2 rent), `N` / `NSmall` (sample sizes), `Dept`. Empty when the
   commune had no qualifying sale.
+- **Feeds `appraisal.PricePerM2`**: `PriceEstimate()` contributes the
+  commune median (confidence per sample size + dispersion), so the price
+  synthesis can clear its MinSources=2 floor from embedded data alone —
+  pairing with the live `dvf` reading instead of forcing `price_confidence`
+  structurally Low.
 - **Build**: `gazetteer refresh -go-embed-update dvfagg` downloads the
-  geo-dvf bulk files (dept × last 3 years), keeps single-lot apartment
-  *Vente* mutations, and writes the embedded `dvf_communes.csv`
-  (~9 k communes, vintage 2022-2024). Excludes 57/67/68 (Livre Foncier)
+  geo-dvf bulk files (dept × last 3 years, currently 2023-2025), keeps
+  single-lot apartment *Vente* mutations, and writes the embedded
+  `dvf_communes.csv` (~9 k communes). Excludes 57/67/68 (Livre Foncier)
   and 976 (not in DVF).
 
 ## `sources/dvf`
