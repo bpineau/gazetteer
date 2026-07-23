@@ -85,12 +85,37 @@ func TestBANNormalizer_GeocoderError(t *testing.T) {
 }
 
 func TestBANNormalizer_NotFound(t *testing.T) {
-	g := &stubGeocoder{err: banx.ErrNotFound}
-	n := NewBANNormalizer(g, nil)
-	_, err := n.Normalize(context.Background(), "garbage address")
-	if !errors.Is(err, banx.ErrNotFound) {
-		t.Errorf("err = %v, want banx.ErrNotFound", err)
+	// Both the not-found and dept-mismatch geocoder sentinels are raised to
+	// gazetteer.ErrAddressNotFound, while errors.Is still matches the original
+	// banx sentinel (double-%w). A generic geocoder error is NOT ErrAddressNotFound.
+	for _, tc := range []struct {
+		name string
+		in   error
+	}{
+		{"not found", banx.ErrNotFound},
+		{"department mismatch", banx.ErrDepartmentMismatch},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := &stubGeocoder{err: tc.in}
+			n := NewBANNormalizer(g, nil)
+			_, err := n.Normalize(context.Background(), "garbage address")
+			if !errors.Is(err, ErrAddressNotFound) {
+				t.Errorf("err = %v, want errors.Is ErrAddressNotFound", err)
+			}
+			if !errors.Is(err, tc.in) {
+				t.Errorf("err = %v, want errors.Is %v (original sentinel preserved)", err, tc.in)
+			}
+		})
 	}
+
+	t.Run("generic error is not ErrAddressNotFound", func(t *testing.T) {
+		g := &stubGeocoder{err: errors.New("ban: 503")}
+		n := NewBANNormalizer(g, nil)
+		_, err := n.Normalize(context.Background(), "10 rue X")
+		if errors.Is(err, ErrAddressNotFound) {
+			t.Errorf("generic geocoder error wrongly classified as ErrAddressNotFound: %v", err)
+		}
+	})
 }
 
 func TestBANNormalizer_PopulatesCityFromCommunes(t *testing.T) {

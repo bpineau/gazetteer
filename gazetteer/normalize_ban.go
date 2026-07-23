@@ -2,6 +2,8 @@ package gazetteer
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/communes"
@@ -53,6 +55,12 @@ func (n *BANNormalizer) WithIRIS(r IRISResolver) *BANNormalizer {
 func (n *BANNormalizer) Normalize(ctx context.Context, addr string) (Listing, error) {
 	r, err := n.geocoder.Geocode(ctx, banx.GeocodeQuery{Address: addr})
 	if err != nil {
+		// Raise the "no such address" cases to the core taxonomy so consumers
+		// classify on gazetteer.ErrAddressNotFound instead of importing banx.
+		// Double-%w keeps errors.Is matching the original banx sentinels too.
+		if errors.Is(err, banx.ErrNotFound) || errors.Is(err, banx.ErrDepartmentMismatch) {
+			return Listing{}, fmt.Errorf("%w: %w", ErrAddressNotFound, err)
+		}
 		return Listing{}, err
 	}
 	lat, lon := r.Lat, r.Lon
