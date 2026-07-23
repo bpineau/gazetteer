@@ -27,6 +27,11 @@ func newSet() dataset.Set {
 		Raw:       rawFiles(),
 		Transform: transform,
 		Validate:  validate,
+		// The embedded aggregate covers DVF through 2024 (the refresh window
+		// bumped to 2023-2025 in code, pending a re-refresh — see transform.go).
+		// geo-dvf publishes a full year annually.
+		Vintage:               "2024-12",
+		ExpectedCadenceMonths: 12,
 	}
 }
 

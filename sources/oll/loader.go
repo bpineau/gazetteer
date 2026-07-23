@@ -23,6 +23,10 @@ var set = dataset.Set{
 	Raw:       aggloRawFiles(),
 	Transform: transform,
 	Validate:  validate,
+	// Newest observatory vintage in the snapshot (Toulouse/Montpellier 2025;
+	// most agglos 2024). OLL republishes each agglo annually.
+	Vintage:               "2025-01",
+	ExpectedCadenceMonths: 12,
 }
 
 // aggloRawFiles lists one raw archive per configured agglomeration.
