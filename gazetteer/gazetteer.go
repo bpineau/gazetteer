@@ -16,11 +16,12 @@ import (
 // Builder configures a Client. Use NewBuilder, chain With* methods, call
 // Build. After Build the Builder may be discarded.
 type Builder struct {
-	sources    []Source
-	httpClient *http.Client
-	logger     *slog.Logger
-	maxConcur  int
-	normalizer Normalizer
+	sources       []Source
+	httpClient    *http.Client
+	logger        *slog.Logger
+	maxConcur     int
+	perSrcTimeout time.Duration
+	normalizer    Normalizer
 }
 
 // NewBuilder returns a Builder pre-populated with sane defaults
@@ -99,6 +100,33 @@ func (b *Builder) WithMaxConcurrency(n int) *Builder {
 	return b
 }
 
+// WithPerSourceTimeout bounds how long any single Source may run inside a
+// Collect. Each Source's Query receives a context derived from the Collect
+// ctx with this deadline; a Source that overruns is cut and its Result is
+// classified StatusFailedTransient (the deadline surfaces as
+// context.DeadlineExceeded, which the Status taxonomy treats as
+// retryable), while its fast siblings complete normally. Every Result —
+// including the timed-out one — carries its ElapsedMS.
+//
+// The default is 0 (disabled): no per-source deadline, matching the
+// historical behavior. This is deliberate — "the data is the product",
+// and multi-request Sources (dvf's per-section fan-out, osm's mirror
+// ladder) can legitimately run for minutes to return complete data, so
+// the library does not silently truncate them out of the box. Only httpx
+// bounds an individual request (60 s). Latency-sensitive callers that must
+// bound the whole Dossier — e.g. an interactive endpoint — should opt in
+// to a generous ceiling (45 s is a reasonable starting point: longer than
+// any single HTTP request, short enough to cap the worst case). A Source
+// that overruns loses only its own contribution; the Dossier degrades
+// gracefully to a partial answer.
+//
+// Zero or negative disables the bound. Factory callers reach this via the
+// Builder path: factory.BuilderDefault(ctx, opts).WithPerSourceTimeout(d).Build().
+func (b *Builder) WithPerSourceTimeout(d time.Duration) *Builder {
+	b.perSrcTimeout = d
+	return b
+}
+
 // WithNormalizer installs a Normalizer on the Builder. The built
 // Client exposes a Normalize method that delegates to it. When no
 // Normalizer is installed, Client.Normalize returns
@@ -119,22 +147,24 @@ func (b *Builder) Build() (*Client, error) {
 		names[s.Name()] = true
 	}
 	c := &Client{
-		sources:    append([]Source(nil), b.sources...),
-		httpClient: b.httpClient,
-		logger:     b.logger,
-		maxConcur:  b.maxConcur,
-		normalizer: b.normalizer,
+		sources:       append([]Source(nil), b.sources...),
+		httpClient:    b.httpClient,
+		logger:        b.logger,
+		maxConcur:     b.maxConcur,
+		perSrcTimeout: b.perSrcTimeout,
+		normalizer:    b.normalizer,
 	}
 	return c, nil
 }
 
 // Client is the immutable, ready-to-use compiler of Dossiers.
 type Client struct {
-	sources    []Source
-	httpClient *http.Client
-	logger     *slog.Logger
-	maxConcur  int
-	normalizer Normalizer
+	sources       []Source
+	httpClient    *http.Client
+	logger        *slog.Logger
+	maxConcur     int
+	perSrcTimeout time.Duration
+	normalizer    Normalizer
 }
 
 // Collect runs every configured Source in parallel, populates a Dossier
@@ -218,7 +248,7 @@ func (c *Client) collect(ctx context.Context, l Listing, sources []Source) Dossi
 				sem <- struct{}{}
 				defer func() { <-sem }()
 			}
-			r := runOne(ctx, s, l)
+			r := runOne(ctx, s, l, c.perSrcTimeout)
 			mu.Lock()
 			results[s.Name()] = r
 			mu.Unlock()
@@ -234,12 +264,18 @@ func (c *Client) collect(ctx context.Context, l Listing, sources []Source) Dossi
 	}
 }
 
-func runOne(ctx context.Context, s Source, l Listing) (r Result) {
+func runOne(ctx context.Context, s Source, l Listing, timeout time.Duration) (r Result) {
+	start := time.Now()
 	r = Result{
 		Name:      s.Name(),
 		Version:   s.Version(),
-		FetchedAt: time.Now(),
+		FetchedAt: start,
 	}
+	// Record the elapsed time for every run — success, empty, failure,
+	// timeout, or recovered panic. Registered first so it runs LAST
+	// (defers are LIFO), capturing the final Result after the panic
+	// recovery below has stamped its Status.
+	defer func() { r.ElapsedMS = time.Since(start).Milliseconds() }()
 	// A panicking Source (typically an out-of-tree plugin bug) must not
 	// take down the host process mid-Collect: convert the panic into a
 	// permanent failure on this Source's Result and let the siblings
@@ -254,6 +290,16 @@ func runOne(ctx context.Context, s Source, l Listing) (r Result) {
 				"source", s.Name(), "panic", v, "stack", string(debug.Stack()))
 		}
 	}()
+	// Bound this single Source so a slow multi-request Source (dvf's
+	// per-section fan-out, osm's mirror ladder) cannot drag the whole
+	// Collect. The deadline surfaces as context.DeadlineExceeded, which
+	// classifyErr routes to StatusFailedTransient (retryable). Disabled
+	// when timeout <= 0.
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 	data, err := s.Query(ctx, l)
 	if err != nil {
 		r.Err = err

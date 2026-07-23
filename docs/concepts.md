@@ -81,13 +81,18 @@ type Result struct {
     Version   int
     Status    Status
     FetchedAt time.Time
+    ElapsedMS int64 // wall-clock Query time, populated by every Collect run
     Err       error
     Data      any   // typed payload
     Evidence  any   // optional reproducibility sidecar
 }
 ```
 
-`Status` classifies the outcome (see below). `Data` is a pointer to a
+`Status` classifies the outcome (see below). `ElapsedMS` records how long
+each Source's Query took (success or failure alike) — the signal behind
+`Builder.WithPerSourceTimeout`, which bounds any single Source so a slow
+one cannot drag the whole Dossier (disabled by default; see its godoc).
+`Data` is a pointer to a
 package-defined typed struct (`*dvf.Result`, `*osm.Result`, …).
 `Evidence`, when populated, captures input fingerprint, ladder tier
 used, resolver provenance — anything that helps a downstream consumer

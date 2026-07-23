@@ -33,6 +33,16 @@ type Result struct {
 	Status    Status
 	FetchedAt time.Time
 
+	// ElapsedMS is the wall-clock time the Source's Query took, in
+	// whole milliseconds — populated by the Client for every run
+	// (success, empty, failure, timeout, or recovered panic). It lets a
+	// caller see who paid what latency in a Collect, and is the signal
+	// behind Builder.WithPerSourceTimeout: a Source whose ElapsedMS
+	// approaches the configured deadline is the one dragging the Dossier.
+	// Zero for a Result built by hand (e.g. in tests) rather than by
+	// Collect.
+	ElapsedMS int64
+
 	// Err is non-nil iff Status is a failure status. JSON round-trip
 	// caveat: Err is serialised as its message string, so after a
 	// Dossier round-trip errors.Is/As matching stops working — gate
@@ -92,6 +102,7 @@ func (r Result) MarshalJSON() ([]byte, error) {
 		Version   int             `json:"version"`
 		Status    Status          `json:"status"`
 		FetchedAt time.Time       `json:"fetched_at,omitzero"`
+		ElapsedMS int64           `json:"elapsed_ms,omitempty"`
 		Err       string          `json:"err,omitempty"`
 		Data      json.RawMessage `json:"data,omitempty"`
 		Evidence  json.RawMessage `json:"evidence,omitempty"`
@@ -101,6 +112,7 @@ func (r Result) MarshalJSON() ([]byte, error) {
 		Version:   r.Version,
 		Status:    r.Status,
 		FetchedAt: r.FetchedAt,
+		ElapsedMS: r.ElapsedMS,
 	}
 	if r.Err != nil {
 		w.Err = r.Err.Error()

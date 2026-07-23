@@ -70,6 +70,7 @@ func (d *Dossier) UnmarshalJSON(b []byte) error {
 		Version   int             `json:"version"`
 		Status    string          `json:"status"`
 		FetchedAt time.Time       `json:"fetched_at"`
+		ElapsedMS int64           `json:"elapsed_ms"`
 		Err       string          `json:"err"`
 		Data      json.RawMessage `json:"data"`
 		Evidence  json.RawMessage `json:"evidence"`
@@ -94,6 +95,7 @@ func (d *Dossier) UnmarshalJSON(b []byte) error {
 			Version:   r.Version,
 			Status:    Status(r.Status),
 			FetchedAt: r.FetchedAt,
+			ElapsedMS: r.ElapsedMS,
 		}
 		if r.Err != "" {
 			out.Err = fmt.Errorf("%s", r.Err)
