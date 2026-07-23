@@ -101,7 +101,7 @@ var sourceDescriptors = map[string]sourceDescriptor{
 		Batch:   true,
 		Summary: "Per-commune DVF aggregate — median €/m² + quartiles (3-year window, apartment sales, offline).",
 		Inputs:  []inputClause{need("INSEE")}, Coverage: "national",
-		Feeds: []string{"prospection: commune-level price benchmark"},
+		Feeds: []string{"appraisal.PricePerM2", "prospection: commune-level price benchmark"},
 	},
 	"encadrement": {
 		Batch:    true,
