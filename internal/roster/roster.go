@@ -71,6 +71,10 @@ type Deps struct {
 	// DataDir is the gazetteer data directory; refreshed artifacts found
 	// there override the embedded copies. Empty means embedded-only.
 	DataDir string
+
+	// RNCDepts restricts the RNC source to these departments (by INSEE
+	// prefix). Empty loads the national registry. See factory.Options.RNCDepts.
+	RNCDepts []string
 }
 
 // Entry binds a Source name to its constructor.
@@ -259,7 +263,7 @@ func Entries() []Entry {
 			return sitadel.NewSource(sitadel.Options{DataDir: d.DataDir}), nil
 		}},
 		{Name: rnc.Name, Build: func(d Deps) (gazetteer.Source, error) {
-			return rnc.NewSource(rnc.Options{DataDir: d.DataDir}), nil
+			return rnc.NewSource(rnc.Options{DataDir: d.DataDir, Depts: d.RNCDepts}), nil
 		}},
 		{Name: ips_ecoles.Name, Build: func(d Deps) (gazetteer.Source, error) {
 			return ips_ecoles.NewSource(ips_ecoles.Options{DataDir: d.DataDir}), nil

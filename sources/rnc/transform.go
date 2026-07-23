@@ -179,7 +179,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 // validate gates publication: the rebuilt artifact must gunzip, parse and be
 // non-empty.
 func validate(r io.Reader) error {
-	idx, err := parseIndex(r)
+	idx, err := parseIndexStream(r, nil)
 	if err != nil {
 		return err
 	}
