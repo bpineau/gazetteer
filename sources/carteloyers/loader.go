@@ -1,6 +1,7 @@
 package carteloyers
 
 import (
+	"compress/gzip"
 	"embed"
 	"encoding/csv"
 	"errors"
@@ -14,7 +15,7 @@ import (
 	"github.com/bpineau/gazetteer/helpers/frnorm"
 )
 
-//go:embed data/carte_loyers_appartement.csv data/carte_loyers_maison.csv data/carte_loyers_app12.csv data/carte_loyers_app3.csv
+//go:embed data/carte_loyers_appartement.csv.gz data/carte_loyers_maison.csv.gz data/carte_loyers_app12.csv.gz data/carte_loyers_app3.csv.gz
 var embedFS embed.FS
 
 // typologyFile binds one INRAE typology to its embedded CSV. Each file is
@@ -40,10 +41,10 @@ func newSet(processed, rawName, rawURL string) dataset.Set {
 }
 
 var fileSets = []typologyFile{
-	{TypologyApartment, newSet("carte_loyers_appartement.csv", "carte_loyers.raw.appartement.csv", urlAppartement)},
-	{TypologyHouse, newSet("carte_loyers_maison.csv", "carte_loyers.raw.maison.csv", urlMaison)},
-	{TypologyApt12, newSet("carte_loyers_app12.csv", "carte_loyers.raw.app12.csv", urlApt12)},
-	{TypologyApt3, newSet("carte_loyers_app3.csv", "carte_loyers.raw.app3.csv", urlApt3)},
+	{TypologyApartment, newSet("carte_loyers_appartement.csv.gz", "carte_loyers.raw.appartement.csv", urlAppartement)},
+	{TypologyHouse, newSet("carte_loyers_maison.csv.gz", "carte_loyers.raw.maison.csv", urlMaison)},
+	{TypologyApt12, newSet("carte_loyers_app12.csv.gz", "carte_loyers.raw.app12.csv", urlApt12)},
+	{TypologyApt3, newSet("carte_loyers_app3.csv.gz", "carte_loyers.raw.app3.csv", urlApt3)},
 }
 
 // Row captures one INSEE × typology observation. Loyers are in
@@ -137,7 +138,12 @@ func loadTypology(s dataset.Set, dir string) (map[string]Row, error) {
 		return nil, err
 	}
 	defer func() { _ = rc.Close() }()
-	return parseCSV(rc)
+	zr, err := gzip.NewReader(rc)
+	if err != nil {
+		return nil, fmt.Errorf("gunzip: %w", err)
+	}
+	defer func() { _ = zr.Close() }()
+	return parseCSV(zr)
 }
 
 func parseCSV(src io.Reader) (map[string]Row, error) {

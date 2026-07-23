@@ -2,6 +2,7 @@ package taxefonciere
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"io"
@@ -9,6 +10,20 @@ import (
 	"os"
 	"testing"
 )
+
+// gunzip decodes the gzipped-JSON artifact the transforms now emit.
+func gunzip(t *testing.T, b []byte) []byte {
+	t.Helper()
+	zr, err := gzip.NewReader(bytes.NewReader(b))
+	if err != nil {
+		t.Fatalf("gunzip: %v", err)
+	}
+	out, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatalf("gunzip read: %v", err)
+	}
+	return out
+}
 
 // closeEnough reports whether two rate/ratio values agree within float
 // noise. Per-commune medians are stored unrounded, so the even-count mean
@@ -25,7 +40,7 @@ func (f fixtureRawSet) Open(string) (io.ReadCloser, error) { return os.Open(f.pa
 func decodeV1(t *testing.T, b []byte) V1Index {
 	t.Helper()
 	var idx V1Index
-	if err := json.Unmarshal(b, &idx); err != nil {
+	if err := json.Unmarshal(gunzip(t, b), &idx); err != nil {
 		t.Fatalf("decode v1: %v", err)
 	}
 	return idx
@@ -34,7 +49,7 @@ func decodeV1(t *testing.T, b []byte) V1Index {
 func decodeV2(t *testing.T, b []byte) V2Index {
 	t.Helper()
 	var idx V2Index
-	if err := json.Unmarshal(b, &idx); err != nil {
+	if err := json.Unmarshal(gunzip(t, b), &idx); err != nil {
 		t.Fatalf("decode v2: %v", err)
 	}
 	return idx

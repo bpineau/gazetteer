@@ -2,7 +2,6 @@ package taxefonciere
 
 import (
 	"embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,7 +10,7 @@ import (
 	"github.com/bpineau/gazetteer/dataset"
 )
 
-//go:embed data/taxe_fonciere_ratios.json data/fiscalite_locale.json
+//go:embed data/taxe_fonciere_ratios.json.gz data/fiscalite_locale.json.gz
 var embedFS embed.FS
 
 // This Source ships two embedded artifacts (V1 legacy ratios + V2 DGFiP
@@ -23,7 +22,7 @@ var (
 		Source:    Name,
 		Version:   Version,
 		Embed:     embedFS,
-		Processed: dataset.File{Name: "taxe_fonciere_ratios.json"},
+		Processed: dataset.File{Name: "taxe_fonciere_ratios.json.gz"},
 		Raw:       []dataset.File{{Name: rawV1Name, URL: rawV1URL}},
 		Transform: transformV1,
 		Validate:  validateV1,
@@ -32,7 +31,7 @@ var (
 		Source:    Name,
 		Version:   Version,
 		Embed:     embedFS,
-		Processed: dataset.File{Name: "fiscalite_locale.json"},
+		Processed: dataset.File{Name: "fiscalite_locale.json.gz"},
 		Raw:       []dataset.File{{Name: rawV2Name, URL: rawV2URL}},
 		Transform: transformV2,
 		Validate:  validateV2,
@@ -127,11 +126,11 @@ func loadV1(dir string) (*V1Index, error) {
 		return nil, fmt.Errorf("taxefonciere: open taxe_fonciere_ratios: %w", err)
 	}
 	defer func() { _ = rc.Close() }()
-	var idx V1Index
-	if err := json.NewDecoder(rc).Decode(&idx); err != nil {
+	idx, err := dataset.ReadGzJSON[V1Index](rc, Name)
+	if err != nil {
 		return nil, fmt.Errorf("taxefonciere: parse taxe_fonciere_ratios: %w", err)
 	}
-	return &idx, nil
+	return idx, nil
 }
 
 func loadV2(dir string) (*V2Index, error) {
@@ -145,12 +144,12 @@ func loadV2(dir string) (*V2Index, error) {
 		return nil, fmt.Errorf("taxefonciere: open fiscalite_locale: %w", err)
 	}
 	defer func() { _ = rc.Close() }()
-	var idx V2Index
-	if err := json.NewDecoder(rc).Decode(&idx); err != nil {
+	idx, err := dataset.ReadGzJSON[V2Index](rc, Name)
+	if err != nil {
 		return nil, fmt.Errorf("taxefonciere: parse fiscalite_locale: %w", err)
 	}
-	applyV2Defaults(&idx)
-	return &idx, nil
+	applyV2Defaults(idx)
+	return idx, nil
 }
 
 // applyV2Defaults backstops the VLC tariff + abattement when the upstream
