@@ -24,9 +24,9 @@ func TestTransform_Golden(t *testing.T) {
 	if err := validate(bytes.NewReader(buf.Bytes())); err != nil {
 		t.Fatalf("validate: %v", err)
 	}
-	idx, err := parseIndex(bytes.NewReader(buf.Bytes()))
+	idx, err := parseIndexStream(bytes.NewReader(buf.Bytes()), nil)
 	if err != nil {
-		t.Fatalf("parseIndex: %v", err)
+		t.Fatalf("parseIndexStream: %v", err)
 	}
 	if idx.Count() != 4 {
 		t.Fatalf("Count = %d, want 4", idx.Count())

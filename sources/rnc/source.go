@@ -3,6 +3,7 @@ package rnc
 import (
 	"context"
 	"fmt"
+	"io"
 	"regexp"
 	"strconv"
 	"strings"
@@ -22,15 +23,39 @@ type Options struct {
 	// DataDir is the gazetteer data directory; a refreshed artifact there
 	// takes precedence over the embedded one. Empty means embedded only.
 	DataDir string
+	// Depts restricts the loaded copropriétés to these departments (by INSEE
+	// prefix). Empty loads the national dataset. A build scoped to a region
+	// (e.g. Île-de-France) passes its departments here to cut the resident
+	// set from ~500 MB to a fraction; an address outside the scope simply has
+	// no copro data (a graceful empty result, never an error).
+	Depts []string
 }
 
 // Source implements gazetteer.Source for the RNC copropriété context.
 type Source struct {
 	opts Options
+	// lazy caches a dept-filtered index for the Source instance (the national
+	// singleton Load cannot be reused: its resident set depends on the filter).
+	lazy dataset.Lazy[Index]
 }
 
 // NewSource builds an rnc Source. Zero-valued Options is fine.
 func NewSource(opts Options) *Source { return &Source{opts: opts} }
+
+// index resolves the copropriété index this Source queries: an injected stub,
+// the shared national singleton (no dept filter), or a per-instance
+// dept-filtered load.
+func (s *Source) index() (*Index, error) {
+	if s.opts.Index != nil {
+		return s.opts.Index, nil
+	}
+	if len(s.opts.Depts) == 0 {
+		return Load(s.opts.DataDir)
+	}
+	return s.lazy.Load(set, s.opts.DataDir, func(r io.Reader) (*Index, error) {
+		return parseIndexStream(r, s.opts.Depts)
+	})
+}
 
 // Name implements gazetteer.Source.
 func (s *Source) Name() string { return Name }
@@ -49,13 +74,9 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	if strings.TrimSpace(l.INSEE) == "" {
 		return nil, fmt.Errorf("rnc: %w: listing.INSEE required", gazetteer.ErrInsufficientInputs)
 	}
-	idx := s.opts.Index
-	if idx == nil {
-		loaded, err := Load(s.opts.DataDir)
-		if err != nil {
-			return nil, fmt.Errorf("rnc: %w: load dataset: %w", gazetteer.ErrUpstreamPermanent, err)
-		}
-		idx = loaded
+	idx, err := s.index()
+	if err != nil {
+		return nil, fmt.Errorf("rnc: %w: load dataset: %w", gazetteer.ErrUpstreamPermanent, err)
 	}
 
 	e, method, conf, dist := idx.match(l)

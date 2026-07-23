@@ -1,8 +1,12 @@
 package rnc
 
 import (
+	"compress/gzip"
 	"embed"
+	"encoding/json"
+	"fmt"
 	"io"
+	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
@@ -77,20 +81,132 @@ type Index struct {
 
 var lazyIndex dataset.Lazy[Index]
 
-// Load returns the singleton index, resolving from dir (datadir) with a
-// fallback to the embedded artifact, parsing on first call. A missing
+// Load returns the singleton national index, resolving from dir (datadir)
+// with a fallback to the embedded artifact, parsing on first call. A missing
 // non-embedded dataset yields an empty index (graceful degradation).
+//
+// Dept-filtered loads (rnc.Options.Depts) do NOT share this singleton — see
+// (*Source).index — because the resident set then depends on the filter.
 func Load(dir string) (*Index, error) {
-	return lazyIndex.Load(set, dir, parseIndex)
+	return lazyIndex.Load(set, dir, func(r io.Reader) (*Index, error) {
+		return parseIndexStream(r, nil)
+	})
 }
 
-func parseIndex(r io.Reader) (*Index, error) {
-	idx, err := dataset.ReadGzJSON[Index](r, Name)
+// parseIndexStream decodes the gzipped national artifact one Entry at a time
+// (a json.Decoder token walk over the "copros" array) rather than
+// materialising the whole 648k-row slice before use. When depts is non-empty
+// it keeps only rows whose INSEE lies in one of those departments, so the peak
+// resident set for a filtered load never exceeds the filtered subset. Repeated
+// low-cardinality strings (department INSEE, syndic type, mandate status,
+// construction period, QPV identity) are interned to collapse the ~500 MB
+// national footprint.
+func parseIndexStream(r io.Reader, depts []string) (*Index, error) {
+	zr, err := gzip.NewReader(r)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: gunzip: %w", Name, err)
+	}
+	defer func() { _ = zr.Close() }()
+
+	dec := json.NewDecoder(zr)
+	if err := expectDelim(dec, '{'); err != nil {
+		return nil, fmt.Errorf("%s: parse json: %w", Name, err)
+	}
+
+	idx := &Index{}
+	keep := deptMatcher(depts)
+	pool := make(map[string]string)
+	intern := func(s string) string {
+		if s == "" {
+			return s
+		}
+		if v, ok := pool[s]; ok {
+			return v
+		}
+		pool[s] = s
+		return s
+	}
+
+	for dec.More() {
+		key, err := dec.Token()
+		if err != nil {
+			return nil, fmt.Errorf("%s: parse json: %w", Name, err)
+		}
+		switch key {
+		case "meta":
+			if err := dec.Decode(&idx.Meta); err != nil {
+				return nil, fmt.Errorf("%s: parse meta: %w", Name, err)
+			}
+		case "copros":
+			if err := expectDelim(dec, '['); err != nil {
+				return nil, fmt.Errorf("%s: parse copros: %w", Name, err)
+			}
+			for dec.More() {
+				var e Entry
+				if err := dec.Decode(&e); err != nil {
+					return nil, fmt.Errorf("%s: parse copro: %w", Name, err)
+				}
+				if keep != nil && !keep(e.INSEE) {
+					continue
+				}
+				e.INSEE = intern(e.INSEE)
+				e.TypeSyndic = intern(e.TypeSyndic)
+				e.MandatEnCours = intern(e.MandatEnCours)
+				e.ConstructionPeriod = intern(e.ConstructionPeriod)
+				e.QPVCode = intern(e.QPVCode)
+				e.QPVName = intern(e.QPVName)
+				idx.Copros = append(idx.Copros, e)
+			}
+			if err := expectDelim(dec, ']'); err != nil {
+				return nil, fmt.Errorf("%s: parse copros end: %w", Name, err)
+			}
+		default:
+			var skip json.RawMessage
+			if err := dec.Decode(&skip); err != nil {
+				return nil, fmt.Errorf("%s: skip %v: %w", key, key, err)
+			}
+		}
 	}
 	idx.buildLookups()
 	return idx, nil
+}
+
+// expectDelim reads the next token and asserts it is the given JSON delimiter.
+func expectDelim(dec *json.Decoder, want json.Delim) error {
+	tok, err := dec.Token()
+	if err != nil {
+		return err
+	}
+	if d, ok := tok.(json.Delim); !ok || d != want {
+		return fmt.Errorf("expected %q, got %v", want, tok)
+	}
+	return nil
+}
+
+// deptMatcher returns a predicate keeping only INSEE codes in one of depts, or
+// nil (keep everything) when depts is empty. Matching is by INSEE prefix, so
+// 2-digit metropolitan departments and 3-digit DOM codes both work.
+func deptMatcher(depts []string) func(insee string) bool {
+	if len(depts) == 0 {
+		return nil
+	}
+	prefixes := make([]string, 0, len(depts))
+	for _, d := range depts {
+		if d = strings.TrimSpace(d); d != "" {
+			prefixes = append(prefixes, d)
+		}
+	}
+	if len(prefixes) == 0 {
+		return nil
+	}
+	return func(insee string) bool {
+		for _, p := range prefixes {
+			if strings.HasPrefix(insee, p) {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 func (idx *Index) buildLookups() {

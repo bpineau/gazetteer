@@ -90,6 +90,13 @@ type Options struct {
 	// would otherwise silently leave the default in place. To ADD a
 	// source (a plugin), use Builder.With instead.
 	SourceOverrides map[string]func(Deps) (gazetteer.Source, error)
+
+	// RNCDepts restricts the RNC copropriété source to these departments
+	// (by INSEE prefix). Empty loads the national registry (~500 MB
+	// resident). A regionally-scoped deployment (e.g. Île-de-France) sets
+	// its departments here to shrink the resident set; an address outside
+	// the scope simply carries no copro data (graceful empty, not an error).
+	RNCDepts []string
 }
 
 // Deps is the shared dependency bundle the factory hands to every
@@ -203,7 +210,7 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		Communes: com,
 		DataDir:  resolveDataDir(opts.DataDir),
 	}
-	rdeps := roster.Deps{HTTP: deps.HTTP, Geocoder: deps.Geocoder, Communes: deps.Communes, DataDir: deps.DataDir}
+	rdeps := roster.Deps{HTTP: deps.HTTP, Geocoder: deps.Geocoder, Communes: deps.Communes, DataDir: deps.DataDir, RNCDepts: opts.RNCDepts}
 
 	b := gazetteer.NewBuilder().
 		WithHTTPClient(hc.HTTPClient())
