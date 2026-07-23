@@ -3,10 +3,13 @@ package gazetteer
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/bpineau/gazetteer/helpers/httpx"
 )
 
 func fetchTestServer(t *testing.T, status int, body string, gotAccept *string) *httptest.Server {
@@ -92,5 +95,33 @@ func TestFetchUpstreamNilClientUsesContext(t *testing.T) {
 	body, err := FetchUpstream(ctx, nil, srv.URL, FetchSpec{Prefix: "demo"})
 	if err != nil || string(body) != "ok" {
 		t.Errorf("FetchUpstream(nil client) = (%q, %v), want (ok, nil)", body, err)
+	}
+}
+
+// zeroReader yields an endless stream of zero bytes without allocating.
+type zeroReader struct{}
+
+func (zeroReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 0
+	}
+	return len(p), nil
+}
+
+// TestFetchUpstreamOverLimit verifies a response larger than the response-size
+// bound is rejected (as a permanent failure) rather than read into memory.
+func TestFetchUpstreamOverLimit(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.CopyN(w, zeroReader{}, httpx.DefaultMaxResponseBytes+64)
+	}))
+	defer srv.Close()
+
+	_, err := FetchUpstream(context.Background(), srv.Client(), srv.URL, FetchSpec{Prefix: "test"})
+	if err == nil {
+		t.Fatal("expected an error for an over-limit response, got nil")
+	}
+	if !errors.Is(err, ErrUpstreamPermanent) {
+		t.Errorf("err = %v, want ErrUpstreamPermanent (over-limit)", err)
 	}
 }

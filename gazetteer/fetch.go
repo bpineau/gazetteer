@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/bpineau/gazetteer/helpers/httpx"
 )
 
 // Fetcher is the injectable fetch seam every live-HTTP Source exposes on
@@ -85,9 +87,16 @@ func FetchUpstream(ctx context.Context, client *http.Client, url string, spec Fe
 		return nil, fmt.Errorf("%s: %w: http %d", spec.Prefix, ErrUpstreamPermanent, resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	// Bound the read so a runaway or malicious response cannot exhaust memory,
+	// mirroring httpx.DefaultMaxResponseBytes. LimitReader caps at limit+1 so an
+	// over-limit body is detected (len > limit) rather than silently truncated.
+	const limit = httpx.DefaultMaxResponseBytes
+	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w: read body: %w", spec.Prefix, ErrUpstreamUnavailable, err)
+	}
+	if int64(len(body)) > limit {
+		return nil, fmt.Errorf("%s: %w: response exceeds %d bytes", spec.Prefix, ErrUpstreamPermanent, limit)
 	}
 	return body, nil
 }
