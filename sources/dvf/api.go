@@ -39,7 +39,11 @@
 // users (wired against an in-memory cache). Within one Query, a
 // per-call memo additionally guarantees each (insee, section) mutation
 // list is fetched at most once even when the geographically-nested
-// fallback tiers overlap.
+// fallback tiers overlap. Across concurrent Queries on the shared
+// Source, a singleflight.Group coalesces overlapping (insee, section)
+// mutation fetches so two Collects for nearby addresses pay for a
+// section once while it is in flight (in-flight dedup only — no caching,
+// no staleness; see Source.fetchMutations).
 //
 // # Rhythm
 //
