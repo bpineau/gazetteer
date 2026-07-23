@@ -64,6 +64,7 @@ func TestBuilder_OptionSetters(t *testing.T) {
 		WithHTTPClient(customHC).
 		WithLogger(customLog).
 		WithMaxConcurrency(3).
+		WithPerSourceTimeout(7 * time.Second).
 		WithNormalizer(&fakeNormalizer{})
 
 	if b.httpClient != customHC {
@@ -74,6 +75,9 @@ func TestBuilder_OptionSetters(t *testing.T) {
 	}
 	if b.maxConcur != 3 {
 		t.Errorf("WithMaxConcurrency = %d, want 3", b.maxConcur)
+	}
+	if b.perSrcTimeout != 7*time.Second {
+		t.Errorf("WithPerSourceTimeout = %v, want 7s", b.perSrcTimeout)
 	}
 	if b.normalizer == nil {
 		t.Errorf("WithNormalizer did not apply")
@@ -294,5 +298,53 @@ func TestCollectSome(t *testing.T) {
 	// No names ⇒ empty partial Dossier (runs nothing).
 	if e := c.CollectSome(context.Background(), Listing{}); len(e.Results) != 0 {
 		t.Errorf("CollectSome() with no names ran %d sources, want 0", len(e.Results))
+	}
+}
+
+// TestPerSourceTimeout_CutsSlowSourceKeepsFast verifies that a Source
+// overrunning the per-source deadline is cut and classified transient,
+// while a fast sibling still returns data, and that ElapsedMS is populated
+// for the run that was cut (proving it stopped well before its own delay).
+func TestPerSourceTimeout_CutsSlowSourceKeepsFast(t *testing.T) {
+	slow := &slowSource{delay: 5 * time.Second} // would far outlast the deadline
+	c, _ := NewBuilder().
+		With(slow).
+		With(namedSource("fast")).
+		WithPerSourceTimeout(20 * time.Millisecond).
+		Build()
+
+	d := c.Collect(context.Background(), Listing{})
+
+	got := d.Results["slow"]
+	if got.Status != StatusFailedTransient {
+		t.Errorf("slow Status = %v, want %v (deadline ⇒ transient)", got.Status, StatusFailedTransient)
+	}
+	if got.ElapsedMS <= 0 {
+		t.Errorf("slow ElapsedMS = %d, want > 0 (timing must be populated)", got.ElapsedMS)
+	}
+	if got.ElapsedMS > 2000 {
+		t.Errorf("slow ElapsedMS = %d, want well under the 5s delay (it was cut)", got.ElapsedMS)
+	}
+
+	if fast := d.Results["fast"]; fast.Status != StatusOK {
+		t.Errorf("fast Status = %v, want %v (siblings unaffected)", fast.Status, StatusOK)
+	}
+}
+
+// TestPerSourceTimeout_ZeroDisablesCut verifies that with no timeout a slow
+// Source runs to completion (no cut) and still reports its ElapsedMS.
+func TestPerSourceTimeout_ZeroDisablesCut(t *testing.T) {
+	slow := &slowSource{delay: 30 * time.Millisecond}
+	c, _ := NewBuilder().With(slow).Build() // perSrcTimeout == 0 (disabled)
+
+	d := c.Collect(context.Background(), Listing{})
+
+	got := d.Results["slow"]
+	if got.Status != StatusOK {
+		// slowSource returns a non-empty &fakeEmptyPayload{} on completion.
+		t.Errorf("slow Status = %v, want %v (no cut when timeout disabled)", got.Status, StatusOK)
+	}
+	if got.ElapsedMS <= 0 {
+		t.Errorf("slow ElapsedMS = %d, want > 0", got.ElapsedMS)
 	}
 }
