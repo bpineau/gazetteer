@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/circuit"
@@ -172,6 +174,15 @@ type Source struct {
 	api      *API
 	sections *SectionDiscoverer
 	communes communes.Communes
+
+	// mutationsSF coalesces concurrent (insee, section) mutation fetches
+	// across DIFFERENT Query calls on this shared Source. The per-Query
+	// queryMemo already dedupes within one ladder walk; this closes the
+	// remaining gap where two Collects for nearby addresses would fetch
+	// the same section payload simultaneously. It only merges in-flight
+	// duplicates — nothing is cached, so there is no staleness. See
+	// fetchMutations.
+	mutationsSF singleflight.Group
 }
 
 // ErrCircuitTripped is returned when the upstream DVF endpoint has
@@ -440,7 +451,7 @@ func (s *Source) fetchSections(ctx context.Context, memo *queryMemo, insee strin
 			if ctx.Err() != nil || s.circuitTripped() {
 				return
 			}
-			r, err := s.api.GetMutations(ctx, insee, sec)
+			r, err := s.fetchMutations(ctx, insee, sec)
 			if err != nil {
 				if errors.Is(err, ErrSectionNotFound) {
 					// Definitive: the section has no DVF data.
@@ -462,6 +473,53 @@ func (s *Source) fetchSections(ctx context.Context, memo *queryMemo, insee strin
 	}
 	wg.Wait()
 	return all
+}
+
+// fetchMutations issues one GET /mutations/{insee}/{section}, coalescing
+// concurrent fetches for the SAME (insee, section) across different Query
+// calls into a single upstream request via mutationsSF. Nearby-address
+// Collects that reach the same cadastral section therefore pay for it once
+// while it is in flight — the per-Query queryMemo only dedupes within one
+// ladder walk, so without this the shared payload would be re-fetched in
+// parallel. It merges in-flight duplicates only; nothing is cached, so a
+// completed fetch releases its key and the next call fetches fresh data
+// (no staleness).
+//
+// Two properties are load-bearing:
+//
+//   - Context isolation. The shared fetch runs on context.WithoutCancel of
+//     the initiating caller's ctx, so an initiator that gives up (its ctx
+//     is cancelled or times out) does NOT cancel the request the surviving
+//     waiters still depend on — a cancelled initiator must not poison the
+//     shared result. GetMutations still wraps its GET in APICallTimeout, so
+//     detaching from the caller's deadline cannot leak an unbounded
+//     request; WithoutCancel keeps the ctx values (HTTP client, logger).
+//     Each caller selects on its OWN ctx, so a cancelled caller returns
+//     promptly with ctx.Err() without waiting on the shared flight.
+//
+//   - Error fidelity. singleflight delivers the (value, error) pair to
+//     every waiter, so a failure — a transport error, or a breaker-tripped
+//     ErrCircuitOpen that GetMutations returns before any HTTP call — is
+//     propagated to all waiters as an error and is never shared as a
+//     successful empty response.
+func (s *Source) fetchMutations(ctx context.Context, insee, section string) (MutationsResponse, error) {
+	key := insee + "/" + section
+	// Detach the shared fetch from THIS caller's cancellation/deadline so
+	// the caller that happens to initiate the flight cannot cancel it out
+	// from under its siblings.
+	shared := context.WithoutCancel(ctx)
+	ch := s.mutationsSF.DoChan(key, func() (any, error) {
+		return s.api.GetMutations(shared, insee, section)
+	})
+	select {
+	case <-ctx.Done():
+		return MutationsResponse{}, ctx.Err()
+	case res := <-ch:
+		if res.Err != nil {
+			return MutationsResponse{}, res.Err
+		}
+		return res.Val.(MutationsResponse), nil
+	}
 }
 
 // circuitTripped reports whether the process-local DVF breaker is open.
