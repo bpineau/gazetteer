@@ -12,6 +12,16 @@ var (
 	// the input set changes.
 	ErrInsufficientInputs = errors.New("gazetteer: insufficient inputs")
 
+	// ErrAddressNotFound signals that Normalize could not resolve a
+	// free-text address to a real location — the geocoder returned no
+	// feature, or the only candidate was outside the input zip's
+	// département. Consumers (e.g. an HTTP layer mapping to 404) classify
+	// with errors.Is(err, gazetteer.ErrAddressNotFound) instead of
+	// importing the helpers/banx sentinels directly. The BANNormalizer
+	// wraps banx.ErrNotFound and banx.ErrDepartmentMismatch with %w, so
+	// errors.Is still matches those older sentinels too.
+	ErrAddressNotFound = errors.New("gazetteer: address not found")
+
 	// ErrUnsupportedPropertyType signals that the Source cannot reason
 	// about Listing.PropertyType (e.g. DVF on parking lots). Stable
 	// given the same property_type — callers may record a sentinel.
