@@ -37,7 +37,7 @@ var (
 		Version:   Version,
 		Embed:     embedFS,
 		Processed: dataset.File{Name: "encadrement_plaine_commune.json"},
-		Raw:       []dataset.File{{Name: rawPlaineCommuneName, URL: rawPlaineCommuneURL}},
+		Raw:       eptRawFiles(eptRawNamePlaineCommune, rawPlaineCommuneKMLBase),
 		Transform: transformPlaineCommune,
 		Validate:  validatePlaineCommune,
 	}
@@ -46,7 +46,7 @@ var (
 		Version:   Version,
 		Embed:     embedFS,
 		Processed: dataset.File{Name: "encadrement_est_ensemble.json"},
-		Raw:       []dataset.File{{Name: rawEstEnsembleName, URL: rawEstEnsembleURL}},
+		Raw:       eptRawFiles(eptRawNameEstEnsemble, rawEstEnsembleKMLBase),
 		Transform: transformEstEnsemble,
 		Validate:  validateEstEnsemble,
 	}

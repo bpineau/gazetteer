@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
-	"github.com/bpineau/gazetteer/helpers/frnorm"
 	"github.com/bpineau/gazetteer/helpers/geoindex"
 )
 
@@ -22,18 +23,34 @@ import (
 // from these upstreams (proven via the python diffs in the design notes):
 //
 //   - Paris: opendata.paris.fr JSON export, filtered to parisYear.
-//   - Plaine Commune: a flat data.gouv.fr JSON array.
+//   - Plaine Commune / Est Ensemble: the DRIHL référence-loyer KML barème
+//     (one KML file per logement × pièces × époque × meublé cell, each
+//     carrying every zone as a Placemark with ref/refmin/refmaj) — this is
+//     the authoritative, annually-renewed source (data.gouv only mirrors an
+//     obsolete 2022/2023 flat export). See eptBaremeVintage.
 //   - Lyon/Villeurbanne: a data.grandlyon.com WFS GeoJSON whose per-IRIS
 //     "valeurs" object nests piece × époque × meublé cells.
 const (
 	rawParisName = "encadrement_paris.raw.json"
 	rawParisURL  = "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/logement-encadrement-des-loyers/exports/json"
 
-	rawPlaineCommuneName = "encadrement_plaine_commune.raw.json"
-	rawPlaineCommuneURL  = "https://static.data.gouv.fr/resources/encadrement-des-loyers-de-plaine-commune/20220608-122406/encadrements-plaine-commune.json"
+	// eptBaremeVintage is the DRIHL arrêté period the EPT barèmes are drawn
+	// from ("du 01 juin 2026 au 31 mai 2027"); it selects the KML directory.
+	// eptBaremeYear is its year, gated by the vintage legality test so a stale
+	// arrêté can never ship silently again.
+	eptBaremeVintage = "2026-06-01"
+	eptBaremeYear    = 2026
 
-	rawEstEnsembleName = "encadrement_est_ensemble.raw.json"
-	rawEstEnsembleURL  = "https://static.data.gouv.fr/resources/encadrement-des-loyers-de-est-ensemble/20230601-202658/encadrements-est-ensemble-2023.json"
+	rawEstEnsembleKMLBase   = "http://www.referenceloyer.drihl.ile-de-france.developpement-durable.gouv.fr/est-ensemble/kml/" + eptBaremeVintage
+	rawPlaineCommuneKMLBase = "http://www.referenceloyer.drihl.ile-de-france.developpement-durable.gouv.fr/plaine-commune/kml/" + eptBaremeVintage
+
+	// eptRawNamePlaineCommune / eptRawNameEstEnsemble prefix the per-cell KML
+	// datadir basenames (both EPTs share the "encadrement" datadir).
+	eptRawNamePlaineCommune = "encadrement_plaine_commune"
+	eptRawNameEstEnsemble   = "encadrement_est_ensemble"
+
+	// eptOpenEndedPiece is the pièces bucket published as "N pièces et plus".
+	eptOpenEndedPiece = 4
 
 	// Zonage géographique (GeoJSON, un feature par commune portant sa zone).
 	// Used to resolve a coordinate to its sub-communal rent-control zone.
@@ -61,10 +78,6 @@ const parisYear = 2025
 // snapshot drops it (Lyon publishes 1/2/3 plus the open-ended cell; the
 // snapshot keeps the three closed buckets only).
 const lyonOpenEndedPiece = "4 et plus"
-
-// pcOpenEndedPiece is the upstream label for the open-ended piece bucket
-// in the Plaine Commune array (kept, mapped to Piece=4 / open-ended).
-const pcOpenEndedPiece = "4 et plus"
 
 // transformParis rebuilds encadrement_paris.json from the opendata.paris.fr
 // JSON export, keeping only parisYear and mapping the export fields to the
@@ -124,74 +137,221 @@ func transformParis(_ context.Context, raw dataset.RawSet, dst io.Writer) error 
 	return json.NewEncoder(dst).Encode(out)
 }
 
-// eptBaremeExportRow is the upstream array shape shared by the two
-// Seine-Saint-Denis EPT barèmes (Plaine Commune, Est Ensemble): the same
-// columns, French-formatted decimal strings (prix_min/med/max) and a
-// "4 et plus" piece label. nombre_de_piece is a JSON number for the closed
-// buckets (1/2/3) but the string "4 et plus" for the open-ended one, so it
-// decodes through a permissive scalar.
-type eptBaremeExportRow struct {
-	Zone        int        `json:"zone"`
-	NombrePiece scalarText `json:"nombre_de_piece"`
-	Annee       string     `json:"annee_de_construction"`
-	PrixMin     scalarText `json:"prix_min"`
-	PrixMed     scalarText `json:"prix_med"`
-	PrixMax     scalarText `json:"prix_max"`
-	Maison      bool       `json:"maison"`
-	Meuble      bool       `json:"meuble"`
+// eptEpoque pairs a DRIHL KML époque slug (used in the filename) with the
+// construction-period label persisted in the barème artifact.
+type eptEpoque struct{ slug, label string }
+
+// The DRIHL barème axes. Their cartesian product is one KML file per cell;
+// each file carries every zone as a Placemark. eptEpoques is kept in the
+// order the committed artifact groups époques (older → newer).
+var (
+	eptEpoques = []eptEpoque{
+		{"inf1946", "avant 1946"},
+		{"1946-1970", "1946-1970"},
+		{"1971-1990", "1971-1990"},
+		{"sup1990", "apres 1990"},
+	}
+	eptPieces    = []int{1, 2, 3, 4}
+	eptLogements = []struct {
+		slug   string
+		maison bool
+	}{{"appartement", false}, {"maison", true}}
+	eptMeubles = []struct {
+		slug   string
+		meuble bool
+	}{{"non-meuble", false}, {"meuble", true}}
+)
+
+// eptKMLCombo is one point of the barème grid; it names the KML file that
+// holds that cell for every zone.
+type eptKMLCombo struct {
+	logementSlug string
+	maison       bool
+	piece        int
+	epoque       eptEpoque
+	meubleSlug   string
+	meuble       bool
+}
+
+// eptKMLCombos enumerates the grid in the committed artifact's row order
+// (zone-major sorting is applied afterwards): logement → pièces → époque →
+// meublé.
+func eptKMLCombos() []eptKMLCombo {
+	out := make([]eptKMLCombo, 0, len(eptLogements)*len(eptPieces)*len(eptEpoques)*len(eptMeubles))
+	for _, lg := range eptLogements {
+		for _, pc := range eptPieces {
+			for _, ep := range eptEpoques {
+				for _, mb := range eptMeubles {
+					out = append(out, eptKMLCombo{
+						logementSlug: lg.slug, maison: lg.maison,
+						piece: pc, epoque: ep,
+						meubleSlug: mb.slug, meuble: mb.meuble,
+					})
+				}
+			}
+		}
+	}
+	return out
+}
+
+// kmlBasename is the DRIHL filename for this cell.
+func (c eptKMLCombo) kmlBasename() string {
+	return fmt.Sprintf("drihl_medianes_%s_%d_%s_%s.kml", c.logementSlug, c.piece, c.epoque.slug, c.meubleSlug)
+}
+
+// eptRawFiles builds the Raw file list for one EPT: one entry per grid cell,
+// its datadir basename prefixed with namePrefix (both EPTs share the datadir)
+// and its URL under kmlBase (the DRIHL vintage directory).
+func eptRawFiles(namePrefix, kmlBase string) []dataset.File {
+	combos := eptKMLCombos()
+	out := make([]dataset.File, 0, len(combos))
+	for _, c := range combos {
+		base := c.kmlBasename()
+		out = append(out, dataset.File{
+			Name: namePrefix + "_" + base,
+			URL:  kmlBase + "/" + base,
+		})
+	}
+	return out
 }
 
 // transformPlaineCommune / transformEstEnsemble rebuild the embedded EPT barème
-// from the data.gouv.fr flat JSON array. Both EPTs publish the identical schema,
-// so they share transformEPTBareme.
+// from the DRIHL référence-loyer KML files. Both EPTs publish the identical
+// grid, so they share transformEPTBareme.
 func transformPlaineCommune(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
-	return transformEPTBareme(raw, rawPlaineCommuneName, dst)
+	return transformEPTBareme(raw, eptRawNamePlaineCommune, dst)
 }
 
 func transformEstEnsemble(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
-	return transformEPTBareme(raw, rawEstEnsembleName, dst)
+	return transformEPTBareme(raw, eptRawNameEstEnsemble, dst)
 }
 
-func transformEPTBareme(raw dataset.RawSet, rawName string, dst io.Writer) error {
-	rc, err := raw.Open(rawName)
+// eptKMLCell is one zone's rates within a single KML file.
+type eptKMLCell struct {
+	zone          int
+	ref, min, max float64
+}
+
+func transformEPTBareme(raw dataset.RawSet, namePrefix string, dst io.Writer) error {
+	var out []eptBaremeRow
+	for _, c := range eptKMLCombos() {
+		name := namePrefix + "_" + c.kmlBasename()
+		cells, err := readEPTKML(raw, name)
+		if err != nil {
+			return fmt.Errorf("encadrement: %s: %w", name, err)
+		}
+		for _, cell := range cells {
+			out = append(out, eptBaremeRow{
+				Zone:           cell.zone,
+				Piece:          c.piece,
+				PieceOpenEnded: c.piece == eptOpenEndedPiece,
+				Epoque:         c.epoque.label,
+				Meuble:         c.meuble,
+				Maison:         c.maison,
+				RefEURPerM2:    cell.ref,
+				MinEURPerM2:    cell.min,
+				MaxEURPerM2:    cell.max,
+			})
+		}
+	}
+	if len(out) == 0 {
+		return fmt.Errorf("encadrement: %s transform produced no rows", namePrefix)
+	}
+	// Deterministic, review-friendly order: zone-major, then the non-maison /
+	// non-meublé apartment block first, iterating pièces then époques.
+	epoqueIdx := map[string]int{}
+	for i, e := range eptEpoques {
+		epoqueIdx[e.label] = i
+	}
+	rank := func(r eptBaremeRow) [5]int {
+		return [5]int{r.Zone, boolRank(r.Maison), boolRank(r.Meuble), r.Piece, epoqueIdx[r.Epoque]}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		ri, rj := rank(out[i]), rank(out[j])
+		for k := range ri {
+			if ri[k] != rj[k] {
+				return ri[k] < rj[k]
+			}
+		}
+		return false
+	})
+	return json.NewEncoder(dst).Encode(out)
+}
+
+func boolRank(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// readEPTKML parses one DRIHL barème KML, returning one cell per distinct
+// zone (a zone whose geometry is split across several Placemarks carries the
+// same rates in each, so the first wins).
+func readEPTKML(raw dataset.RawSet, name string) ([]eptKMLCell, error) {
+	rc, err := raw.Open(name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() { _ = rc.Close() }()
 
-	var in []eptBaremeExportRow
-	if err := json.NewDecoder(dataset.BOMReader(rc)).Decode(&in); err != nil {
-		return fmt.Errorf("encadrement: decode %s: %w", rawName, err)
+	var doc struct {
+		Placemarks []struct {
+			Data []struct {
+				Name  string `xml:"name,attr"`
+				Value string `xml:"value"`
+			} `xml:"ExtendedData>Data"`
+		} `xml:"Document>Placemark"`
+	}
+	if err := xml.NewDecoder(dataset.BOMReader(rc)).Decode(&doc); err != nil {
+		return nil, fmt.Errorf("decode kml: %w", err)
 	}
 
-	out := make([]eptBaremeRow, 0, len(in))
-	for _, r := range in {
-		piece, openEnded, err := parsePiece(string(r.NombrePiece), pcOpenEndedPiece)
+	seen := map[int]bool{}
+	cells := make([]eptKMLCell, 0, len(doc.Placemarks))
+	for _, pm := range doc.Placemarks {
+		m := make(map[string]string, len(pm.Data))
+		for _, d := range pm.Data {
+			m[d.Name] = strings.TrimSpace(d.Value)
+		}
+		zs := m["idZone"]
+		if zs == "" {
+			continue
+		}
+		zone, err := strconv.Atoi(zs)
 		if err != nil {
-			return fmt.Errorf("encadrement: %s piece %q: %w", rawName, r.NombrePiece, err)
+			return nil, fmt.Errorf("bad idZone %q: %w", zs, err)
 		}
-		ref, ok1 := frnorm.ParseFRFloat(string(r.PrixMed))
-		mn, ok2 := frnorm.ParseFRFloat(string(r.PrixMin))
-		mx, ok3 := frnorm.ParseFRFloat(string(r.PrixMax))
+		if seen[zone] {
+			continue
+		}
+		ref, ok1 := parseDotFloat(m["ref"])
+		mn, ok2 := parseDotFloat(m["refmin"])
+		mx, ok3 := parseDotFloat(m["refmaj"])
 		if !ok1 || !ok2 || !ok3 {
-			return fmt.Errorf("encadrement: %s zone %d: bad price cell (med=%q min=%q max=%q)", rawName, r.Zone, r.PrixMed, r.PrixMin, r.PrixMax)
+			return nil, fmt.Errorf("zone %d: bad rate cell (ref=%q min=%q max=%q)", zone, m["ref"], m["refmin"], m["refmaj"])
 		}
-		out = append(out, eptBaremeRow{
-			Zone:           r.Zone,
-			Piece:          piece,
-			PieceOpenEnded: openEnded,
-			Epoque:         r.Annee,
-			Meuble:         r.Meuble,
-			Maison:         r.Maison,
-			RefEURPerM2:    ref,
-			MinEURPerM2:    mn,
-			MaxEURPerM2:    mx,
-		})
+		seen[zone] = true
+		cells = append(cells, eptKMLCell{zone: zone, ref: ref, min: mn, max: mx})
 	}
-	if len(out) == 0 {
-		return fmt.Errorf("encadrement: %s transform produced no rows", rawName)
+	if len(cells) == 0 {
+		return nil, errors.New("no placemarks carrying an idZone")
 	}
-	return json.NewEncoder(dst).Encode(out)
+	return cells, nil
+}
+
+// parseDotFloat parses a dot-decimal rate (the KML uses "27.3"); a comma
+// decimal is tolerated defensively.
+func parseDotFloat(s string) (float64, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, false
+	}
+	f, err := strconv.ParseFloat(strings.Replace(s, ",", ".", 1), 64)
+	if err != nil {
+		return 0, false
+	}
+	return f, true
 }
 
 // zoneGeoSpec describes the per-EPT GeoJSON property keys used to extract a
@@ -451,20 +611,6 @@ func (s *scalarText) UnmarshalJSON(b []byte) error {
 // bool.
 func isMeuble(txt string) bool {
 	return strings.EqualFold(strings.TrimSpace(txt), "meublé")
-}
-
-// parsePiece maps a piece label to (piece, openEnded). The open-ended label
-// ("4 et plus") becomes Piece=4 / openEnded=true; a bare integer becomes
-// Piece=N / openEnded=false.
-func parsePiece(label, openEndedLabel string) (int, bool, error) {
-	if strings.EqualFold(strings.TrimSpace(label), openEndedLabel) {
-		return 4, true, nil
-	}
-	n, err := strconv.Atoi(strings.TrimSpace(label))
-	if err != nil {
-		return 0, false, err
-	}
-	return n, false, nil
 }
 
 // validateParis / validatePlaineCommune / validateLyon gate publication:

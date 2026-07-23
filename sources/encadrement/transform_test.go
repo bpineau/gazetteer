@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/bpineau/gazetteer/dataset"
@@ -18,6 +20,61 @@ import (
 type fixtureRawSet struct{ path string }
 
 func (f fixtureRawSet) Open(string) (io.ReadCloser, error) { return os.Open(f.path) }
+
+// mapRawSet serves named raw bytes from memory, used by the KML-backed EPT
+// barème transform (it reads one KML per grid cell, by name).
+type mapRawSet map[string][]byte
+
+func (m mapRawSet) Open(name string) (io.ReadCloser, error) {
+	b, ok := m[name]
+	if !ok {
+		return nil, fmt.Errorf("mapRawSet: no such raw file %q", name)
+	}
+	return io.NopCloser(bytes.NewReader(b)), nil
+}
+
+// kmlZone is one Placemark's rates in a synthetic DRIHL barème KML.
+type kmlZone struct {
+	zone          int
+	ref, min, max float64
+}
+
+// fakeDRIHLKML renders a DRIHL-shaped barème KML carrying one Placemark per
+// entry (a zone may appear twice to exercise dedup).
+func fakeDRIHLKML(zones []kmlZone) []byte {
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
+	b.WriteString(`<kml xmlns="http://earth.google.com/kml/2.1"><Document>`)
+	for _, z := range zones {
+		fmt.Fprintf(&b, `<Placemark><ExtendedData>`+
+			`<Data name="idZone"><value>%d</value></Data>`+
+			`<Data name="ref"><value>%g</value></Data>`+
+			`<Data name="refmin"><value>%g</value></Data>`+
+			`<Data name="refmaj"><value>%g</value></Data>`+
+			`</ExtendedData></Placemark>`, z.zone, z.ref, z.min, z.max)
+	}
+	b.WriteString(`</Document></kml>`)
+	return []byte(b.String())
+}
+
+// buildEPTRawSet synthesises the full 64-cell KML grid for one EPT (namePrefix
+// keys the files exactly as the transform requests them). Each cell carries
+// zones {307, 308} plus a duplicate 307 (dedup). The (appartement, 2,
+// 1946-1970, non-meuble) cell gets distinctive zone-307 rates so the field
+// mapping can be asserted.
+func buildEPTRawSet(namePrefix string) mapRawSet {
+	m := mapRawSet{}
+	for _, c := range eptKMLCombos() {
+		z307 := kmlZone{307, 20, 15, 25}
+		if !c.maison && !c.meuble && c.piece == 2 && c.epoque.label == "1946-1970" {
+			z307 = kmlZone{307, 27.4, 19.2, 32.9}
+		}
+		m[namePrefix+"_"+c.kmlBasename()] = fakeDRIHLKML([]kmlZone{
+			z307, {308, 21, 16, 26}, {307, 99, 99, 99}, // trailing dup 307 must be ignored
+		})
+	}
+	return m
+}
 
 func TestTransformParis_Golden(t *testing.T) {
 	t.Parallel()
@@ -55,69 +112,70 @@ func TestTransformParis_Golden(t *testing.T) {
 	}
 }
 
-func TestTransformPlaineCommune_Golden(t *testing.T) {
+// TestTransformEPTBareme_Golden drives the shared KML→barème transform over a
+// synthetic full grid (64 cells × 2 zones), asserting row count, the
+// zone-major ordering, the open-ended flag, dedup of a repeated zone, and the
+// field mapping for one distinctive cell. Plaine Commune and Est Ensemble
+// share the transform, so the EPT under test only sets the datadir name prefix.
+func TestTransformEPTBareme_Golden(t *testing.T) {
 	t.Parallel()
-	var buf bytes.Buffer
-	if err := transformPlaineCommune(context.Background(), fixtureRawSet{"testdata/plaine_commune_sample.json"}, &buf); err != nil {
-		t.Fatalf("transformPlaineCommune: %v", err)
+	cases := []struct {
+		name      string
+		prefix    string
+		transform func(context.Context, dataset.RawSet, io.Writer) error
+		validate  func(io.Reader) error
+	}{
+		{"plaine_commune", eptRawNamePlaineCommune, transformPlaineCommune, validatePlaineCommune},
+		{"est_ensemble", eptRawNameEstEnsemble, transformEstEnsemble, validateEstEnsemble},
 	}
-	if err := validatePlaineCommune(bytes.NewReader(buf.Bytes())); err != nil {
-		t.Fatalf("validatePlaineCommune: %v", err)
-	}
-
-	var rows []eptBaremeRow
-	if err := json.Unmarshal(buf.Bytes(), &rows); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if len(rows) != 6 {
-		t.Fatalf("rows = %d, want 6", len(rows))
-	}
-	// Row 0: a non-open-ended meublé apartment cell; French "23,4" → 23.4.
-	r0 := rows[0]
-	want0 := eptBaremeRow{
-		Zone: 310, Piece: 1, PieceOpenEnded: false, Epoque: "avant 1946",
-		Meuble: true, Maison: false, RefEURPerM2: 23.4, MinEURPerM2: 16.4, MaxEURPerM2: 28.1,
-	}
-	if r0 != want0 {
-		t.Errorf("row[0] = %+v, want %+v", r0, want0)
-	}
-	// Row 1: the "4 et plus" label must map to Piece=4 / open-ended.
-	r1 := rows[1]
-	if r1.Piece != 4 || !r1.PieceOpenEnded {
-		t.Errorf("row[1] piece/open-ended = %d/%v, want 4/true", r1.Piece, r1.PieceOpenEnded)
-	}
-	if r1.RefEURPerM2 != 14.6 {
-		t.Errorf("row[1] ref = %v, want 14.6", r1.RefEURPerM2)
-	}
-}
-
-func TestTransformEstEnsemble_Golden(t *testing.T) {
-	t.Parallel()
-	var buf bytes.Buffer
-	if err := transformEstEnsemble(context.Background(), fixtureRawSet{"testdata/est_ensemble_sample.json"}, &buf); err != nil {
-		t.Fatalf("transformEstEnsemble: %v", err)
-	}
-	if err := validateEstEnsemble(bytes.NewReader(buf.Bytes())); err != nil {
-		t.Fatalf("validateEstEnsemble: %v", err)
-	}
-	var rows []eptBaremeRow
-	if err := json.Unmarshal(buf.Bytes(), &rows); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if len(rows) != 3 {
-		t.Fatalf("rows = %d, want 3", len(rows))
-	}
-	// Row 0: French "24,1" → 24.1, non-open-ended.
-	want0 := eptBaremeRow{
-		Zone: 307, Piece: 1, PieceOpenEnded: false, Epoque: "avant 1946",
-		Meuble: false, Maison: false, RefEURPerM2: 24.1, MinEURPerM2: 16.9, MaxEURPerM2: 28.9,
-	}
-	if rows[0] != want0 {
-		t.Errorf("row[0] = %+v, want %+v", rows[0], want0)
-	}
-	// Row 1: "4 et plus" → Piece=4 / open-ended.
-	if rows[1].Piece != 4 || !rows[1].PieceOpenEnded {
-		t.Errorf("row[1] piece/open-ended = %d/%v, want 4/true", rows[1].Piece, rows[1].PieceOpenEnded)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := c.transform(context.Background(), buildEPTRawSet(c.prefix), &buf); err != nil {
+				t.Fatalf("transform: %v", err)
+			}
+			if err := c.validate(bytes.NewReader(buf.Bytes())); err != nil {
+				t.Fatalf("validate: %v", err)
+			}
+			var rows []eptBaremeRow
+			if err := json.Unmarshal(buf.Bytes(), &rows); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			// 64 grid cells × 2 distinct zones; the duplicate 307 must be dropped.
+			if len(rows) != 128 {
+				t.Fatalf("rows = %d, want 128 (dedup of the repeated zone must hold)", len(rows))
+			}
+			// Zone-major order: row 0 is the lowest zone's non-maison / non-meublé
+			// 1-pièce avant-1946 cell.
+			want0 := eptBaremeRow{
+				Zone: 307, Piece: 1, PieceOpenEnded: false, Epoque: "avant 1946",
+				Meuble: false, Maison: false, RefEURPerM2: 20, MinEURPerM2: 15, MaxEURPerM2: 25,
+			}
+			if rows[0] != want0 {
+				t.Errorf("row[0] = %+v, want %+v", rows[0], want0)
+			}
+			// The open-ended flag tracks pièce 4 exactly.
+			for _, r := range rows {
+				if (r.Piece == 4) != r.PieceOpenEnded {
+					t.Errorf("piece %d open-ended=%v (open-ended must equal piece==4)", r.Piece, r.PieceOpenEnded)
+				}
+			}
+			// Field mapping: the distinctive (2-pièces, 1946-1970, nu, appartement)
+			// zone-307 cell round-trips its rates and axis labels.
+			var got *eptBaremeRow
+			for i := range rows {
+				r := rows[i]
+				if r.Zone == 307 && r.Piece == 2 && r.Epoque == "1946-1970" && !r.Meuble && !r.Maison {
+					got = &r
+				}
+			}
+			if got == nil {
+				t.Fatal("distinctive cell (307/2/1946-1970/nu/appartement) not found")
+			}
+			if got.RefEURPerM2 != 27.4 || got.MinEURPerM2 != 19.2 || got.MaxEURPerM2 != 32.9 {
+				t.Errorf("distinctive cell rates = %v/%v/%v, want 27.4/19.2/32.9", got.RefEURPerM2, got.MinEURPerM2, got.MaxEURPerM2)
+			}
+		})
 	}
 }
 

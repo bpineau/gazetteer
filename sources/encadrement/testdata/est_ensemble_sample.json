@@ -1,5 +1,0 @@
-[
- {"zone":307,"nombre_de_piece":1,"annee_de_construction":"avant 1946","prix_min":"16,9","prix_med":"24,1","prix_max":"28,9","meuble":false,"maison":false},
- {"zone":307,"nombre_de_piece":"4 et plus","annee_de_construction":"apres 1990","prix_min":"10,5","prix_med":"15,0","prix_max":"18,0","meuble":true,"maison":false},
- {"zone":308,"nombre_de_piece":2,"annee_de_construction":"1946-1970","prix_min":"14,0","prix_med":"19,0","prix_max":"22,8","meuble":false,"maison":true}
-]
