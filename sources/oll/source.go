@@ -16,7 +16,11 @@ const Name = "oll"
 
 // sourceVersion bumps when the Source's internal logic changes. Callers gate
 // cache invalidation on it.
-const sourceVersion = 1
+//
+// v2 adds the relet ("emménagés récents", <1 an) median alongside the
+// all-tenancies median and makes RentEstimate prefer it — the artifact gains a
+// relet_median field, so a v1 datadir cache must be superseded.
+const sourceVersion = 2
 
 // Version exposes sourceVersion so callers that wrap the Source can mirror it.
 const Version = sourceVersion
@@ -102,16 +106,17 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 
 	logger.Debug("oll.hit", slog.String("zone", ref.label), slog.Int("pieces", pieces), slog.Int("n", cell.N))
 	return &Result{
-		ObservedMedianEURPerM2: cell.MedianEURPerM2,
-		ObservedQ1EURPerM2:     cell.Q1EURPerM2,
-		ObservedQ3EURPerM2:     cell.Q3EURPerM2,
-		AvgSurfaceM2:           cell.SurfaceM2,
-		SampleSize:             cell.N,
-		Zone:                   ref.label,
-		Agglo:                  ref.name,
-		Pieces:                 pieces,
-		Confidence:             confidenceForN(cell.N),
-		Evidence:               Evidence{INSEE: insee, AggloCode: ref.agglo, ZoneID: ref.zone, Year: ref.year},
+		ObservedMedianEURPerM2:       cell.MedianEURPerM2,
+		ObservedRecentMedianEURPerM2: cell.ReletMedianEURPerM2,
+		ObservedQ1EURPerM2:           cell.Q1EURPerM2,
+		ObservedQ3EURPerM2:           cell.Q3EURPerM2,
+		AvgSurfaceM2:                 cell.SurfaceM2,
+		SampleSize:                   cell.N,
+		Zone:                         ref.label,
+		Agglo:                        ref.name,
+		Pieces:                       pieces,
+		Confidence:                   confidenceForN(cell.N),
+		Evidence:                     Evidence{INSEE: insee, AggloCode: ref.agglo, ZoneID: ref.zone, Year: ref.year},
 	}, nil
 }
 

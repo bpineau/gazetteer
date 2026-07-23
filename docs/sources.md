@@ -332,13 +332,16 @@ signal, complementing `encadrement` (legal cap) and `carteloyers` (model).
 
 - **Needs**: INSEE; rooms optional (refines the bucket, else the zone-level
   all-sizes median is used).
-- **Result**: `ObservedMedianEURPerM2` (observed median, **€/m²/month hors
-  charges**), `ObservedQ1EURPerM2` / `ObservedQ3EURPerM2` (inter-quartile band),
-  `AvgSurfaceM2` (mean dwelling surface — sanity-checks the bucket),
-  `SampleSize`, `Zone` + `Agglo` + `Pieces` (resolved cell) and `Confidence`.
-  Satisfies `appraisal.RentEstimator` (weight 0.95 in `DefaultRentWeights`,
-  above the modelled `carteloyers`). `IsEmpty` (StatusOKEmpty) outside the
-  perimeter.
+- **Result**: `ObservedMedianEURPerM2` (all-tenancies observed median,
+  **€/m²/month hors charges**), `ObservedRecentMedianEURPerM2` (the "emménagés
+  récents" / relet median — leases signed <1 an ago, the level a landlord
+  re-lets at; observed where published, else derived from the zone/agglo
+  relet-to-all ratio), `ObservedQ1EURPerM2` / `ObservedQ3EURPerM2`
+  (inter-quartile band), `AvgSurfaceM2` (mean dwelling surface — sanity-checks
+  the bucket), `SampleSize`, `Zone` + `Agglo` + `Pieces` (resolved cell) and
+  `Confidence`. Satisfies `appraisal.RentEstimator` (weight 0.95 in
+  `DefaultRentWeights`, above the modelled `carteloyers`) — **preferring the
+  relet median when present**. `IsEmpty` (StatusOKEmpty) outside the perimeter.
 - **Resolution**: INSEE → OLL zone (embedded commune→zone map) → the cell for
   the rooms bucket. Zone numbers join the rent table via
   `Zone_calcul = "L<agglo>.4."+zeropad2(zone)`.
