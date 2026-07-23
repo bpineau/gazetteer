@@ -115,7 +115,7 @@ func transformV1(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		idx.DeptFallback[dept] = roundDecimals(stats.Median(ms), v1RoundDecimal)
 	}
 
-	return json.NewEncoder(dst).Encode(idx)
+	return dataset.WriteGzJSON(dst, idx)
 }
 
 // transformV2 rebuilds fiscalite_locale.json from the V2 Opendatasoft JSON
@@ -220,14 +220,14 @@ func transformV2(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 
 	applyV2Defaults(&idx)
 
-	return json.NewEncoder(dst).Encode(idx)
+	return dataset.WriteGzJSON(dst, idx)
 }
 
 // validateV1 gates publication: the rebuilt V1 artifact must parse and
 // carry communes.
 func validateV1(r io.Reader) error {
-	var idx V1Index
-	if err := json.NewDecoder(r).Decode(&idx); err != nil {
+	idx, err := dataset.ReadGzJSON[V1Index](r, Name)
+	if err != nil {
 		return fmt.Errorf("taxefonciere: validate v1: %w", err)
 	}
 	if len(idx.Communes) == 0 {
@@ -239,8 +239,8 @@ func validateV1(r io.Reader) error {
 // validateV2 gates publication: the rebuilt V2 artifact must parse and
 // carry communes.
 func validateV2(r io.Reader) error {
-	var idx V2Index
-	if err := json.NewDecoder(r).Decode(&idx); err != nil {
+	idx, err := dataset.ReadGzJSON[V2Index](r, Name)
+	if err != nil {
 		return fmt.Errorf("taxefonciere: validate v2: %w", err)
 	}
 	if len(idx.Communes) == 0 {

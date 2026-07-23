@@ -2,6 +2,7 @@ package carteloyers
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"io"
 	"os"
@@ -22,7 +23,12 @@ func TestTransform_Golden(t *testing.T) {
 	if err := validate(bytes.NewReader(buf.Bytes())); err != nil {
 		t.Fatalf("validate: %v", err)
 	}
-	rows, err := parseCSV(bytes.NewReader(buf.Bytes()))
+	// The transform now emits gzipped CSV; gunzip before parsing.
+	zr, err := gzip.NewReader(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		t.Fatalf("gunzip: %v", err)
+	}
+	rows, err := parseCSV(zr)
 	if err != nil {
 		t.Fatalf("parseCSV: %v", err)
 	}

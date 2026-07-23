@@ -2,15 +2,13 @@ package cartofriches
 
 import (
 	"embed"
-	"encoding/json"
-	"fmt"
 	"io"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
 
-//go:embed data/cartofriches_communes.json
+//go:embed data/cartofriches_communes.json.gz
 var embedFS embed.FS
 
 // set binds the embedded Cartofriches extract to the datadir/refresh
@@ -20,7 +18,7 @@ var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
-	Processed: dataset.File{Name: "cartofriches_communes.json"},
+	Processed: dataset.File{Name: "cartofriches_communes.json.gz"},
 	Raw:       []dataset.File{{Name: rawName, URL: rawURL}},
 	Transform: transform,
 	Validate:  validate,
@@ -61,17 +59,9 @@ func Load(dir string) (*Index, error) {
 	return lazyIndex.Load(set, dir, parseIndex)
 }
 
-// parseIndex decodes the JSON extract into an Index.
+// parseIndex decodes the gzipped-JSON extract into an Index.
 func parseIndex(r io.Reader) (*Index, error) {
-	body, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("cartofriches: read embed: %w", err)
-	}
-	var idx Index
-	if err := json.Unmarshal(body, &idx); err != nil {
-		return nil, fmt.Errorf("cartofriches: parse json: %w", err)
-	}
-	return &idx, nil
+	return dataset.ReadGzJSON[Index](r, Name)
 }
 
 // Lookup returns the aggregate entry for the given INSEE. `ok` is

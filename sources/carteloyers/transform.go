@@ -1,6 +1,7 @@
 package carteloyers
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/csv"
 	"errors"
@@ -71,7 +72,10 @@ func makeTransform(rawName string) dataset.Transform {
 			}
 		}
 
-		w := csv.NewWriter(dst)
+		// The processed artifact ships gzipped (it embeds ~4× smaller); write
+		// the CSV through a gzip writer so a refresh reproduces that format.
+		gz := gzip.NewWriter(dst)
+		w := csv.NewWriter(gz)
 		w.Comma = ';'
 		if err := w.Write(outHeader); err != nil {
 			return err
@@ -106,13 +110,19 @@ func makeTransform(rawName string) dataset.Transform {
 		if n == 0 {
 			return errors.New("carteloyers: transform produced no rows")
 		}
-		return nil
+		return gz.Close() // flush the gzip footer
 	}
 }
 
-// validate gates publication: the rebuilt CSV must parse and be non-empty.
+// validate gates publication: the rebuilt (gzipped) CSV must gunzip, parse and
+// be non-empty.
 func validate(r io.Reader) error {
-	rows, err := parseCSV(r)
+	zr, err := gzip.NewReader(r)
+	if err != nil {
+		return fmt.Errorf("carteloyers: gunzip: %w", err)
+	}
+	defer func() { _ = zr.Close() }()
+	rows, err := parseCSV(zr)
 	if err != nil {
 		return err
 	}

@@ -3,7 +3,6 @@ package cartofriches
 import (
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -141,7 +140,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		idx.Communes[insee] = *e
 	}
 
-	return json.NewEncoder(dst).Encode(idx)
+	return dataset.WriteGzJSON(dst, idx)
 }
 
 // unescapeQuotes rewrites the upstream's backslash-escaped quotes (`\"`,
