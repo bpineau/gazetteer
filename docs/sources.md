@@ -243,9 +243,10 @@ Lyon / Villeurbanne.
     (Saint-Denis, Montreuil) collapse across their zones at
     `ConfidenceLow`. `Evidence.ZoneID` records the resolved zone(s).
 - **Eligibility**: residential only.
-- **Vintages**: Paris 2025, Lyon 2025-2026, Plaine Commune 2022, Est
-  Ensemble 2023 (zonage 2022). Zone numbers are not unique across EPTs,
-  so lookups are scoped by `(zone_source, zone)`.
+- **Vintages**: Paris 2025, Lyon 2025-2026, Plaine Commune & Est Ensemble
+  barème "du 01 juin 2026" (DRIHL référence-loyer KML; zonage 2022). Zone
+  numbers are not unique across EPTs, so lookups are scoped by
+  `(zone_source, zone)`.
 
 ## `sources/catnat`
 

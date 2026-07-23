@@ -24,7 +24,12 @@ const Name = "encadrement"
 // their sub-communal zone by point-in-polygon over an embedded zonage, with an
 // INSEE-commune fallback. Adds the est_ensemble barème + both EPT geometries as
 // embedded datasets.
-const sourceVersion = 2
+//
+// v3 re-ingests the EPT barèmes from the authoritative DRIHL référence-loyer
+// KML (arrêté "du 01 juin 2026") instead of the obsolete 2022/2023 data.gouv
+// flat export — caps rise ~6-13% across the 93. Bumped so any datadir cache
+// built from the stale v2 barème is superseded by the embedded v3 artifact.
+const sourceVersion = 3
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
