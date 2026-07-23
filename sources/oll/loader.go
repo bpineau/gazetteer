@@ -63,10 +63,15 @@ type rentRow struct {
 	Pieces         int     `json:"pieces"`
 	OpenEnded      bool    `json:"open_ended"`
 	MedianEURPerM2 float64 `json:"median_eur_per_m2"`
-	Q1EURPerM2     float64 `json:"q1_eur_per_m2,omitempty"`
-	Q3EURPerM2     float64 `json:"q3_eur_per_m2,omitempty"`
-	SurfaceM2      float64 `json:"surface_m2,omitempty"`
-	N              int     `json:"n"`
+	// ReletMedianEURPerM2 is the "emménagés récents" (< 1 an) median €/m²/month
+	// HC — the level a landlord re-lets at. Observed when the cell publishes a
+	// relet median, else derived from the zone/agglo relet-to-all ratio (see
+	// parseRents). Zero when no relet signal is available for the cell.
+	ReletMedianEURPerM2 float64 `json:"relet_median_eur_per_m2,omitempty"`
+	Q1EURPerM2          float64 `json:"q1_eur_per_m2,omitempty"`
+	Q3EURPerM2          float64 `json:"q3_eur_per_m2,omitempty"`
+	SurfaceM2           float64 `json:"surface_m2,omitempty"`
+	N                   int     `json:"n"`
 }
 
 // zoneRef is the resolved (agglo, zone) a commune belongs to.

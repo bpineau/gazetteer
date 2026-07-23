@@ -466,7 +466,7 @@
   },
   {
     "name": "oll",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "Observed market rents (Observatoires Locaux des Loyers), median €/m²/month by zone × rooms.",
     "inputs": [

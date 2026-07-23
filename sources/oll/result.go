@@ -28,6 +28,15 @@ type Result struct {
 	// matched.
 	ObservedMedianEURPerM2 float64 `json:"observed_median_eur_per_m2"`
 
+	// ObservedRecentMedianEURPerM2 is the "emménagés récents" (leases signed <1
+	// an ago) median €/m²/month HC — the relet level a landlord actually re-lets
+	// at, above the all-tenancies median (which is dragged down by long-standing
+	// under-indexed leases). Observed where OLL publishes a relet cell, else
+	// derived from the zone/agglo relet-to-all ratio (see parseRents). Zero when
+	// no relet signal is available. RentEstimate prefers this over the
+	// all-tenancies median.
+	ObservedRecentMedianEURPerM2 float64 `json:"observed_recent_median_eur_per_m2,omitempty"`
+
 	// ObservedQ1EURPerM2 / ObservedQ3EURPerM2 are the first and third quartiles
 	// of the same cell — the inter-quartile band around the median.
 	ObservedQ1EURPerM2 float64 `json:"observed_q1_eur_per_m2,omitempty"`
@@ -91,14 +100,23 @@ func (r *Result) IsEmpty() bool {
 // (the OLL methodology's headline indicator), the same basis as encadrement
 // (loyer de référence HC) and as carteloyers once it applies its CC→HC factor —
 // so the three blend into appraisal.RentValue on a single hors-charges basis.
+// It prefers the relet ("emménagés récents") median when available — the level
+// a landlord re-lets at, which is what an investor sizing a new lease cares
+// about — and falls back to the all-tenancies median otherwise.
 func (r *Result) RentEstimate() appraisal.RentEstimate {
 	if r == nil || r.ObservedMedianEURPerM2 <= 0 {
 		return appraisal.RentEstimate{}
 	}
+	median := r.ObservedMedianEURPerM2
+	basis := "all"
+	if r.ObservedRecentMedianEURPerM2 > 0 {
+		median = r.ObservedRecentMedianEURPerM2
+		basis = "relet"
+	}
 	return appraisal.RentEstimate{
-		EurPerM2Cents: int64(math.Round(r.ObservedMedianEURPerM2 * 100)),
+		EurPerM2Cents: int64(math.Round(median * 100)),
 		Confidence:    appraisal.ParseConfidence(r.Confidence),
-		Method:        fmt.Sprintf("oll_%s_z%s_p%d", r.Evidence.AggloCode, r.Evidence.ZoneID, r.Pieces),
+		Method:        fmt.Sprintf("oll_%s_z%s_p%d_%s", r.Evidence.AggloCode, r.Evidence.ZoneID, r.Pieces, basis),
 	}
 }
 

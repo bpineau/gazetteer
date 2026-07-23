@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -207,8 +209,30 @@ func parseZonage(text string) ([]zoneRow, error) {
 	return out, nil
 }
 
-// parseRents reads the observed-rent table and keeps the headline cells: one per
-// (zone, rooms) for appartements, aggregated over époque and ancienneté.
+// olrReletLabel is the anciennete_locataire value marking a cell restricted to
+// leases signed less than a year ago — the "emménagés récents" / relet market,
+// the level a landlord actually re-lets at (vs the all-tenancies median, which
+// is dragged down by long-standing, under-indexed leases).
+const olrReletLabel = "1. Moins de 1 an"
+
+// rentCellKey identifies a base cell (appartement, époque-aggregated,
+// pièces-local-aggregated) within an agglo table. zone == "" is the
+// agglo-wide level (a ratio donor, never emitted as a queryable cell).
+type rentCellKey struct {
+	zone   string
+	pieces int
+	open   bool
+}
+
+// parseRents reads the observed-rent table and keeps the headline cells: one
+// per (zone, rooms) for appartements, aggregated over époque. For each it
+// captures BOTH the all-tenancies median and the relet ("moins de 1 an")
+// median. Relet cells are published per-zone only pièces-aggregated and
+// per-pièces only agglo-wide, so a (zone, pièces) cell's relet level is, in
+// order: its own observed relet cell if any; else the zone's pièces-aggregated
+// relet/all ratio applied to its all-tenancies median; else the agglo per-pièces
+// ratio; else the agglo overall ratio. Documented approximation: relet uplift is
+// assumed uniform across pièces within a zone.
 func parseRents(text string) ([]rentRow, error) {
 	recs, err := readCSV(text)
 	if err != nil {
@@ -228,19 +252,29 @@ func parseRents(text string) ([]rentRow, error) {
 		idx[n] = i
 	}
 
-	var out []rentRow
+	type cellVal struct {
+		median, q1, q3, surf float64
+		n                    int
+	}
+	allCells := map[rentCellKey]cellVal{}
+	reletMedian := map[rentCellKey]float64{}
+
 	for _, r := range recs[1:] {
-		// Headline cell: appartement, a rooms bucket, every other dimension
-		// aggregated (blank), with a published median.
+		// Base cell: appartement, époque-aggregated, pièces-local-aggregated.
 		if field(r, idx["type_habitat"]) != "Appartement" ||
 			field(r, idx["nombre_pieces_local"]) != "" ||
 			field(r, idx["epoque_construction_local"]) != "" || field(r, idx["epoque_construction_homogene"]) != "" ||
-			field(r, idx["anciennete_locataire_local"]) != "" || field(r, idx["anciennete_locataire_homogene"]) != "" {
+			field(r, idx["anciennete_locataire_local"]) != "" {
 			continue
 		}
-		// pieces bucket: a blank label is the zone-level all-sizes aggregate
-		// (pieces 0), used when the listing has no room count; otherwise
-		// "Appart NP" → N.
+		anc := field(r, idx["anciennete_locataire_homogene"])
+		isAll := anc == ""
+		isRelet := anc == olrReletLabel
+		if !isAll && !isRelet {
+			continue // "1 an et plus" and any other slice are ignored
+		}
+
+		// pièces bucket: blank = zone all-sizes aggregate (0); "Appart NP" → N.
 		ph := field(r, idx["nombre_pieces_homogene"])
 		var pieces int
 		var openEnded bool
@@ -251,22 +285,72 @@ func parseRents(text string) ([]rentRow, error) {
 			}
 			pieces, openEnded = p, oe
 		}
-		zone := zoneFromCalcul(field(r, idx["zone_calcul"]))
 		median, ok := frnorm.ParseFRFloat(field(r, idx["loyer_median"]))
-		if zone == "" || !ok {
+		if !ok {
+			continue // thin cell with no published median
+		}
+		key := rentCellKey{zone: zoneFromCalcul(field(r, idx["zone_calcul"])), pieces: pieces, open: openEnded}
+		if isRelet {
+			reletMedian[key] = median
 			continue
 		}
 		q1, _ := frnorm.ParseFRFloat(field(r, idx["loyer_1_quartile"]))
 		q3, _ := frnorm.ParseFRFloat(field(r, idx["loyer_3_quartile"]))
 		surf, _ := frnorm.ParseFRFloat(field(r, idx["surface_moyenne"]))
 		n, _ := strconv.Atoi(strings.TrimSpace(field(r, idx["nombre_observations"])))
+		allCells[key] = cellVal{median: median, q1: q1, q3: q3, surf: surf, n: n}
+	}
+
+	// reletRatio returns relet/all for a donor cell when both are observed.
+	reletRatio := func(k rentCellKey) (float64, bool) {
+		a, okA := allCells[k]
+		rel, okR := reletMedian[k]
+		if okA && okR && a.median > 0 {
+			return rel / a.median, true
+		}
+		return 0, false
+	}
+
+	out := make([]rentRow, 0, len(allCells))
+	for key, v := range allCells {
+		if key.zone == "" {
+			continue // agglo-wide donors are not queryable cells
+		}
+		relet := 0.0
+		switch {
+		case reletMedian[key] > 0: // this exact cell has an observed relet median
+			relet = reletMedian[key]
+		default:
+			// Derive from the best available relet/all ratio.
+			for _, donor := range []rentCellKey{
+				{zone: key.zone, pieces: 0, open: false},       // zone-level uplift
+				{zone: "", pieces: key.pieces, open: key.open}, // agglo per-pièces uplift
+				{zone: "", pieces: 0, open: false},             // agglo overall uplift
+			} {
+				if rt, ok := reletRatio(donor); ok {
+					relet = round1(v.median * rt)
+					break
+				}
+			}
+		}
 		out = append(out, rentRow{
-			Zone: zone, Pieces: pieces, OpenEnded: openEnded,
-			MedianEURPerM2: median, Q1EURPerM2: q1, Q3EURPerM2: q3, SurfaceM2: surf, N: n,
+			Zone: key.zone, Pieces: key.pieces, OpenEnded: key.open,
+			MedianEURPerM2: v.median, ReletMedianEURPerM2: relet,
+			Q1EURPerM2: v.q1, Q3EURPerM2: v.q3, SurfaceM2: v.surf, N: v.n,
 		})
 	}
+	// Deterministic order (map iteration is not) so the artifact is stable.
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Zone != out[j].Zone {
+			return out[i].Zone < out[j].Zone
+		}
+		return out[i].Pieces < out[j].Pieces
+	})
 	return out, nil
 }
+
+// round1 rounds to one decimal, the published OLL rent precision.
+func round1(x float64) float64 { return math.Round(x*10) / 10 }
 
 // readCSV parses a ";"-separated CSV (ragged rows allowed). Input text is
 // already BOM-free: decodeText strips the UTF-8 BOM when decoding members.
