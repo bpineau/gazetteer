@@ -783,6 +783,40 @@ func TestCache_FixtureHit_NoNetwork(t *testing.T) {
 	}
 }
 
+// TestCache_BodyLenMismatch_Miss verifies that a cache entry whose body length
+// disagrees with its meta record (a torn / truncated write) is treated as a
+// miss rather than served as a partial response.
+func TestCache_BodyLenMismatch_Miss(t *testing.T) {
+	dir := t.TempDir()
+	r := Options{HTTPCacheDir: dir, RateLimitPerHost: 1000}.resolve()
+	r.now = func() time.Time { return time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC) }
+	ct := newCacheTransport(unreachableTransport{}, r, dir)
+
+	req, _ := http.NewRequest(http.MethodGet, "http://fixture.invalid/y", nil)
+	hash := requestHash(req)
+	metaPath, bodyPath := ct.pathsFor(hash)
+	meta := &cacheMeta{
+		URL: req.URL.String(), Method: req.Method, Status: 200,
+		Header:       http.Header{"Content-Type": []string{"text/plain"}},
+		FetchedAtSec: r.now().Unix(), ExpiresAtSec: r.now().Add(time.Hour).Unix(),
+		BodyLen: 5,
+	}
+	if err := ct.writeEntry(metaPath, bodyPath, meta, []byte("hello")); err != nil {
+		t.Fatal(err)
+	}
+	// A clean entry reads back.
+	if _, _, ok := ct.readEntry(metaPath, bodyPath); !ok {
+		t.Fatal("intact entry should read back as a hit")
+	}
+	// Truncate the body on disk so its length no longer matches meta.BodyLen.
+	if err := os.WriteFile(bodyPath, []byte("hi"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, ok := ct.readEntry(metaPath, bodyPath); ok {
+		t.Error("readEntry served a body whose length disagrees with meta.BodyLen; want a miss")
+	}
+}
+
 // unreachableTransport panics if used; helps assert no-network paths.
 type unreachableTransport struct{}
 

@@ -183,6 +183,13 @@ func (t *cacheTransport) readEntry(metaPath, bodyPath string) (*cacheMeta, []byt
 	if err != nil {
 		return nil, nil, false
 	}
+	// Integrity guard: a body whose length disagrees with the meta record is a
+	// torn or truncated write (e.g. crash between the atomic body write and the
+	// meta write, or external tampering). Treat it as a miss so a fresh fetch
+	// replaces it rather than serving a partial response.
+	if int64(len(body)) != meta.BodyLen {
+		return nil, nil, false
+	}
 	return &meta, body, true
 }
 
