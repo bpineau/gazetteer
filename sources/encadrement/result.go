@@ -154,6 +154,17 @@ func (r *Result) RentEstimate() appraisal.RentEstimate {
 	}
 }
 
+// RentCap satisfies appraisal.RentCapper: it contributes the loyer de référence
+// majoré (the legal ceiling, HC €/m²/month → centimes) so consumers can clamp a
+// market rent to the legal maximum without re-deriving the cap. ok is false
+// outside an encadrement zone (no published majoré).
+func (r *Result) RentCap() (int64, bool) {
+	if r == nil || r.LoyerRefMajEURPerM2HC <= 0 {
+		return 0, false
+	}
+	return int64(math.Round(r.LoyerRefMajEURPerM2HC * 100)), true
+}
+
 // mapEncConfidence translates encadrement's stable confidence strings to
 // the appraisal package's coarse enum. Deliberately NOT
 // appraisal.ParseConfidence: encadrement never emits "high", so any

@@ -6,8 +6,29 @@ import (
 	"github.com/bpineau/gazetteer/appraisal"
 )
 
-// Compile-time check: *Result satisfies appraisal.RentEstimator.
-var _ appraisal.RentEstimator = (*Result)(nil)
+// Compile-time check: *Result satisfies appraisal.RentEstimator and
+// appraisal.RentCapper.
+var (
+	_ appraisal.RentEstimator = (*Result)(nil)
+	_ appraisal.RentCapper    = (*Result)(nil)
+)
+
+func TestResult_RentCap(t *testing.T) {
+	t.Parallel()
+	// 32.16 €/m²/month HC majoré → 3216 cents.
+	r := &Result{LoyerRefEURPerM2HC: 26.80, LoyerRefMajEURPerM2HC: 32.16}
+	cents, ok := r.RentCap()
+	if !ok || cents != 3216 {
+		t.Errorf("RentCap() = %d, %v, want 3216, true", cents, ok)
+	}
+	// No majoré → not a cap.
+	if cents, ok := (&Result{}).RentCap(); ok || cents != 0 {
+		t.Errorf("empty RentCap() = %d, %v, want 0, false", cents, ok)
+	}
+	if _, ok := (*Result)(nil).RentCap(); ok {
+		t.Error("nil RentCap() ok = true, want false")
+	}
+}
 
 func TestResult_RentEstimateValueMapping(t *testing.T) {
 	t.Parallel()
