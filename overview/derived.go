@@ -1,5 +1,11 @@
 package overview
 
+import (
+	"math"
+
+	"github.com/bpineau/gazetteer/appraisal"
+)
+
 // Derived decision fields over a CommuneOverview row. These are the
 // standard projections every screening consumer needs and used to
 // re-implement (effective price/rent, gross yield, reliability) — they
@@ -31,13 +37,14 @@ func (o CommuneOverview) EffectivePriceEURM2() float64 {
 // EffectiveRentEURM2HC returns the legally chargeable rent per m²/month
 // HC: the market rent capped by the encadrement reference when the
 // commune is encadrée and the cap is lower. This is the rent number a
-// rental-investment decision should use, not the raw market reading.
+// rental-investment decision should use, not the raw market reading. The
+// min(market, cap) rule lives once in appraisal.EffectiveRentCents.
 func (o CommuneOverview) EffectiveRentEURM2HC() float64 {
-	r := o.RentMarketEURM2HC
-	if o.RentCapEURM2HC != nil && *o.RentCapEURM2HC < r {
-		r = *o.RentCapEURM2HC
+	var capCents int64
+	if o.RentCapEURM2HC != nil {
+		capCents = int64(math.Round(*o.RentCapEURM2HC * 100))
 	}
-	return r
+	return float64(appraisal.EffectiveRentCents(int64(math.Round(o.RentMarketEURM2HC*100)), capCents)) / 100
 }
 
 // GrossYieldPct returns the gross rental yield in percent

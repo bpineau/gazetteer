@@ -17,6 +17,32 @@ type RentEstimator interface {
 	RentEstimate() RentEstimate
 }
 
+// RentCapper is the optional interface a Source's typed Result MAY implement to
+// contribute the LEGAL rent ceiling — the loyer de référence majoré, the rent
+// above which a lease is illegal in an encadrement zone. It is distinct from
+// RentEstimator: the estimator feeds the market blend (encadrement contributes
+// its reference median there), the capper feeds the ceiling that clamps it.
+// Only encadrement zones have one; everywhere else ok is false.
+type RentCapper interface {
+	RentCap() (eurPerM2Cents int64, ok bool)
+}
+
+// EffectiveRentCents is the single definition of the legally chargeable rent
+// per m²/month (centimes): the market blend capped by the legal ceiling when
+// both are present, whichever alone is present otherwise, 0 when neither is.
+// Consumers (RentConsolidated.EffectiveEURPerM2, overview) call this instead of
+// re-deriving min(market, cap).
+func EffectiveRentCents(blendCents, capCents int64) int64 {
+	switch {
+	case blendCents > 0 && capCents > 0:
+		return min(blendCents, capCents)
+	case blendCents > 0:
+		return blendCents
+	default:
+		return capCents // the cap alone, or 0 when there is no cap either
+	}
+}
+
 // RentEstimate is one source's contribution to the consolidated rent
 // synthesis.
 //
@@ -89,9 +115,23 @@ type RentConsolidated struct {
 	// order) wins ; other inputs' Bracket fields are not merged.
 	Bracket string
 
+	// CapEurPerM2Cents is the legal rent ceiling (loyer de référence majoré) in
+	// centimes per m²/month, from the most binding RentCapper contributor
+	// (encadrement). Zero when the address is not in an encadrement zone.
+	CapEurPerM2Cents int64
+
 	// Inputs lists each contributing source in deterministic name order.
 	// Empty when no source implements RentEstimator.
 	Inputs []RentInput
+}
+
+// EffectiveEURPerM2 returns the legally chargeable rent in €/m²/month: the
+// consolidated market blend capped by the legal majoré when both exist, the cap
+// alone when there is no market reading, the blend alone when there is no cap.
+// This is the rent a rental-yield decision should use — not the raw blend,
+// which can exceed the legal ceiling in an encadrement zone.
+func (c RentConsolidated) EffectiveEURPerM2() float64 {
+	return float64(EffectiveRentCents(c.EurPerM2Cents, c.CapEurPerM2Cents)) / 100
 }
 
 // EURPerM2 returns the consolidated value in euros per m² per month
@@ -147,12 +187,18 @@ func RentValue(d gazetteer.Dossier, opts ...RentOptions) RentConsolidated {
 	sort.Strings(names)
 
 	var inputs []RentInput
+	var capCents int64 // most binding legal ceiling across RentCapper contributors
 	for _, name := range names {
 		r := d.Results[name]
 		switch r.Status {
 		case "", gazetteer.StatusOK, gazetteer.StatusOKEmpty:
 		default:
 			continue
+		}
+		if capper, ok := r.Data.(RentCapper); ok {
+			if c, ok := capper.RentCap(); ok && c > 0 && (capCents == 0 || c < capCents) {
+				capCents = c
+			}
 		}
 		est, ok := r.Data.(RentEstimator)
 		if !ok {
@@ -176,7 +222,9 @@ func RentValue(d gazetteer.Dossier, opts ...RentOptions) RentConsolidated {
 	}
 
 	if len(inputs) == 0 {
-		return RentConsolidated{Confidence: ConfidenceLow}
+		// No market reading, but a legal cap alone is still a usable rent
+		// (EffectiveEURPerM2 returns the cap when the blend is absent).
+		return RentConsolidated{Confidence: ConfidenceLow, CapEurPerM2Cents: capCents}
 	}
 
 	// 2-3. Shared kernel: MAD outlier rejection, weighted mean, confidence.
@@ -196,7 +244,7 @@ func RentValue(d gazetteer.Dossier, opts ...RentOptions) RentConsolidated {
 		}
 	}
 	if !ok {
-		return RentConsolidated{Confidence: ConfidenceLow, Inputs: inputs}
+		return RentConsolidated{Confidence: ConfidenceLow, CapEurPerM2Cents: capCents, Inputs: inputs}
 	}
 
 	// 4. Bracket precedence — first non-empty Bracket in (sorted) name
@@ -212,10 +260,11 @@ func RentValue(d gazetteer.Dossier, opts ...RentOptions) RentConsolidated {
 	}
 
 	return RentConsolidated{
-		EurPerM2Cents: mean,
-		Confidence:    conf,
-		Bracket:       bracket,
-		Inputs:        inputs,
+		EurPerM2Cents:    mean,
+		Confidence:       conf,
+		Bracket:          bracket,
+		CapEurPerM2Cents: capCents,
+		Inputs:           inputs,
 	}
 }
 
