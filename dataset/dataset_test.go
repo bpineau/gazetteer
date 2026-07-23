@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 	"testing/fstest"
+	"time"
 )
 
 // embedFor returns a fs.FS that mimics a source's embed.FS: the processed
@@ -144,5 +145,31 @@ func mustWrite(t *testing.T, path, body string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func TestSet_Overdue(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name    string
+		set     Set
+		overdue bool
+	}{
+		{"untracked (no vintage/cadence)", Set{}, false},
+		{"cadence but no vintage", Set{ExpectedCadenceMonths: 12}, false},
+		{"vintage but no cadence", Set{Vintage: "2000-01"}, false},
+		{"fresh annual", Set{Vintage: "2025-06", ExpectedCadenceMonths: 12}, false},   // deadline 2027-06
+		{"at the edge", Set{Vintage: "2024-07", ExpectedCadenceMonths: 12}, false},    // deadline 2026-07 == now, not after
+		{"stale annual", Set{Vintage: "2022-01", ExpectedCadenceMonths: 12}, true},    // deadline 2024-01
+		{"stale quarterly", Set{Vintage: "2025-09", ExpectedCadenceMonths: 3}, true},  // deadline 2026-03
+		{"malformed vintage", Set{Vintage: "nope", ExpectedCadenceMonths: 12}, false}, // never overdue
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := c.set.Overdue(now); got != c.overdue {
+				t.Errorf("Overdue = %v, want %v", got, c.overdue)
+			}
+		})
 	}
 }

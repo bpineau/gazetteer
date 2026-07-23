@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // embedDataDir is the directory, inside each Set.Embed filesystem, under
@@ -86,6 +87,45 @@ type Set struct {
 	// generic well-formedness check (see validateProcessed). A Source that
 	// wants its real parser to gate publication supplies it here.
 	Validate func(r io.Reader) error
+
+	// Vintage is the reference period the embedded data is current to, as
+	// "YYYY-MM" (the month the underlying data represents, NOT the download
+	// date), or "" when not tracked. It powers the freshness guard (Overdue) —
+	// the tripwire that would have caught a barème or price window silently
+	// going years stale.
+	Vintage string
+
+	// ExpectedCadenceMonths is how often the upstream republishes a new
+	// vintage (12 = annual, 3 = quarterly, 0 = not tracked). With Vintage it
+	// makes a Set self-describe its freshness.
+	ExpectedCadenceMonths int
+}
+
+// VintageTime parses Vintage ("YYYY-MM") into the first day of that month.
+// ok is false when Vintage is empty or malformed.
+func (s Set) VintageTime() (time.Time, bool) {
+	t, err := time.Parse("2006-01", strings.TrimSpace(s.Vintage))
+	if err != nil {
+		return time.Time{}, false
+	}
+	return t, true
+}
+
+// Overdue reports whether the Set's embedded data is stale as of now: its
+// Vintage plus two full cadence periods (one for the expected next vintage,
+// one of grace for the upstream's publication lag) has elapsed. A Set without
+// a tracked Vintage or cadence is never overdue. This is the guard behind the
+// freshness doctor check.
+func (s Set) Overdue(now time.Time) bool {
+	if s.ExpectedCadenceMonths <= 0 {
+		return false
+	}
+	vt, ok := s.VintageTime()
+	if !ok {
+		return false
+	}
+	deadline := vt.AddDate(0, 2*s.ExpectedCadenceMonths, 0)
+	return now.After(deadline)
 }
 
 // Open returns the processed artifact, preferring a validated datadir copy

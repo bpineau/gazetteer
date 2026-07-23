@@ -24,31 +24,37 @@ var embedFS embed.FS
 // raw upstream and Transform that rebuilds its committed artifact (transform.go).
 var (
 	setParis = dataset.Set{
-		Source:    Name,
-		Version:   Version,
-		Embed:     embedFS,
-		Processed: dataset.File{Name: "encadrement_paris.json"},
-		Raw:       []dataset.File{{Name: rawParisName, URL: rawParisURL}},
-		Transform: transformParis,
-		Validate:  validateParis,
+		Source:                Name,
+		Version:               Version,
+		Embed:                 embedFS,
+		Processed:             dataset.File{Name: "encadrement_paris.json"},
+		Raw:                   []dataset.File{{Name: rawParisName, URL: rawParisURL}},
+		Transform:             transformParis,
+		Validate:              validateParis,
+		Vintage:               "2025-07", // Ville de Paris grille 2025 (annual arrêté)
+		ExpectedCadenceMonths: 12,
 	}
 	setPlaineCommune = dataset.Set{
-		Source:    Name,
-		Version:   Version,
-		Embed:     embedFS,
-		Processed: dataset.File{Name: "encadrement_plaine_commune.json"},
-		Raw:       eptRawFiles(eptRawNamePlaineCommune, rawPlaineCommuneKMLBase),
-		Transform: transformPlaineCommune,
-		Validate:  validatePlaineCommune,
+		Source:                Name,
+		Version:               Version,
+		Embed:                 embedFS,
+		Processed:             dataset.File{Name: "encadrement_plaine_commune.json"},
+		Raw:                   eptRawFiles(eptRawNamePlaineCommune, rawPlaineCommuneKMLBase),
+		Transform:             transformPlaineCommune,
+		Validate:              validatePlaineCommune,
+		Vintage:               "2026-06", // DRIHL arrêté "du 01 juin 2026" (annual)
+		ExpectedCadenceMonths: 12,
 	}
 	setEstEnsemble = dataset.Set{
-		Source:    Name,
-		Version:   Version,
-		Embed:     embedFS,
-		Processed: dataset.File{Name: "encadrement_est_ensemble.json"},
-		Raw:       eptRawFiles(eptRawNameEstEnsemble, rawEstEnsembleKMLBase),
-		Transform: transformEstEnsemble,
-		Validate:  validateEstEnsemble,
+		Source:                Name,
+		Version:               Version,
+		Embed:                 embedFS,
+		Processed:             dataset.File{Name: "encadrement_est_ensemble.json"},
+		Raw:                   eptRawFiles(eptRawNameEstEnsemble, rawEstEnsembleKMLBase),
+		Transform:             transformEstEnsemble,
+		Validate:              validateEstEnsemble,
+		Vintage:               "2026-06", // DRIHL arrêté "du 01 juin 2026" (annual)
+		ExpectedCadenceMonths: 12,
 	}
 	setPlaineCommuneZones = dataset.Set{
 		Source:    Name,
@@ -69,13 +75,15 @@ var (
 		Validate:  validateZones,
 	}
 	setLyon = dataset.Set{
-		Source:    Name,
-		Version:   Version,
-		Embed:     embedFS,
-		Processed: dataset.File{Name: "encadrement_lyon_villeurbanne.json"},
-		Raw:       []dataset.File{{Name: rawLyonName, URL: rawLyonURL}},
-		Transform: transformLyon,
-		Validate:  validateLyon,
+		Source:                Name,
+		Version:               Version,
+		Embed:                 embedFS,
+		Processed:             dataset.File{Name: "encadrement_lyon_villeurbanne.json"},
+		Raw:                   []dataset.File{{Name: rawLyonName, URL: rawLyonURL}},
+		Transform:             transformLyon,
+		Validate:              validateLyon,
+		Vintage:               "2025-06", // Métropole de Lyon barème 2025-2026 (annual)
+		ExpectedCadenceMonths: 12,
 	}
 )
 
