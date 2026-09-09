@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -118,10 +119,23 @@ func (t *cacheTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 // status is cacheable, and returns a fresh *http.Response with the body
 // re-attached (so the caller can read it once more).
 func (t *cacheTransport) persistAndReturn(req *http.Request, resp *http.Response, metaPath, bodyPath string) (*http.Response, error) {
-	body, err := io.ReadAll(resp.Body)
+	// Bound the read: this buffer sits BELOW GetBytes' io.LimitReader and
+	// below Download's streaming io.Copy, so without a limit of its own an
+	// oversized (or hostile) response is fully resident in RAM before either
+	// guard ever sees it. Read one byte past the limit so the overrun is
+	// detectable, and fail rather than cache a truncated body.
+	var src io.Reader = resp.Body
+	limit := t.resolved.maxResponseBytes
+	if limit > 0 {
+		src = io.LimitReader(resp.Body, limit+1)
+	}
+	body, err := io.ReadAll(src)
 	_ = resp.Body.Close()
 	if err != nil {
 		return nil, err
+	}
+	if limit > 0 && int64(len(body)) > limit {
+		return nil, fmt.Errorf("httpx: response from %s exceeds MaxResponseBytes=%d", req.URL, limit)
 	}
 
 	// Build a re-readable response in any case.

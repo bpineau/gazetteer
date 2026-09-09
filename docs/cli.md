@@ -61,6 +61,9 @@ $ gazetteer query --json "1 rue de Rivoli, 75001 Paris" | jq .
 - `--explain` — (query) diagnose, per source that returned nothing, *why*:
   a missing required input vs no data for this address. The first move for a
   mostly-empty Dossier.
+- `--timeout <duration>` — overall budget for the Collect (default 30s;
+  `0` disables it). A Source cut by the deadline degrades to a transient
+  failure while its siblings still land.
 - `--verbose` — DEBUG-level slog output to stderr.
 
 Every Source prints a compact, human-readable one-line summary of what
@@ -146,9 +149,9 @@ chomage         v1
 delinquance     v3
 dpedist         v1
 dvf             v4
-dvfagg          v1
+dvfagg          v2
 education       v1
-encadrement     v2
+encadrement     v3
 filoiris        v1
 filosofi        v1
 georisques      v1
@@ -160,11 +163,12 @@ locservice      v1
 logiris         v1
 lovac           v1
 nuisances       v1
-oll             v1
+oll             v2
 osm_transit     v3
 qpv             v2
-rnc             v1
+rnc             v2
 rpls            v1
+sensible        v1
 sitadel         v1
 taxefonciere    v1
 vacance         v1

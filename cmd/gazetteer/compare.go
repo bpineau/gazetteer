@@ -127,6 +127,8 @@ func parseCompareFlags(args []string) (*queryFlags, []string, error) {
 		fmt.Fprintf(fs.Output(),
 			"Usage: gazetteer compare [--property-type ...] [--surface m²] [--rooms N] [--source ...] [--json] [--verbose] \"<addr1>\" \"<addr2>\" [...]\n")
 		fmt.Fprintln(fs.Output(), "\nRanks the addresses best-first by yield-first zone score. Quote each address separately.")
+		fmt.Fprintln(fs.Output())
+		fs.PrintDefaults()
 	}
 	q.common.registerVerbose(fs)
 	fs.StringVar(&q.sources, "source", "", "Comma-separated source names (default: all). See `sources list`.")

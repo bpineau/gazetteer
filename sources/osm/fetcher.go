@@ -83,6 +83,12 @@ func NewHTTPOverpassFetcher(c *httpx.Client, endpoint string) *HTTPOverpassFetch
 // bounds what a truly hung mirror can cost. A var so tests can shrink it.
 var overpassMirrorTimeout = 60 * time.Second
 
+// maxOverpassBodyBytes caps one Overpass answer. The refresh's largest
+// sub-query (all rail stations of a dense department) is a few MiB, so 64 MiB
+// is far above any legitimate payload while still bounding what a wedged
+// mirror can push into memory.
+const maxOverpassBodyBytes = int64(64 << 20)
+
 const (
 	// mirrorSkipThreshold is the consecutive-failure streak after which
 	// a mirror is skipped; mirrorProbeEvery lets every Nth skip probe
@@ -229,9 +235,16 @@ func (f *HTTPOverpassFetcher) queryOne(ctx context.Context, endpoint, ql string)
 		return nil, fmt.Errorf("osm: overpass POST: %w", err)
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	// Bound the read: going through HTTPClient().Do bypasses httpx's own
+	// io.LimitReader, so a wedged or hostile mirror could otherwise stream
+	// unbounded data into memory (only the 60 s mirror timeout stands in the
+	// way). One byte past the cap makes the overrun detectable.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxOverpassBodyBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("osm: read body: %w", err)
+	}
+	if int64(len(body)) > maxOverpassBodyBytes {
+		return nil, fmt.Errorf("osm: overpass response from %s exceeds %d bytes", endpoint, maxOverpassBodyBytes)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		// Overpass returns plain-text error messages with rich details

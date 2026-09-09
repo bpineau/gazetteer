@@ -276,7 +276,8 @@ them to produce a useful answer:
 --property-type apartment|house|land|commercial   (default: apartment)
 --surface <m²>
 --rooms <N>
---source <comma-separated names>                  (default: every Source the CLI knows)
+--source <comma-separated names>                  (default: every Source except the opt-in ones, i.e. bdnb)
+--timeout <duration>                              (Collect budget, default 30s; 0 disables)
 --json                                            (emit the full Dossier)
 --verbose                                         (debug)
 ```

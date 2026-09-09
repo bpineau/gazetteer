@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/bpineau/gazetteer/gazetteer"
@@ -116,5 +118,43 @@ func TestDescriptorInputTokens(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// TestCLIDocSourcesListCurrent guards the `sources list` transcript pasted in
+// docs/cli.md against drift. AGENTS.md promises the docs are "kept honest by
+// tests"; before this guard, only docs/sources.json was, and the transcript had
+// silently gone stale on five sources (a whole Source was missing from it).
+//
+// The transcript is compared line-for-line against the same data `sources list`
+// renders: every registered name, its Version, and the opt-in marker.
+func TestCLIDocSourcesListCurrent(t *testing.T) {
+	const path = "../../docs/cli.md"
+	doc, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	const marker = "$ gazetteer sources list\n"
+	i := bytes.Index(doc, []byte(marker))
+	if i < 0 {
+		t.Fatalf("%s: no `sources list` transcript found", path)
+	}
+	rest := doc[i+len(marker):]
+	j := bytes.Index(rest, []byte("```"))
+	if j < 0 {
+		t.Fatalf("%s: unterminated `sources list` transcript", path)
+	}
+	got := strings.TrimSpace(string(rest[:j]))
+
+	var want strings.Builder
+	for _, e := range buildCatalog() {
+		dflt := ""
+		if !e.Default {
+			dflt = "  (opt-in via --source)"
+		}
+		fmt.Fprintf(&want, "%-14s  v%d%s\n", e.Name, e.Version, dflt)
+	}
+	if got != strings.TrimSpace(want.String()) {
+		t.Errorf("%s: the `sources list` transcript is stale — replace the block with:\n\n%s", path, want.String())
 	}
 }

@@ -1028,6 +1028,33 @@ func TestGetBytes_MaxResponseBytes(t *testing.T) {
 	}
 }
 
+// Test that the disk cache honours MaxResponseBytes too. The cache transport
+// buffers the body BELOW GetBytes' io.LimitReader, so without a limit of its
+// own an oversized response was fully resident in RAM before any guard saw it.
+func TestCacheTransport_MaxResponseBytes(t *testing.T) {
+	body := strings.Repeat("a", 4096)
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	c := newTestClient(t, Options{RateLimitPerHost: 1000, MaxResponseBytes: 1024, HTTPCacheDir: dir})
+	if _, _, err := c.GetBytes(context.Background(), srv.URL+"/", nil); err == nil {
+		t.Fatal("expected MaxResponseBytes error through the cache transport")
+	}
+	// An over-limit response must never be persisted: a second call must go
+	// back upstream rather than serve a truncated body from disk.
+	if _, _, err := c.GetBytes(context.Background(), srv.URL+"/", nil); err == nil {
+		t.Fatal("expected MaxResponseBytes error on the second call too")
+	}
+	if hits != 2 {
+		t.Fatalf("over-limit response was cached: upstream hits = %d, want 2", hits)
+	}
+}
+
 // Test that isRetryableNetErr distinguishes context.Canceled and net.OpError.
 func TestIsRetryableNetErr(t *testing.T) {
 	if isRetryableNetErr(nil) {

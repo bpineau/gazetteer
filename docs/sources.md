@@ -751,7 +751,7 @@ A Source's typed `Result` MAY implement:
 - `appraisal.RentEstimator`  — contributes to `appraisal.RentValue`
 - `appraisal.HazardReporter` — contributes to `appraisal.HazardProfile`
 
-Today: `dvf` → PriceEstimator; `carteloyers` + `encadrement` + `oll` →
+Today: `dvf` + `dvfagg` → PriceEstimator; `carteloyers` + `encadrement` + `oll` →
 RentEstimator; `georisques` + `catnat` → HazardReporter.
 
 On top of these, `appraisal/zonescore` is a terminal consumer that folds
@@ -824,7 +824,7 @@ deep links from the listing's coordinates and address fields.
 - **Result**: `Links []Link` (each `{Key, Label, Category, URL}`), plus a
   `Map()` helper returning a `key→URL` map. Categories: `map`, `prices`,
   `risks`, `urbanism`, `context`.
-- **Links built** (v1): Google Maps / Street View, OpenStreetMap, Géoportail
+- **Links built** (v3): Google Maps / Street View, OpenStreetMap, Géoportail
   (ortho + cadastre WMTS), IGN Remonter le temps (`map`); Pappers Immobilier,
   DVF explorer on explore.data.gouv.fr (`prices`); Géorisques rapport, enriched
   with INSEE/city when present (`risks`); Géoportail de l'Urbanisme / PLU

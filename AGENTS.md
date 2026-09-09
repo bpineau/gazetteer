@@ -2,8 +2,10 @@
 
 This file is the **canonical entry point** for working in this repo. Read it
 first; it is written to be ingested in one shot. Deeper references live in
-[`docs/`](docs/). Everything here is kept honest by tests. If a fact below is
-wrong, that's a bug.
+[`docs/`](docs/). The machine-readable facts are kept honest by tests
+(`docs/sources.json` and the `sources list` transcript in `docs/cli.md` are
+both compared to the live catalog by `cmd/gazetteer`'s guards); the prose
+pages are maintained by hand. If a fact below is wrong, that's a bug.
 
 ## What this is — the data is the product
 
@@ -200,7 +202,8 @@ Two patterns sit alongside the per-address `Collect`:
 - **Tune one Source, keep the roster.** `factory.Options.SourceOverrides`
   swaps a single Source's constructor while sharing the factory's deps
   (rate-limited HTTP client, cached geocoder) — e.g. give dvf a persistent
-  `SectionCache` or inject an `Options.Fetcher` circuit breaker. Typo'd names
+  `SectionCache`, or inject an `Options.Fetcher` circuit breaker into a source
+  that carries that seam (ademe, georisques, ...). Typo'd names
   error. To *add* a source, use `BuilderDefault(...).With(plugin)`.
 - **Screen every commune offline.** `overview.Build(overview.Options{Depts…})`
   joins the embedded, commune-keyed Sources into one `CommuneOverview` row per
