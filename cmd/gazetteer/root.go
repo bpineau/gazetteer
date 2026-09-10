@@ -8,6 +8,19 @@ import (
 	"os"
 )
 
+// streams is the CLI's output plumbing: a sub-command writes its data to
+// out and its usage banners, warnings and logs to err. Bundling the pair
+// keeps the dispatch signatures short, and passing it explicitly (rather
+// than reaching for os.Stdout deep inside a printer) is what lets a test
+// drive a whole sub-command against a bytes.Buffer.
+type streams struct {
+	out io.Writer
+	err io.Writer
+}
+
+// osStreams is the process's own pair, used by main.
+func osStreams() streams { return streams{out: os.Stdout, err: os.Stderr} }
+
 // usage prints the top-level help text.
 func usage(w io.Writer) {
 	fmt.Fprintln(w, "Usage: gazetteer <command> [flags] [args]")
@@ -35,33 +48,33 @@ var errUsage = errors.New("usage")
 // run dispatches the first arg to its sub-command. Returns errUsage
 // when the user typed garbage so main can map that to a non-zero exit
 // without printing a redundant "gazetteer: usage" banner.
-func run(ctx context.Context, args []string) error {
+func run(ctx context.Context, args []string, w streams) error {
 	if len(args) == 0 {
-		usage(os.Stderr)
+		usage(w.err)
 		return errUsage
 	}
 	cmd, rest := args[0], args[1:]
 	switch cmd {
 	case "version", "-v", "--version":
-		return runVersion(ctx, rest)
+		return runVersion(ctx, rest, w)
 	case "normalize":
-		return runNormalize(ctx, rest)
+		return runNormalize(ctx, rest, w)
 	case "query":
-		return runQuery(ctx, rest)
+		return runQuery(ctx, rest, w)
 	case "appraise":
-		return runAppraise(ctx, rest)
+		return runAppraise(ctx, rest, w)
 	case "compare":
-		return runCompare(ctx, rest)
+		return runCompare(ctx, rest, w)
 	case "sources":
-		return runSources(ctx, rest)
+		return runSources(ctx, rest, w)
 	case "refresh":
-		return runRefresh(ctx, rest)
+		return runRefresh(ctx, rest, w)
 	case "help", "-h", "--help":
-		usage(os.Stdout)
+		usage(w.out)
 		return nil
 	default:
-		fmt.Fprintf(os.Stderr, "gazetteer: unknown command %q\n\n", cmd)
-		usage(os.Stderr)
+		fmt.Fprintf(w.err, "gazetteer: unknown command %q\n\n", cmd)
+		usage(w.err)
 		return errUsage
 	}
 }

@@ -176,6 +176,28 @@ names := gazetteer.RegisteredNames()
 factory := gazetteer.Lookup("ademe")
 ```
 
+## Driving the CLI in a test
+
+`cmd/gazetteer`'s entry point is `run(ctx, args, streams)`, and `streams`
+bundles the pair of writers every sub-command prints through. No printer
+reaches for `os.Stdout`, so a test drives a whole sub-command against
+buffers and asserts on what the user would see, on the right stream:
+
+```go
+var c capture // { stdout, stderr bytes.Buffer }, see run_test.go
+err := run(context.Background(), []string{"sources", "list"}, c.streams())
+```
+
+The error is the exit contract: `nil` = exit 0, `errUsage` = "the command
+already printed its own banner" (exit 1, no extra line), any other error
+= exit 1 with `gazetteer: <err>` on stderr.
+
+Only argument-level sub-commands belong in such a test: `query`,
+`appraise`, `compare` and `normalize` geocode through the BAN. Their
+argument validation, though, is all done BEFORE the first round-trip
+(`--source`, `--property-type`, `--profile`), so the rejection paths are
+network-free and testable.
+
 ## Resetting circuit-breaker state between tests
 
 ```go
