@@ -48,8 +48,9 @@ const DefaultHTTPTimeout = 60 * time.Second
 // The deadline is the whole point: http.DefaultClient has NO timeout, so an
 // upstream that accepts the TCP connection and then never answers pins the
 // Source, and the Collect waiting on it, for the life of the process. Collect's
-// own per-Source timeout is opt-in (WithPerSourceTimeout) and unset by default,
-// so nothing else bounds the atomic Query and hand-built Builder paths.
+// own per-Source timeout is opt-in (WithPerSourceTimeout): a factory-built
+// Client sets it (factory.DefaultPerSourceTimeout, 45 s), the atomic Query and
+// hand-built Builder paths do not, so nothing else bounds them.
 //
 // Override it per Source with Options.HTTPClient, per Client with
 // Builder.WithHTTPClient (factory.NewDefault already passes a polite, cached,

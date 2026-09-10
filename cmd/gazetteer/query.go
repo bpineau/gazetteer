@@ -55,13 +55,19 @@ type queryFlags struct {
 	timeout      time.Duration // overall budget for the Collect; 0 ⇒ no deadline
 	jsonOut      bool
 	explain      bool   // diagnose per-source why-empty/why-failed (query only)
-	profile      string // ZoneScore weight preset (appraise / compare only)
+	profile      string // ZoneScore weight preset (appraise only here; compare registers its own)
 	addr         string
 }
 
+// cmdAppraise is the sub-command name `appraise` hands parseQueryFlags. It
+// is the only user of the shared flag set that computes a ZoneScore, hence
+// the only one that registers --profile (see parseQueryFlags).
+const cmdAppraise = "appraise"
+
 // parseQueryFlags wires the shared flag set used by `query` and
 // `appraise`. The first arg is the sub-command name (for the Usage
-// banner); the rest are the user's argv.
+// banner, and to gate the sub-command-specific flags); the rest are the
+// user's argv.
 func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 	var q queryFlags
 	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
@@ -86,8 +92,14 @@ func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
 		"Overall budget for the Collect (deadline propagated via ctx). Slow Sources past this point return ctx.DeadlineExceeded → StatusFailedTransient. 0 disables the deadline.")
 	fs.BoolVar(&q.jsonOut, "json", false, "Emit the full Dossier as indented JSON")
 	fs.BoolVar(&q.explain, "explain", false, "Diagnose per source WHY it returned nothing (missing input vs no data for this address)")
-	fs.StringVar(&q.profile, "profile", "",
-		"ZoneScore weight preset for appraise/compare: yield (default) | balanced | patrimoine | transport.")
+	// --profile only feeds the ZoneScore weights, and `query` computes no
+	// score: registering it there advertised a flag runQuery never reads and
+	// swallowed an invalid preset name in silence. `compare` scores too, but
+	// builds its own flag set (parseCompareFlags) and registers it itself.
+	if cmd == cmdAppraise {
+		fs.StringVar(&q.profile, "profile", "",
+			"ZoneScore weight preset: yield (default) | balanced | patrimoine | transport.")
+	}
 	positional, err := parseInterleaved(fs, args)
 	if err != nil {
 		return nil, errUsage

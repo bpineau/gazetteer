@@ -64,13 +64,42 @@ const maxParallelListings = 8
 // scorers need the same inputs Collect does. opts tunes the scoring profile (see
 // Options); the same profile applies to every candidate for a fair comparison.
 // At most maxParallelListings Dossiers are collected concurrently.
+//
+// Cancelling ctx stops the fan-out: candidates that have not been collected
+// yet are not collected at all, and each keeps an empty Dossier (so it scores
+// as "nothing known" and ranks last). The returned Comparison always holds one
+// entry per input listing.
 func Compare(ctx context.Context, c Collector, listings []gazetteer.Listing, opts ...Options) Comparison {
 	dossiers := make([]gazetteer.Dossier, len(listings))
 	sem := make(chan struct{}, maxParallelListings)
 	var wg sync.WaitGroup
+	// skipFrom is the first candidate that never got a slot: the loop is
+	// sequential, so a cancellation stops it and leaves exactly the tail
+	// [skipFrom, len) uncollected.
+	skipFrom := len(listings)
+loop:
 	for i := range listings {
+		// Give up as soon as the ctx is done instead of queueing (and then
+		// collecting) every remaining candidate: the caller has abandoned the
+		// comparison, or the shared budget is spent. The ctx is checked both
+		// before and after the select, since a select whose two arms are both
+		// ready picks pseudo-randomly.
+		if ctx.Err() != nil {
+			skipFrom = i
+			break
+		}
+		select {
+		case sem <- struct{}{}:
+			if ctx.Err() != nil {
+				<-sem // hand the slot back
+				skipFrom = i
+				break loop
+			}
+		case <-ctx.Done():
+			skipFrom = i
+			break loop
+		}
 		wg.Add(1)
-		sem <- struct{}{}
 		go func(i int) {
 			defer wg.Done()
 			defer func() { <-sem }()
@@ -78,6 +107,12 @@ func Compare(ctx context.Context, c Collector, listings []gazetteer.Listing, opt
 		}(i)
 	}
 	wg.Wait()
+	// An uncollected candidate keeps an empty Dossier carrying its own
+	// Listing: it scores as "nothing known" and therefore ranks last (see the
+	// rendement rule below), rather than silently showing a blank listing.
+	for i := skipFrom; i < len(listings); i++ {
+		dossiers[i] = gazetteer.Dossier{Listing: listings[i]}
+	}
 
 	entries := make([]ComparisonEntry, len(listings))
 	for i, d := range dossiers {

@@ -352,3 +352,32 @@ func TestRentValue_UnknownSourceUsesDefaultWeight(t *testing.T) {
 		t.Errorf("mystery weight = %v, want 0.4 (default)", mysteryInput.Weight)
 	}
 }
+
+// TestRentInputWeightIsRaw is the rent-side twin of TestPriceInputWeightIsRaw:
+// RentInput.Weight is the RAW looked-up weight, never normalized to 1.
+func TestRentInputWeightIsRaw(t *testing.T) {
+	t.Parallel()
+
+	d := buildDossier(map[string]fakeEntry{
+		"encadrement": {data: fakeRentEstimator{eurPerM2Cents: 30_00, confidence: ConfidenceHigh}},
+		"carteloyers": {data: fakeRentEstimator{eurPerM2Cents: 20_00, confidence: ConfidenceHigh}},
+	})
+
+	got := RentValue(d)
+	weights := make(map[string]float64, len(got.Inputs))
+	var sum float64
+	for _, in := range got.Inputs {
+		weights[in.Source] = in.Weight
+		sum += in.Weight
+	}
+	if weights["encadrement"] != DefaultRentWeights["encadrement"] || weights["carteloyers"] != DefaultRentWeights["carteloyers"] {
+		t.Errorf("Inputs weights = %v, want the raw DefaultRentWeights entries", weights)
+	}
+	if sum == 1 {
+		t.Errorf("Inputs weights sum to 1 (%v): they are documented as RAW, not normalized", sum)
+	}
+	blend := (weights["encadrement"]*30_00 + weights["carteloyers"]*20_00) / sum
+	if want := int64(blend); got.EurPerM2Cents != want {
+		t.Errorf("EurPerM2Cents = %d, want %d (weighted by the raw weights)", got.EurPerM2Cents, want)
+	}
+}

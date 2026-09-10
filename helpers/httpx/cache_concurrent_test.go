@@ -8,11 +8,12 @@ import (
 	"testing"
 )
 
-// TestWriteFileAtomicConcurrentWriters: nothing single-flights the disk cache,
-// so two in-flight requests for the same URL write the same entry at the same
-// time. With a fixed "<path>.tmp" they shared one O_TRUNC tmpfile and renamed
-// the interleaved result; readEntry's BodyLen check hid it for bodies, the meta
-// file had no such guard. Each writer must own its tmpfile.
+// TestWriteFileAtomicConcurrentWriters: the miss path is single-flighted per
+// key now, but concurrent writers of one entry remain reachable (two processes
+// sharing a cache directory, a cache-bypassing caller, a prune racing a
+// write). With a fixed "<path>.tmp" they shared one O_TRUNC tmpfile and
+// renamed the interleaved result; readEntry's BodyLen check hid it for bodies,
+// the meta file had no such guard. Each writer must own its tmpfile.
 func TestWriteFileAtomicConcurrentWriters(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "abc123.body")
 

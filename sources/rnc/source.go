@@ -81,11 +81,11 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 
 	e, method, conf, dist := idx.match(l)
 	ev := Evidence{
-		INSEE:         strings.TrimSpace(l.INSEE),
-		RowCount:      idx.Count(),
-		DataVintage:   idx.Meta.DataVintage,
-		MatchDistance: dist,
-		VoieQuery:     normVoie(l.Address),
+		INSEE:          strings.TrimSpace(l.INSEE),
+		RowCount:       idx.Count(),
+		DataVintage:    idx.Meta.DataVintage,
+		MatchDistanceM: dist,
+		VoieQuery:      normVoie(l.Address),
 	}
 	if l.Lat != nil {
 		ev.QueryLat = *l.Lat

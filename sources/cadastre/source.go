@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/banx"
 )
@@ -26,7 +28,7 @@ const Version = sourceVersion
 // Options configures a cadastre Source. The zero value is usable: every
 // field has a sane default (BaseURL → package var BaseURL; BatiBaseURL
 // → package var BatiBaseURL; HTTPClient → gazetteer.HTTPClientFrom(ctx)
-// at Query time; BatiCache → a sync.Map keyed by INSEE).
+// at Query time; BatiCache → a bounded DefaultBatiCache keyed by INSEE).
 type Options struct {
 	// BaseURL overrides the API Carto cadastre-parcelle endpoint.
 	// Tests use this to point at httptest.NewServer. Default:
@@ -70,9 +72,10 @@ type Options struct {
 	Fetcher gazetteer.Fetcher
 
 	// BatiCache overrides the in-process building-polygon cache. When
-	// nil, the Source uses a private sync.Map per Source instance — no
-	// TTL, no eviction (a process is short-lived enough for the
-	// monthly-refreshed cadastre data to stay coherent).
+	// nil, the Source allocates a private DefaultBatiCache: no TTL (the
+	// monthly-refreshed cadastre data cannot go stale inside one run) but
+	// bounded to DefaultBatiCacheMaxCommunes whole-commune dumps, oldest
+	// use evicted first.
 	BatiCache BatiCache
 }
 
@@ -81,6 +84,16 @@ type Options struct {
 type Source struct {
 	opts         Options
 	defaultCache *DefaultBatiCache
+
+	// batiSF coalesces concurrent bâti fetches for the SAME commune across
+	// parallel Query calls on this shared Source. A miss is a whole-commune
+	// building dump (a few MB, tens of thousands of polygons), so two
+	// addresses of the same commune arriving together used to download and
+	// parse it twice, the second write to the cache overwriting the first.
+	// It merges in-flight duplicates only: once a fetch completes its key is
+	// released and the cache (not the group) serves the next call. See
+	// resolveBatiPolygons.
+	batiSF singleflight.Group
 }
 
 // NewSource builds a cadastre Source. Zero-valued Options is fine; the

@@ -535,7 +535,10 @@ type TransportCircuit struct {
 	// tracker entirely — callers that talk to a quota-aware upstream
 	// (BDNB header) should NOT use this counter, the HTTPFetcher flow
 	// is the right one for them.
-	max429    int
+	//
+	// Atomic because SetMax429 may arm the tracker while Observe calls
+	// are already in flight on the shared circuit.
+	max429    atomic.Int32
 	consec429 atomic.Int32
 }
 
@@ -574,7 +577,9 @@ func (t *TransportCircuit) Tripped() bool {
 }
 
 // SetMax429 enables (or disables when n<=0) the consecutive-429
-// breaker on this circuit. Safe to call on a nil receiver. The
+// breaker on this circuit. Safe to call on a nil receiver, and safe to
+// call concurrently with Observe (the threshold is stored atomically;
+// an Observe already past its read keeps the previous value). The
 // counter is independent from the transport-error counter: a 429
 // run does NOT advance the transport streak and vice versa, but
 // any single 2xx (Observe(nil)) resets BOTH streaks.
@@ -582,7 +587,7 @@ func (t *TransportCircuit) SetMax429(n int) {
 	if t == nil {
 		return
 	}
-	t.max429 = n
+	t.max429.Store(int32(n))
 }
 
 // Observe folds the outcome of one upstream call into the counter:
@@ -622,15 +627,19 @@ func (t *TransportCircuit) Observe(err error) {
 			)
 		}
 	case errIs429(err):
-		if t.max429 <= 0 {
+		// One read of the threshold per Observe: a concurrent SetMax429
+		// must not be able to change it between the guard and the
+		// comparison below.
+		max429 := t.max429.Load()
+		if max429 <= 0 {
 			return
 		}
 		n := t.consec429.Add(1)
-		if int(n) >= t.max429 {
+		if n >= max429 {
 			tripAndWarn(t.flag, t.source,
 				"circuit tripped on consecutive 429 responses", t.logger,
 				slog.Int("consecutive_429", int(n)),
-				slog.Int("threshold", t.max429),
+				slog.Int("threshold", int(max429)),
 			)
 		}
 	}

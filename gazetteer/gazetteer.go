@@ -95,6 +95,11 @@ func (b *Builder) WithLogger(l *slog.Logger) *Builder {
 
 // WithMaxConcurrency caps the number of Sources executed in parallel by
 // Client.Collect. Zero or negative = unlimited.
+//
+// The cap governs EXECUTION: a Source still queued for a slot when the
+// Collect ctx is cancelled (or its deadline passes) is not run at all. Its
+// Result then carries StatusFailedTransient and an Err wrapping the
+// cancellation cause, so the Dossier still holds one Result per Source.
 func (b *Builder) WithMaxConcurrency(n int) *Builder {
 	b.maxConcur = n
 	return b
@@ -120,8 +125,11 @@ func (b *Builder) WithMaxConcurrency(n int) *Builder {
 // that overruns loses only its own contribution; the Dossier degrades
 // gracefully to a partial answer.
 //
-// Zero or negative disables the bound. Factory callers reach this via the
-// Builder path: factory.BuilderDefault(ctx, opts).WithPerSourceTimeout(d).Build().
+// Zero or negative disables the bound. The factory does opt in on its
+// callers' behalf: a Client from factory.NewDefault carries
+// factory.DefaultPerSourceTimeout (45 s), overridable via
+// factory.Options.PerSourceTimeout or by chaining this method on
+// factory.BuilderDefault(ctx, opts).WithPerSourceTimeout(d).Build().
 func (b *Builder) WithPerSourceTimeout(d time.Duration) *Builder {
 	b.perSrcTimeout = d
 	return b
@@ -245,7 +253,17 @@ func (c *Client) collect(ctx context.Context, l Listing, sources []Source) Dossi
 	for _, s := range sources {
 		wg.Go(func() {
 			if sem != nil {
-				sem <- struct{}{}
+				if err := acquire(ctx, sem); err != nil {
+					// The Collect was abandoned (caller cancel, ctx deadline)
+					// while this Source queued for a slot: the cap governs
+					// EXECUTION, so a cancelled Collect must not go on running
+					// the whole backlog. Record the cancellation as the
+					// retryable failure it is, keeping one Result per Source.
+					mu.Lock()
+					results[s.Name()] = notRunResult(s, err)
+					mu.Unlock()
+					return
+				}
 				defer func() { <-sem }()
 			}
 			r := runOne(ctx, s, l, c.perSrcTimeout)
@@ -261,6 +279,42 @@ func (c *Client) collect(ctx context.Context, l Listing, sources []Source) Dossi
 		Results:    results,
 		StartedAt:  started,
 		FinishedAt: time.Now(),
+	}
+}
+
+// acquire takes one slot of the concurrency semaphore, giving up as soon as
+// ctx is done. An abandoned Collect must never start another Source, so the
+// ctx is checked both before and after the select: a select whose two arms are
+// both ready picks pseudo-randomly, and taking a slot from a cancelled Collect
+// would let the backlog trickle through one Source at a time.
+func acquire(ctx context.Context, sem chan struct{}) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	select {
+	case sem <- struct{}{}:
+		if err := ctx.Err(); err != nil {
+			<-sem // hand the slot back
+			return err
+		}
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// notRunResult is the envelope for a Source that never ran because the
+// Collect was cancelled while it waited for a concurrency slot. Status comes
+// from the same classifyErr taxonomy as a real failure (context.Canceled and
+// context.DeadlineExceeded both land on StatusFailedTransient: a fresh run
+// retries them), and ElapsedMS stays 0 since no Query was issued.
+func notRunResult(s Source, err error) Result {
+	return Result{
+		Name:      s.Name(),
+		Version:   s.Version(),
+		Status:    classifyErr(err),
+		FetchedAt: time.Now(),
+		Err:       fmt.Errorf("source %s not run: %w", s.Name(), err),
 	}
 }
 

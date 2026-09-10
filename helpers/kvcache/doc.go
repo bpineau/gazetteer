@@ -13,8 +13,10 @@
 //
 // Reference backends:
 //
-//   - helpers/kvcache/memcache — in-memory, concurrent-safe; fine for
-//     tests and short-lived processes.
+//   - helpers/kvcache/memcache: in-memory, concurrent-safe and bounded
+//     (an entry ceiling, expired rows swept before the
+//     least-recently-used one is evicted); fine for tests, for
+//     short-lived processes and for a long-lived server's memos.
 //
 // Persistent backends are out-of-scope for the library; implement
 // the interface against any SQL / KV store and run the conformance

@@ -119,7 +119,10 @@ building-footprint analysis (count + total emprise + ratio).
     point — public, no auth, GeoJSON FeatureCollection.
   - `cadastre.data.gouv.fr/bundler/cadastre-etalab/communes/{insee}/
     geojson/batiments` for the opt-in bâti dump (gzipped, several MB
-    per commune). The Source caches the dump in-process per INSEE.
+    per commune). The Source caches the dump in-process per INSEE (bounded to
+    `cadastre.DefaultBatiCacheMaxCommunes` dumps, least-recently-used evicted
+    first) and coalesces concurrent misses of one commune into a single
+    download.
 - **Bâti soft-fail**: when `IncludeBati: true` and the bâti dump
   fetch / parse fails, the parcel data is still returned with bâti
   fields nil and `Evidence.BatiError` populated.
