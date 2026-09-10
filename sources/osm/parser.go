@@ -50,11 +50,14 @@ type Station struct {
 // Display formats the station for the auction-detail UI :
 // "Lourmel (M8)" if lines are known, "Lourmel" otherwise. Pure helper,
 // no allocation when Lines is empty.
+//
+// An unclassified station (Type == "", which the parser never emits but a
+// hand-built or JSON-decoded Station can carry) simply gets no mode prefix:
+// "Lourmel (8)".
 func (s Station) Display() string {
 	if len(s.Lines) == 0 {
 		return s.Name
 	}
-	lt := strings.ToUpper(string(s.Type))
 	prefix := ""
 	switch s.Type {
 	case TransitTypeMetro:
@@ -64,7 +67,11 @@ func (s Station) Display() string {
 	case TransitTypeTram:
 		prefix = "T"
 	default:
-		prefix = lt[:1]
+		// First letter of the mode ("T" for transilien / train). Guarded:
+		// an empty Type used to index [:1] into an empty string and panic.
+		if lt := strings.ToUpper(string(s.Type)); lt != "" {
+			prefix = lt[:1]
+		}
 	}
 	if len(s.Lines) == 1 {
 		return s.Name + " (" + prefix + s.Lines[0] + ")"
