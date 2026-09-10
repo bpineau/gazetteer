@@ -91,7 +91,9 @@ type Result struct {
 `Status` classifies the outcome (see below). `ElapsedMS` records how long
 each Source's Query took (success or failure alike) — the signal behind
 `Builder.WithPerSourceTimeout`, which bounds any single Source so a slow
-one cannot drag the whole Dossier (disabled by default; see its godoc).
+one cannot drag the whole Dossier. A factory-built Client sets it to
+`factory.DefaultPerSourceTimeout` (45 s); a hand-built Builder leaves it
+disabled unless you call the method (see its godoc).
 `Data` is a pointer to a
 package-defined typed struct (`*dvf.Result`, `*osm.Result`, …).
 `Evidence`, when populated, captures input fingerprint, ladder tier

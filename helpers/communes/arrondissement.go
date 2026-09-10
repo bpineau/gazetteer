@@ -5,21 +5,6 @@ import (
 	"strings"
 )
 
-// FoldArrondissement maps Paris / Lyon / Marseille arrondissement
-// INSEE codes onto their parent commune INSEE. Datasets published by
-// the French administration usually carry one row per parent commune
-// only (75056 for Paris, 69123 for Lyon, 13055 for Marseille). The
-// arrondissement-level codes (75101..75120, 69381..69389,
-// 13201..13216) inherit the same value.
-//
-// The BAN forward-geocoder returns the arrondissement-level INSEE for
-// any Paris / Lyon / Marseille address, so a Source that looks up an
-// embedded dataset keyed by parent commune MUST fold the input INSEE
-// through this helper before the lookup — otherwise every Paris /
-// Lyon / Marseille listing returns an empty result.
-//
-// Returns insee unchanged for every other code (including INSEEs that
-// are already parent commune for Paris/Lyon/Marseille).
 // ArrondissementParents returns the explicit arrondissement→parent INSEE
 // mapping (Paris 75101..75120 → 75056, Lyon 69381..69389 → 69123,
 // Marseille 13201..13216 → 13055) as a fresh map. It is the enumerable
@@ -39,6 +24,21 @@ func ArrondissementParents() map[string]string {
 	return out
 }
 
+// FoldArrondissement maps Paris / Lyon / Marseille arrondissement
+// INSEE codes onto their parent commune INSEE. Datasets published by
+// the French administration usually carry one row per parent commune
+// only (75056 for Paris, 69123 for Lyon, 13055 for Marseille). The
+// arrondissement-level codes (75101..75120, 69381..69389,
+// 13201..13216) inherit the same value.
+//
+// The BAN forward-geocoder returns the arrondissement-level INSEE for
+// any Paris / Lyon / Marseille address, so a Source that looks up an
+// embedded dataset keyed by parent commune MUST fold the input INSEE
+// through this helper before the lookup: otherwise every Paris /
+// Lyon / Marseille listing returns an empty result.
+//
+// Returns insee unchanged for every other code (including the parent
+// commune codes of Paris / Lyon / Marseille themselves).
 func FoldArrondissement(insee string) string {
 	if len(insee) != 5 {
 		return insee

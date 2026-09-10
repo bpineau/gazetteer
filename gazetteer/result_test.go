@@ -77,7 +77,9 @@ func TestResult_EvidenceJSONRoundTrip(t *testing.T) {
 		Tier string `json:"tier"`
 		N    int    `json:"n"`
 	}
-	Register("evroundtrip", func() any { return &evTestPayload{} })
+	// registerForTest, not Register: the registry is process-global and a
+	// duplicate registration panics, which would break `go test -count=N`.
+	registerForTest(t, "evroundtrip", func() any { return &evTestPayload{} })
 	d := Dossier{Results: map[string]Result{
 		"evroundtrip": {
 			Name:     "evroundtrip",

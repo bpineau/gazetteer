@@ -794,3 +794,29 @@ func TestHTTPFetcher_QuotaTripped_429StreakResetsOn2xx(t *testing.T) {
 		t.Fatalf("tripped despite intervening 2xx successes")
 	}
 }
+
+// SetMax429 races with Observe: a source can arm the 429 tracker while
+// fetches are already in flight (the option is set on a shared circuit,
+// not per call). Run under -race, this test reports a data race whenever
+// max429 is a plain int field.
+func TestTransportCircuit_SetMax429ConcurrentWithObserve(t *testing.T) {
+	flag := &atomic.Bool{}
+	tc := NewTransportCircuit("tc429race", 5, flag, nil)
+
+	err429 := &httpx.ErrHTTP{Status: http.StatusTooManyRequests, URL: "https://x"}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for range 1000 {
+			tc.Observe(err429)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := range 1000 {
+			tc.SetMax429(i % 7) // includes 0 (disabled) and small thresholds
+		}
+	}()
+	wg.Wait()
+}

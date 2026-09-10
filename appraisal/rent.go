@@ -142,10 +142,29 @@ func (c RentConsolidated) EURPerM2() float64 { return float64(c.EurPerM2Cents) /
 // detection. Excluded entries are kept in the slice so callers can
 // surface "why" in UIs and diagnostics.
 type RentInput struct {
-	Source      string
-	Estimate    RentEstimate
-	Weight      float64
-	Excluded    bool
+	// Source is the contributing Source's registry name (the Dossier key).
+	Source string
+
+	// Estimate is the contribution verbatim, as the Source reported it.
+	Estimate RentEstimate
+
+	// Weight is the RAW per-source weight this contribution entered the
+	// synthesis with, resolved in that order from RentOptions.Weights,
+	// DefaultRentWeights, then RentOptions.DefaultWeight. It is NOT
+	// normalized: the weights of the non-excluded inputs do not sum to 1
+	// (the weighted mean divides by their sum internally). Compute a
+	// contribution share as Weight / Σ Weight over the entries whose
+	// Excluded is false.
+	Weight float64
+
+	// Excluded is true when the MAD outlier filter dropped this
+	// contribution from the weighted mean. The entry is kept in the slice
+	// so callers can show what was rejected (its Bracket still counts:
+	// see the Bracket precedence rule on RentValue).
+	Excluded bool
+
+	// ExcludedWhy is the stable machine-readable reason behind Excluded
+	// ("outlier_z_score"). Empty when Excluded is false.
 	ExcludedWhy string
 }
 
