@@ -38,6 +38,11 @@ func TestOverpassQLBuilders(t *testing.T) {
 		}
 	}
 
+	// An empty bbox falls back to metropolitan France in both builders.
+	if !strings.Contains(FranceTransitRoutesOverpassQL(""), "[bbox:"+FranceMetropolitanBBox+"]") {
+		t.Error("routes QL with an empty bbox must default to the metropolitan box")
+	}
+
 	routes := FranceTransitRoutesOverpassQL("41.0,-5.5,51.5,10.0")
 	for _, want := range []string{
 		"[bbox:41.0,-5.5,51.5,10.0]",
@@ -52,7 +57,7 @@ func TestOverpassQLBuilders(t *testing.T) {
 }
 
 func TestItoa(t *testing.T) {
-	cases := map[int]string{0: "0", 7: "7", 42: "42", 1048576: "1048576"}
+	cases := map[int]string{0: "0", 7: "7", 42: "42", 1048576: "1048576", -7: "-7", -1048576: "-1048576"}
 	for in, want := range cases {
 		if got := itoa(in); got != want {
 			t.Errorf("itoa(%d) = %q, want %q", in, got, want)

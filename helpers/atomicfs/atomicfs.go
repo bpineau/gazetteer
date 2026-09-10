@@ -22,16 +22,10 @@ import (
 //
 // The caller is expected to have created the parent directory.
 func WriteFile(path string, data []byte, perm os.FileMode) error {
-	out, tmp, err := createTemp(path, perm)
-	if err != nil {
+	return writeThrough(path, perm, "write", func(out *os.File) error {
+		_, err := out.Write(data)
 		return err
-	}
-	if _, err := out.Write(data); err != nil {
-		_ = out.Close()
-		_ = os.Remove(tmp)
-		return fmt.Errorf("atomicfs: write %s: %w", tmp, err)
-	}
-	return seal(out, tmp, path)
+	})
 }
 
 // CopyFile copies src to dst with the same per-writer tmpfile, fsync and
@@ -48,16 +42,27 @@ func CopyFile(src, dst string, perm os.FileMode) error {
 	}
 	defer func() { _ = in.Close() }()
 
-	out, tmp, err := createTemp(dst, perm)
+	return writeThrough(dst, perm, "copy to", func(out *os.File) error {
+		_, err := io.Copy(out, in)
+		return err
+	})
+}
+
+// writeThrough runs fill against a tmpfile of its own next to path, then
+// seals it into place. Both public writers share it so the failure
+// discipline (close, unlink, wrap) is written once; `what` names the step
+// in the error ("write", "copy to").
+func writeThrough(path string, perm os.FileMode, what string, fill func(*os.File) error) error {
+	out, tmp, err := createTemp(path, perm)
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, in); err != nil {
+	if err := fill(out); err != nil {
 		_ = out.Close()
 		_ = os.Remove(tmp)
-		return fmt.Errorf("atomicfs: copy to %s: %w", tmp, err)
+		return fmt.Errorf("atomicfs: %s %s: %w", what, tmp, err)
 	}
-	return seal(out, tmp, dst)
+	return seal(out, tmp, path)
 }
 
 // createTemp opens a tmpfile next to path, unique to this writer, with perm as
