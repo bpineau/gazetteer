@@ -214,8 +214,8 @@ func TestRefresh_ValidationRejectsBadTransform(t *testing.T) {
 	if Exists(filepath.Join(dir, "broken.csv.gz")) {
 		t.Error("invalid processed artifact must not be installed")
 	}
-	if Exists(filepath.Join(dir, "broken.csv.gz.tmp")) {
-		t.Error("temp file must be cleaned up on validation failure")
+	if m, _ := filepath.Glob(filepath.Join(dir, "broken.csv.gz.*.tmp")); len(m) > 0 {
+		t.Errorf("temp file must be cleaned up on validation failure, found %v", m)
 	}
 }
 

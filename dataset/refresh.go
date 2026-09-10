@@ -206,21 +206,30 @@ func refreshOne(ctx context.Context, c *httpx.Client, s Set, dir string, opts Re
 // the processed artifact's sha256 and byte size.
 func buildProcessed(ctx context.Context, s Set, dir string, opts RefreshOptions) (string, int64, error) {
 	dest := filepath.Join(dir, s.Processed.Name)
-	tmp := dest + ".tmp"
+
+	// The tmpfile is unique to this refresh: two concurrent refreshes of the
+	// same dataset (a cron and a manual run, say) would otherwise transform
+	// into the same "<dest>.tmp" and interleave their bytes.
+	tf, err := os.CreateTemp(dir, s.Processed.Name+".*.tmp") //nolint:gosec // shared cache artifact
+	if err != nil {
+		return "", 0, fmt.Errorf("dataset %q: open temp: %w", s.Source, err)
+	}
+	tmp := tf.Name()
+	if err := tf.Chmod(0o644); err != nil { // os.CreateTemp always creates 0600
+		_ = tf.Close()
+		_ = os.Remove(tmp)
+		return "", 0, fmt.Errorf("dataset %q: chmod temp: %w", s.Source, err)
+	}
 
 	sum, n, err := func() (string, int64, error) {
-		f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644) //nolint:gosec // shared cache artifact
-		if err != nil {
-			return "", 0, fmt.Errorf("dataset %q: open temp: %w", s.Source, err)
-		}
-		defer func() { _ = f.Close() }()
+		defer func() { _ = tf.Close() }()
 
 		h := sha256.New()
-		cw := &countingWriter{w: io.MultiWriter(f, h)}
+		cw := &countingWriter{w: io.MultiWriter(tf, h)}
 		if err := s.Transform(ctx, dirRawSet{dir: dir}, cw); err != nil {
 			return "", 0, fmt.Errorf("dataset %q: transform: %w", s.Source, err)
 		}
-		if err := f.Sync(); err != nil {
+		if err := tf.Sync(); err != nil {
 			return "", 0, fmt.Errorf("dataset %q: sync temp: %w", s.Source, err)
 		}
 		return hex.EncodeToString(h.Sum(nil)), cw.n, nil

@@ -124,10 +124,19 @@ func (c *Client) Download(ctx context.Context, url, destPath string, opts Downlo
 	}
 	fromCache := resp.Header.Get("X-From-Cache") == "1"
 
-	tmp := destPath + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644) //nolint:gosec // public artefact dir; 0o644 lets read-only users (analysts) inspect downloaded PDFs/images
+	// A tmpfile unique to this download: two concurrent downloads of the same
+	// destination would otherwise open, truncate and interleave their bytes in
+	// the same "<dest>.tmp" before both renaming the mixture into place.
+	f, err := os.CreateTemp(filepath.Dir(destPath), filepath.Base(destPath)+".*.tmp")
 	if err != nil {
-		return DownloadResult{}, fmt.Errorf("httpx: open tmp %s: %w", tmp, err)
+		return DownloadResult{}, fmt.Errorf("httpx: open tmp for %s: %w", destPath, err)
+	}
+	tmp := f.Name()
+	//nolint:gosec // public artefact dir; 0o644 lets read-only users (analysts) inspect downloaded PDFs/images
+	if err := f.Chmod(0o644); err != nil { // os.CreateTemp always creates 0600
+		_ = f.Close()
+		_ = os.Remove(tmp)
+		return DownloadResult{}, fmt.Errorf("httpx: chmod tmp %s: %w", tmp, err)
 	}
 
 	limit := opts.MaxBytes

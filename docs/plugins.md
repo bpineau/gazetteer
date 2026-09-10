@@ -197,7 +197,9 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 
 Convention across shipped Sources: prefer an `Options.HTTPClient`
 field on your constructor (overrides ctx); fall back to
-`HTTPClientFrom(ctx)`; ultimate fallback is `http.DefaultClient`.
+`HTTPClientFrom(ctx)`; ultimate fallback is `gazetteer.DefaultHTTPClient`
+(a plain client carrying a `DefaultHTTPTimeout` deadline, so a silent
+upstream cannot hang a Source forever).
 
 ## Per-Source caching
 

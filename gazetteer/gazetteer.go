@@ -25,12 +25,12 @@ type Builder struct {
 }
 
 // NewBuilder returns a Builder pre-populated with sane defaults
-// (http.DefaultClient, slog.Default(); Cache falls back to the
-// package-level default via CacheFrom). Override any default with the
-// corresponding With* method.
+// (DefaultHTTPClient, i.e. a plain client with a DefaultHTTPTimeout deadline,
+// and slog.Default(); Cache falls back to the package-level default via
+// CacheFrom). Override any default with the corresponding With* method.
 func NewBuilder() *Builder {
 	return &Builder{
-		httpClient: http.DefaultClient,
+		httpClient: DefaultHTTPClient,
 		logger:     slog.Default(),
 	}
 }

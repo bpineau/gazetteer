@@ -270,8 +270,8 @@ func TestDownload_SHA256_Atomic_Skip(t *testing.T) {
 	if res.SHA256 != sha256Hex(payload) {
 		t.Fatalf("sha256 mismatch: got %s, want %s", res.SHA256, sha256Hex(payload))
 	}
-	if _, err := os.Stat(dest + ".tmp"); !os.IsNotExist(err) {
-		t.Fatalf(".tmp not cleaned: %v", err)
+	if m, _ := filepath.Glob(dest + ".*.tmp"); len(m) > 0 {
+		t.Fatalf("tmpfiles not cleaned: %v", m)
 	}
 	got, err := os.ReadFile(dest)
 	if err != nil {
@@ -301,8 +301,8 @@ func TestDownload_SHA256_Atomic_Skip(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected sha256 mismatch error")
 	}
-	if _, statErr := os.Stat(dest2 + ".tmp"); !os.IsNotExist(statErr) {
-		t.Fatalf(".tmp not removed on mismatch: %v", statErr)
+	if m, _ := filepath.Glob(dest2 + ".*.tmp"); len(m) > 0 {
+		t.Fatalf("tmpfiles not removed on mismatch: %v", m)
 	}
 	if _, statErr := os.Stat(dest2); !os.IsNotExist(statErr) {
 		t.Fatalf("dest must not exist on error: %v", statErr)

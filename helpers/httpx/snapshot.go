@@ -133,7 +133,7 @@ func (t *snapshotTransport) writeSnapshot(req *http.Request, resp *http.Response
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(path, out, 0o644)
+	return writeFileAtomic(path, out)
 }
 
 func guessExt(ct string) string {

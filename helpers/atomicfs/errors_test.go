@@ -24,7 +24,7 @@ func TestWriteFile_RenameFailureCleansTmp(t *testing.T) {
 	if err := WriteFile(dst, []byte("x"), 0o644); err == nil {
 		t.Fatal("rename over a directory must fail")
 	}
-	if Exists(dst + ".partial") {
+	if m, _ := filepath.Glob(dst + ".*.partial"); len(m) > 0 {
 		t.Error("failed write must remove its tmpfile")
 	}
 }
@@ -50,7 +50,7 @@ func TestCopyFile_RenameFailureCleansTmp(t *testing.T) {
 	if err := CopyFile(src, dst, 0o644); err == nil {
 		t.Fatal("rename over a directory must fail")
 	}
-	if Exists(dst + ".partial") {
+	if m, _ := filepath.Glob(dst + ".*.partial"); len(m) > 0 {
 		t.Error("failed copy must remove its tmpfile")
 	}
 }

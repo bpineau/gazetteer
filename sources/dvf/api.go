@@ -208,7 +208,9 @@ func (a *API) GetMutations(ctx context.Context, insee, section string) (Mutation
 	// ErrSectionNotFound: 404 is application-level (section doesn't
 	// exist), it is NOT a transport failure and Observe() filters it out
 	// naturally; only DNS / dial / TLS / deadline tick the counter.
-	a.circuit.Observe(err)
+	// ctx, not callCtx: OUR APICallTimeout expiring is an upstream signal and
+	// must count, the caller cancelling on us is not and must not.
+	a.circuit.ObserveCtx(ctx, err)
 	if err != nil {
 		if herr, ok := errors.AsType[*httpx.ErrHTTP](err); ok && herr.Status == 404 {
 			return MutationsResponse{}, ErrSectionNotFound

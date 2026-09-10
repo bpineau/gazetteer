@@ -21,9 +21,9 @@ func TestWriteFile_CreatesDestinationAtomically(t *testing.T) {
 	if string(got) != "hello" {
 		t.Errorf("contents = %q, want %q", got, "hello")
 	}
-	// No .partial sibling left behind.
-	if _, err := os.Stat(dst + ".partial"); !os.IsNotExist(err) {
-		t.Errorf(".partial sibling still present after successful write")
+	// No .partial sibling left behind (the name carries a random component).
+	if leftovers := partials(t, dst); len(leftovers) > 0 {
+		t.Errorf(".partial siblings still present after successful write: %v", leftovers)
 	}
 }
 
@@ -108,4 +108,15 @@ func TestCopyFile(t *testing.T) {
 	if got, _ := os.ReadFile(dst); string(got) != "payload" {
 		t.Errorf("dst clobbered by failed copy: %q", got)
 	}
+}
+
+// partials lists the tmpfile siblings atomicfs may have left next to path.
+// The name is "<path>.<random>.partial", so a plain os.Stat cannot see them.
+func partials(t *testing.T, path string) []string {
+	t.Helper()
+	m, err := filepath.Glob(path + ".*.partial")
+	if err != nil {
+		t.Fatalf("glob: %v", err)
+	}
+	return m
 }

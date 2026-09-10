@@ -211,7 +211,7 @@ func (t *cacheTransport) writeEntry(metaPath, bodyPath string, meta *cacheMeta, 
 	if err := os.MkdirAll(filepath.Dir(metaPath), 0o755); err != nil { //nolint:gosec // public HTTP cache dir; not a secrets store
 		return err
 	}
-	if err := writeFileAtomic(bodyPath, body, 0o644); err != nil {
+	if err := writeFileAtomic(bodyPath, body); err != nil {
 		return err
 	}
 	if err := t.writeMeta(metaPath, meta); err != nil {
@@ -228,19 +228,35 @@ func (t *cacheTransport) writeMeta(metaPath string, meta *cacheMeta) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(metaPath, mb, 0o644)
+	return writeFileAtomic(metaPath, mb)
 }
 
-// writeFileAtomic writes data to path via a sibling .tmp + rename.
+// cacheFileMode is the mode of every on-disk cache file: world-readable, like
+// the cache directory itself (a public HTTP cache, not a secrets store).
+const cacheFileMode os.FileMode = 0o644
+
+// writeFileAtomic writes data to path via a sibling tmpfile + rename, the
+// tmpfile unique to this writer.
+//
+// Uniqueness is load-bearing: nothing single-flights the disk cache, so two
+// in-flight requests for the same URL write the same entry concurrently. With
+// a fixed "<path>.tmp" they opened it O_TRUNC, interleaved their bytes and both
+// renamed the mixture into place. readEntry's BodyLen check caught most torn
+// bodies; the meta file had no such guard.
 //
 // Deliberately not helpers/atomicfs.WriteFile: the HTTP cache fsyncs
 // before the rename so a crash can't leave a renamed-but-empty cache
 // entry that would later be served as a valid response. atomicfs serves
 // callers whose artifacts are re-derivable and skips the fsync cost.
-func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
-	tmp := path + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode) //nolint:gosec // tmp = path+".tmp"; path is derived from a SHA-256 cache key, not user input
+func writeFileAtomic(path string, data []byte) error {
+	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp") //nolint:gosec // path is derived from a SHA-256 cache key, not user input
 	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	if err := f.Chmod(cacheFileMode); err != nil { // os.CreateTemp always creates 0600
+		_ = f.Close()
+		_ = os.Remove(tmp)
 		return err
 	}
 	if _, err := f.Write(data); err != nil {

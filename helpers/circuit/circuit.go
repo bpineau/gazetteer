@@ -359,6 +359,15 @@ func (h *HTTPFetcher) Fetch(ctx context.Context, url string) ([]byte, error) {
 		return nil, fmt.Errorf("%s fetch %s: %w", h.Options.ErrPrefix, url, ErrCircuitOpen)
 	}
 	body, resp, err := h.Client.GetBytes(ctx, url, h.Options.Headers)
+	// A CANCELLATION the caller caused says nothing about the upstream, so it
+	// feeds no breaker: one Ctrl-C, or one abandoned Collect, cancels every
+	// fetch in flight at once, and the flag it would trip is process-wide and
+	// never rearmed. A DEADLINE is the opposite and still counts: a budget the
+	// caller set for this fetch expiring is exactly the "upstream hung" signal
+	// the transport breaker exists for.
+	if err != nil && errors.Is(ctx.Err(), context.Canceled) {
+		return nil, fmt.Errorf("%s fetch %s: %w", h.Options.ErrPrefix, url, err)
+	}
 	circuit := h.circuitFlag()
 	// Detect upstream signals once. is429 is true on any 429 (including
 	// retry-exhausted 429s wrapped in *ErrTooManyRetries). quotaHeader is
@@ -439,6 +448,12 @@ func (h *HTTPFetcher) circuitFlag() *atomic.Bool {
 
 // isTransportOrDeadlineErr returns true when err is (or wraps) a
 // transport failure or a context deadline / cancellation.
+//
+// It classifies the ERROR alone, which cannot tell an upstream that hung from
+// a caller that walked away: both surface as a wrapped context error. That
+// distinction is made at the call site instead, against the caller's own ctx
+// (see HTTPFetcher.Fetch and TransportCircuit.ObserveCtx), where a
+// cancellation is dropped and a deadline still counts.
 //
 // Covers both the typed wrapper that httpx.Client surfaces
 // (*httpx.ErrTransport) and the raw stdlib variants callers that
@@ -581,6 +596,9 @@ func (t *TransportCircuit) SetMax429(n int) {
 //   - other errors are ignored (e.g. non-429 4xx, JSON decode failure).
 //
 // Safe to call on a nil receiver — the call is a no-op.
+//
+// Prefer ObserveCtx when the caller's context is at hand: a cancellation the
+// caller itself caused must not count against the upstream.
 func (t *TransportCircuit) Observe(err error) {
 	if t == nil || t.flag == nil {
 		return
@@ -616,6 +634,20 @@ func (t *TransportCircuit) Observe(err error) {
 			)
 		}
 	}
+}
+
+// ObserveCtx is Observe, ignoring a failure the CALLER cancelled. Pass the
+// context the caller handed you, not one you derived: your own per-call
+// timeout expiring IS an upstream signal and must keep counting, whereas a
+// Ctrl-C cancels every in-flight fetch at once and would otherwise trip a
+// breaker nothing ever rearms.
+//
+// Safe to call on a nil receiver: the call is a no-op.
+func (t *TransportCircuit) ObserveCtx(ctx context.Context, err error) {
+	if err != nil && errors.Is(ctx.Err(), context.Canceled) {
+		return
+	}
+	t.Observe(err)
 }
 
 // errIs429 reports whether err is (or wraps) an *httpx.ErrHTTP with

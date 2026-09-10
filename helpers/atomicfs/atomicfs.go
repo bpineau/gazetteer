@@ -7,19 +7,24 @@ import (
 	"path/filepath"
 )
 
-// WriteFile writes data to path via a "<path>.partial" tmpfile, fsync
-// and rename(2). The destination is either the new file or untouched;
+// WriteFile writes data to path via a "<path>.<random>.partial" tmpfile,
+// fsync and rename(2). The destination is either the new file or untouched;
 // no partial state is visible to concurrent readers, and the content is
 // flushed to stable storage before the rename so a system crash cannot
 // leave an empty or truncated destination behind. On failure the
 // tmpfile is removed best-effort.
 //
+// Concurrent WRITERS of the same path are safe too, which is why the tmpfile
+// name carries a random component: with a fixed "<path>.partial" the two would
+// open, truncate and interleave their writes into the SAME tmpfile, then both
+// rename the mixture into place. Each writer now owns its tmpfile, so the
+// destination ends up as one writer's complete content (last rename wins).
+//
 // The caller is expected to have created the parent directory.
 func WriteFile(path string, data []byte, perm os.FileMode) error {
-	tmp := path + ".partial"
-	out, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm) //nolint:gosec // caller-controlled path by design
+	out, tmp, err := createTemp(path, perm)
 	if err != nil {
-		return fmt.Errorf("atomicfs: create %s: %w", tmp, err)
+		return err
 	}
 	if _, err := out.Write(data); err != nil {
 		_ = out.Close()
@@ -29,11 +34,11 @@ func WriteFile(path string, data []byte, perm os.FileMode) error {
 	return seal(out, tmp, path)
 }
 
-// CopyFile copies src to dst with the same "<dst>.partial" tmpfile,
-// fsync and rename(2) discipline as WriteFile: concurrent readers of
-// dst see either the previous content or the complete new copy, never a
-// partial write, even across a system crash. The copy is streamed, so
-// src may be arbitrarily large.
+// CopyFile copies src to dst with the same per-writer tmpfile, fsync and
+// rename(2) discipline as WriteFile: concurrent readers of dst see either the
+// previous content or the complete new copy, never a partial write, even
+// across a system crash, and concurrent writers cannot mix their bytes. The
+// copy is streamed, so src may be arbitrarily large.
 //
 // The caller is expected to have created dst's parent directory.
 func CopyFile(src, dst string, perm os.FileMode) error {
@@ -43,10 +48,9 @@ func CopyFile(src, dst string, perm os.FileMode) error {
 	}
 	defer func() { _ = in.Close() }()
 
-	tmp := dst + ".partial"
-	out, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm) //nolint:gosec // caller-controlled path by design
+	out, tmp, err := createTemp(dst, perm)
 	if err != nil {
-		return fmt.Errorf("atomicfs: create %s: %w", tmp, err)
+		return err
 	}
 	if _, err := io.Copy(out, in); err != nil {
 		_ = out.Close()
@@ -54,6 +58,22 @@ func CopyFile(src, dst string, perm os.FileMode) error {
 		return fmt.Errorf("atomicfs: copy to %s: %w", tmp, err)
 	}
 	return seal(out, tmp, dst)
+}
+
+// createTemp opens a tmpfile next to path, unique to this writer, with perm as
+// its mode (os.CreateTemp always creates 0600). It returns the open file and
+// its name.
+func createTemp(path string, perm os.FileMode) (*os.File, string, error) {
+	out, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.partial")
+	if err != nil {
+		return nil, "", fmt.Errorf("atomicfs: create tmpfile for %s: %w", path, err)
+	}
+	if err := out.Chmod(perm); err != nil {
+		_ = out.Close()
+		_ = os.Remove(out.Name())
+		return nil, "", fmt.Errorf("atomicfs: chmod %s: %w", out.Name(), err)
+	}
+	return out, out.Name(), nil
 }
 
 // seal finishes an atomic write: flush the tmpfile to stable storage,

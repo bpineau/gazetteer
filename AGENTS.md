@@ -265,8 +265,9 @@ never disables corporate secret-scanning.
   from the first call is cached for the process lifetime (dataset.Lazy). Two
   components disagreeing on DataDir silently share the first one's data.
 - **The atomic `Query`/`QueryResult` path has no built-in politeness**: outside
-  `Collect`, the ctx fallback is `http.DefaultClient` — no rate limits, no
-  retries, no cache. For live sources, pass `Options.HTTPClient` (start from
+  `Collect`, the ctx fallback is `gazetteer.DefaultHTTPClient`, a bare client
+  with a `DefaultHTTPTimeout` (60 s) deadline and nothing else: no rate limits,
+  no retries, no cache. For live sources, pass `Options.HTTPClient` (start from
   `factory.HostRateLimits()`) or use a factory-built Client.
 - IRIS coverage is **Île-de-France only in practice**: the `iris` resolver and
   `logiris` are IDF-scoped datasets. `filoiris`'s dataset is *national*, but it
