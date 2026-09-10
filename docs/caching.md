@@ -84,11 +84,17 @@ Run with `-race` to exercise the parallel-access sub-test.
 ```go
 import "github.com/bpineau/gazetteer/helpers/kvcache/memcache"
 
-c := memcache.New() // fresh, empty, concurrent-safe
+c := memcache.New()                          // bounded to memcache.DefaultMaxEntries
+c = memcache.New(memcache.WithMaxEntries(0)) // unlimited: short-lived processes only
 ```
 
 Persistence: none. Use for tests, one-shot CLI tools, and short-lived
 processes that do not need cross-run memo.
+
+Bounded: at the entry ceiling an insertion sweeps the expired rows first and
+only then evicts the least-recently-used one, so a long-lived server cannot
+grow without bound. Nothing sweeps on a timer, so below the ceiling expired
+rows are still there for a stale-while-revalidate read.
 
 ### `gazetteer.NewKVMemCache()` — convenience re-export
 

@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"errors"
+	"io"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -179,4 +181,53 @@ func TestUsageListsEverySubcommand(t *testing.T) {
 			t.Errorf("usage output does not mention %q", cmd)
 		}
 	}
+}
+
+// TestProfileFlagIsAppraiseOnly pins B18's fix: the shared flag set backs both
+// `query` and `appraise`, but only `appraise` computes a ZoneScore. On `query`
+// the flag used to be advertised by -h while runQuery never read it, so an
+// invalid preset passed silently; it must now be unknown there (a loud usage
+// error) and still work on `appraise`. `compare` keeps its own registration.
+func TestProfileFlagIsAppraiseOnly(t *testing.T) {
+	q, err := parseQueryFlags("appraise", []string{"--profile", "patrimoine", "12 rue X, Paris"})
+	if err != nil {
+		t.Fatalf("appraise --profile: %v", err)
+	}
+	if q.profile != "patrimoine" {
+		t.Errorf("appraise profile = %q, want %q", q.profile, "patrimoine")
+	}
+
+	if _, err := parseQueryFlags("query", []string{"--profile", "patrimoine", "12 rue X, Paris"}); !errors.Is(err, errUsage) {
+		t.Errorf("query --profile err = %v, want errUsage (the flag must not exist there)", err)
+	}
+
+	// And the -h transcript each sub-command prints must agree.
+	if got := usageOf(t, "query"); strings.Contains(got, "-profile") {
+		t.Errorf("`query -h` offers --profile:\n%s", got)
+	}
+	if got := usageOf(t, "appraise"); !strings.Contains(got, "-profile") {
+		t.Errorf("`appraise -h` does not offer --profile:\n%s", got)
+	}
+}
+
+// usageOf captures what `gazetteer <cmd> -h` prints. parseQueryFlags writes
+// its Usage banner to os.Stderr, so the test swaps in a pipe for the call.
+func usageOf(t *testing.T, cmd string) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	orig := os.Stderr
+	os.Stderr = w
+	_, _ = parseQueryFlags(cmd, []string{"-h"})
+	os.Stderr = orig
+	if err := w.Close(); err != nil {
+		t.Fatalf("close pipe: %v", err)
+	}
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read pipe: %v", err)
+	}
+	return string(out)
 }

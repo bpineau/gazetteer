@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bpineau/gazetteer/helpers/httpx"
@@ -41,7 +42,13 @@ type HTTPOverpassFetcher struct {
 	http      *httpx.Client
 	endpoint  string
 	fallbacks []string
-	logger    *slog.Logger
+
+	// logger is swappable at runtime (SetLogger) while Query reads it,
+	// so it is published atomically rather than as a plain field: the
+	// live Source holds one long-lived fetcher and nothing serialises a
+	// reconfiguration against an in-flight fetch. Never nil once the
+	// constructor has run; log() covers the zero-value receiver anyway.
+	logger atomic.Pointer[slog.Logger]
 
 	// mu guards streaks/skips. A mirror with mirrorSkipThreshold
 	// consecutive failures is skipped (a hung mirror must not tax every
@@ -57,20 +64,22 @@ type HTTPOverpassFetcher struct {
 // NewHTTPOverpassFetcher returns a fetcher bound to c. `endpoint` may
 // be empty — it then falls back to the package-level OverpassEndpoint.
 // The package-level OverpassFallbackEndpoints list is used automatically.
-// The logger defaults to slog.Default() — callers wanting per-test capture
-// should set the Logger field directly after construction.
+// The logger defaults to slog.Default(); callers wanting per-test
+// capture call SetLogger, which is safe to use while a Query is in
+// flight.
 func NewHTTPOverpassFetcher(c *httpx.Client, endpoint string) *HTTPOverpassFetcher {
 	if endpoint == "" {
 		endpoint = OverpassEndpoint
 	}
-	return &HTTPOverpassFetcher{
+	f := &HTTPOverpassFetcher{
 		http:      c,
 		endpoint:  endpoint,
 		fallbacks: OverpassFallbackEndpoints,
-		logger:    slog.Default(),
 		streaks:   map[string]int{},
 		skips:     map[string]int{},
 	}
+	f.SetLogger(slog.Default())
+	return f
 }
 
 // overpassMirrorTimeout is the per-MIRROR time slice inside Query. Each
@@ -123,11 +132,23 @@ func (f *HTTPOverpassFetcher) observe(ep string, err error) {
 
 // SetLogger overrides the default slog logger. Used by tests to capture
 // the warn/error lines emitted by the fallback loop without polluting
-// stderr.
+// stderr. A nil logger is ignored.
+//
+// Safe to call concurrently with Query: the logger is stored atomically,
+// and an in-flight Query keeps using whichever logger it loaded.
 func (f *HTTPOverpassFetcher) SetLogger(l *slog.Logger) {
 	if l != nil {
-		f.logger = l
+		f.logger.Store(l)
 	}
+}
+
+// log returns the fetcher's logger, falling back to slog.Default() when
+// none was ever stored.
+func (f *HTTPOverpassFetcher) log() *slog.Logger {
+	if l := f.logger.Load(); l != nil {
+		return l
+	}
+	return slog.Default()
 }
 
 // Query posts the QL body to the Overpass interpreter and returns the
@@ -154,10 +175,7 @@ func (f *HTTPOverpassFetcher) Query(ctx context.Context, ql string) ([]byte, err
 	endpoints = append(endpoints, f.endpoint)
 	endpoints = append(endpoints, f.fallbacks...)
 
-	logger := f.logger
-	if logger == nil {
-		logger = slog.Default()
-	}
+	logger := f.log()
 
 	var lastErr error
 	for i, ep := range endpoints {

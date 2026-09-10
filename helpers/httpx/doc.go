@@ -9,9 +9,16 @@
 //
 // The composite transport delivers per-host token-bucket rate-limiting,
 // exponential-backoff retries with Retry-After honour, an on-disk
-// persistent HTTP cache with ETag / Last-Modified revalidation, raw
-// request/response snapshots for debugging, and atomic file downloads
-// with streaming sha256.
+// persistent HTTP cache with ETag / Last-Modified revalidation and
+// single-flighted misses (concurrent requests for one cache key share a
+// single upstream trip), raw request/response snapshots for debugging, and
+// atomic file downloads with streaming sha256.
+//
+// # Cache lifetime
+//
+// The disk cache never evicts on its own: entries live until a caller runs
+// Client.PruneCache (by age, by total size, or both). That is deliberate,
+// and its godoc explains why the policy cannot belong to the library.
 //
 // # Mental model
 //

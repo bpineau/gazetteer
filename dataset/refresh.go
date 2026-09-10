@@ -42,6 +42,8 @@ type RefreshOptions struct {
 	Log func(Event)
 }
 
+// emit delivers one progress event to the caller's Log, dropping it when no
+// Log was supplied. Every phase of Refresh reports through this one seam.
 func (o RefreshOptions) emit(e Event) {
 	if o.Log != nil {
 		o.Log(e)
@@ -135,6 +137,13 @@ func checkNoCollisions(sets []Set) error {
 	return nil
 }
 
+// refreshOne runs the full pipeline for a single Set: validate the
+// declaration, take the idempotency fast-path when the datadir artifact is
+// already current (unless opts.Force), download every raw input, transform,
+// validate the product, write it atomically and record it in the manifest.
+// It never returns an error: every outcome, success or failure, is reported
+// on the returned SetResult (Err / Skipped / Reason) so one broken Set cannot
+// abort a whole Refresh.
 func refreshOne(ctx context.Context, c *httpx.Client, s Set, dir string, opts RefreshOptions) SetResult {
 	res := SetResult{Source: s.Source, Processed: s.Processed.Name, Embedded: s.Embed != nil}
 	if err := s.check(); err != nil {
@@ -299,6 +308,9 @@ func commitManifest(dir string, s Set, res SetResult, urls []string) error {
 // dirRawSet implements RawSet over the flat datadir.
 type dirRawSet struct{ dir string }
 
+// Open implements RawSet: it opens the named raw input from the flat datadir.
+// name must be a clean single path element (validName), so a Set cannot reach
+// outside the datadir.
 func (d dirRawSet) Open(name string) (io.ReadCloser, error) {
 	if err := validName(name); err != nil {
 		return nil, err
@@ -312,6 +324,8 @@ type countingWriter struct {
 	n int64
 }
 
+// Write implements io.Writer, forwarding to the wrapped writer and adding
+// the accepted byte count to n (which the caller reads after the copy).
 func (c *countingWriter) Write(p []byte) (int, error) {
 	n, err := c.w.Write(p)
 	c.n += int64(n)

@@ -20,8 +20,10 @@
 //   - (opt-in) `cadastre.data.gouv.fr/bundler/cadastre-etalab/communes/
 //     {insee}/geojson/batiments` — Etalab's per-commune building
 //     polygon dump (Content-Type: application/vnd.geo+json, served
-//     gzipped, a few MB per commune). Cached in-process per INSEE so
-//     a single commune is fetched at most once per run.
+//     gzipped, a few MB per commune). Cached in-process per INSEE
+//     (DefaultBatiCache, bounded to DefaultBatiCacheMaxCommunes dumps,
+//     least-recently-used evicted first) and single-flighted, so
+//     overlapping queries on one commune share a single download.
 //
 // # Error semantics
 //

@@ -381,3 +381,38 @@ func TestPricePerM2_CustomWeightsOverrideDefaults(t *testing.T) {
 
 // Compile-time check: fakePriceEstimator must satisfy PriceEstimator.
 var _ PriceEstimator = fakePriceEstimator{}
+
+// TestPriceInputWeightIsRaw pins the documented meaning of PriceInput.Weight:
+// the RAW looked-up weight, never normalized to 1. A caller that reads the
+// field as a share would silently mis-attribute every synthesis, so both
+// halves are asserted: the values are the table's own, and the consolidated
+// mean is their weight-normalized blend.
+func TestPriceInputWeightIsRaw(t *testing.T) {
+	t.Parallel()
+
+	d := buildDossier(map[string]fakeEntry{
+		"meilleursagents": {data: fakePriceEstimator{eurPerM2Cents: 10_000_00, confidence: ConfidenceHigh}},
+		"dvf":             {data: fakePriceEstimator{eurPerM2Cents: 8_000_00, confidence: ConfidenceHigh}},
+	})
+
+	got := PricePerM2(d)
+	weights := make(map[string]float64, len(got.Inputs))
+	var sum float64
+	for _, in := range got.Inputs {
+		weights[in.Source] = in.Weight
+		sum += in.Weight
+	}
+	// The raw table values, verbatim: 1.0 and 0.9, summing to 1.9.
+	if weights["meilleursagents"] != DefaultPriceWeights["meilleursagents"] || weights["dvf"] != DefaultPriceWeights["dvf"] {
+		t.Errorf("Inputs weights = %v, want the raw DefaultPriceWeights entries", weights)
+	}
+	if sum == 1 {
+		t.Errorf("Inputs weights sum to 1 (%v): they are documented as RAW, not normalized", sum)
+	}
+	// The mean normalizes them internally: (1.0*10000 + 0.9*8000) / 1.9.
+	blend := (weights["meilleursagents"]*10_000_00 + weights["dvf"]*8_000_00) / sum
+	want := int64(blend)
+	if got.EurPerM2Cents != want {
+		t.Errorf("EurPerM2Cents = %d, want %d (weighted by the raw weights)", got.EurPerM2Cents, want)
+	}
+}

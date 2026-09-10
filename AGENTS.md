@@ -174,7 +174,8 @@ high-level API, not the project's purpose.
 ## Standalone building blocks — the library beneath the library
 
 `helpers/*` and `dataset` are supported public API, usable without ever
-building a Dossier: `httpx` (rate-limited HTTP client + disk cache), `banx`
+building a Dossier: `httpx` (rate-limited HTTP client + disk cache, misses
+single-flighted per key, pruning explicit via `PruneCache`), `banx`
 (BAN geocoding, cached + dept-guarded; `NewDefaultGeocoder` is the canonical
 production stack), `communes` (35k-commune table; offline
 `ResolveINSEE(city, zip)` with PLM rules), `frnorm`/`fraddr`/`proptype`
@@ -269,6 +270,14 @@ never disables corporate secret-scanning.
   with a `DefaultHTTPTimeout` (60 s) deadline and nothing else: no rate limits,
   no retries, no cache. For live sources, pass `Options.HTTPClient` (start from
   `factory.HostRateLimits()`) or use a factory-built Client.
+- **Per-Source timeout: bounded via the factory, unbounded via the raw
+  Builder.** `factory.NewDefault` / `NewDefaultWith` set
+  `factory.DefaultPerSourceTimeout` (45 s) on the Client, so one wedged
+  upstream cannot pin a whole `Collect` (the Source is cut, its Result is
+  `StatusFailedTransient`, its siblings still land). Override with
+  `factory.Options.PerSourceTimeout` (a negative value disables the bound);
+  a hand-built `gazetteer.Builder` still defaults to NO bound and opts in via
+  `WithPerSourceTimeout`.
 - IRIS coverage is **Île-de-France only in practice**: the `iris` resolver and
   `logiris` are IDF-scoped datasets. `filoiris`'s dataset is *national*, but it
   only fires where `Listing.IRIS` is set — and `iris` (IDF-only) is the sole

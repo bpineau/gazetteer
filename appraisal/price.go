@@ -66,10 +66,28 @@ func (c PriceConsolidated) EURPerM2() float64 { return float64(c.EurPerM2Cents) 
 // detection. Excluded entries are kept in the slice so callers can
 // surface "why" in UIs and diagnostics.
 type PriceInput struct {
-	Source      string
-	Estimate    PriceEstimate
-	Weight      float64
-	Excluded    bool
+	// Source is the contributing Source's registry name (the Dossier key).
+	Source string
+
+	// Estimate is the contribution verbatim, as the Source reported it.
+	Estimate PriceEstimate
+
+	// Weight is the RAW per-source weight this contribution entered the
+	// synthesis with, resolved in that order from PriceOptions.Weights,
+	// DefaultPriceWeights, then PriceOptions.DefaultWeight. It is NOT
+	// normalized: the weights of the non-excluded inputs do not sum to 1
+	// (the weighted mean divides by their sum internally). Compute a
+	// contribution share as Weight / Σ Weight over the entries whose
+	// Excluded is false.
+	Weight float64
+
+	// Excluded is true when the MAD outlier filter dropped this
+	// contribution from the weighted mean. The entry is kept in the slice
+	// so callers can show what was rejected.
+	Excluded bool
+
+	// ExcludedWhy is the stable machine-readable reason behind Excluded
+	// ("outlier_z_score"). Empty when Excluded is false.
 	ExcludedWhy string
 }
 
