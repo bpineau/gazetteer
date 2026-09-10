@@ -140,7 +140,8 @@ empty, the usual cause is a **missing input** or **out-of-coverage** address.
 
 ## Debugging recipes
 
-- **"a mostly-empty Dossier — why?"** → `gazetteer query --explain "<addr>"`.
+- **"a mostly-empty Dossier, why?"** → `gazetteer query --explain "<addr>"`
+  (`appraise --explain` too, which keeps the synthesis under the diagnosis).
   It prints the normalised Listing and, per source that returned nothing, the
   cause: a **missing required input** ("Listing is missing X, which this source
   needs") vs **no data for this address** ("inputs present → coverage: …"). This

@@ -35,12 +35,21 @@ func runQuery(ctx context.Context, args []string) error {
 		enc.SetIndent("", "  ")
 		return enc.Encode(dossier)
 	}
-	if q.explain {
-		printDiagnosis(os.Stdout, dossier)
-		return nil
-	}
-	printDossierSummary(os.Stdout, dossier)
+	printSourceBlock(os.Stdout, dossier, q.explain)
 	return nil
+}
+
+// printSourceBlock renders the per-source half of the human output shared by
+// `query` and `appraise`: the why-nothing diagnosis when --explain is set,
+// the one-line-per-source summary otherwise. Both sub-commands collect the
+// same Dossier, so both answer "why is this thin?" the same way; keeping the
+// choice here is what stops one of them from silently ignoring the flag.
+func printSourceBlock(out io.Writer, d gazetteer.Dossier, explain bool) {
+	if explain {
+		printDiagnosis(out, d)
+		return
+	}
+	printDossierSummary(out, d)
 }
 
 // queryFlags is the shared flag bundle for `query` and `appraise`.
@@ -54,7 +63,7 @@ type queryFlags struct {
 	rooms        int           // 0 ⇒ unset
 	timeout      time.Duration // overall budget for the Collect; 0 ⇒ no deadline
 	jsonOut      bool
-	explain      bool   // diagnose per-source why-empty/why-failed (query only)
+	explain      bool   // diagnose per-source why-empty/why-failed (query + appraise)
 	profile      string // ZoneScore weight preset (appraise only here; compare registers its own)
 	addr         string
 }
