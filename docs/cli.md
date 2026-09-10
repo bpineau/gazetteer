@@ -58,9 +58,10 @@ $ gazetteer query --json "1 rue de Rivoli, 75001 Paris" | jq .
   `yield` (default, yield-first) | `balanced` | `patrimoine`
   (capital-appreciation / low-hassle) | `transport` (heavily up-weights
   walk-to-station — for a "near a station, not Paris" thesis).
-- `--explain` — (query) diagnose, per source that returned nothing, *why*:
-  a missing required input vs no data for this address. The first move for a
-  mostly-empty Dossier.
+- `--explain` (query / appraise) - diagnose, per source that returned
+  nothing, *why*: a missing required input vs no data for this address. The
+  first move for a mostly-empty Dossier. It replaces the per-Source table;
+  on `appraise` the synthesis still prints under it.
 - `--timeout <duration>` — overall budget for the Collect (default 30s;
   `0` disables it). A Source cut by the deadline degrades to a transient
   failure while its siblings still land.
@@ -72,7 +73,8 @@ it found (e.g. `dvf  10132 €/m², 1645 sales, tier=address_radius`;
 Empty results say why where it helps (e.g. `oll  no observed-rent cell
 (Paris intra-muros is out of OLL scope)`).
 
-The flag set is identical for `appraise`. Flags may appear before or
+`appraise` takes the same flag set and adds `--profile` (it is the only
+one of the two that computes a zone score). Flags may appear before or
 after the positional address; quoted multi-word addresses are not
 required.
 
@@ -88,10 +90,15 @@ under the per-Source summary.
 ```bash
 $ gazetteer appraise "10 rue Dareau, 75014 Paris"
 $ gazetteer appraise --json "10 rue Dareau, 75014 Paris"
+$ gazetteer appraise --explain "10 rue Dareau, 75014 Paris"
 ```
 
 The JSON envelope adds four top-level keys (`price`, `rent`, `hazard`,
-`zone_score`) alongside the raw `dossier`.
+`zone_score`) alongside the raw `dossier`. `--explain` answers the usual
+follow-up to a thin appraisal - which Sources fed nothing into the
+synthesis, and whether that was a missing input or no data for this
+address - by swapping the per-Source table for the diagnosis while keeping
+the price / rent / hazard / zone-score blocks.
 
 ### `compare`
 

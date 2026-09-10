@@ -30,9 +30,14 @@ func (q *queryFlags) zonescoreOptions() ([]zonescore.Options, error) {
 }
 
 // runAppraise implements `gazetteer appraise [--source ...] [--json]
-// [--verbose] <addr>`. Reuses the query pipeline (normalize +
-// Collect) and then folds the Dossier through the three appraisal
-// synthesisers: PricePerM2, RentValue, HazardProfile.
+// [--verbose] [--explain] [--profile ...] <addr>`. Reuses the query
+// pipeline (normalize + Collect) and then folds the Dossier through the
+// three appraisal synthesisers (PricePerM2, RentValue, HazardProfile)
+// plus the zone score.
+//
+// --explain swaps the per-source summary for the why-nothing diagnosis
+// and keeps the synthesis: a thin appraisal is exactly the case where the
+// operator needs to know which Sources came back empty, and why.
 func runAppraise(ctx context.Context, args []string) error {
 	q, err := parseQueryFlags("appraise", args)
 	if err != nil {
@@ -63,7 +68,7 @@ func runAppraise(ctx context.Context, args []string) error {
 			ZoneScore: score,
 		})
 	}
-	printDossierSummary(os.Stdout, dossier)
+	printSourceBlock(os.Stdout, dossier, q.explain)
 	fmt.Fprintln(os.Stdout)
 	printAppraisal(os.Stdout, price, rent, hazard)
 	printZoneScore(os.Stdout, score)
