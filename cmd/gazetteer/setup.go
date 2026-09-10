@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
-	"os"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
@@ -29,15 +29,15 @@ func (c *commonFlags) registerVerbose(fs *flag.FlagSet) {
 	fs.BoolVar(&c.verbose, "verbose", false, "Enable DEBUG-level slog output to stderr")
 }
 
-// setupLogger installs a slog handler honouring --verbose. Returns the
-// resulting logger so callers may also pass it to the gazetteer
-// Builder for explicit propagation.
-func (c *commonFlags) setupLogger() *slog.Logger {
+// setupLogger installs a slog handler on w (the CLI's stderr) honouring
+// --verbose. Returns the resulting logger so callers may also pass it to
+// the gazetteer Builder for explicit propagation.
+func (c *commonFlags) setupLogger(w io.Writer) *slog.Logger {
 	lvl := slog.LevelInfo
 	if c.verbose {
 		lvl = slog.LevelDebug
 	}
-	h := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: lvl})
+	h := slog.NewTextHandler(w, &slog.HandlerOptions{Level: lvl})
 	l := slog.New(h)
 	slog.SetDefault(l)
 	return l

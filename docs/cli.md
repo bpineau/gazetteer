@@ -57,7 +57,9 @@ $ gazetteer query --json "1 rue de Rivoli, 75001 Paris" | jq .
 - `--profile` — (appraise / compare only) the ZoneScore weight preset:
   `yield` (default, yield-first) | `balanced` | `patrimoine`
   (capital-appreciation / low-hassle) | `transport` (heavily up-weights
-  walk-to-station — for a "near a station, not Paris" thesis).
+  walk-to-station — for a "near a station, not Paris" thesis). The printed
+  header names the preset in force (`zone_score (patrimoine):`), so the
+  label can never contradict the weights the score was computed with.
 - `--explain` (query / appraise) - diagnose, per source that returned
   nothing, *why*: a missing required input vs no data for this address. The
   first move for a mostly-empty Dossier. It replaces the per-Source table;
@@ -76,7 +78,9 @@ Empty results say why where it helps (e.g. `oll  no observed-rent cell
 `appraise` takes the same flag set and adds `--profile` (it is the only
 one of the two that computes a zone score). Flags may appear before or
 after the positional address; quoted multi-word addresses are not
-required.
+required. Every argument (`--source`, `--property-type`, `--profile`) is
+validated before the first network call, so a typo costs no round-trip
+and is never masked by a geocoding error.
 
 ### `appraise`
 

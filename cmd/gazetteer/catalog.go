@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -346,9 +345,9 @@ func buildCatalog() []catalogEntry {
 }
 
 // runSourcesCatalog implements `gazetteer sources catalog [--json]`.
-func runSourcesCatalog(args []string) error {
+func runSourcesCatalog(args []string, w streams) error {
 	fs := flag.NewFlagSet("sources catalog", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(w.err)
 	var asJSON bool
 	fs.BoolVar(&asJSON, "json", false, "Emit the full machine-readable catalog as indented JSON")
 	fs.Usage = func() {
@@ -362,7 +361,7 @@ func runSourcesCatalog(args []string) error {
 	}
 	cat := buildCatalog()
 	if asJSON {
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(w.out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(cat)
 	}
@@ -371,10 +370,10 @@ func runSourcesCatalog(args []string) error {
 		if !e.Default {
 			tag = " (opt-in)"
 		}
-		fmt.Printf("%-14s v%d%s\n    %s\n", e.Name, e.Version, tag, e.Summary)
-		fmt.Printf("    inputs: %v | coverage: %s\n", e.Inputs, e.Coverage)
+		fmt.Fprintf(w.out, "%-14s v%d%s\n    %s\n", e.Name, e.Version, tag, e.Summary)
+		fmt.Fprintf(w.out, "    inputs: %v | coverage: %s\n", e.Inputs, e.Coverage)
 		if len(e.Feeds) > 0 {
-			fmt.Printf("    feeds:  %v\n", e.Feeds)
+			fmt.Fprintf(w.out, "    feeds:  %v\n", e.Feeds)
 		}
 	}
 	return nil

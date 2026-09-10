@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -20,22 +19,22 @@ import (
 // Sources in parallel via the gazetteer Client, then prints either a
 // per-source human summary, the full Dossier as JSON (--json), or a
 // per-source why-empty/why-failed diagnosis (--explain).
-func runQuery(ctx context.Context, args []string) error {
-	q, err := parseQueryFlags("query", args)
+func runQuery(ctx context.Context, args []string, w streams) error {
+	q, err := parseQueryFlags("query", args, w)
 	if err != nil {
 		return err
 	}
-	dossier, err := executeQuery(ctx, q)
+	dossier, err := executeQuery(ctx, q, w)
 	if err != nil {
 		return err
 	}
 
 	if q.jsonOut {
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(w.out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(dossier)
 	}
-	printSourceBlock(os.Stdout, dossier, q.explain)
+	printSourceBlock(w.out, dossier, q.explain)
 	return nil
 }
 
@@ -77,10 +76,10 @@ const cmdAppraise = "appraise"
 // `appraise`. The first arg is the sub-command name (for the Usage
 // banner, and to gate the sub-command-specific flags); the rest are the
 // user's argv.
-func parseQueryFlags(cmd string, args []string) (*queryFlags, error) {
+func parseQueryFlags(cmd string, args []string, w streams) (*queryFlags, error) {
 	var q queryFlags
 	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(w.err)
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(),
 			"Usage: gazetteer %s [--property-type apartment|house|land|commercial] [--surface m²] [--rooms N] [--source dvf,osm_transit,...] [--json] [--verbose] <addr>\n", cmd)
@@ -144,8 +143,8 @@ func parsePropertyType(s string) (gazetteer.PropertyType, error) {
 // executeQuery is the shared collect pipeline used by `query` and
 // `appraise`. Returns the populated Dossier; sub-commands choose how
 // to render it.
-func executeQuery(ctx context.Context, q *queryFlags) (gazetteer.Dossier, error) {
-	logger := q.common.setupLogger()
+func executeQuery(ctx context.Context, q *queryFlags, w streams) (gazetteer.Dossier, error) {
+	logger := q.common.setupLogger(w.err)
 
 	deps, err := newRuntimeDeps()
 	if err != nil {
@@ -154,6 +153,15 @@ func executeQuery(ctx context.Context, q *queryFlags) (gazetteer.Dossier, error)
 
 	selected := splitCSV(q.sources)
 	sources, err := resolveSources(deps, selected)
+	if err != nil {
+		return gazetteer.Dossier{}, err
+	}
+
+	// Every user input is validated BEFORE the first network call, as
+	// `compare` and --profile already were: a typo'd --property-type used to
+	// be reported only after the BAN round-trip, and a failing normalize hid
+	// it behind an unrelated error.
+	pt, err := parsePropertyType(q.propertyType)
 	if err != nil {
 		return gazetteer.Dossier{}, err
 	}
@@ -167,10 +175,6 @@ func executeQuery(ctx context.Context, q *queryFlags) (gazetteer.Dossier, error)
 	// normalised Listing so sources that gate on them (DVF, encadrement,
 	// taxefonciere, carteloyers, locservice, …) can produce a useful
 	// answer.
-	pt, err := parsePropertyType(q.propertyType)
-	if err != nil {
-		return gazetteer.Dossier{}, err
-	}
 	listing.PropertyType = pt
 	if q.surface > 0 {
 		s := q.surface
