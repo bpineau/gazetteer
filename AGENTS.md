@@ -331,4 +331,6 @@ docs/                 long-form reference (start at docs/readme.md)
 [docs/concepts.md](docs/concepts.md) · [docs/helpers.md](docs/helpers.md) ·
 [docs/sources.md](docs/sources.md) ·
 [docs/cli.md](docs/cli.md) · [docs/datasets.md](docs/datasets.md) ·
-[docs/plugins.md](docs/plugins.md) · [docs/testing.md](docs/testing.md)
+[docs/plugins.md](docs/plugins.md) · [docs/testing.md](docs/testing.md) ·
+[docs/caching.md](docs/caching.md) ·
+[docs/circuit_breakers.md](docs/circuit_breakers.md)
