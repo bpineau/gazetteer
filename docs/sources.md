@@ -46,7 +46,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `dpedist`        | INSEE                                          | data.ademe.fr values_agg API|
 | `dvf`            | INSEE or address + property_type (+ surface)   | data.gouv.fr Etalab DVF     |
 | `education`      | INSEE                                          | data.education.gouv.fr API  |
-| `encadrement`    | zip/INSEE + property_type + rooms (+ lat/lon for 93)| offline barème + zonage |
+| `encadrement`    | zip/INSEE + property_type (+ rooms, build_year, lat/lon) | offline barème + zonage |
 | `filosofi`       | INSEE                                          | offline INSEE Filosofi 2021 |
 | `filoiris`       | `Listing.IRIS`                                 | offline INSEE Filosofi 2021 IRIS |
 | `logiris`        | `Listing.IRIS`                                 | offline INSEE RP 2021 logement IRIS (IDF) |
@@ -234,15 +234,32 @@ Zoned rent caps (encadrement des loyers) for Paris, the two
 Seine-Saint-Denis EPTs (Plaine Commune, Est Ensemble) and
 Lyon / Villeurbanne.
 
-- **Needs**: zip OR INSEE + property type + rooms; coordinates
-  (lat/lon) for the precise Seine-Saint-Denis zone.
+- **Needs**: zip OR INSEE + property type; rooms and build year each narrow
+  the grille cell (see below); coordinates (lat/lon) for the precise
+  Seine-Saint-Denis zone. Surface is NOT consulted — the Result is per m²,
+  and multiplying by a surface is the caller's step.
 - **Result**: `LoyerRefMajEURPerM2HC` (the **legal max**, loyer de référence
   majoré, €/m²/month HC), `LoyerRefEURPerM2HC` (the published reference, ~20 %
   below), `Zone` + `ZoneSource` (resolved zone, e.g. `Paris 11e` /
   `plaine_commune`) and `Confidence`. Also satisfies `appraisal.RentEstimator`.
+- **Cell identification** — the published grille is keyed by (zone, pièces,
+  époque de construction, meublé). The Source reads the non-meublé,
+  non-maison cells and narrows them with what the Listing carries:
+  - `Rooms` picks the pièces bucket, saturating at the open-ended top cell
+    ("4 pièces et plus"), so a T6 reads the same cap as a T4. Without it the
+    collapse spans every bucket and `Confidence` is capped at
+    `ConfidenceLow`: the per-m² cap falls by about a third from a studio to a
+    four-room flat, so there is no safe default.
+  - `BuildYear` picks the époque bucket. Without it the collapse spans every
+    construction period, which is a real approximation: in Paris 1er the same
+    3-room cell is capped at 28.10 €/m²/month for a 1946-1970 building and
+    35.00 for a pre-1946 one. `Evidence.Epoque` names the bucket used, empty
+    when the reading spanned several.
 - **Zone identification**:
-  - Paris by zip: 75001..75020, 75116 (arrondissement-median).
-  - Lyon / Villeurbanne by INSEE: 69381..69389, 69266.
+  - Paris by zip (75001..75020, 75116) or INSEE (75101..75120),
+    arrondissement-median.
+  - Lyon / Villeurbanne by INSEE (69381..69389, 69266) or zip
+    (69001..69009, 69100).
   - Plaine Commune (9 communes) & Est Ensemble (9 communes) by
     point-in-polygon over an embedded zonage GeoJSON: the listing's
     coordinates resolve the exact sub-communal zone. Without

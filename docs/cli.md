@@ -44,11 +44,15 @@ $ gazetteer query --json "1 rue de Rivoli, 75001 Paris" | jq .
 
 - `--property-type apartment|house|land|commercial` — drives Source
   eligibility (DVF, encadrement, taxe-foncière). Default: `apartment`.
-- `--surface <m²>` — habitable surface. Required by DVF, taxe-foncière
-  and encadrement to produce a useful answer; ADEME also uses it to
-  pick the right dwelling when an address carries several DPE rows.
+- `--surface <m²>` — habitable surface. Required by DVF and taxe-foncière
+  to produce a useful answer; ADEME also uses it to pick the right dwelling
+  when an address carries several DPE rows. (encadrement publishes a per-m²
+  cap and does not read it.)
 - `--rooms <N>` — room count. Required by carteloyers, encadrement and
-  locservice to pick the typology bucket.
+  locservice to pick the typology bucket. Without it, encadrement spans
+  every bucket of the grille and returns a low-confidence reading.
+- `--build-year <YYYY>` — construction year. Picks the époque cell of the
+  encadrement grille; without it the cap spans every construction period.
 - `--source` — comma-separated Source names. Default: every Source
   the CLI knows how to instantiate (every `Default: true` entry in the
   registry — only `bdnb` is opt-in, see below).
@@ -162,7 +166,7 @@ dpedist         v1
 dvf             v4
 dvfagg          v2
 education       v1
-encadrement     v3
+encadrement     v4
 filoiris        v1
 filosofi        v1
 georisques      v1
