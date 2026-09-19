@@ -60,6 +60,7 @@ type queryFlags struct {
 	propertyType string        // "apartment" (default) | "house" | "land" | "commercial"
 	surface      float64       // m²; 0 ⇒ unset
 	rooms        int           // 0 ⇒ unset
+	buildYear    int           // construction year; 0 ⇒ unset
 	timeout      time.Duration // overall budget for the Collect; 0 ⇒ no deadline
 	jsonOut      bool
 	explain      bool   // diagnose per-source why-empty/why-failed (query + appraise)
@@ -82,7 +83,7 @@ func parseQueryFlags(cmd string, args []string, w streams) (*queryFlags, error) 
 	fs.SetOutput(w.err)
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(),
-			"Usage: gazetteer %s [--property-type apartment|house|land|commercial] [--surface m²] [--rooms N] [--source dvf,osm_transit,...] [--json] [--verbose] <addr>\n", cmd)
+			"Usage: gazetteer %s [--property-type apartment|house|land|commercial] [--surface m²] [--rooms N] [--build-year YYYY] [--source dvf,osm_transit,...] [--json] [--verbose] <addr>\n", cmd)
 		fmt.Fprintln(fs.Output())
 		fmt.Fprintf(fs.Output(), "Available sources: %s\n", strings.Join(allSourceNames(), ", "))
 		fmt.Fprintln(fs.Output())
@@ -96,6 +97,8 @@ func parseQueryFlags(cmd string, args []string, w streams) (*queryFlags, error) 
 		"Habitable surface in m² (e.g. 45). Required by DVF, taxe-foncière, encadrement for a meaningful answer.")
 	fs.IntVar(&q.rooms, "rooms", 0,
 		"Room count (1, 2, 3…). Required by carteloyers / encadrement / locservice for a typed rent reference.")
+	fs.IntVar(&q.buildYear, "build-year", 0,
+		"Construction year of the building (e.g. 1930). Selects the époque cell of the encadrement grille; without it the cap spans every construction period.")
 	fs.DurationVar(&q.timeout, "timeout", 30*time.Second,
 		"Overall budget for the Collect (deadline propagated via ctx). Slow Sources past this point return ctx.DeadlineExceeded → StatusFailedTransient. 0 disables the deadline.")
 	fs.BoolVar(&q.jsonOut, "json", false, "Emit the full Dossier as indented JSON")
@@ -184,6 +187,10 @@ func executeQuery(ctx context.Context, q *queryFlags, w streams) (gazetteer.Doss
 		r := q.rooms
 		listing.Rooms = &r
 	}
+	if q.buildYear > 0 {
+		y := q.buildYear
+		listing.BuildYear = &y
+	}
 
 	builder := gazetteer.NewBuilder().
 		WithHTTPClient(deps.HTTP.HTTPClient()).
@@ -253,6 +260,9 @@ func printDossierSummary(out io.Writer, d gazetteer.Dossier) {
 	}
 	if d.Listing.Rooms != nil {
 		fmt.Fprintf(out, "  rooms    %d\n", *d.Listing.Rooms)
+	}
+	if d.Listing.BuildYear != nil {
+		fmt.Fprintf(out, "  built    %d\n", *d.Listing.BuildYear)
 	}
 	fmt.Fprintln(out)
 

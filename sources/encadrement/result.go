@@ -60,11 +60,12 @@ type Result struct {
 	// "lyon_villeurbanne". Empty when no match.
 	ZoneSource string `json:"zone_source,omitempty"`
 
-	// Confidence is "medium" on a clean match — the grille gives a single
-	// value with no per-cell sample size, so the operator-facing copy flags
-	// the "approx époque" caveat — and "low" on a resolved-but-ambiguous
-	// match (a multi-zone EPT commune queried without coordinates, collapsed
-	// across its zones; see ConfidenceLow). ConfidenceNone otherwise.
+	// Confidence is "medium" on a clean match (zone and rooms bucket both
+	// resolved; the grille gives a single value with no per-cell sample
+	// size) and "low" on a reading the inputs left ambiguous: a multi-zone
+	// EPT commune queried without coordinates, or a listing with no Rooms,
+	// whose cap was collapsed across the spanned cells. ConfidenceNone
+	// otherwise. Evidence.Piece / Epoque say which axes were pinned.
 	Confidence string `json:"confidence"`
 
 	// Evidence captures reproducibility metadata about the query that
@@ -93,11 +94,28 @@ type Evidence struct {
 	Arrondissement string `json:"arrondissement,omitempty"`
 
 	// Piece is the rooms bucket the Source picked (1..4). Open-ended
-	// cells ("4 et plus") match any piece ≥ their stored Piece.
+	// cells ("4 et plus") match any piece ≥ their stored Piece. Zero when
+	// Listing.Rooms was absent, in which case the collapse spanned every
+	// bucket and the Confidence is capped at ConfidenceLow.
 	Piece int `json:"piece,omitempty"`
 
+	// BuildYear is the construction year the Source filtered the époque
+	// bucket on. Zero when Listing.BuildYear was absent or implausible, in
+	// which case the collapse spanned every époque.
+	BuildYear int `json:"build_year,omitempty"`
+
+	// Epoque is the published construction-period label behind the reading
+	// ("Avant 1946", "1946-1970", ...). Empty when the collapse spanned
+	// several époques.
+	Epoque string `json:"epoque,omitempty"`
+
+	// EpoqueUnmatched is true when a BuildYear was supplied but matched no
+	// published bucket, so the Source fell back to the all-époques collapse
+	// rather than reporting the address unregulated.
+	EpoqueUnmatched bool `json:"epoque_unmatched,omitempty"`
+
 	// NbCellsMatched is the number of grille cells that matched the
-	// (zone, piece, non-meublé, non-maison) filter. Drives the
+	// (zone, pièces, époque, non-meublé, non-maison) filter. Drives the
 	// median collapse.
 	NbCellsMatched int `json:"nb_cells_matched,omitempty"`
 
