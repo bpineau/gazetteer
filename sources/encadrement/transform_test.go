@@ -250,16 +250,24 @@ func TestTransformLyon_Golden(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &rows); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	// Two features × pieces {1,2,3} (open-ended dropped) × 5 époques × 2
-	// meublé = 2 × 30 = 60 rows.
-	if len(rows) != 60 {
-		t.Fatalf("rows = %d, want 60 (open-ended bucket must be dropped)", len(rows))
+	// Two features × pieces {1, 2, 3, "4 et plus"} × 5 époques × 2 meublé
+	// = 2 × 40 = 80 rows.
+	if len(rows) != 80 {
+		t.Fatalf("rows = %d, want 80", len(rows))
 	}
-	// The open-ended "4 et plus" bucket (Piece would be 4) must be absent.
+	// The open-ended "4 et plus" bucket lands as piece 4, flagged, so a T4
+	// (or a T6) resolves to it instead of falling out of the perimeter.
+	openEnded := 0
 	for _, r := range rows {
-		if r.Piece == 4 {
-			t.Fatalf("found a piece=4 row; open-ended bucket should be dropped: %+v", r)
+		if r.PieceOpenEnded != (r.Piece == 4) {
+			t.Fatalf("piece %d has PieceOpenEnded = %v: %+v", r.Piece, r.PieceOpenEnded, r)
 		}
+		if r.PieceOpenEnded {
+			openEnded++
+		}
+	}
+	if openEnded != 20 {
+		t.Errorf("open-ended rows = %d, want 20 (2 features × 5 époques × 2 meublé)", openEnded)
 	}
 	// First feature is Villeurbanne IRIS 692660101 zone 4; first emitted cell
 	// is piece 1 / 1946-1970 / meublé per upstream key order.

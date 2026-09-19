@@ -283,7 +283,8 @@ them to produce a useful answer:
 ```
 --property-type apartment|house|land|commercial   (default: apartment)
 --surface <m²>
---rooms <N>
+--rooms <N>                                       (encadrement: without it the cap spans every pièces bucket, at low confidence)
+--build-year <YYYY>                               (encadrement: picks the époque cell of the grille)
 --source <comma-separated names>                  (default: every Source except the opt-in ones, i.e. bdnb)
 --timeout <duration>                              (Collect budget, default 30s; 0 disables)
 --json                                            (emit the full Dossier)

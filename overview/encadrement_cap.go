@@ -15,9 +15,12 @@ import (
 // sous-zone within multi-zone communes). Use the /api/zone per-address endpoint
 // for binding decisions.
 //
-// Returns (cap, true) for communes in Paris (75101–75120) and the EPT
-// perimeters carried by the embedded encadrement zonage artifacts (Plaine
-// Commune, Est Ensemble). Returns (0, false) for all other communes.
+// Returns (cap, true) for every commune the embedded encadrement artifacts
+// cover: Paris (75101–75120), Lyon and Villeurbanne (69381–69389, 69266), and
+// the two Seine-Saint-Denis EPT perimeters (Plaine Commune, Est Ensemble).
+// Returns (0, false) for all other communes — which is what sets
+// CommuneOverview.Encadree, so a territory missing here is screened as
+// unregulated and its market rent goes uncapped.
 func RepresentativeT2Majore(idx *encadrement.Index, insee string) (float64, bool) {
 	if idx == nil || len(insee) != 5 {
 		return 0, false
@@ -25,15 +28,19 @@ func RepresentativeT2Majore(idx *encadrement.Index, insee string) (float64, bool
 
 	var entries []encadrement.Entry
 
-	if insee >= "75101" && insee <= "75120" {
+	switch zones, ept, inEPT := idx.ZonesForINSEE(insee); {
+	case insee >= "75101" && insee <= "75120":
 		// Paris: arrondissement is the 2-digit code at positions 3:5
 		// (e.g. "75119" → "19"). The format matches LookupParis("01".."20").
 		entries = idx.LookupParis(insee[3:5])
-	} else if zones, ept, ok := idx.ZonesForINSEE(insee); ok {
+	case len(idx.LookupLyonInsee(insee)) > 0:
+		// Lyon arrondissements and Villeurbanne, keyed by commune INSEE.
+		entries = idx.LookupLyonInsee(insee)
+	case inEPT:
 		for _, z := range zones {
 			entries = append(entries, idx.LookupEPTZone(ept, z)...)
 		}
-	} else {
+	default:
 		return 0, false
 	}
 

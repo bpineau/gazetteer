@@ -50,3 +50,34 @@ func TestRepresentativeT2Majore(t *testing.T) {
 		t.Fatal("RepresentativeT2Majore(77284) = _, true; want false (Provins is not encadré)")
 	}
 }
+
+// TestRepresentativeT2Majore_Lyon is the regression for the Métropole de Lyon
+// perimeter, which the commune screen used to miss entirely: the nine Lyon
+// arrondissements and Villeurbanne came back ok=false, so CommuneOverview
+// marked them Encadree=false and EffectiveRentEURM2HC left their market rent
+// uncapped — the one place a screen must not be optimistic.
+func TestRepresentativeT2Majore_Lyon(t *testing.T) {
+	t.Parallel()
+
+	idx, err := encadrement.Load("")
+	if err != nil {
+		t.Fatalf("encadrement.Load: %v", err)
+	}
+	for _, insee := range []string{"69381", "69383", "69389", "69266"} {
+		cap, ok := RepresentativeT2Majore(idx, insee)
+		if !ok {
+			t.Errorf("RepresentativeT2Majore(%s) = _, false; want true (inside the Lyon perimeter)", insee)
+			continue
+		}
+		// The published T2 majoré across the Métropole sits in a narrow band;
+		// anything outside it means the lookup grabbed the wrong cells.
+		if cap < 10 || cap > 30 {
+			t.Errorf("RepresentativeT2Majore(%s) = %.2f, want 10..30 €/m²/mois HC", insee, cap)
+		}
+	}
+	// The Lyon parent commune carries no grille of its own (dvfagg keys the
+	// arrondissements), and must not borrow one.
+	if _, ok := RepresentativeT2Majore(idx, "69123"); ok {
+		t.Error("RepresentativeT2Majore(69123) = _, true; want false (parent commune, no grille)")
+	}
+}

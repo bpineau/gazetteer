@@ -467,16 +467,17 @@ type zoneRow struct {
 }
 
 type lyonRow struct {
-	Insee       string   `json:"insee"`
-	IRIS        string   `json:"iris"`
-	Zone        string   `json:"zone"`
-	Commune     string   `json:"commune"`
-	Piece       int      `json:"piece"`
-	Epoque      string   `json:"epoque"`
-	Meuble      bool     `json:"meuble"`
-	RefEURPerM2 float64  `json:"ref_eur_m2"`
-	MinEURPerM2 *float64 `json:"min_eur_m2"`
-	MaxEURPerM2 *float64 `json:"max_eur_m2"`
+	Insee          string   `json:"insee"`
+	IRIS           string   `json:"iris"`
+	Zone           string   `json:"zone"`
+	Commune        string   `json:"commune"`
+	Piece          int      `json:"piece"`
+	PieceOpenEnded bool     `json:"piece_open_ended"`
+	Epoque         string   `json:"epoque"`
+	Meuble         bool     `json:"meuble"`
+	RefEURPerM2    float64  `json:"ref_eur_m2"`
+	MinEURPerM2    *float64 `json:"min_eur_m2"`
+	MaxEURPerM2    *float64 `json:"max_eur_m2"`
 }
 
 func parseAll(dir string) (*Index, error) {
@@ -548,6 +549,7 @@ func parseAll(dir string) (*Index, error) {
 			ZoneID:                r.IRIS,
 			Commune:               r.Commune,
 			Piece:                 r.Piece,
+			PieceOpenEnded:        r.PieceOpenEnded,
 			Epoque:                r.Epoque,
 			Meuble:                r.Meuble,
 			LoyerRefEURPerM2HC:    r.RefEURPerM2,

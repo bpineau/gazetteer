@@ -3,7 +3,9 @@ package encadrement
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
@@ -29,7 +31,16 @@ const Name = "encadrement"
 // KML (arrêté "du 01 juin 2026") instead of the obsolete 2022/2023 data.gouv
 // flat export — caps rise ~6-13% across the 93. Bumped so any datadir cache
 // built from the stale v2 barème is superseded by the embedded v3 artifact.
-const sourceVersion = 3
+//
+// v4 fixes what the grille was read with. The Lyon snapshot now carries the
+// "4 et plus" bucket it used to drop, so a Lyon or Villeurbanne flat of four
+// rooms or more is no longer reported outside the perimeter; Listing.BuildYear
+// selects the époque cell instead of the cap being a median across every
+// construction period; an absent Listing.Rooms spans the grille at
+// ConfidenceLow instead of silently quoting the studio cap; and Paris resolves
+// from INSEE as well as zip (Lyon from zip as well as INSEE). Bumped so a
+// datadir cache built from the v3 Lyon artifact is superseded.
+const sourceVersion = 4
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -78,18 +89,22 @@ func (s *Source) Datasets() []dataset.Set {
 //
 //  1. Reject non-residential property types with
 //     gazetteer.ErrUnsupportedPropertyType.
-//  2. Try Paris (zip 75001..75020, 75116).
-//  3. Otherwise try Lyon / Villeurbanne (INSEE 69381..69389, 69266).
+//  2. Try Paris (zip 75001..75020 / 75116, or INSEE 75101..75120).
+//  3. Otherwise try Lyon / Villeurbanne (INSEE 69381..69389 / 69266, or
+//     zip 69001..69009 / 69100).
 //  4. Otherwise try the Seine-Saint-Denis EPTs (Plaine Commune, Est
 //     Ensemble): point-in-polygon on the embedded zonage resolves the
 //     sub-communal zone from the listing's coordinates, with an
 //     INSEE-commune fallback (see resolve93).
-//  5. On a match, collapse the cells matching (piece, non-meublé,
-//     non-maison) by median of LoyerRefMaxEURPerM2HC.
+//  5. On a match, collapse the cells matching (pièces, époque,
+//     non-meublé, non-maison) by median of LoyerRefMaxEURPerM2HC.
 //
-// SurfaceM2 is consulted (we require > 0 to compute a meaningful
-// monthly cap downstream); when missing the Source skips with
-// gazetteer.ErrInsufficientInputs.
+// Rooms and BuildYear both narrow the grille cell, and both are optional:
+// an absent one spans every published bucket for that axis and is recorded
+// in the Evidence (an absent Rooms additionally caps the Confidence at
+// ConfidenceLow, because the cap per m² varies by a third from a studio to
+// a four-room flat). SurfaceM2 is not consulted: this Source publishes a
+// per-m² cap, and multiplying by a surface is the caller's step.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	if !propertyTypeEligible(string(l.PropertyType)) {
 		return nil, fmt.Errorf("encadrement: %w: %q", gazetteer.ErrUnsupportedPropertyType, l.PropertyType)
@@ -106,10 +121,15 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 
 	zip := strings.TrimSpace(l.Zip)
 	insee := strings.TrimSpace(l.INSEE)
-	rooms := intDeref(l.Rooms)
+	sel := cellFilter{
+		piece:     clampPiece(intDeref(l.Rooms)),
+		buildYear: usableBuildYear(l.BuildYear, time.Now()),
+	}
 
-	// Paris.
-	if arr := parisArrondissementFromZip(zip); arr != "" {
+	// Paris. Either identifier resolves the arrondissement: a hand-built
+	// Listing routinely carries one without the other, and treating an
+	// INSEE-only Paris address as unregulated is the worst possible answer.
+	if arr := parisArrondissement5(zip, insee); arr != "" {
 		entries := idx.LookupParis(arr)
 		if len(entries) == 0 {
 			return &Result{
@@ -120,19 +140,19 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 				},
 			}, nil
 		}
-		return collapse(entries, "Paris "+arr+"e", ZoneSourceParis, rooms, Evidence{
+		return collapse(entries, "Paris "+arr+"e", ZoneSourceParis, sel, Evidence{
 			Zip:            zip,
+			INSEE:          insee,
 			Arrondissement: arr,
-			Piece:          clampPiece(rooms),
 		}, ConfidenceMedium), nil
 	}
 
-	// Lyon / Villeurbanne — try INSEE.
-	if insee != "" {
-		if entries := idx.LookupLyonInsee(insee); len(entries) > 0 {
-			return collapse(entries, lyonZoneLabel(insee), ZoneSourceLyonVilleurbanne, rooms, Evidence{
-				INSEE: insee,
-				Piece: clampPiece(rooms),
+	// Lyon / Villeurbanne, keyed by INSEE with a zip fallback.
+	if lyon := lyonINSEE(insee, zip); lyon != "" {
+		if entries := idx.LookupLyonInsee(lyon); len(entries) > 0 {
+			return collapse(entries, lyonZoneLabel(lyon), ZoneSourceLyonVilleurbanne, sel, Evidence{
+				Zip:   zip,
+				INSEE: lyon,
 			}, ConfidenceMedium), nil
 		}
 	}
@@ -145,7 +165,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		for _, z := range m.zones {
 			entries = append(entries, idx.LookupEPTZone(m.ept, z)...)
 		}
-		return collapse(entries, m.commune, m.ept, rooms, Evidence{
+		return collapse(entries, m.commune, m.ept, sel, Evidence{
 			Zip:    zip,
 			INSEE:  insee,
 			ZoneID: strings.Join(m.zones, "+"),
@@ -193,23 +213,92 @@ func normalizePropertyType(t string) string {
 	}
 }
 
-// collapse picks the cap value for a piece bucket out of the entries
-// published for its zone. We pick the median ref-majoré across the
-// matching piece-bucket non-meublé non-maison cells. conf is the confidence
-// stamped on a successful match (a no-cell match always degrades to
-// ConfidenceNone).
-func collapse(entries []Entry, label, zoneSource string, rooms int, ev Evidence, conf string) *Result {
-	piece := clampPiece(rooms)
-	var majs, refs []float64
+// cellFilter names the grille cells a query selects inside its zone.
+//
+// Both axes are optional and a zero means "unknown, span every published
+// bucket" — the grille has no cell for "any number of rooms", so spanning is
+// the only honest reading of a missing input, and the median across the
+// spanned cells is what the Result then carries.
+type cellFilter struct {
+	// piece is the rooms bucket (1..4), or 0 when Rooms was absent.
+	piece int
+	// buildYear is the construction year, or 0 when BuildYear was absent
+	// or implausible (see usableBuildYear).
+	buildYear int
+}
+
+// matches reports whether e is one of the cells this filter selects. Furnished
+// and maison cells are never selected: the published meublé grille is a
+// different cap, and the rare maison cells are a different perimeter.
+func (f cellFilter) matches(e Entry) bool {
+	if e.Meuble || e.Maison {
+		return false
+	}
+	if f.piece > 0 && e.Piece != f.piece && (!e.PieceOpenEnded || f.piece < e.Piece) {
+		return false
+	}
+	if f.buildYear > 0 && !epoqueCovers(e.Epoque, f.buildYear) {
+		return false
+	}
+	return true
+}
+
+// collapse picks the cap out of the cells published for a zone: the median
+// loyer de référence majoré (and, in parallel, the median loyer de référence)
+// across the cells sel selects. conf is the confidence stamped on a successful
+// match; a no-cell match always degrades to ConfidenceNone, and an unknown
+// rooms count caps it at ConfidenceLow.
+//
+// When a BuildYear selects no cell — a territory whose époque vocabulary this
+// package does not parse — the collapse retries across every époque rather
+// than reporting the address unregulated, and says so in the Evidence.
+func collapse(entries []Entry, label, zoneSource string, sel cellFilter, ev Evidence, conf string) *Result {
+	majs, refs, epoque := selectCells(entries, sel)
+	if len(majs) == 0 && sel.buildYear > 0 {
+		sel.buildYear = 0
+		majs, refs, epoque = selectCells(entries, sel)
+		ev.EpoqueUnmatched = true
+	}
+
+	ev.Piece = sel.piece
+	ev.BuildYear = sel.buildYear
+	ev.Epoque = epoque
+	ev.NbCellsMatched = len(majs)
+	if len(majs) == 0 {
+		return &Result{
+			Confidence: ConfidenceNone,
+			Evidence:   ev,
+		}
+	}
+	if sel.piece == 0 && conf == ConfidenceMedium {
+		conf = ConfidenceLow
+	}
+	return &Result{
+		LoyerRefMajEURPerM2HC: stats.Median(majs),
+		LoyerRefEURPerM2HC:    stats.Median(refs),
+		Zone:                  label,
+		ZoneSource:            zoneSource,
+		Confidence:            conf,
+		Evidence:              ev,
+	}
+}
+
+// selectCells gathers the majoré and référence readings of the cells sel
+// selects. epoque is the single époque label behind them, or "" when the
+// selection spans several (an unknown BuildYear, or a zone whose cells
+// disagree).
+func selectCells(entries []Entry, sel cellFilter) (majs, refs []float64, epoque string) {
+	spans := false
 	for _, e := range entries {
-		if e.Meuble {
+		if !sel.matches(e) {
 			continue
 		}
-		if e.Maison {
-			continue
-		}
-		if e.Piece != piece && (!e.PieceOpenEnded || piece < e.Piece) {
-			continue
+		switch {
+		case spans:
+		case epoque == "":
+			epoque = e.Epoque
+		case epoque != e.Epoque:
+			spans, epoque = true, ""
 		}
 		if e.LoyerRefMaxEURPerM2HC > 0 {
 			majs = append(majs, e.LoyerRefMaxEURPerM2HC)
@@ -218,31 +307,19 @@ func collapse(entries []Entry, label, zoneSource string, rooms int, ev Evidence,
 			refs = append(refs, e.LoyerRefEURPerM2HC)
 		}
 	}
-	ev.Piece = piece
-	ev.NbCellsMatched = len(majs)
-	if len(majs) == 0 {
-		return &Result{
-			Confidence: ConfidenceNone,
-			Evidence:   ev,
-		}
-	}
-	maj := stats.Median(majs)
-	ref := stats.Median(refs)
-	return &Result{
-		LoyerRefMajEURPerM2HC: maj,
-		LoyerRefEURPerM2HC:    ref,
-		Zone:                  label,
-		ZoneSource:            zoneSource,
-		Confidence:            conf,
-		Evidence:              ev,
-	}
+	return majs, refs, epoque
 }
 
-// clampPiece bounds a rooms count to the [1, 4] range the published
-// grilles use. 0 (rooms unknown) defaults to 1, ≥ 5 saturates at 4.
+// clampPiece bounds a rooms count to the [1, 4] range the published grilles
+// use, saturating at the open-ended top bucket ("4 pièces et plus" in Paris
+// and the 93, "4 et plus" in Lyon). A count below 1 means "rooms unknown" and
+// maps to 0, which cellFilter reads as "span every bucket": defaulting an
+// unknown count to a studio instead would quote the single most expensive cap
+// of the grille (38.00 against 29.45 EUR/m²/month for Paris 1er) as if it had
+// been looked up.
 func clampPiece(rooms int) int {
 	if rooms < 1 {
-		return 1
+		return 0
 	}
 	if rooms > 4 {
 		return 4
@@ -250,25 +327,82 @@ func clampPiece(rooms int) int {
 	return rooms
 }
 
+// parisArrondissement5 extracts the 2-digit Paris arrondissement key
+// ("01" .. "20") from a zip or, failing that, from an INSEE code. Empty when
+// neither identifies a Paris arrondissement.
+func parisArrondissement5(zip, insee string) string {
+	if arr := parisArrondissementFromZip(zip); arr != "" {
+		return arr
+	}
+	return parisArrondissementFromINSEE(insee)
+}
+
 // parisArrondissementFromZip converts a 75001..75020 / 75116 zip into
 // the 2-digit arrondissement key the Paris index uses
 // ("01" .. "20", plus "16" for 75116).
 func parisArrondissementFromZip(zip string) string {
-	if len(zip) != 5 || zip[:2] != "75" {
-		return ""
-	}
 	if zip == "75116" {
 		return "16"
 	}
-	// 75001..75020 → "01".."20".
-	if zip[2] != '0' {
+	return twoDigitKey(arrondissementNumber(zip, "750", 20))
+}
+
+// parisArrondissementFromINSEE converts a 75101..75120 commune code — what the
+// BAN returns for any Paris address — into the same 2-digit key. The parent
+// code 75056 carries no arrondissement and yields "".
+func parisArrondissementFromINSEE(insee string) string {
+	return twoDigitKey(arrondissementNumber(insee, "751", 20))
+}
+
+// twoDigitKey zero-pads an arrondissement number into the index's key, or
+// returns "" for the 0 that arrondissementNumber uses for "not one".
+func twoDigitKey(n int) string {
+	if n == 0 {
 		return ""
 	}
-	n := int(zip[3]-'0')*10 + int(zip[4]-'0')
-	if n < 1 || n > 20 {
-		return ""
+	return fmt.Sprintf("%02d", n)
+}
+
+// lyonINSEE resolves a listing to a Métropole de Lyon commune code inside the
+// encadrement perimeter: the nine Lyon arrondissements (69381..69389) and
+// Villeurbanne (69266), by INSEE or, when the listing carries none, by zip.
+// The zip fallback is not a general zip→INSEE table, only the unambiguous
+// perimeter one: 69001..69009 are the Lyon arrondissements and 69100 is
+// Villeurbanne. Empty for anything else.
+func lyonINSEE(insee, zip string) string {
+	if insee == "69266" {
+		return insee
 	}
-	return zip[3:5]
+	if arrondissementNumber(insee, "6938", 9) > 0 {
+		return insee
+	}
+	if zip == "69100" {
+		return "69266"
+	}
+	// 69001..69009 → 69381..69389.
+	if n := arrondissementNumber(zip, "6900", 9); n > 0 {
+		return fmt.Sprintf("6938%d", n)
+	}
+	return ""
+}
+
+// arrondissementNumber reads the arrondissement number off a 5-character code
+// that starts with prefix, bounded by count. It returns 0 when code is not
+// such a code — a different commune, a malformed length, a non-digit tail, or
+// an out-of-range number like the "00" of a parent code.
+//
+// The prefix carries the spelling, which differs per family: Paris
+// arrondissements are "751" + a 2-digit number, Lyon's are "6938" + a single
+// digit, and their zips are "750"/"6900" + the same.
+func arrondissementNumber(code, prefix string, count int) int {
+	if len(code) != 5 || !strings.HasPrefix(code, prefix) {
+		return 0
+	}
+	n, err := strconv.Atoi(code[len(prefix):])
+	if err != nil || n < 1 || n > count {
+		return 0
+	}
+	return n
 }
 
 // lyonZoneLabel produces a stable label for the Lyon zone (arr or

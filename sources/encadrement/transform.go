@@ -73,11 +73,21 @@ const zoneCoordDecimals = 6
 // most recent grille (annee 2025). Bump when a newer arrêté lands.
 const parisYear = 2025
 
-// lyonOpenEndedPiece is the upstream label for the open-ended ("4 et
-// plus") piece bucket in the Lyon "valeurs" object. The committed Lyon
-// snapshot drops it (Lyon publishes 1/2/3 plus the open-ended cell; the
-// snapshot keeps the three closed buckets only).
-const lyonOpenEndedPiece = "4 et plus"
+// lyonOpenEndedPiece is the upstream label for the open-ended piece bucket in
+// the Lyon "valeurs" object, whose other keys are the plain "1", "2" and "3".
+// lyonOpenEndedValue is the Piece number it is stored under, matching the
+// convention the Paris and 93 artifacts already use for their own "4 pièces et
+// plus" cell.
+//
+// The snapshot DROPPED this bucket up to source v3, which left the grille with
+// no cell above three rooms and so reported every Lyon or Villeurbanne flat of
+// four rooms or more as sitting outside the encadrement perimeter — a T4 in
+// Lyon 3e came back with no cap at all instead of the 12.00 to 15.10
+// EUR/m²/month the arrêté sets depending on the époque.
+const (
+	lyonOpenEndedPiece = "4 et plus"
+	lyonOpenEndedValue = 4
+)
 
 // transformParis rebuilds encadrement_paris.json from the opendata.paris.fr
 // JSON export, keeping only parisYear and mapping the export fields to the
@@ -484,16 +494,17 @@ func transformLyon(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		for _, c := range cells {
 			mn, mx := c.minore, c.majore
 			out = append(out, lyonRow{
-				Insee:       p.Insee,
-				IRIS:        p.CodeIRIS.String(),
-				Zone:        p.Zonage.String(),
-				Commune:     p.Commune,
-				Piece:       c.piece,
-				Epoque:      c.epoque,
-				Meuble:      c.meuble,
-				RefEURPerM2: c.reference,
-				MinEURPerM2: &mn,
-				MaxEURPerM2: &mx,
+				Insee:          p.Insee,
+				IRIS:           p.CodeIRIS.String(),
+				Zone:           p.Zonage.String(),
+				Commune:        p.Commune,
+				Piece:          c.piece,
+				PieceOpenEnded: c.openEnded,
+				Epoque:         c.epoque,
+				Meuble:         c.meuble,
+				RefEURPerM2:    c.reference,
+				MinEURPerM2:    &mn,
+				MaxEURPerM2:    &mx,
 			})
 		}
 	}
@@ -506,6 +517,7 @@ func transformLyon(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 // lyonCell is one flattened Lyon grid cell.
 type lyonCell struct {
 	piece     int
+	openEnded bool
 	epoque    string
 	meuble    bool
 	reference float64
@@ -522,19 +534,19 @@ type lyonRates struct {
 }
 
 // flattenLyonValeurs walks the nested "valeurs" object (piece → époque →
-// {"meuble"|"non meuble"} → rates) preserving the upstream key order, and
-// drops the open-ended piece bucket. Order preservation is what makes the
-// rebuilt array byte-identical to the committed snapshot, so we decode the
-// object levels with json.Decoder token streams rather than maps.
+// {"meuble"|"non meuble"} → rates) preserving the upstream key order, mapping
+// the open-ended piece key to lyonOpenEndedValue. Order preservation is what
+// makes the rebuilt array byte-identical to the committed snapshot, so we
+// decode the object levels with json.Decoder token streams rather than maps.
 func flattenLyonValeurs(rawValeurs json.RawMessage) ([]lyonCell, error) {
 	var cells []lyonCell
 	err := walkOrderedObject(rawValeurs, func(pieceKey string, pieceRaw json.RawMessage) error {
-		if pieceKey == lyonOpenEndedPiece {
-			return nil // committed snapshot omits the open-ended bucket
-		}
-		piece, err := strconv.Atoi(pieceKey)
-		if err != nil {
-			return fmt.Errorf("piece key %q: %w", pieceKey, err)
+		piece, openEnded := lyonOpenEndedValue, pieceKey == lyonOpenEndedPiece
+		if !openEnded {
+			var err error
+			if piece, err = strconv.Atoi(pieceKey); err != nil {
+				return fmt.Errorf("piece key %q: %w", pieceKey, err)
+			}
 		}
 		return walkOrderedObject(pieceRaw, func(epoque string, epoqueRaw json.RawMessage) error {
 			return walkOrderedObject(epoqueRaw, func(meubleKey string, ratesRaw json.RawMessage) error {
@@ -544,6 +556,7 @@ func flattenLyonValeurs(rawValeurs json.RawMessage) ([]lyonCell, error) {
 				}
 				cells = append(cells, lyonCell{
 					piece:     piece,
+					openEnded: openEnded,
 					epoque:    epoque,
 					meuble:    meubleKey == "meuble",
 					reference: rates.Reference,
@@ -665,6 +678,12 @@ func validateZones(r io.Reader) error {
 	return nil
 }
 
+// validateLyon refuses an artifact that would leave a piece bucket uncovered.
+// The grille must reach every rooms count, which means every bucket from 1 up
+// to the open-ended one must be published, and the open-ended one must be
+// flagged: a snapshot missing it reads as "no cap" for T4 and above rather
+// than as an error, which is how the bucket stayed dropped for three source
+// versions.
 func validateLyon(r io.Reader) error {
 	var rows []lyonRow
 	if err := json.NewDecoder(r).Decode(&rows); err != nil {
@@ -672,6 +691,20 @@ func validateLyon(r io.Reader) error {
 	}
 	if len(rows) == 0 {
 		return errors.New("encadrement: validated lyon artifact is empty")
+	}
+	seen := map[int]bool{}
+	openEnded := false
+	for _, row := range rows {
+		seen[row.Piece] = true
+		openEnded = openEnded || row.PieceOpenEnded
+	}
+	for p := 1; p <= lyonOpenEndedValue; p++ {
+		if !seen[p] {
+			return fmt.Errorf("encadrement: validated lyon artifact has no cell for %d pièce(s)", p)
+		}
+	}
+	if !openEnded {
+		return errors.New("encadrement: validated lyon artifact has no open-ended pièces bucket")
 	}
 	return nil
 }
