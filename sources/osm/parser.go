@@ -302,8 +302,8 @@ func classifyType(tags map[string]string) (TransitType, bool) {
 	// (Châtelet carries subway, light_rail and train at once).
 	//
 	// `tram=yes` used to be read with railway=tram_stop, ABOVE all of
-	// these, so a métro station that also serves a tram — which is what
-	// a tram/métro interchange is — was published as a tram, the
+	// these, so a métro station that also serves a tram - which is what
+	// a tram/métro interchange is - was published as a tram, the
 	// slowest mode of the set, against the precedence the comment right
 	// here announced.
 	if tags["subway"] == "yes" {

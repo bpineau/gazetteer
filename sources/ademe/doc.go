@@ -13,7 +13,7 @@
 // carrying DPE label, GES label, surface, build year and dwelling
 // type.
 //
-// That tie-break is UNBOUNDED — the closest row wins however far it is,
+// That tie-break is UNBOUNDED - the closest row wins however far it is,
 // because it is still the only certificate at that address. The
 // confidence leg is what bounds it: a picked row whose surface
 // contradicts the anchor (SurfaceAgrees, a deliberately wide band since

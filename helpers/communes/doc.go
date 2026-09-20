@@ -6,7 +6,7 @@
 // supply a synthetic CSV via NewTable / ParseCSV.
 //
 // Neighbors sweeps the WHOLE table with a haversine, behind a
-// bounding-box prefilter — fine for the 35 k corpus (tens of
+// bounding-box prefilter - fine for the 35 k corpus (tens of
 // microseconds), no spatial index needed. It never stops at a
 // département boundary: half the neighbours of a border commune are on
 // the other side of one.

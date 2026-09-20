@@ -14,7 +14,7 @@ import (
 // Source already had. Lat/Lon pointers TO ZERO are how "no coordinates"
 // survives a JSON round-trip, and this Source used to take them at face
 // value: it measured from Null Island, found no perimeter within
-// NearbyMeters and answered IsEmpty() — "not in or near a sensitive
+// NearbyMeters and answered IsEmpty() - "not in or near a sensitive
 // zone", about an address it never located.
 func TestQuery_NullIslandSentinel(t *testing.T) {
 	zero := 0.0

@@ -158,7 +158,7 @@ func TestPickFeature_FallbackToFirstWhenNoneContain(t *testing.T) {
 		t.Fatalf("ParseFeatureCollection: %v", err)
 	}
 	// Way outside every parcel: no containment hit. The nearest one is
-	// still returned, but it says so and says how far — the fallback
+	// still returned, but it says so and says how far - the fallback
 	// used to be feature 0 with an "ok" that meant nothing, so a parcel
 	// 700 km away read exactly like a hit.
 	pick, ok := PickFeature(fc.Features, 10.0, 50.0)

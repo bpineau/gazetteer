@@ -31,7 +31,7 @@ import (
 // commune median or p75 reaches maxPPM (the highest median is 17 000
 // and the highest p75 16 865, both Paris), so the cap only trims the
 // far tail of the deepest markets. Four of the 9 090 communes have a
-// median of exactly minPPM, each on a single sale — the floor is at the
+// median of exactly minPPM, each on a single sale - the floor is at the
 // edge of the real distribution down there, not above it. How many
 // sub-floor rows were dropped cannot be read back from an aggregate;
 // it needs the geo-dvf bulk files a refresh downloads.

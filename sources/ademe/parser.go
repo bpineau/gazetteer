@@ -462,7 +462,7 @@ const (
 // SurfaceAgrees reports whether a picked row's surface is close enough
 // to the caller's anchor for the two to be the same dwelling.
 //
-// comparable is false when either side is unknown — the caller passed no
+// comparable is false when either side is unknown - the caller passed no
 // SurfaceM2, or ADEME published no surface_habitable_logement for that
 // row. Unknown is not disagreement, so a caller must branch on it.
 func SurfaceAgrees(wantSurface float64, rowSurface *float64) (agrees, comparable bool) {
@@ -488,7 +488,7 @@ type MatchQuality struct {
 	Number bool
 
 	// Street is true when the row is on the listing's voie (type word +
-	// name tokens) — what tells "8 Rue des Petites Ecuries" from "8 Cour
+	// name tokens) - what tells "8 Rue des Petites Ecuries" from "8 Cour
 	// des Petites Ecuries".
 	Street bool
 
@@ -503,12 +503,12 @@ type MatchQuality struct {
 	EtiquetteDPE string
 }
 
-// PickConfidence implements the confidence calibration (v4 — street- and
+// PickConfidence implements the confidence calibration (v4 - street- and
 // surface-aware):
 //
 //	high   : street-number matched AND street (type+name) matched AND
 //	         etiquette_dpe non-empty AND the surfaces do not contradict
-//	         each other — the row is on the right voie at the right
+//	         each other - the row is on the right voie at the right
 //	         number with a DPE label, for a dwelling the right size.
 //	medium : a partial match — number matched OR etiquette present, but
 //	         NOT all of the above. A number-matched, DPE-bearing row on
@@ -519,8 +519,8 @@ type MatchQuality struct {
 // The surface leg exists because the picker's surface tie-break is
 // UNBOUNDED: it returns the closest surface among the rows at that
 // address, however far the closest one is. Ask for a 30 m² studio where
-// ADEME holds one 250 m² duplex and the duplex comes back — correctly,
-// it is the only certificate there — but not at high confidence.
+// ADEME holds one 250 m² duplex and the duplex comes back - correctly,
+// it is the only certificate there - but not at high confidence.
 func PickConfidence(m MatchQuality) string {
 	if !m.Found {
 		return ConfidenceLow

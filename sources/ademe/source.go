@@ -25,7 +25,7 @@ const Name = "ademe"
 //     number, those on the same voie (street type word + name tokens,
 //     e.g. "rue petites ecuries" vs "cour petites ecuries") are
 //     preferred, and only a number+street+DPE match earns "high"
-//     confidence — a number-matched but wrong-street row is no longer a
+//     confidence - a number-matched but wrong-street row is no longer a
 //     false-positive "high".
 //   - v4: surface-aware confidence. The surface tie-break returns the
 //     CLOSEST row among those at the address, however far the closest

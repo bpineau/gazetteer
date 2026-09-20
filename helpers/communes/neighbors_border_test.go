@@ -13,7 +13,7 @@ import (
 // to the rest of France only above a 10 km radius. A commune on a
 // département boundary has half its neighbours on the other side, so
 // the answer was short by exactly the communes a border address cares
-// about — and the DVF "neighborhood" tier runs at 5 km, documented as
+// about - and the DVF "neighborhood" tier runs at 5 km, documented as
 // "communes within 5 km", so it priced a market half the size.
 //
 // The reference is a brute-force haversine over the whole table: the

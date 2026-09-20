@@ -138,7 +138,7 @@ func TestINSEEResolution_CarriesPrecision(t *testing.T) {
 		t.Errorf("INSEE = %q, want 93048", got.INSEE)
 	}
 	if got.Precision != PrecisionMunicipality {
-		t.Errorf("Precision = %q, want municipality — the coordinates are the commune's", got.Precision)
+		t.Errorf("Precision = %q, want municipality - the coordinates are the commune's", got.Precision)
 	}
 }
 

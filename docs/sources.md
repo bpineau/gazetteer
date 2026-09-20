@@ -80,7 +80,7 @@ dataset on data.gouv.fr.
   `Evidence`.
 - **Which dwelling**: ADEME holds one certificate per dwelling, so an
   apartment building answers with several rows at the same street number.
-  `Listing.SurfaceM2` picks the closest one — but the tie-break is
+  `Listing.SurfaceM2` picks the closest one - but the tie-break is
   unbounded (the closest row wins however far it is, being the only
   certificate there), so the CONFIDENCE carries the bound: a picked row
   whose surface contradicts the anchor is `medium`, never `high`, and
@@ -117,7 +117,7 @@ French cadastral parcel under a listing's lat/lon, with an optional
 building-footprint analysis (count + total emprise + ratio).
 
 - **Needs**: lat/lon (resolved via Geocoder when absent), at
-  `Options.MinCoordPrecision` or finer — a street centroid by default.
+  `Options.MinCoordPrecision` or finer - a street centroid by default.
   A commune centre has a cadastral parcel of its own (the mairie's), so
   a coordinate that coarse is refused with `banx.ErrCoarseMatch` rather
   than answered with a stranger's parcel. Raise the floor to
@@ -125,12 +125,12 @@ building-footprint analysis (count + total emprise + ratio).
 - **Result**: `cadastre.Result` carries a one-element `Parcels` slice
   with the 14-char Etalab id (its `INSEE` is the first five characters
   of that id, so for Paris / Lyon / Marseille it is the ARRONDISSEMENT
-  code, not the parent commune — fold it with
+  code, not the parent commune - fold it with
   `communes.FoldArrondissement` for a parent-keyed dataset), contenance
   in m² / ares / hectares and
   a deeplink to the Etalab cadastre viewer, plus `MatchDistanceM` (0
   when the point is INSIDE the parcel, the distance to the nearest one
-  otherwise — read it before treating the parcel as the property's).
+  otherwise - read it before treating the parcel as the property's).
   When `IncludeBati: true`, also carries `BatiM2`, `BatiCount`,
   `EmpriseRatio`.
 - **`IsEmpty()`**: true when the API returns zero features (typical
@@ -197,9 +197,9 @@ offline batch complement to the live, per-address `dvf` source.
   synthesis can clear its MinSources=2 floor from embedded data alone —
   pairing with the live `dvf` reading instead of forcing `price_confidence`
   structurally Low.
-- **Plausibility bounds**: a kept sale is 9–250 m² at 300–25 000 €/m²;
+- **Plausibility bounds**: a kept sale is 9-250 m² at 300-25 000 €/m²;
   anything outside is dropped, never clamped. These are TIGHTER than
-  `dvf`'s (9–1 000 m², 100–50 000 €/m²) because the cohorts differ:
+  `dvf`'s (9-1 000 m², 100-50 000 €/m²) because the cohorts differ:
   `dvfagg` aggregates APARTMENTS only, `dvf` every built local. Measured
   on the shipped aggregate, the cap never binds (the highest commune
   median is 17 000 €/m² and the highest p75 16 865, both Paris) and four
@@ -764,7 +764,7 @@ is the listing **inside** a QPV? Answered by point-in-polygon over the QPV
 
 - **Needs**: INSEE; Lat/Lon strongly recommended (unlocks the address-level
   point-in-polygon path; without them, or with coordinates only as precise
-  as the commune itself — `qpv.MinCoordPrecision` — the answer is
+  as the commune itself - `qpv.MinCoordPrecision` - the answer is
   commune-level only, and says so through `MatchLevel`).
 - **Result**: `qpv.Result` with `HasQPV`, `MatchLevel` (`point` | `commune`),
   the matched QPV code(s) + labels, and — for a point outside every QPV — a

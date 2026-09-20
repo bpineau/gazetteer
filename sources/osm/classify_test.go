@@ -29,8 +29,8 @@ func TestClassifyType(t *testing.T) {
 		{"subway wins over train", map[string]string{"subway": "yes", "train": "yes", "network": "RER"}, TransitTypeMetro, true},
 		// A tram/métro interchange is a station node carrying BOTH mode
 		// flags. The tram flag used to be read above every other mode, so
-		// the station was published as a tram — the slowest mode of the
-		// set — against the precedence the classifier states.
+		// the station was published as a tram - the slowest mode of the
+		// set - against the precedence the classifier states.
 		{"subway wins over tram at an interchange", map[string]string{"railway": "station", "subway": "yes", "tram": "yes"}, TransitTypeMetro, true},
 		{"light_rail wins over tram", map[string]string{"railway": "station", "light_rail": "yes", "tram": "yes"}, TransitTypeMetro, true},
 		{"tram wins over train", map[string]string{"railway": "station", "tram": "yes", "train": "yes"}, TransitTypeTram, true},
