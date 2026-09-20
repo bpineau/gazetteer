@@ -10,6 +10,10 @@
 // not a holed-shape mass centroid) and equirectangular planar areas in m²
 // (AreaM2, honest to ~0.5 % for parcel-sized shapes at French latitudes).
 //
+// Containment and measurement answer the SAME question: AreaM2 applies the
+// even-odd rule ring by ring, so it measures exactly the region Covers calls
+// inside, whatever order the rings arrive in.
+//
 // The package treats coordinates as a flat Cartesian plane. Over a city-sized
 // footprint the planar approximation is well within geocoding precision, so it
 // is the right tool for "which administrative zone contains this address?"
