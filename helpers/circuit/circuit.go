@@ -490,7 +490,12 @@ func isTransportOrDeadlineErr(err error) bool {
 	if _, ok := errors.AsType[http2.StreamError](err); ok {
 		return true
 	}
-	if _, ok := errors.AsType[*http2.GoAwayError](err); ok {
+	// x/net v0.59.0 deprecated GoAwayError along with the rest of the
+	// package's client surface, now that net/http carries HTTP/2 itself,
+	// but it named no replacement and the type is still what a GOAWAY
+	// produces. Keep recognizing it until net/http exports an error of
+	// its own to match.
+	if _, ok := errors.AsType[*http2.GoAwayError](err); ok { //nolint:staticcheck // SA1019: deprecated with no replacement; still the error a GOAWAY yields
 		return true
 	}
 	if _, ok := errors.AsType[http2.ConnectionError](err); ok {
