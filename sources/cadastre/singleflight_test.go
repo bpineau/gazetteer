@@ -49,7 +49,7 @@ func newBatiServer(t *testing.T, status int, body []byte) (srv *httptest.Server,
 // collapse to ONE download and both callers must get the polygons.
 func TestResolveBatiPolygons_CoalescesConcurrentSameCommune(t *testing.T) {
 	srv, calls, arrived, release := newBatiServer(t, http.StatusOK, buildSyntheticBatiAroundSmallCommune(t))
-	s := NewSource(Options{BatiBaseURL: srv.URL, IncludeBati: true})
+	s := NewSource(Options{BatiBaseURL: srv.URL, IncludeBati: true, HTTPClient: srv.Client()})
 
 	out := make(chan batiResult, 2)
 	resolve := func(ctx context.Context) {
@@ -90,7 +90,7 @@ func TestResolveBatiPolygons_CoalescesConcurrentSameCommune(t *testing.T) {
 // contract), never be shared as an empty success and never be cached.
 func TestResolveBatiPolygons_ErrorReachesEveryWaiter(t *testing.T) {
 	srv, calls, arrived, release := newBatiServer(t, http.StatusInternalServerError, []byte("upstream down"))
-	s := NewSource(Options{BatiBaseURL: srv.URL, IncludeBati: true})
+	s := NewSource(Options{BatiBaseURL: srv.URL, IncludeBati: true, HTTPClient: srv.Client()})
 
 	out := make(chan batiResult, 2)
 	resolve := func() {
@@ -123,7 +123,7 @@ func TestResolveBatiPolygons_ErrorReachesEveryWaiter(t *testing.T) {
 // the dump.
 func TestResolveBatiPolygons_CancelledInitiatorDoesNotFailWaiter(t *testing.T) {
 	srv, calls, arrived, release := newBatiServer(t, http.StatusOK, buildSyntheticBatiAroundSmallCommune(t))
-	s := NewSource(Options{BatiBaseURL: srv.URL, IncludeBati: true})
+	s := NewSource(Options{BatiBaseURL: srv.URL, IncludeBati: true, HTTPClient: srv.Client()})
 
 	initiatorCtx, cancelInitiator := context.WithCancel(context.Background())
 	initiatorErr := make(chan error, 1)

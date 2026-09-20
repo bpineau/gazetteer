@@ -383,6 +383,25 @@ walking away.
   constant is how a stored or cached Result is told apart from one produced by
   the corrected logic; changing what a source returns without moving it makes
   old and new data indistinguishable.
+- **A test server needs its own client, or it poisons its neighbours.** A
+  Source given no `HTTPClient` falls back on `gazetteer.DefaultHTTPClient`,
+  whose transport is the process-wide `http.DefaultTransport`. A server's
+  `Close` closes that shared transport's idle connections as a courtesy,
+  so one parallel test's server shutting down can pull a live connection out
+  from under a neighbour in the same package, which surfaces as
+  `http: CloseIdleConnections called` where a status was expected. Always pass
+  `HTTPClient: srv.Client()` (or an `httpx` client, which clones its own
+  transport). `internal/lint` enforces it for Options literals fed a server
+  URL; a server wired through a package-level base-URL variable instead (dvf,
+  osm) is outside that check, so do it by hand there.
+- **A geometry fixture must not sit ON an edge or a vertex.** `geopoly` says so
+  in its own doc: coverage of a boundary point is undefined. The verdict then
+  rests on the last bit of a cross product or a cosine, which the arm64 and
+  amd64 compilers are free to round differently (FMA contraction), so the test
+  is green locally and red on CI. Watch for coordinates that coincide by
+  arithmetic and not by sight: `48.94 + 0.005` and `48.945` are the same
+  float64. Place the point metres clear of the boundary, or assert a distance
+  with a tolerance in metres rather than a binary inside/outside.
 
 ## Where things live
 
@@ -391,6 +410,7 @@ gazetteer/            core types: Builder, Client, Source, Result, Dossier, Get[
 factory/              one-call wiring of every stable source (NewDefault,
                       SourceOverrides, HostRateLimits, Offline/LiveSourceNames)
 internal/roster/      THE single source roster (one entry wires factory + CLI)
+internal/lint/        repo-wide hygiene checks, written as tests over the tree
 sources/<name>/       one package per source (uniform shape, see above)
 appraisal/            PricePerM2 / RentValue / HazardProfile consolidation
 appraisal/zonescore/  the 0-100 zone score + Compare + Personas

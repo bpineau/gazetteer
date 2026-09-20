@@ -45,13 +45,16 @@ func TestInsideZone(t *testing.T) {
 }
 
 func TestNearbyZone(t *testing.T) {
-	// Point ~200 m east of the square's NE corner: not inside, but within
-	// NearbyMeters of a boundary vertex (the distance hint is vertex-based;
-	// real QRR rings are dense, the synthetic square only has corners).
+	// Point ~200 m east of the middle of the square's east edge: outside,
+	// but within NearbyMeters of the boundary. The latitude is the square's
+	// own centre, not a corner's: 48.94+0.005 and 48.945 are the same
+	// float64, so a query point at the corner's latitude sits exactly ON an
+	// edge, where coverage is undefined by the geopoly contract and the
+	// verdict can hang on the platform's last bit.
 	idx := NewIndexForTest(map[string]geopoly.MultiPolygon{"Zone Test": square(48.94, 2.52)})
-	lon := 2.52 + 0.005 + 0.0027 // NE corner + ~200 m at this latitude
+	lon := 2.52 + 0.005 + 0.0027 // east edge + ~200 m at this latitude
 	r, err := NewSource(Options{Index: idx}).QueryResult(context.Background(),
-		gazetteer.Listing{Lat: ptr(48.945), Lon: ptr(lon)})
+		gazetteer.Listing{Lat: ptr(48.94), Lon: ptr(lon)})
 	if err != nil {
 		t.Fatal(err)
 	}
