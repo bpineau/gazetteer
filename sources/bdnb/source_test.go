@@ -135,8 +135,9 @@ func TestSource_HappyPath(t *testing.T) {
 	body := mustReadFixture(t, "list_paris11.json")
 	srv := newStubServer(t, http.StatusOK, body)
 	s := NewSource(Options{
-		BaseURL:  srv.URL,
-		Geocoder: stubGeocoder{cityCode: "75111"},
+		BaseURL:    srv.URL,
+		Geocoder:   stubGeocoder{cityCode: "75111"},
+		HTTPClient: srv.Client(),
 	})
 	data, err := s.Query(context.Background(), newListingParis11())
 	if err != nil {
@@ -207,7 +208,7 @@ func TestSource_EmptyResponse(t *testing.T) {
 	t.Parallel()
 
 	srv := newStubServer(t, http.StatusOK, []byte(`[]`))
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}, HTTPClient: srv.Client()})
 	data, err := s.Query(context.Background(), newListingParis11())
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -241,7 +242,7 @@ func TestSource_HTTP5xx_ErrUpstreamUnavailable(t *testing.T) {
 	t.Parallel()
 
 	srv := newStubServer(t, http.StatusServiceUnavailable, []byte(`{"error":"down"}`))
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}, HTTPClient: srv.Client()})
 	_, err := s.Query(context.Background(), newListingParis11())
 	if !errors.Is(err, gazetteer.ErrUpstreamUnavailable) {
 		t.Errorf("Query = %v, want wrapping ErrUpstreamUnavailable", err)
@@ -252,7 +253,7 @@ func TestSource_HTTP4xx_ErrUpstreamPermanent(t *testing.T) {
 	t.Parallel()
 
 	srv := newStubServer(t, http.StatusForbidden, []byte(`{"error":"forbidden"}`))
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}, HTTPClient: srv.Client()})
 	_, err := s.Query(context.Background(), newListingParis11())
 	if !errors.Is(err, gazetteer.ErrUpstreamPermanent) {
 		t.Errorf("Query = %v, want wrapping ErrUpstreamPermanent", err)
@@ -300,7 +301,7 @@ func TestSource_InsufficientInputs_EmptyPattern(t *testing.T) {
 	// Address is zip-only — fraddr yields no street tokens, so the
 	// ilike pattern is empty.
 	srv := newStubServer(t, http.StatusOK, []byte(`[]`))
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}, HTTPClient: srv.Client()})
 	_, err := s.Query(context.Background(), gazetteer.Listing{
 		Address: "75011 Paris",
 		Zip:     "75011",
@@ -322,8 +323,9 @@ func TestSource_ListingINSEEShortCircuit(t *testing.T) {
 	_ = called
 
 	s := NewSource(Options{
-		BaseURL:  srv.URL,
-		Geocoder: gcCallTrack{stubGeocoder: gc, called: &called},
+		BaseURL:    srv.URL,
+		Geocoder:   gcCallTrack{stubGeocoder: gc, called: &called},
+		HTTPClient: srv.Client(),
 	})
 	listing := newListingParis11()
 	listing.INSEE = "75111"
@@ -361,7 +363,7 @@ func TestSource_PicksRowMatchingStreetNumber(t *testing.T) {
         {"batiment_groupe_id":"c","cle_interop_adr_principale_ban":"X_10","libelle_adr_principale_ban":"10 Rue Aubert 93200 Saint-Denis","code_commune_insee":"93066"}
     ]`)
 	srv := newStubServer(t, http.StatusOK, body)
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "93066"}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "93066"}, HTTPClient: srv.Client()})
 	data, err := s.Query(context.Background(), gazetteer.Listing{
 		Address: "9, rue Aubert 93200 Saint-Denis",
 		Zip:     "93200",
@@ -385,7 +387,7 @@ func TestSource_FetcherTransportError(t *testing.T) {
 	// ErrUpstreamUnavailable.
 	srv := newStubServer(t, http.StatusOK, []byte(`[]`))
 	srv.Close()
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}, HTTPClient: srv.Client()})
 	_, err := s.Query(context.Background(), newListingParis11())
 	if !errors.Is(err, gazetteer.ErrUpstreamUnavailable) {
 		t.Errorf("Query(closed server) = %v, want ErrUpstreamUnavailable", err)
@@ -396,7 +398,7 @@ func TestSource_ParseFailureMapsToUpstreamUnavailable(t *testing.T) {
 	t.Parallel()
 
 	srv := newStubServer(t, http.StatusOK, []byte(`not json`))
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}, HTTPClient: srv.Client()})
 	_, err := s.Query(context.Background(), newListingParis11())
 	if !errors.Is(err, gazetteer.ErrUpstreamUnavailable) {
 		t.Errorf("Query(garbage body) = %v, want ErrUpstreamUnavailable", err)
@@ -409,8 +411,9 @@ func TestQueryAtomicHelper(t *testing.T) {
 	body := mustReadFixture(t, "list_paris11.json")
 	srv := newStubServer(t, http.StatusOK, body)
 	res, err := Query(context.Background(), Options{
-		BaseURL:  srv.URL,
-		Geocoder: stubGeocoder{cityCode: "75111"},
+		BaseURL:    srv.URL,
+		Geocoder:   stubGeocoder{cityCode: "75111"},
+		HTTPClient: srv.Client(),
 	}, newListingParis11())
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -470,8 +473,9 @@ func TestResult_JSONShape(t *testing.T) {
 	body := mustReadFixture(t, "list_paris11.json")
 	srv := newStubServer(t, http.StatusOK, body)
 	res, err := Query(context.Background(), Options{
-		BaseURL:  srv.URL,
-		Geocoder: stubGeocoder{cityCode: "75111"},
+		BaseURL:    srv.URL,
+		Geocoder:   stubGeocoder{cityCode: "75111"},
+		HTTPClient: srv.Client(),
 	}, newListingParis11())
 	if err != nil {
 		t.Fatalf("Query: %v", err)

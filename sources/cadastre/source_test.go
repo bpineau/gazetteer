@@ -200,6 +200,7 @@ func TestSource_HappyPath_WithBati(t *testing.T) {
 		BaseURL:     parcelleURL,
 		BatiBaseURL: ms.URL,
 		IncludeBati: true,
+		HTTPClient:  ms.Client(),
 	})
 	data, err := s.Query(context.Background(), listingAt(49.01795, 1.99016))
 	if err != nil {
@@ -238,6 +239,7 @@ func TestSource_BatiCachedOnSecondCall(t *testing.T) {
 		BaseURL:     parcelleURL,
 		BatiBaseURL: ms.URL,
 		IncludeBati: true,
+		HTTPClient:  ms.Client(),
 	})
 
 	if _, err := s.Query(context.Background(), listingAt(49.01795, 1.99016)); err != nil {
@@ -264,6 +266,7 @@ func TestSource_BatiSoftFailOn500(t *testing.T) {
 		BaseURL:     parcelleURL,
 		BatiBaseURL: ms.URL,
 		IncludeBati: true,
+		HTTPClient:  ms.Client(),
 	})
 	data, err := s.Query(context.Background(), listingAt(49.01795, 1.99016))
 	if err != nil {

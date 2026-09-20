@@ -108,8 +108,9 @@ func TestSource_HappyPath(t *testing.T) {
 	body := mustReadFixture(t, "paris11.json")
 	srv := newStubServer(t, http.StatusOK, body)
 	s := NewSource(Options{
-		BaseURL:  srv.URL,
-		Geocoder: stubGeocoder{lat: 48.860874, lon: 2.370245},
+		BaseURL:    srv.URL,
+		Geocoder:   stubGeocoder{lat: 48.860874, lon: 2.370245},
+		HTTPClient: srv.Client(),
 	})
 	data, err := s.Query(context.Background(), newListingParis11())
 	if err != nil {
@@ -201,7 +202,8 @@ func TestSource_UsesListingCoordsWhenSet(t *testing.T) {
 		BaseURL: srv.URL,
 		// Geocoder would return different coords if consulted — verify
 		// we use the listing-provided ones.
-		Geocoder: stubGeocoder{lat: 99, lon: 99},
+		Geocoder:   stubGeocoder{lat: 99, lon: 99},
+		HTTPClient: srv.Client(),
 	})
 	l := newListingParis11()
 	l.Lat = &lat
@@ -220,7 +222,7 @@ func TestSource_Upstream5xx_Transient(t *testing.T) {
 	t.Parallel()
 
 	srv := newStubServer(t, http.StatusInternalServerError, []byte("server error"))
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}, HTTPClient: srv.Client()})
 	_, err := s.Query(context.Background(), newListingParis11())
 	if !errors.Is(err, gazetteer.ErrUpstreamUnavailable) {
 		t.Errorf("Query(5xx) = %v, want ErrUpstreamUnavailable", err)
@@ -231,7 +233,7 @@ func TestSource_Upstream4xx_Permanent(t *testing.T) {
 	t.Parallel()
 
 	srv := newStubServer(t, http.StatusBadRequest, []byte("bad request"))
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}, HTTPClient: srv.Client()})
 	_, err := s.Query(context.Background(), newListingParis11())
 	if !errors.Is(err, gazetteer.ErrUpstreamPermanent) {
 		t.Errorf("Query(400) = %v, want ErrUpstreamPermanent", err)
@@ -242,7 +244,7 @@ func TestSource_404TreatedAsEmpty(t *testing.T) {
 	t.Parallel()
 
 	srv := newStubServer(t, http.StatusNotFound, nil)
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}, HTTPClient: srv.Client()})
 	data, err := s.Query(context.Background(), newListingParis11())
 	if err != nil {
 		t.Fatalf("Query(404) = %v, want nil error (treated as empty body)", err)
@@ -259,7 +261,7 @@ func TestSource_GarbageBody_Transient(t *testing.T) {
 	t.Parallel()
 
 	srv := newStubServer(t, http.StatusOK, []byte("not json"))
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}, HTTPClient: srv.Client()})
 	_, err := s.Query(context.Background(), newListingParis11())
 	if !errors.Is(err, gazetteer.ErrUpstreamUnavailable) {
 		t.Errorf("Query(garbage) = %v, want ErrUpstreamUnavailable", err)
@@ -273,7 +275,7 @@ func TestSource_EmptyBodyYieldsEmptyResult(t *testing.T) {
 	// the request bounced. That is an empty result (StatusOKEmpty), not
 	// a confident "no hazard" reading.
 	srv := newStubServer(t, http.StatusOK, []byte("{}"))
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}, HTTPClient: srv.Client()})
 	data, err := s.Query(context.Background(), newListingParis11())
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -297,7 +299,7 @@ func TestSource_CommuneNoHazardsYieldsMediumNotEmpty(t *testing.T) {
 	// hazards. This is a legitimate "nothing here" reading — medium
 	// confidence and NOT empty.
 	srv := newStubServer(t, http.StatusOK, []byte(`{"commune":{"codeInsee":"75111"}}`))
-	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}})
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}, HTTPClient: srv.Client()})
 	data, err := s.Query(context.Background(), newListingParis11())
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -319,7 +321,7 @@ func TestQuery_TypedHelper(t *testing.T) {
 
 	body := mustReadFixture(t, "paris11.json")
 	srv := newStubServer(t, http.StatusOK, body)
-	res, err := Query(context.Background(), Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}}, newListingParis11())
+	res, err := Query(context.Background(), Options{BaseURL: srv.URL, Geocoder: stubGeocoder{lat: 48.86, lon: 2.37}, HTTPClient: srv.Client()}, newListingParis11())
 	if err != nil {
 		t.Fatalf("Query helper: %v", err)
 	}
