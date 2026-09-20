@@ -18,7 +18,7 @@
 //   - Query time (a source's loader): [Index] is a generic, payload-parameterised
 //     bag of [Feature]s with a bbox-prefiltered first-cover [Index.Resolve]
 //     scan (plus [Index.ResolveWhere] for a candidate predicate and
-//     [Index.Nearest] for the vertex-distance fallback). The source controls
+//     [Index.Nearest] for the boundary-distance fallback). The source controls
 //     feature order before building the Index, so first-cover ties resolve
 //     deterministically exactly as before.
 //
@@ -32,7 +32,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/bpineau/gazetteer/helpers/geodist"
 	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
@@ -225,18 +224,28 @@ func (idx *Index[T]) ResolveWhere(lat, lon float64, keep func(T) bool) (T, bool)
 // factor absorbing the small real-world variation, 110.57–111.69 km).
 const metersPerDegreeLat = 111_320.0
 
-// Nearest returns the payload of the feature with the smallest vertex distance
-// to (lat, lon), that distance in metres, and ok=true — considering only
-// features with a vertex within maxMeters. ok is false when none qualifies.
+// Nearest returns the payload of the feature whose BOUNDARY is closest to
+// (lat, lon), that distance in metres, and ok=true — considering only features
+// whose boundary is within maxMeters. ok is false when none qualifies.
 //
-// Distance is the minimum great-circle distance from the point to any boundary
-// *vertex* (not the polygon edge), via [geodist.MetersBetween] — a cheap
-// "is there a QPV nearby?" hint, not an exact distance-to-boundary.
+// Distance is to the nearest boundary EDGE, via
+// [geopoly.MultiPolygon.BoundaryDistanceM]. It used to be the distance to the
+// nearest VERTEX, which is not the same question: administrative contours are
+// not drawn at a uniform density, and a long straight stretch is published as
+// two vertices kilometres apart. On the QPV contours this module embeds, half
+// the edges are under 22 m but the longest is 3 961 m, so a point 30 m outside
+// such a zone measured 1 981 m from its nearest vertex and a 1 000 m query
+// reported no QPV nearby at all.
+//
+// Note what the distance does NOT say: a point deep INSIDE a feature is far
+// from its boundary, exactly like a point far outside. Callers that must tell
+// the two apart test Resolve (or geopoly.Covers) first — which is what qpv and
+// sensible do.
 //
 // Features whose bounding box, expanded by maxMeters, does not contain the
-// point are rejected without touching their vertices — in the common
-// "point is far from every feature" case this skips >99 % of the vertex
-// distance computations.
+// point are rejected without touching their geometry — in the common
+// "point is far from every feature" case this skips >99 % of the distance
+// computations.
 func (idx *Index[T]) Nearest(lat, lon, maxMeters float64) (T, float64, bool) {
 	var best T
 	if idx == nil {
@@ -256,17 +265,10 @@ func (idx *Index[T]) Nearest(lat, lon, maxMeters float64) (T, float64, bool) {
 			lon < b.MinLon-dLon || lon > b.MaxLon+dLon {
 			continue
 		}
-		for _, polygon := range f.mp {
-			for _, ring := range polygon {
-				for _, v := range ring {
-					d := geodist.MetersBetween(lat, lon, v.Lat, v.Lon)
-					if d < bestDist {
-						bestDist = d
-						best = f.Payload
-						found = true
-					}
-				}
-			}
+		if d := f.mp.BoundaryDistanceM(lat, lon); d < bestDist {
+			bestDist = d
+			best = f.Payload
+			found = true
 		}
 	}
 	if !found {

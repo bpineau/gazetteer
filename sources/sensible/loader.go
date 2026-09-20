@@ -144,7 +144,7 @@ func (idx *Index) resolve(lat, lon float64) (in, nearby []Zone) {
 			in = append(in, z)
 			continue
 		}
-		if d, ok := vertexDistanceM(f.mp, lat, lon, NearbyMeters); ok {
+		if d, ok := boundaryDistanceM(f.mp, lat, lon, NearbyMeters); ok {
 			z := f.zone
 			z.DistanceM = int(d + 0.5)
 			nearby = append(nearby, z)
@@ -208,22 +208,18 @@ func expand(b geopoly.BBox, m, atLat float64) geopoly.BBox {
 	}
 }
 
-// vertexDistanceM returns the minimum great-circle distance from (lat, lon)
-// to any boundary vertex of mp, ok=false when it exceeds maxMeters. A cheap
-// "how close is this zone?" hint (vertex, not edge, distance) — the same
-// convention as geoindex.Index.Nearest; QRR rings are dense enough (hundreds
-// of vertices per zone) that the difference is a few tens of metres at most.
-func vertexDistanceM(mp geopoly.MultiPolygon, lat, lon, maxMeters float64) (float64, bool) {
-	best := math.Inf(1)
-	for _, poly := range mp {
-		for _, ring := range poly {
-			for _, v := range ring {
-				if d := geodist.MetersBetween(lat, lon, v.Lat, v.Lon); d < best {
-					best = d
-				}
-			}
-		}
-	}
+// boundaryDistanceM returns the distance from (lat, lon) to the nearest EDGE
+// of mp's boundary, ok=false when it exceeds maxMeters.
+//
+// It used to measure to the nearest VERTEX, on the assumption that "QRR rings
+// are dense enough that the difference is a few tens of metres at most". That
+// assumption is false for 7 of the 62 shipped zones: across 29 417 edges the
+// median is 15.9 m but the longest is 2 234 m, and a point 50 m outside the
+// Lunel/Mauguio perimeter sits on such an edge — it was reported as no zone
+// nearby at all, where the doc promises "zones whose boundary lies within this
+// distance".
+func boundaryDistanceM(mp geopoly.MultiPolygon, lat, lon, maxMeters float64) (float64, bool) {
+	best := mp.BoundaryDistanceM(lat, lon)
 	if best > maxMeters {
 		return 0, false
 	}

@@ -68,7 +68,7 @@ type Zone struct {
 
 	// DistanceM is the distance from the listing to the zone boundary in
 	// metres: 0 when the listing is INSIDE the zone, the boundary distance
-	// (vertex distance for polygons, edge-of-circle distance for ORCOD/
+	// (distance to the nearest boundary edge for polygons, edge-of-circle for ORCOD/
 	// curated circles) when it is nearby.
 	DistanceM int `json:"distance_m"`
 
