@@ -439,24 +439,96 @@ func rangeRightBound(s string) string {
 	return s[hiStart:i]
 }
 
-// PickConfidence implements the confidence calibration (v3 —
-// street-aware):
+// SurfaceAgreementTolerance and SurfaceAgreementFloorM2 bound how far a
+// picked row's surface_habitable_logement may sit from the caller's
+// SurfaceM2 anchor and still be believable as the SAME dwelling: 20 %,
+// or SurfaceAgreementFloorM2, whichever is larger.
+//
+// The band is wide on purpose. A listing quotes loi Carrez and a DPE
+// quotes surface habitable, and the two conventions disagree by a few
+// per cent on an ordinary flat, more when a mezzanine or an annexe is
+// involved. It is not meant to catch a small discrepancy; it is meant
+// to catch the 250 m² duplex returned for a 30 m² studio because it was
+// the only DPE at that street number.
+//
+// The floor keeps the rule sane at the bottom of the range: 20 % of a
+// 20 m² studio is 4 m², which is inside the two conventions' own
+// disagreement.
+const (
+	SurfaceAgreementTolerance = 0.20
+	SurfaceAgreementFloorM2   = 5.0
+)
+
+// SurfaceAgrees reports whether a picked row's surface is close enough
+// to the caller's anchor for the two to be the same dwelling.
+//
+// comparable is false when either side is unknown — the caller passed no
+// SurfaceM2, or ADEME published no surface_habitable_logement for that
+// row. Unknown is not disagreement, so a caller must branch on it.
+func SurfaceAgrees(wantSurface float64, rowSurface *float64) (agrees, comparable bool) {
+	if wantSurface <= 0 || rowSurface == nil || *rowSurface <= 0 {
+		return false, false
+	}
+	tol := wantSurface * SurfaceAgreementTolerance
+	if tol < SurfaceAgreementFloorM2 {
+		tol = SurfaceAgreementFloorM2
+	}
+	return math.Abs(*rowSurface-wantSurface) <= tol, true
+}
+
+// MatchQuality is what agreed between the query and the row the picker
+// chose. PickConfidence reads it; the Source fills it from the picked
+// row, so every leg is derived from the answer and not from the search.
+type MatchQuality struct {
+	// Found is false when nothing matched at all.
+	Found bool
+
+	// Number is true when the row's adresse_ban / adresse_brut starts
+	// with the listing's street number.
+	Number bool
+
+	// Street is true when the row is on the listing's voie (type word +
+	// name tokens) — what tells "8 Rue des Petites Ecuries" from "8 Cour
+	// des Petites Ecuries".
+	Street bool
+
+	// SurfaceDisagrees is true ONLY when both the caller's anchor and
+	// the row's surface are known and they are too far apart to be the
+	// same dwelling (see SurfaceAgrees). An unknown surface on either
+	// side leaves it false: it is not evidence against the match.
+	SurfaceDisagrees bool
+
+	// EtiquetteDPE is the picked row's DPE label; empty means the row
+	// carries no certificate.
+	EtiquetteDPE string
+}
+
+// PickConfidence implements the confidence calibration (v4 — street- and
+// surface-aware):
 //
 //	high   : street-number matched AND street (type+name) matched AND
-//	         etiquette_dpe non-empty — the row is on the right voie at
-//	         the right number with a DPE label.
+//	         etiquette_dpe non-empty AND the surfaces do not contradict
+//	         each other — the row is on the right voie at the right
+//	         number with a DPE label, for a dwelling the right size.
 //	medium : a partial match — number matched OR etiquette present, but
-//	         NOT all three. Crucially a number-matched, DPE-bearing row
-//	         on the WRONG street is medium, never high (the bug fix).
+//	         NOT all of the above. A number-matched, DPE-bearing row on
+//	         the WRONG street is medium, never high; so is one whose
+//	         surface says it is the neighbour's flat.
 //	low    : nothing matched (caller wraps in an empty/skipped result).
-func PickConfidence(matched, numberMatched, streetMatched bool, etiquetteDPE string) string {
-	if !matched {
+//
+// The surface leg exists because the picker's surface tie-break is
+// UNBOUNDED: it returns the closest surface among the rows at that
+// address, however far the closest one is. Ask for a 30 m² studio where
+// ADEME holds one 250 m² duplex and the duplex comes back — correctly,
+// it is the only certificate there — but not at high confidence.
+func PickConfidence(m MatchQuality) string {
+	if !m.Found {
 		return ConfidenceLow
 	}
-	if numberMatched && streetMatched && etiquetteDPE != "" {
+	if m.Number && m.Street && m.EtiquetteDPE != "" && !m.SurfaceDisagrees {
 		return ConfidenceHigh
 	}
-	if numberMatched || etiquetteDPE != "" {
+	if m.Number || m.EtiquetteDPE != "" {
 		return ConfidenceMedium
 	}
 	return ConfidenceLow
