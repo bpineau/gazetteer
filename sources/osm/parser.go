@@ -279,8 +279,9 @@ func coordinates(el overpassElement) (lat, lon float64, ok bool) {
 // the latter happens e.g. on a `railway=station` with no station=*
 // sub-tag AND no mode hint (very rare on French data, but defensive).
 func classifyType(tags map[string]string) (TransitType, bool) {
-	// Tramway is the easiest call.
-	if tags["railway"] == "tram_stop" || tags["tram"] == "yes" {
+	// `railway=tram_stop` is what the element IS, not a mode it also
+	// serves, so it settles the question before any precedence applies.
+	if tags["railway"] == "tram_stop" {
 		return TransitTypeTram, true
 	}
 
@@ -295,13 +296,24 @@ func classifyType(tags map[string]string) (TransitType, bool) {
 		return TransitTypeMetro, true
 	}
 
-	// Mode flags. Subway > light_rail > train precedence (Châtelet has
-	// all three ; the operator wants the highest-frequency mode shown).
+	// Mode flags, in the order of the precedence stated below: subway >
+	// light_rail > tram > train. A station node serves several modes at
+	// an interchange and the operator wants the fastest one shown
+	// (Châtelet carries subway, light_rail and train at once).
+	//
+	// `tram=yes` used to be read with railway=tram_stop, ABOVE all of
+	// these, so a métro station that also serves a tram — which is what
+	// a tram/métro interchange is — was published as a tram, the
+	// slowest mode of the set, against the precedence the comment right
+	// here announced.
 	if tags["subway"] == "yes" {
 		return TransitTypeMetro, true
 	}
 	if tags["light_rail"] == "yes" {
 		return TransitTypeMetro, true
+	}
+	if tags["tram"] == "yes" {
+		return TransitTypeTram, true
 	}
 
 	// RER : we detect via `network` or `route_ref` containing "RER".

@@ -40,8 +40,11 @@ type Result struct {
 	// have no `ref` tag on OSM).
 	NearestTransitLines []string `json:"nearest_transit_lines,omitempty"`
 
-	// NearestTransitWalkM is the walking distance in metres
-	// (haversine × sinuosity). 0 on an empty/skipped result.
+	// NearestTransitWalkM is the ESTIMATED walking distance in metres:
+	// the great-circle distance times WalkSinuosityMultiplier, not a
+	// route over a street graph. A river, a railway cutting or a walled
+	// estate between the two is invisible to it. 0 on an empty/skipped
+	// result.
 	NearestTransitWalkM int `json:"nearest_transit_walk_m"`
 
 	// NearestTransitWalkMin is NearestTransitWalkM / WalkSpeedMetersPerMinute,
