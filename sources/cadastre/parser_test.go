@@ -138,9 +138,15 @@ func TestPickFeature_ContainmentHit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseFeatureCollection: %v", err)
 	}
-	idx, ok := PickFeature(fc.Features, 2.3522, 48.8566)
-	if !ok || idx < 0 {
-		t.Fatalf("PickFeature = (%d, %v), want a hit", idx, ok)
+	pick, ok := PickFeature(fc.Features, 2.3522, 48.8566)
+	if !ok || pick.Index < 0 {
+		t.Fatalf("PickFeature = (%+v, %v), want a hit", pick, ok)
+	}
+	if !pick.Contains {
+		t.Errorf("Contains = false, want true: the point is inside the parcel")
+	}
+	if pick.DistanceM != 0 {
+		t.Errorf("DistanceM = %v, want 0 on a containment hit", pick.DistanceM)
 	}
 }
 
@@ -151,18 +157,27 @@ func TestPickFeature_FallbackToFirstWhenNoneContain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseFeatureCollection: %v", err)
 	}
-	// Way outside the parcel — no containment hit, fallback to first.
-	idx, ok := PickFeature(fc.Features, 10.0, 50.0)
-	if !ok || idx != 0 {
-		t.Errorf("PickFeature(out-of-range) = (%d, %v), want (0, true)", idx, ok)
+	// Way outside every parcel: no containment hit. The nearest one is
+	// still returned, but it says so and says how far — the fallback
+	// used to be feature 0 with an "ok" that meant nothing, so a parcel
+	// 700 km away read exactly like a hit.
+	pick, ok := PickFeature(fc.Features, 10.0, 50.0)
+	if !ok {
+		t.Fatalf("PickFeature(out-of-range) ok = false, want true")
+	}
+	if pick.Contains {
+		t.Errorf("Contains = true, want false: the point is nowhere near")
+	}
+	if pick.DistanceM < 500_000 {
+		t.Errorf("DistanceM = %.0f m, want the real (huge) distance to Paris", pick.DistanceM)
 	}
 }
 
 func TestPickFeature_EmptyList(t *testing.T) {
 	t.Parallel()
 
-	idx, ok := PickFeature(nil, 0, 0)
-	if ok || idx != -1 {
-		t.Errorf("PickFeature(nil) = (%d, %v), want (-1, false)", idx, ok)
+	pick, ok := PickFeature(nil, 0, 0)
+	if ok || pick.Index != -1 {
+		t.Errorf("PickFeature(nil) = (%+v, %v), want (Index -1, false)", pick, ok)
 	}
 }

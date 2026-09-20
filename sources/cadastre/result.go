@@ -1,5 +1,7 @@
 package cadastre
 
+import "github.com/bpineau/gazetteer/helpers/banx"
+
 // Confidence values are not exposed by this Source — the result is
 // either present (the API Carto returned a parcel under the lat/lon) or
 // empty (IsEmpty() == true). The bâti enrichment is opt-in and either
@@ -20,6 +22,20 @@ type Result struct {
 	// happy path. The slice shape leaves room for a future multi-parcel
 	// extension without breaking the wire contract.
 	Parcels []Parcel `json:"parcels"`
+
+	// MatchDistanceM is how far the queried point was from the returned
+	// parcel, in metres: 0 when the point is INSIDE it (the only case
+	// where the parcel is certainly the one the address stands on), and
+	// positive when no parcel claimed the point and the nearest one was
+	// taken instead. Nil when no parcel came back, or when no geometry
+	// could be parsed to measure against.
+	//
+	// Read it before treating the parcel as the property's. API Carto
+	// filters to parcels near the query point, so a fallback is normally
+	// a few metres out — but the number is the only thing that says so,
+	// and it is only as meaningful as the point it was measured from
+	// (Evidence.CoordPrecision).
+	MatchDistanceM *float64 `json:"match_distance_m,omitempty"`
 
 	// BatiM2 is the total planar area (m²) of buildings whose centroid
 	// sits inside the parcel. Nil when IncludeBati is false or when the
@@ -103,6 +119,19 @@ type Evidence struct {
 	// here — URL builder caps at LatLonDecimals decimals).
 	Lat float64 `json:"lat"`
 	Lon float64 `json:"lon"`
+
+	// CoordPrecision is the granularity those coordinates were matched
+	// at (banx.Precision): the address itself, its street, its hamlet or
+	// its commune's centre. Empty when the caller's Listing reported
+	// none. A parcel read from a coordinate coarser than
+	// Options.MinCoordPrecision is refused outright, so this field says
+	// how good an accepted one was.
+	CoordPrecision banx.Precision `json:"coord_precision,omitempty"`
+
+	// ParcelContains is true when the queried point lies INSIDE the
+	// returned parcel. False means no parcel claimed the point and the
+	// nearest one was taken instead; Result.MatchDistanceM says how far.
+	ParcelContains bool `json:"parcel_contains"`
 
 	// ParcelleAPIURL is the full API Carto URL the Source queried.
 	// Empty when the Source bailed before building a URL (insufficient

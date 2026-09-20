@@ -50,6 +50,11 @@ type banProperties struct {
 	Score    float64 `json:"score"`
 	CityCode string  `json:"citycode"`
 	PostCode string  `json:"postcode"`
+	// Type is BAN's match granularity ("housenumber" | "street" |
+	// "locality" | "municipality"), decoded into
+	// GeocodeResult.Precision. Without it a commune-centre answer for a
+	// nonexistent street is indistinguishable from a doorstep.
+	Type string `json:"type"`
 }
 
 // banMaxQueryLen caps the `q` parameter at BAN's documented limit of
@@ -100,6 +105,7 @@ func (c *BANClient) Geocode(ctx context.Context, q GeocodeQuery) (GeocodeResult,
 		Score:     f.Properties.Score,
 		CityCode:  f.Properties.CityCode,
 		PostCode:  f.Properties.PostCode,
+		Precision: ParsePrecision(f.Properties.Type),
 		Source:    "ban",
 		FetchedAt: time.Now().UTC(),
 	}, nil
@@ -144,6 +150,7 @@ func (c *BANClient) Reverse(ctx context.Context, lat, lon float64) (GeocodeResul
 		Score:     f.Properties.Score,
 		CityCode:  f.Properties.CityCode,
 		PostCode:  f.Properties.PostCode,
+		Precision: ParsePrecision(f.Properties.Type),
 		Source:    "ban_reverse",
 		FetchedAt: time.Now().UTC(),
 	}, nil
