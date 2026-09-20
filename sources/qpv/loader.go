@@ -80,8 +80,8 @@ func (idx *Index) resolvePoint(lat, lon float64) *QPV {
 	return nil
 }
 
-// nearest returns the QPV with the smallest vertex distance to (lat, lon) and
-// that distance in metres, considering only QPVs whose nearest vertex falls
+// nearest returns the QPV whose BOUNDARY is closest to (lat, lon) and that
+// distance in metres, considering only QPVs whose boundary falls
 // within maxMeters. Returns nil when none qualifies.
 func (idx *Index) nearest(lat, lon, maxMeters float64) (*QPV, float64) {
 	if idx == nil {

@@ -86,7 +86,7 @@ type Result struct {
 	NearestLabel string `json:"nearest_label,omitempty"`
 
 	// NearestMeters is the great-circle distance, in metres, from the
-	// listing to the nearest vertex of the QPV identified by
+	// listing to the nearest boundary EDGE of the QPV identified by
 	// NearestCode. Zero when no nearby QPV was found.
 	NearestMeters float64 `json:"nearest_meters,omitempty"`
 

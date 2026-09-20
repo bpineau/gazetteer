@@ -21,6 +21,12 @@
 // membership — acceptable because real geocoded coordinates never land exactly
 // on a polygon boundary.
 //
+// "How far is this point from the zone?" is BoundaryDistanceM, which measures
+// to the nearest EDGE. Measuring to the nearest VERTEX instead is the tempting
+// shortcut and it is wrong by up to half an edge length: administrative
+// contours are not drawn at a uniform density, and a long straight stretch
+// ships as two vertices kilometres apart.
+//
 // Example:
 //
 //	zone := geopoly.MultiPolygon{{{{2.0, 48.9}, {2.1, 48.9}, {2.1, 49.0}, {2.0, 49.0}}}}
