@@ -412,6 +412,10 @@ func TestQuery_NotControlledStaysNotControlled(t *testing.T) {
 		{INSEE: "69029", Zip: "69380", Rooms: intp(3)}, // Chasselay, Métropole but unregulated
 		{INSEE: "13201", Zip: "13001", Rooms: intp(3)}, // Marseille: no grille ships
 		{INSEE: "93029", Zip: "93700", Rooms: intp(3)}, // Drancy, in neither 93 EPT
+		// A set INSEE is authoritative: a contradicting zip must not promote
+		// an out-of-perimeter commune into Paris or Lyon.
+		{INSEE: "33063", Zip: "75001", Rooms: intp(3)},
+		{INSEE: "33063", Zip: "69003", Rooms: intp(3)},
 	} {
 		res := query(t, l)
 		if !res.IsEmpty() {
