@@ -24,6 +24,24 @@ func ArrondissementParents() map[string]string {
 	return out
 }
 
+// IsArrondissementParent reports whether insee is one of the three parent
+// commune codes Paris (75056), Lyon (69123) and Marseille (13055) carry
+// alongside their arrondissement codes.
+//
+// It is the test a dataset keyed by ARRONDISSEMENT needs, and the mirror of
+// FoldArrondissement, which a dataset keyed by parent needs. Getting the
+// direction wrong is silent either way: the lookup simply misses and the
+// caller reads "no data for this commune" about Paris. ResolveINSEE("Paris",
+// "75000") returns the parent code, so an ordinary input reaches it.
+func IsArrondissementParent(insee string) bool {
+	switch insee {
+	case "75056", "69123", "13055":
+		return true
+	default:
+		return false
+	}
+}
+
 // FoldArrondissement maps Paris / Lyon / Marseille arrondissement
 // INSEE codes onto their parent commune INSEE. Datasets published by
 // the French administration usually carry one row per parent commune

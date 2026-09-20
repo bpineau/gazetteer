@@ -83,6 +83,66 @@ func MapPropertyTypeToDVF(pt string) string {
 	}
 }
 
+// Window is the date range a DVF cohort is drawn from: mutations dated
+// before From or after To are out of the cohort. Both ends are inclusive,
+// and a zero To means "no upper bound".
+//
+// The upper bound is what makes an as-of valuation honest. Listing.AsOf
+// promises "the reference date for time-sensitive lookups (DVF window)", but
+// a floor alone lets a query stamped as of mid-2022 answer with 2025 prices:
+// on the packaged Paris 7e fixture, an AsOf of 2022-06-30 used to keep 60
+// mutations dated after it and publish their 18 150 €/m² median.
+type Window struct {
+	From time.Time
+	To   time.Time
+}
+
+// WindowEndingAt returns the CutoffYears-long window that ends at asOf — the
+// window Source.Query runs, and the one a caller replaying an appraisal at a
+// past date wants.
+func WindowEndingAt(asOf time.Time) Window {
+	return Window{From: asOf.AddDate(-CutoffYears, 0, 0), To: asOf}
+}
+
+// contains reports whether a mutation date falls in the window.
+func (w Window) contains(d time.Time) bool {
+	if d.Before(w.From) {
+		return false
+	}
+	return w.To.IsZero() || !d.After(w.To)
+}
+
+// IsBuiltLocal reports whether a DVF `type_local` designates a BUILT local,
+// i.e. one whose `surface_reelle_bati` is part of what the mutation's price
+// bought: "Appartement", "Maison" and the "Local industriel. commercial ou
+// assimilé" family. A "Dépendance" (cave, parking, box) is not one: DVF
+// publishes no surface for it and its value is folded into the mutation's
+// single `valeur_fonciere`, which is why a bundled parking inflates the €/m²
+// of the flat it came with and nothing here can separate the two.
+//
+// The predicate is exported because it decides the per-m² cohort in both
+// DVF-backed Sources (dvf and dvfagg), and the two used to spell it
+// separately.
+func IsBuiltLocal(typeLocal string) bool {
+	t := strings.TrimSpace(typeLocal)
+	return strings.EqualFold(t, "Appartement") ||
+		strings.EqualFold(t, "Maison") ||
+		strings.HasPrefix(t, "Local")
+}
+
+// builtLocalsPerMutation counts the built locals each `id_mutation` carries.
+// Rows with an empty id cannot be grouped and are left out of the tally, so
+// singleBuiltLocal keeps them (see its godoc).
+func builtLocalsPerMutation(in []Mutation) map[string]int {
+	n := make(map[string]int, len(in))
+	for _, m := range in {
+		if m.IDMutation != "" && IsBuiltLocal(m.TypeLocal) {
+			n[m.IDMutation]++
+		}
+	}
+	return n
+}
+
 // FilterMutations applies the anti-anomaly criteria to the input
 // mutations and returns those that survive. Keeps only entries whose
 //   - NatureMutation == "Vente" (ordinary resales of existing dwellings;
@@ -90,9 +150,33 @@ func MapPropertyTypeToDVF(pt string) string {
 //     so the cohort stays comparable to the MA / Pappersimmo street-level
 //     ancien-rue surfaces we cross-reference);
 //   - TypeLocal matches target (case-insensitive);
-//   - DateMutation is on or after cutoff;
+//   - mutation carries EXACTLY ONE built local (see below);
+//   - DateMutation falls inside window (see Window: the upper bound is what
+//     keeps an as-of query from answering with prices from after its own
+//     reference date);
 //   - surface falls within [SurfaceMinM2, SurfaceMaxM2];
 //   - price-per-m² is within [PricePerM2Min, PricePerM2Max].
+//
+// THE SINGLE-BUILT-LOCAL RULE. `valeur_fonciere` prices the whole MUTATION
+// and geo-dvf repeats it verbatim on each of that mutation's rows. A sale
+// bundling several lots therefore publishes the full price against each
+// lot's own surface, and dividing one by the other yields a €/m² that is
+// wrong by the ratio of the bundle to the lot. Measured on the packaged
+// Paris 7e fixture: mutation 2024-1216400 sold two flats of 64 and 134 m²
+// for 3 010 000 € and used to enter the median twice, at 47 031 and
+// 22 463 €/m², where the transaction is 15 202 €/m². Keeping only the
+// mutations that hold one built local is the same rule dvfagg's transform
+// already applies (dvfagg.accumulate), so the two DVF-backed Sources now
+// measure the same cohort.
+//
+// A bundled Dépendance does NOT disqualify a mutation: it has no published
+// surface, and dropping every flat sold with a cave would gut the sample.
+// Its value stays in the numerator, which biases the reading up by whatever
+// the parking was worth. That residual is inherent to DVF.
+//
+// Rows with an empty `id_mutation` cannot be grouped and are kept, on the
+// same "treat what cannot be grouped as its own unit" principle the
+// per-parcelle cap uses.
 //
 // After the per-row filter pass a second pass caps the number of
 // surviving mutations at MaxMutationsPerParcelle (4) per distinct
@@ -104,7 +188,8 @@ func MapPropertyTypeToDVF(pt string) string {
 // Rows whose `id_parcelle` is empty (pre-2018 DVF rows are the typical
 // case) are treated as their own unique parcelle, i.e. never grouped
 // together by the cap.
-func FilterMutations(in []Mutation, target string, cutoff time.Time) []Mutation {
+func FilterMutations(in []Mutation, target string, window Window) []Mutation {
+	built := builtLocalsPerMutation(in)
 	out := make([]Mutation, 0, len(in))
 	for _, m := range in {
 		if m.NatureMutation != NatureMutationVente {
@@ -113,8 +198,11 @@ func FilterMutations(in []Mutation, target string, cutoff time.Time) []Mutation 
 		if !strings.EqualFold(m.TypeLocal, target) {
 			continue
 		}
+		if built[m.IDMutation] > 1 {
+			continue
+		}
 		d, err := time.Parse("2006-01-02", m.DateMutation)
-		if err != nil || d.Before(cutoff) {
+		if err != nil || !window.contains(d) {
 			continue
 		}
 		s := m.Surface()

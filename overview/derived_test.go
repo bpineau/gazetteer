@@ -9,7 +9,9 @@ func fp(v float64) *float64 { return &v }
 
 func TestEffectivePriceEURM2(t *testing.T) {
 	t.Parallel()
-	if got := (CommuneOverview{PriceMedianSmallEURM2: 4200, PriceMedianEURM2: 3800}).EffectivePriceEURM2(); got != 4200 {
+	// The small-unit median wins once it rests on enough sales; see
+	// TestEffectivePriceEURM2_ThinSmallSample for the floor itself.
+	if got := (CommuneOverview{PriceMedianSmallEURM2: 4200, PriceMedianEURM2: 3800, PriceNSmall: 40}).EffectivePriceEURM2(); got != 4200 {
 		t.Errorf("small median preferred: got %v", got)
 	}
 	if got := (CommuneOverview{PriceMedianEURM2: 3800}).EffectivePriceEURM2(); got != 3800 {
@@ -32,7 +34,7 @@ func TestEffectiveRentEURM2HC(t *testing.T) {
 
 func TestGrossYieldPct(t *testing.T) {
 	t.Parallel()
-	o := CommuneOverview{PriceMedianSmallEURM2: 3000, RentMarketEURM2HC: 15}
+	o := CommuneOverview{PriceMedianSmallEURM2: 3000, PriceNSmall: 40, RentMarketEURM2HC: 15}
 	want := 15.0 * 12 / 3000 * 100 // 6 %
 	if got := o.GrossYieldPct(); math.Abs(got-want) > 1e-9 {
 		t.Errorf("yield = %v, want %v", got, want)
@@ -55,5 +57,39 @@ func TestPriceReliable(t *testing.T) {
 	bimodal := CommuneOverview{PriceNSmall: 30, PriceP25EURM2: 2000, PriceP75EURM2: 4000}
 	if bimodal.PriceReliable() {
 		t.Error("P75/P25 >= 2.0 must be unreliable")
+	}
+}
+
+// TestEffectivePriceEURM2_ThinSmallSample pins the sample floor: the
+// small-unit median only speaks for the commune once it rests on enough
+// sales. Values are Longuyon's (INSEE 54322) in the embedded aggregate.
+func TestEffectivePriceEURM2_ThinSmallSample(t *testing.T) {
+	t.Parallel()
+	thin := CommuneOverview{
+		PriceMedianEURM2:      845.14,
+		PriceP25EURM2:         682.93,
+		PriceP75EURM2:         1066.67,
+		PriceN:                89,
+		PriceMedianSmallEURM2: 3425,
+		PriceNSmall:           1,
+	}
+	if got := thin.EffectivePriceEURM2(); got != 845.14 {
+		t.Errorf("EffectivePriceEURM2 = %.2f, want the 89-sale median 845.14 (one small-unit sale cannot set a commune's price)", got)
+	}
+	if thin.PriceReliable() {
+		t.Error("PriceReliable() = true, want false on a 1-sale small band")
+	}
+
+	solid := thin
+	solid.PriceNSmall = minSmallSampleN
+	if got := solid.EffectivePriceEURM2(); got != 3425 {
+		t.Errorf("EffectivePriceEURM2 = %.2f, want the small-unit median 3425 once the sample clears the floor", got)
+	}
+
+	// No small-unit sale at all still falls back rather than reading zero.
+	none := thin
+	none.PriceMedianSmallEURM2, none.PriceNSmall = 0, 0
+	if got := none.EffectivePriceEURM2(); got != 845.14 {
+		t.Errorf("EffectivePriceEURM2 = %.2f, want the all-unit median 845.14", got)
 	}
 }
