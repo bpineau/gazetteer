@@ -11,6 +11,12 @@
 // reliability (income, employment), safety, the net-yield drag of the property
 // tax, and access / livability.
 //
+// The rendement axis divides by appraisal.RentConsolidated.EffectiveEURPerM2,
+// the market blend clamped by the encadrement majoré, so a rent-controlled
+// address is scored on the rent that may legally be charged rather than on a
+// market reading the landlord cannot collect. overview.GrossYieldPct applies
+// the same rule, so the per-address score and the commune screen agree.
+//
 // Every Axis carries its Value, Weight, contributing Sources and a human Reason,
 // so the Composite is auditable rather than a black box. Missing sources degrade
 // gracefully: an absent axis is dropped and the remaining weights are

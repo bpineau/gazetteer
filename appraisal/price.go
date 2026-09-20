@@ -95,12 +95,22 @@ type PriceInput struct {
 // Source.Name. Names appear as plain strings so no Go-level dependency
 // on out-of-tree plugin packages is introduced; callers consume their
 // own weighting by overriding PriceOptions.Weights.
+//
+// dvfagg carries the DefaultWeight value explicitly rather than reaching it by
+// omission: it is a shipped in-tree estimator, and a weight that appears only
+// as a fallback is a decision nobody made. Note what pairing it with dvf does
+// NOT buy — both read the same DVF mutations, cut per address and per commune,
+// so two contributors here are one dataset and the MAD filter (inert below
+// three) can never have them disagree usefully. A Dossier carrying only those
+// two clears MinSources and can report ConfidenceHigh on a single source of
+// truth; a caller who cares should weigh them as one.
 var DefaultPriceWeights = map[string]float64{
 	"meilleursagents": 1.0,
 	"dvf":             0.9,
 	"pappersimmo":     0.8,
 	"bienici":         0.6,
 	"castorus":        0.5,
+	"dvfagg":          0.4,
 }
 
 // PricePerM2 synthesises a consolidated price-per-m² estimate from a
