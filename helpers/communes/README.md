@@ -19,7 +19,15 @@ no file deployment, no HTTP fetch, no init() side effect until first use.
 `https://geo.api.gouv.fr/communes` — snapshot fetched and stored as
 `data/france.csv` with the header `insee,dept,lon,lat,name`. The
 arrondissements of Paris (75101–75120), Lyon (69381–69389) and
-Marseille (13201–13216) are included, each as their own row.
+Marseille (13201–13216) are included, each as their own row, alongside the
+parent codes 75056 / 69123 / 13055.
+
+Which of the two a dataset is keyed by decides which helper you need, and
+guessing wrong fails silently — the lookup simply misses and the caller reads
+"no data" about Paris. `FoldArrondissement` maps an arrondissement code onto
+its parent, for the datasets published per commune mère (most administrative
+ones); `IsArrondissementParent` tests for the parent code, for the datasets
+published per arrondissement (geo-dvf, carteloyers, encadrement).
 
 ## Example
 
