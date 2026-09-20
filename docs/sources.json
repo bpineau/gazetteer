@@ -486,7 +486,7 @@
   },
   {
     "name": "osm_transit",
-    "version": 3,
+    "version": 4,
     "default": true,
     "summary": "Walking distance to the nearest métro / RER / tram / Transilien station.",
     "inputs": [

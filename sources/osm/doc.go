@@ -1,6 +1,13 @@
-// Package osm is a gazetteer.Source that computes the walking distance
+// Package osm is a gazetteer.Source that estimates the walking distance
 // from a listing to the nearest métro / RER / tram / Transilien / train
 // station, against an OpenStreetMap station catalog.
+//
+// ESTIMATES: the distance is the great-circle one scaled by
+// WalkSinuosityMultiplier, not a route over a street graph. Nothing
+// between the address and the station is consulted, so a river, a
+// railway cutting or a walled estate is invisible and the nearest
+// station as the crow flies need not be the nearest on foot. It is an
+// order of magnitude for ranking addresses, not an itinerary.
 //
 // The catalog is resolved like every other block dataset: an embedded
 // baseline (metropolitan France, ~9k stations) is used unless a refreshed

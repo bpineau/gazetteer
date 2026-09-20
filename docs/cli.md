@@ -179,7 +179,7 @@ logiris         v1
 lovac           v1
 nuisances       v1
 oll             v2
-osm_transit     v3
+osm_transit     v4
 qpv             v3
 rnc             v2
 rpls            v1

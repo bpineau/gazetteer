@@ -522,6 +522,14 @@ canonical name `osm_transit`.
 - **Result**: nearest station name, type, lines, walk distance (m) and
   walk minutes. `SkipReasonOutOfRange` is set when the closest station
   is beyond `MaxNearestStationMeters` (5 000 m great-circle).
+- **"Walking distance" is DERIVED, not routed**: it is the great-circle
+  distance times `WalkSinuosityMultiplier` (1.3, the OSM routing
+  community's urban figure), and the minutes are that over 80 m/min. No
+  street graph is consulted, so a river, a railway cutting, a motorway or
+  a walled estate between the address and the station is invisible, and
+  the nearest station as the crow flies need not be the nearest on foot.
+  `Evidence.WalkMultiplier` carries the factor; treat the number as an
+  order of magnitude for ranking, never as a routed itinerary.
 - **`ErrNoCatalog`**: transient — `UpdateCatalog` with a non-empty
   catalog makes the next Query succeed.
 - **Refresh**: out-of-band via `osm.NewCatalogFetcher(...)` and
