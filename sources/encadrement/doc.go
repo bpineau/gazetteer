@@ -23,8 +23,9 @@
 // collapse to one bucket of the grille — the pièces bucket and the époque de
 // construction — and an absent one spans every bucket on that axis rather
 // than assuming a value. An absent Rooms additionally caps the Confidence at
-// ConfidenceLow: the cap per m² falls by about a third from a studio to a
-// four-room flat, so a default would be a guess dressed as a lookup.
+// ConfidenceLow: the cap per m² falls by a fifth to a third from a studio to
+// a four-room flat (38.00 to 29.50 EUR/m²/month in Paris 1er, 20.50 to 14.00
+// in Lyon 3e), so a default would be a guess dressed as a lookup.
 //
 // The *Result satisfies appraisal.RentEstimator with Bracket populated, so
 // consumers can label the rent as a "loyer de référence" rather than a market

@@ -273,8 +273,9 @@ Lyon / Villeurbanne.
   - `Rooms` picks the pièces bucket, saturating at the open-ended top cell
     ("4 pièces et plus"), so a T6 reads the same cap as a T4. Without it the
     collapse spans every bucket and `Confidence` is capped at
-    `ConfidenceLow`: the per-m² cap falls by about a third from a studio to a
-    four-room flat, so there is no safe default.
+    `ConfidenceLow`: the per-m² cap falls by a fifth to a third from a studio
+    to a four-room flat (38.00 to 29.50 €/m²/month in Paris 1er, 20.50 to
+    14.00 in Lyon 3e), so there is no safe default.
   - `BuildYear` picks the époque bucket. Without it the collapse spans every
     construction period, which is a real approximation: in Paris 1er the same
     3-room cell is capped at 28.10 €/m²/month for a 1946-1970 building and
