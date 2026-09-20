@@ -30,7 +30,10 @@ const Name = "cadastre"
 //     must be re-derived, not reused from a cache. v2 also refuses a
 //     coordinate coarser than Options.MinCoordPrecision (a commune
 //     centre has a parcel of its own), and reports how far the returned
-//     parcel is from the queried point (Result.MatchDistanceM).
+//     parcel is from the queried point (Result.MatchDistanceM), and
+//     fixes Parcel.INSEE, which carried the PARENT commune code for a
+//     Paris / Lyon / Marseille parcel where its own godoc promised the
+//     arrondissement the id embeds (75056 against 75104).
 const sourceVersion = 2
 
 // Version exposes sourceVersion so callers that wrap the Source can

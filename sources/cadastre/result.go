@@ -71,9 +71,12 @@ type Parcel struct {
 	// "75104000AE0003".
 	ID string `json:"id"`
 
-	// INSEE is the 5-digit commune INSEE the parcel anchors on. For
-	// Paris / Lyon / Marseille, this is the arrondissement code (the
-	// one the Etalab id embeds), NOT the parent code.
+	// INSEE is the 5-char commune code the parcel anchors on — the
+	// first five characters of ID, by construction. For Paris / Lyon /
+	// Marseille this is the ARRONDISSEMENT code (75104, not 75056),
+	// which is what the Etalab id embeds; fold it with
+	// communes.FoldArrondissement before a lookup in a dataset keyed by
+	// parent commune.
 	INSEE string `json:"insee"`
 
 	// Prefixe is the 3-char "com_abs" prefix. Typically "000"; non-zero
@@ -179,10 +182,23 @@ func (r *Result) IsEmpty() bool {
 // upstream id is authoritative (notably for Paris / Lyon / Marseille
 // where it embeds the arrondissement code instead of the parent
 // commune INSEE).
+//
+// Parcel.INSEE is then read back OUT of that id rather than taken from
+// the insee argument, so the two can never disagree. They used to: API
+// Carto's `code_insee` is the PARENT code for Paris / Lyon / Marseille
+// (75056 on the packaged Paris 1er fixture) while its `idu` embeds the
+// arrondissement (75104), and Parcel.INSEE's own godoc promised the
+// arrondissement. The arrondissement is also the more useful of the
+// two, since the datasets keyed the other way have
+// communes.FoldArrondissement and nothing recovers an arrondissement
+// from a parent.
 func MakeParcel(idu, insee, prefixe, section, numero string, contenanceM2 int) Parcel {
 	id := idu
 	if id == "" {
 		id = ParcelID(insee, prefixe, section, numero)
+	}
+	if len(id) >= 5 {
+		insee = id[:5]
 	}
 	return Parcel{
 		ID:             id,

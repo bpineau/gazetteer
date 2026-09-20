@@ -113,7 +113,11 @@ building-footprint analysis (count + total emprise + ratio).
   than answered with a stranger's parcel. Raise the floor to
   `banx.PrecisionHouseNumber` for doorstep-only matching.
 - **Result**: `cadastre.Result` carries a one-element `Parcels` slice
-  with the 14-char Etalab id, contenance in m² / ares / hectares and
+  with the 14-char Etalab id (its `INSEE` is the first five characters
+  of that id, so for Paris / Lyon / Marseille it is the ARRONDISSEMENT
+  code, not the parent commune — fold it with
+  `communes.FoldArrondissement` for a parent-keyed dataset), contenance
+  in m² / ares / hectares and
   a deeplink to the Etalab cadastre viewer, plus `MatchDistanceM` (0
   when the point is INSIDE the parcel, the distance to the nearest one
   otherwise — read it before treating the parcel as the property's).
