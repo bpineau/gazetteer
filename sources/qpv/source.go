@@ -31,7 +31,7 @@ const Version = sourceVersion
 
 // NearestQPVMaxMeters caps the nearest-QPV hint: on a point match that
 // lands outside every QPV, the Source records the closest QPV only when a
-// QPV vertex lies within this distance. A hint only — it never affects
+// QPV boundary lies within this distance. A hint only — it never affects
 // HasQPV. ~1 km is "the next street over could be a QPV" territory.
 const NearestQPVMaxMeters = 1000.0
 
