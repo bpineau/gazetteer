@@ -69,11 +69,13 @@ func TestFilterBatiInParcel_MultiPartIsOrderIndependent(t *testing.T) {
 // footprint read as zero.
 func TestFilterBatiInParcel_ConcaveFootprint(t *testing.T) {
 	t.Parallel()
-	// An L filling the parcel's west half and south strip.
+	// A thin L along the parcel's south and west sides. The arms are thin on
+	// purpose: the centroid must fall well inside the notch, not on an edge of
+	// the L, where the verdict would hang on the platform's floating point.
 	l := geopoly.Polygon{geopoly.Ring{
-		{Lon: 2.3501, Lat: 48.8501}, {Lon: 2.3509, Lat: 48.8501},
-		{Lon: 2.3509, Lat: 48.8502}, {Lon: 2.3503, Lat: 48.8502},
-		{Lon: 2.3503, Lat: 48.8504}, {Lon: 2.3501, Lat: 48.8504},
+		{Lon: 2.3501, Lat: 48.85010}, {Lon: 2.3509, Lat: 48.85010},
+		{Lon: 2.3509, Lat: 48.85015}, {Lon: 2.35015, Lat: 48.85015},
+		{Lon: 2.35015, Lat: 48.8504}, {Lon: 2.3501, Lat: 48.8504},
 	}}
 	mp := geopoly.MultiPolygon{l}
 	if mp.Covers(l.Centroid()) {
