@@ -19,9 +19,23 @@ const (
 type MatchMethod string
 
 const (
+	// MatchGeoVoie is the primary path: the nearest copropriété of the
+	// listing's own commune within 60 m. The street is a confidence BOOSTER,
+	// not a requirement — a hit at 25 m or less whose street also agrees is
+	// ConfidenceHigh, anything else on this path is ConfidenceMedium. So the
+	// name promises more than the value guarantees: read Confidence and
+	// Evidence.MatchDistanceM, not this label, to tell the listing's own
+	// building from its neighbour's.
 	MatchGeoVoie MatchMethod = "geo_voie"
-	MatchVoie    MatchMethod = "voie"
-	MatchNone    MatchMethod = ""
+
+	// MatchVoie is the fallback for a listing with no usable coordinates: a
+	// street match inside the commune, accepted only when exactly one
+	// copropriété matches. Always ConfidenceLow, and Evidence.MatchDistanceM
+	// is 0 because no distance was computed.
+	MatchVoie MatchMethod = "voie"
+
+	// MatchNone means nothing matched; the Result is empty.
+	MatchNone MatchMethod = ""
 )
 
 // Parcelle is a cadastral parcel identifier in the canonical 14-character
