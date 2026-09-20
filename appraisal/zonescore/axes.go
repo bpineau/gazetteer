@@ -22,7 +22,17 @@ import (
 )
 
 // scoreRendement — the dominant axis: gross yield from the consolidated price
-// and rent. yield% = rent€/m²/month × 12 / price€/m² × 100.
+// and the LEGALLY CHARGEABLE rent. yield% = rent€/m²/month × 12 / price€/m² × 100.
+//
+// The rent is RentConsolidated.EffectiveEURPerM2, the market blend clamped by
+// the encadrement majoré, not the raw blend. In a rent-controlled zone the
+// market reading sits above the ceiling often enough to matter, and a yield
+// computed on a rent the landlord cannot legally charge is an invitation to
+// overbid. EffectiveEURPerM2's own godoc says it is "the rent a rental-yield
+// decision should use", and overview.GrossYieldPct has always used it — this
+// axis, which carries the heaviest weight of the six, read the raw blend. On a
+// 10 000 €/m² address with a 28 €/m²/month blend against a 25 €/m²/month
+// majoré, that scored a 3.4 % yield at 7.2 where the legal 3.0 % scores 0.
 //
 // The 3 %→0 / 8 %→100 band encodes the yield-first thesis: below ~3 % gross a
 // French rental is a capital play, not income (often negative cash-flow after
@@ -32,15 +42,19 @@ import (
 func scoreRendement(d gazetteer.Dossier) axisResult {
 	price := appraisal.PricePerM2(d)
 	rent := appraisal.RentValue(d)
-	if price.EurPerM2Cents <= 0 || rent.EurPerM2Cents <= 0 {
+	p := float64(price.EurPerM2Cents) / 100 // €/m²
+	r := rent.EffectiveEURPerM2()           // €/m²/month, capped by the majoré
+	if p <= 0 || r <= 0 {
 		return axisResult{}
 	}
-	p := float64(price.EurPerM2Cents) / 100 // €/m²
-	r := float64(rent.EurPerM2Cents) / 100  // €/m²/month
 	yield := r * 12 / p * 100
+	reason := fmt.Sprintf("rendement brut %.1f%% (loyer %.0f€/m²/mois, prix %.0f€/m²)", yield, r, p)
+	if c := rent.CapEurPerM2Cents; c > 0 && c < rent.EurPerM2Cents {
+		reason += fmt.Sprintf(", loyer plafonné par l'encadrement (marché %.0f€)", rent.EURPerM2())
+	}
 	return axisResult{
 		value:   lerp(yield, 3, 8),
-		reason:  fmt.Sprintf("rendement brut %.1f%% (loyer %.0f€/m²/mois, prix %.0f€/m²)", yield, r, p),
+		reason:  reason,
 		sources: priceRentSources(price, rent),
 		present: true,
 	}

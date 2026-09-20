@@ -805,6 +805,14 @@ per-axis breakdown (rendement, tension, solvabilité, sécurité, fiscalité,
 accès). `zonescore.Compute` scores one address; `zonescore.Compare`
 ranks several. The CLI surfaces them via `appraise` and `compare`.
 
+The rendement axis — the heaviest of the six — divides by
+`RentConsolidated.EffectiveEURPerM2`, i.e. the market blend clamped by the
+encadrement majoré, not the raw blend. In a rent-controlled zone the market
+reading sits above the ceiling often enough to matter, and a yield computed on
+a rent that cannot legally be charged is an invitation to overbid.
+`overview.GrossYieldPct` applies the same rule, so the per-address score and
+the commune screen agree.
+
 ### Tests via `Options.BaseURL`
 
 Sources whose Options struct exposes a `BaseURL` field are wired to a
