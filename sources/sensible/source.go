@@ -13,9 +13,17 @@ const Name = "sensible"
 
 // sourceVersion bumps when the Source's internal logic changes.
 //
-// v1 flags listings inside (or within NearbyMeters of) a QRR police-priority
-// perimeter or an ORCOD-IN copropriété-dégradée perimeter.
-const sourceVersion = 1
+// History:
+//   - v1: flags listings inside (or within NearbyMeters of) a QRR
+//     police-priority perimeter or an ORCOD-IN copropriété-dégradée
+//     perimeter, measuring "nearby" to the nearest VERTEX of the contour.
+//   - v2: "nearby" is measured to the nearest EDGE, which is the question
+//     the doc always promised. Nearby, NearestDistanceM, the zone list and
+//     IsEmpty() move wherever a contour carries a long straight stretch
+//     (7 of the 62 shipped zones have an edge longer than twice the 400 m
+//     window), so a v1 reading must be re-derived, not reused from a
+//     cache. A point INSIDE a perimeter is unaffected.
+const sourceVersion = 2
 
 // Version exposes sourceVersion so callers can mirror it.
 const Version = sourceVersion

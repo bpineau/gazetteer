@@ -11,10 +11,16 @@ const Name = "dvfagg"
 
 // Version bumps when the Source's internal logic changes (gates datadir reuse).
 //
-// v2 adds PriceEstimate (appraisal.PriceEstimator) so the commune median can
-// satisfy appraisal.PricePerM2 offline, and moves the refresh window to
-// 2023-2025.
-const Version = 2
+// History:
+//   - v2: adds PriceEstimate (appraisal.PriceEstimator) so the commune
+//     median can satisfy appraisal.PricePerM2 offline, and moves the
+//     refresh window to 2023-2025.
+//   - v3: the built-local predicate is shared with dvf (dvf.IsBuiltLocal),
+//     so the two DVF-backed Sources can no longer drift apart on the same
+//     dataset, and a Paris/Lyon/Marseille PARENT code is refused with
+//     ErrInsufficientInputs instead of answering "no qualifying sale".
+//     Both change what a caller stores for those inputs.
+const Version = 3
 
 // Result is the per-commune DVF price aggregate, in EUR/m², 3-year window.
 // Built at refresh time from single-lot apartment sales; see transform.go.
