@@ -328,13 +328,19 @@ func clampPiece(rooms int) int {
 }
 
 // parisArrondissement5 extracts the 2-digit Paris arrondissement key
-// ("01" .. "20") from a zip or, failing that, from an INSEE code. Empty when
-// neither identifies a Paris arrondissement.
+// ("01" .. "20") from a listing's identifiers. Empty when neither names a
+// Paris arrondissement.
+//
+// The INSEE is the authoritative commune code and wins whenever it is set:
+// the zip is only consulted for a listing that carries none. A listing whose
+// INSEE says Saint-Denis and whose zip says 75001 is therefore resolved as
+// Saint-Denis, not silently promoted to Paris on the weaker identifier — the
+// same rule lyonINSEE follows.
 func parisArrondissement5(zip, insee string) string {
-	if arr := parisArrondissementFromZip(zip); arr != "" {
-		return arr
+	if insee != "" {
+		return parisArrondissementFromINSEE(insee)
 	}
-	return parisArrondissementFromINSEE(insee)
+	return parisArrondissementFromZip(zip)
 }
 
 // parisArrondissementFromZip converts a 75001..75020 / 75116 zip into
@@ -370,11 +376,14 @@ func twoDigitKey(n int) string {
 // perimeter one: 69001..69009 are the Lyon arrondissements and 69100 is
 // Villeurbanne. Empty for anything else.
 func lyonINSEE(insee, zip string) string {
-	if insee == "69266" {
-		return insee
-	}
-	if arrondissementNumber(insee, "6938", 9) > 0 {
-		return insee
+	if insee != "" {
+		if insee == "69266" || arrondissementNumber(insee, "6938", 9) > 0 {
+			return insee
+		}
+		// A set INSEE is the authoritative commune code: it names some other
+		// commune, so the zip must not promote the listing into the Lyon
+		// perimeter behind its back.
+		return ""
 	}
 	if zip == "69100" {
 		return "69266"

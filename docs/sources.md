@@ -281,10 +281,12 @@ Lyon / Villeurbanne.
     35.00 for a pre-1946 one. `Evidence.Epoque` names the bucket used, empty
     when the reading spanned several.
 - **Zone identification**:
-  - Paris by zip (75001..75020, 75116) or INSEE (75101..75120),
-    arrondissement-median.
-  - Lyon / Villeurbanne by INSEE (69381..69389, 69266) or zip
-    (69001..69009, 69100).
+  - Paris by INSEE (75101..75120) or, for a listing carrying none, by zip
+    (75001..75020, 75116); arrondissement-median.
+  - Lyon / Villeurbanne by INSEE (69381..69389, 69266) or, failing that, by
+    zip (69001..69009, 69100).
+  - A set INSEE is authoritative: a contradicting zip never promotes an
+    out-of-perimeter commune into Paris or Lyon.
   - Plaine Commune (9 communes) & Est Ensemble (9 communes) by
     point-in-polygon over an embedded zonage GeoJSON: the listing's
     coordinates resolve the exact sub-communal zone. Without
