@@ -33,18 +33,48 @@ func DeptFromZip(zip string) string {
 	return communes.DeptFromZip(zip)
 }
 
-// deptMatchKey returns the prefix used to test cross-zip département
-// membership. Unlike DeptFromZip it does NOT split Corsica (both 2A and
-// 2B zips share the "20" key) so that two zips on the same island fold
-// together for cross-source enricher matching. It also tolerates
-// shorter-than-5-char inputs by falling back to the input itself
-// (so equality remains the safe default for malformed values).
+// saintMartinBarthZips maps the two postal codes that a 3-digit prefix cannot
+// separate from Guadeloupe onto their real département. Saint-Barthélemy (977)
+// and Saint-Martin (978) were split off Guadeloupe in 2007 but kept postal
+// codes inside the 971xx range, so "971" is the prefix of three départements,
+// not one — and the two islands sit ~230 km from Guadeloupe.
+var saintMartinBarthZips = map[string]string{
+	"97133": "977", // Saint-Barthélemy
+	"97150": "978", // Saint-Martin
+}
+
+// deptMatchKey returns the key used to test cross-zip département membership.
+// Unlike DeptFromZip it does NOT split Corsica (both 2A and 2B zips share the
+// "20" key) so that two zips on the same island fold together for
+// cross-source enricher matching.
+//
+// Anything that is not a well-formed 5-digit zip returns the input unchanged,
+// so the comparison degrades to equality. That matters for the zip whose
+// leading zero was eaten by a spreadsheet or a JSON number: "1000" is
+// Bourg-en-Bresse in the Ain (01), and a 2-character prefix would read "10",
+// the Aube, and declare it the same département as Troyes.
 func deptMatchKey(zip string) string {
-	if len(zip) < 2 {
+	if !isFiveDigitZip(zip) {
 		return zip
 	}
-	if zip[0] == '9' && (zip[1] == '7' || zip[1] == '8') && len(zip) >= 3 {
+	if d, ok := saintMartinBarthZips[zip]; ok {
+		return d
+	}
+	if zip[0] == '9' && (zip[1] == '7' || zip[1] == '8') {
 		return zip[:3]
 	}
 	return zip[:2]
+}
+
+// isFiveDigitZip reports whether zip is exactly five ASCII digits.
+func isFiveDigitZip(zip string) bool {
+	if len(zip) != 5 {
+		return false
+	}
+	for i := range len(zip) {
+		if zip[i] < '0' || zip[i] > '9' {
+			return false
+		}
+	}
+	return true
 }
