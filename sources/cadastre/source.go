@@ -19,7 +19,16 @@ const Name = "cadastre"
 
 // sourceVersion bumps when the Source's internal logic changes.
 // Stateful callers gate cache invalidation on it.
-const sourceVersion = 1
+//
+// History:
+//   - v1: parcel lookup plus a building footprint credited WHOLE whenever
+//     one point of the building feature fell inside the parcel.
+//   - v2: the footprint is attributed PER PART (BatiPolygon.Parts), each
+//     tested on a point geopoly.RepresentativePoint guarantees lies inside
+//     it. BatiM2 and EmpriseRatio move for every multi-wing or concave
+//     (L-shaped, U-shaped) building, so a v1 reading of those two fields
+//     must be re-derived, not reused from a cache.
+const sourceVersion = 2
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.

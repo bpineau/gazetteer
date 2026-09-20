@@ -155,7 +155,7 @@ ademe           v3
 anct            v1
 bdnb            v2  (opt-in via --source)
 bpe             v1
-cadastre        v1
+cadastre        v2
 carteloyers     v1
 cartofriches    v1
 catnat          v1
@@ -164,7 +164,7 @@ chomage         v1
 delinquance     v3
 dpedist         v1
 dvf             v5
-dvfagg          v2
+dvfagg          v3
 education       v1
 encadrement     v4
 filoiris        v1
@@ -180,10 +180,10 @@ lovac           v1
 nuisances       v1
 oll             v2
 osm_transit     v3
-qpv             v2
+qpv             v3
 rnc             v2
 rpls            v1
-sensible        v1
+sensible        v2
 sitadel         v1
 taxefonciere    v1
 vacance         v1
