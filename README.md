@@ -81,7 +81,7 @@ func main() {
 	// A second dimension, a second Result shape: carteloyers exposes the
 	// reference rent as a float in €/m²/month, charges comprises (CC).
 	if r, ok := gazetteer.Get[*carteloyers.Result](dossier, carteloyers.Name); ok && !r.IsEmpty() {
-		fmt.Printf("Reference rent: %.1f €/m²/month CC (%.1f–%.1f)\n",
+		fmt.Printf("Reference rent: %.1f €/m²/month CC (%.1f-%.1f)\n",
 			r.LoyerMedEURPerM2CC, r.LoyerLowEURPerM2CC, r.LoyerHighEURPerM2CC)
 	}
 }
@@ -100,7 +100,7 @@ client, _ := b.With(myPlugin).Build()
 `factory.NewDefault` wires **every** stable Source, including `osm_transit`
 (an embedded station catalog with a live Overpass fallback, so no setup is
 needed) and `bdnb` (a live building API with a per-key rolling quota). To
-prune Sources you never consume — cutting their latency and failure surface —
+prune Sources you never consume - cutting their latency and failure surface - 
 pass a deny-list:
 
 ```go
@@ -122,7 +122,7 @@ its default `query`/`appraise` set for the same quota reason; pass
 - `builder.Without(names…)` drops Sources from a pre-populated Builder
   (e.g. `factory.BuilderDefault`) before `.Build()`.
 - `client.CollectSome(ctx, listing, names…)` collects only a named subset
-  on an existing Client — e.g. fetch the cheap embedded Sources first,
+  on an existing Client - e.g. fetch the cheap embedded Sources first,
   before paying for the slow live APIs.
 
 ## Sources shipped
@@ -132,7 +132,7 @@ Building / energy / risk:
 | Source         | What it provides                                                 |
 |----------------|------------------------------------------------------------------|
 | `ademe`        | DPE (energy performance certificates) at the address             |
-| `bdnb`         | Base de Données Nationale des Bâtiments — building age, type     |
+| `bdnb`         | Base de Données Nationale des Bâtiments - building age, type     |
 | `cadastre`     | Cadastral parcel id, contenance, viewer link (+ opt-in bâti)     |
 | `iris`         | INSEE IRIS code/name/type at the address (also resolves `Listing.IRIS`) |
 | `dpedist`      | DPE class distribution per commune (passoire share F+G)          |
@@ -146,14 +146,14 @@ Market data:
 
 | Source         | What it provides                                                 |
 |----------------|------------------------------------------------------------------|
-| `dvf`          | Demandes de Valeurs Foncières — historical transaction prices    |
-| `dvfagg`       | Per-commune DVF price aggregate (median €/m² + dispersion, offline) — the batch complement to `dvf` |
+| `dvf`          | Demandes de Valeurs Foncières - historical transaction prices    |
+| `dvfagg`       | Per-commune DVF price aggregate (median €/m² + dispersion, offline) - the batch complement to `dvf` |
 | `locservice`   | Rental-market tension (supply tightness + tenant-budget scores)  |
 | `carteloyers`  | National rent observatory tiers                                  |
 | `oll`          | Observed market rents by zone (Observatoires Locaux des Loyers)  |
 | `encadrement`  | Rent control caps (Paris, Plaine Commune + Est Ensemble 93, Lyon) |
 | `lovac`        | Vacancy rate per commune from the LOVAC fiscal file              |
-| `sitadel`      | New-housing pipeline per commune — permits authorised + housing starts (SDES Sitadel) |
+| `sitadel`      | New-housing pipeline per commune - permits authorised + housing starts (SDES Sitadel) |
 | `taxefonciere` | Property tax ratios by commune                                   |
 
 Commune-level signals for the investor:
@@ -164,15 +164,15 @@ Commune-level signals for the investor:
 | `filoiris`     | INSEE Filosofi income / poverty at IRIS (sub-commune) level      |
 | `logiris`      | INSEE census housing at IRIS: renter / social-housing / vacancy  |
 | `chomage`      | INSEE local unemployment rate by zone d'emploi (quarterly)       |
-| `delinquance`  | SSMSI État 4001 — per-commune crime indicators                   |
+| `delinquance`  | SSMSI État 4001 - per-commune crime indicators                   |
 | `zonageabc`    | Official A bis / A / B1 / B2 / C tension classification          |
 | `zonetendue`   | "Zone tendue" + TLV-2013 + tendue-touristique flags              |
 | `anct`         | Action Cœur de Ville / Petites Villes de Demain / ORT membership |
-| `qpv`          | Quartiers Prioritaires de la politique de la Ville — point-in-polygon (is the address inside a QPV?), commune fallback |
+| `qpv`          | Quartiers Prioritaires de la politique de la Ville - point-in-polygon (is the address inside a QPV?), commune fallback |
 | `sensible`     | The State's hardest-neighbourhood perimeters: inside / near a QRR police-priority zone or an ORCOD-IN copro dégradée (point-in-polygon, far more selective than QPV) |
 | `cartofriches` | Cerema brownfield inventory aggregated per commune               |
 | `education`    | Count of open schools per commune (live API)                     |
-| `bpe`          | INSEE BPE — curated commerce / health / services counts          |
+| `bpe`          | INSEE BPE - curated commerce / health / services counts          |
 | `rpls`         | % social housing (loi SRU) per commune                           |
 | `vacance`      | INSEE census demographic vacancy rate (per arrondissement)       |
 | `ips_ecoles`   | DEPP median IPS over écoles primaires (per arrondissement)       |
@@ -188,14 +188,14 @@ External links:
 
 | Source         | What it provides                                                 |
 |----------------|------------------------------------------------------------------|
-| `links`        | Deep links to useful third-party tools for the address — maps, prices/DVF, Géorisques, PLU, INSEE fiche (built from coordinates / INSEE / address, no HTTP) |
+| `links`        | Deep links to useful third-party tools for the address - maps, prices/DVF, Géorisques, PLU, INSEE fiche (built from coordinates / INSEE / address, no HTTP) |
 
 ### Optional convenience layer
 
 On top of the typed `Dossier` (the main product) sits a thin, *optional*
-high-level API — skip it if you just want the data. `appraisal/` consolidates a
+high-level API - skip it if you just want the data. `appraisal/` consolidates a
 few dimensions into rent and price estimates with confidence bands, and
-`appraisal/zonescore` composites them into a 0–100 score with an explainable
+`appraisal/zonescore` composites them into a 0-100 score with an explainable
 per-axis breakdown (rendement, tension, solvabilité, sécurité, fiscalité, accès)
 and selectable weight presets (`yield` / `balanced` / `patrimoine` /
 `transport`, via the CLI `--profile`). The IRIS-level income (`filoiris`) and
@@ -204,7 +204,7 @@ neighbourhoods diverge within a commune.
 
 ## Reusable building blocks
 
-The packages the sources are made of are usable standalone — a polite
+The packages the sources are made of are usable standalone - a polite
 rate-limited HTTP client with disk cache, single-flighted misses and an
 explicit `PruneCache` (`helpers/httpx`), circuit
 breakers (`helpers/circuit`), BAN geocoding with caching and coherence
@@ -213,14 +213,14 @@ resolution (`helpers/communes`), French text/number/address parsing
 (`helpers/frnorm`, `helpers/fraddr`, `helpers/proptype`), geometry kernels
 (`helpers/geodist`, `geopoly`, `geoindex`), scraping + anti-bot detection
 (`helpers/scrape`), a pluggable KV cache (`helpers/kvcache`), and the
-embed-and-refresh dataset pipeline (`dataset`) — even for apps that never
+embed-and-refresh dataset pipeline (`dataset`) - even for apps that never
 build a Dossier. **[docs/helpers.md](docs/helpers.md) is the map.**
 
 ## Batch / commune-level data
 
 The per-address flow above (`Normalize` → `Collect` → `Dossier`) answers
-"tell me everything about *this* address". For the inverse — screening
-*every* commune at once — the `overview` package joins the embedded,
+"tell me everything about *this* address". For the inverse - screening
+*every* commune at once - the `overview` package joins the embedded,
 commune-keyed Sources **offline** into one row per commune:
 
 ```go
@@ -239,7 +239,7 @@ encadrement cap, income, vacancy, taxe foncière, QPV, zonage and nearby
 transit lines per commune (`Depts` empty = all communes nationally).
 
 The same commune-keyed shortcut is available per Source via **batch-read
-helpers** that skip the full `Query`/`Listing` path — load an index once,
+helpers** that skip the full `Query`/`Listing` path - load an index once,
 then read many communes:
 
 ```go
@@ -277,7 +277,7 @@ gazetteer version                       # build version
 ```
 
 `query` and `appraise` honour the listing's property attributes when
-supplied — DVF, encadrement, taxe-foncière and the rental Sources need
+supplied - DVF, encadrement, taxe-foncière and the rental Sources need
 them to produce a useful answer:
 
 ```
@@ -313,7 +313,7 @@ gazetteer refresh delinquance   # just one source
 ```
 
 `refresh` is **idempotent**: a dataset already present and current in the
-datadir is skipped untouched — no download, no rebuild. Only the first run
+datadir is skipped untouched - no download, no rebuild. Only the first run
 does work, so you can safely call it on every start (e.g. a one-time warm-up
 on boot); pass `--force` to rebuild regardless. Library callers use the same
 contract via `dataset.Refresh`:
@@ -331,19 +331,19 @@ out-of-tree Source refreshable.
 
 ## Concepts
 
-- **Listing** — the universal input (address + coords + property attrs)
-- **Source** — a named, versioned data origin: `Query(ctx, listing) → (payload, error)`
-- **Result** — the framework envelope around a Source's typed payload
-- **Dossier** — the aggregated output of one `Client.Collect` call
-- **Builder / Client** — configure sources, then run them in parallel
-- **Cache** — pluggable backend for intermediate state (in-memory default)
-- **Normalizer** — canonicalises a free-text address into a Listing
+- **Listing** - the universal input (address + coords + property attrs)
+- **Source** - a named, versioned data origin: `Query(ctx, listing) → (payload, error)`
+- **Result** - the framework envelope around a Source's typed payload
+- **Dossier** - the aggregated output of one `Client.Collect` call
+- **Builder / Client** - configure sources, then run them in parallel
+- **Cache** - pluggable backend for intermediate state (in-memory default)
+- **Normalizer** - canonicalises a free-text address into a Listing
 
 ## Plugins
 
 Out-of-tree source packages implement the same `Source` interface and
 register their typed payload via `gazetteer.Register` in `init()`.
-Callers wire them with `builder.With(...)` like any official source —
+Callers wire them with `builder.With(...)` like any official source - 
 the framework itself has no compile-time knowledge of which sources are
 available.
 
