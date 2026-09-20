@@ -77,6 +77,9 @@ small in-memory CSV.
 | `(*Table).Neighbors(insee string, radiusKm float64) []string` | Haversine sweep. |
 | `(*Table).SameDepartment(insee string) []string` | All INSEE codes in the dept. |
 | `(*Table).CityDepts(name string) []string` | Reverse name → dept codes. |
+| `(*Table).ZipForINSEE(insee string) (string, bool, bool)` | Primary postal code (+ "has alternates"). |
+| `(*Table).AltZipsForINSEE(insee string) []string` | The commune's other postal codes. |
+| `(*Table).ZipMatchesINSEE(insee, zip string) (match, known bool)` | Do this INSEE and this postcode belong together? 23 communes are served by a postcode of another département, so their prefixes cannot answer it. |
 | `HaversineKm(lat1, lon1, lat2, lon2 float64) float64` | Great-circle distance. |
 | `Commune` | Record struct. |
 | `Communes` | Interface for the three primary operations. |

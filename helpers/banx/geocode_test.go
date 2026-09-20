@@ -405,9 +405,14 @@ func TestCachedGeocoder_DeptGuard(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			res := GeocodeResult{
-				Lat:      45.5,
-				Lon:      4.7,
-				CityCode: tc.banPC, // keep dept-coherent so validateCoherence doesn't pre-empt
+				Lat: 45.5,
+				Lon: 4.7,
+				// A real INSEE served by that postcode, so the
+				// coherence guard (which has its own test) cannot
+				// pre-empt the dept guard under test. "" when no
+				// commune is served by that code, which the
+				// coherence guard skips.
+				CityCode: inseeServedBy(tc.banPC),
 				PostCode: tc.banPC,
 				Score:    0.9,
 				Source:   "ban",
