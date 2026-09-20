@@ -1,6 +1,10 @@
 package encadrement
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 // TestBaremeVintage_NotStale is the legality guard: the embedded barème for
 // every zone system must be drawn from an arrêté in force in 2025 or later, so
@@ -15,6 +19,17 @@ func TestBaremeVintage_NotStale(t *testing.T) {
 	}
 	if eptBaremeYear < floor {
 		t.Errorf("EPT (Plaine Commune / Est Ensemble) vintage %d < %d — stale arrêté", eptBaremeYear, floor)
+	}
+	if lyonBaremeYear < floor {
+		t.Errorf("Lyon / Villeurbanne vintage %d < %d — stale arrêté", lyonBaremeYear, floor)
+	}
+	// The Lyon vintage lives in the WFS layer name, so the constant and the
+	// URL must move together. Paris and the EPTs already tie their year to
+	// the fetch (the export filter and the KML directory); Lyon did not, and
+	// was the one zone the staleness guard did not cover.
+	if want := fmt.Sprintf("carencadrmtloyer_%d_%d", lyonBaremeYear, lyonBaremeYear+1); !strings.Contains(rawLyonURL, want) {
+		t.Errorf("rawLyonURL does not fetch the %s layer that lyonBaremeYear = %d claims:\n%s",
+			want, lyonBaremeYear, rawLyonURL)
 	}
 }
 
