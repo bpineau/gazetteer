@@ -20,12 +20,22 @@ const Name = "osm_transit"
 // sourceVersion bumps when the Source's internal logic changes.
 // Stateful callers gate cache invalidation on it.
 //
-// Version 3 : Station.Lines is now populated by joining the parent
-// route relations (`relation[type=route][route=*]`) and stop_area
-// umbrellas. Previously the catalog only kept the `ref` / `route_ref`
-// tag carried directly on the station node, which was empty for ~89 %
-// of stations.
-const sourceVersion = 3
+// History:
+//   - v3: Station.Lines is populated by joining the parent route
+//     relations (`relation[type=route][route=*]`) and stop_area
+//     umbrellas. Previously the catalog only kept the `ref` /
+//     `route_ref` tag carried directly on the station node, which was
+//     empty for ~89 % of stations.
+//   - v4: classifyType applies the mode precedence it states. The
+//     `tram=yes` FLAG was read above every other mode, so a station
+//     node carrying both a tram and a métro flag — which is what a
+//     tram/métro interchange is — was published as a tram, the slowest
+//     mode of the set. The flag now sits between light_rail and train;
+//     `railway=tram_stop`, which says what the element IS rather than
+//     what it also serves, still settles the question first.
+//     Station.Type moves for those nodes, on the live-fallback path
+//     immediately and in the catalog at its next refresh.
+const sourceVersion = 4
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
