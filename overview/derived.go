@@ -22,13 +22,25 @@ const minSmallSampleN = 8
 // alone then hides more than it tells.
 const maxReliableIQRRatio = 2.0
 
-// EffectivePriceEURM2 returns the price per m² a screening should use:
-// the small-unit (T1–T2, 18–55 m²) median when the commune had such
-// sales, else the all-unit median (~10 % of communes have no small-unit
-// sale in the window; every dvfagg commune has a positive all-unit
-// median, so the row stays a usable proxy instead of a zero price).
+// EffectivePriceEURM2 returns the price per m² a screening should use: the
+// small-unit (T1–T2, 18–55 m²) median when the commune had ENOUGH such sales
+// for a median to mean anything (minSmallSampleN), else the all-unit median
+// (~10 % of communes have no small-unit sale in the window; every dvfagg
+// commune has a positive all-unit median, so the row stays a usable proxy
+// instead of a zero price).
+//
+// The sample floor is the one PriceReliable already applies, and it is here
+// because the two used to disagree: preferring the small-unit median whenever
+// it was merely positive let a SINGLE sale set a commune's price. Longuyon
+// (54322) has 89 sales at a 845 €/m² median and one small-unit sale at
+// 3 425, which this method returned — 4.05x the commune's own median, which
+// drags GrossYieldPct from about 16.5 % to 4.07 % and buries the row in any
+// yield ranking. 3 515 of the 9 090 embedded communes carry between 1 and 7
+// small-unit sales, so this is the rule outside dense markets, not an edge.
+// PriceReliable still reports the thinness; this method no longer depends on
+// the caller having read it.
 func (o CommuneOverview) EffectivePriceEURM2() float64 {
-	if o.PriceMedianSmallEURM2 > 0 {
+	if o.PriceMedianSmallEURM2 > 0 && o.PriceNSmall >= minSmallSampleN {
 		return o.PriceMedianSmallEURM2
 	}
 	return o.PriceMedianEURM2

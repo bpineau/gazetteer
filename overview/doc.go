@@ -20,7 +20,8 @@
 // given source degrades to a zero / nil field rather than failing the row.
 //
 // Decision-grade projections over a row live as methods so their rules
-// have one home: EffectivePriceEURM2 (small-unit median else all-unit),
+// have one home: EffectivePriceEURM2 (small-unit median when its sample
+// clears the same floor PriceReliable applies, else all-unit),
 // EffectiveRentEURM2HC (market capped by encadrement — the legally
 // chargeable rent), GrossYieldPct, and PriceReliable (thin-sample /
 // bimodality flag). Rank and filter on those, not on the raw fields.

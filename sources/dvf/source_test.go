@@ -16,6 +16,7 @@ import (
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/circuit"
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 	"github.com/bpineau/gazetteer/helpers/httpx"
 	"github.com/bpineau/gazetteer/helpers/kvcache/memcache"
 )
@@ -281,6 +282,19 @@ func TestSource_AddressRadius(t *testing.T) {
 	})
 	if err := src.Sections().PrimeFromList(context.Background(), insee, []string{sec}); err != nil {
 		t.Fatalf("PrimeFromList: %v", err)
+	}
+	// Prime the section GEOMETRY too. Without it sectionsNearPoint falls
+	// through to the live cadastre API — the one network call left in this
+	// package's tests — and came back with every real section of the 7e, each
+	// of which this stub answers with the SAME 16 mutations. The tier then
+	// scored one sale dozens of times over, which the single-built-local rule
+	// now (rightly) refuses. Priming keeps the test hermetic and leaves the
+	// disk holding exactly the section it is meant to.
+	if err := src.Sections().PrimeGeos(context.Background(), insee, []SectionGeo{{
+		Code: sec,
+		Box:  geopoly.BBox{MinLat: mLat - 0.01, MaxLat: mLat + 0.01, MinLon: mLon - 0.01, MaxLon: mLon + 0.01},
+	}}); err != nil {
+		t.Fatalf("PrimeGeos: %v", err)
 	}
 
 	lat := mLat
