@@ -137,23 +137,65 @@ func (r Ring) AreaM2() float64 {
 	return math.Abs(sum) * 0.5
 }
 
-// AreaM2 returns the planar area of the polygon in square meters: the
-// outer ring's area minus every subsequent ring's, per the GeoJSON
-// convention that ring 0 is the boundary and rings 1+ are holes. The
-// result is floored at 0 so degenerate ring sets (holes larger than
-// the boundary, disjoint-ring "union" encodings) cannot go negative.
+// AreaM2 returns the planar area of the polygon in square meters, under
+// the SAME even-odd rule Covers applies: a ring nested inside an odd
+// number of the polygon's other rings is subtracted, a ring nested
+// inside an even number is added. The ordinary GeoJSON shape — ring 0
+// the boundary, rings 1+ the holes — therefore measures boundary minus
+// holes; two DISJOINT rings measure the sum of both; an island inside a
+// hole is added back.
+//
+// It used to subtract every ring after the first unconditionally, which
+// contradicted Covers on the disjoint case the Polygon godoc itself
+// names: two detached 1 000 m² parcels packed into one Polygon (a real
+// upstream encoding) both answered Covers true and measured 0 m²
+// together. The result is still floored at 0 for genuinely degenerate
+// input such as overlapping rings.
 func (poly Polygon) AreaM2() float64 {
-	if len(poly) == 0 {
+	var total float64
+	for i, r := range poly {
+		a := r.AreaM2()
+		if a == 0 {
+			continue
+		}
+		if poly.ringDepth(i)%2 == 0 {
+			total += a
+		} else {
+			total -= a
+		}
+	}
+	if total < 0 {
 		return 0
 	}
-	area := poly[0].AreaM2()
-	for _, hole := range poly[1:] {
-		area -= hole.AreaM2()
-	}
-	if area < 0 {
+	return total
+}
+
+// ringDepth counts how many of the polygon's OTHER rings enclose ring i.
+// Even means the ring adds area, odd means it takes some away — the
+// per-ring form of the even-odd rule Covers applies per crossing.
+//
+// Containment is tested on a VERTEX of ring i, not on a point of its
+// interior: the interior of an outer ring includes the inside of its own
+// holes, so an interior point would report the boundary as nested in its
+// own hole and flip its sign. A vertex sits on ring i and nowhere else,
+// so for the non-crossing rings valid input is made of it answers
+// exactly "is ring i inside ring j". A vertex landing exactly on another
+// ring is undefined, like every boundary point in this package.
+func (poly Polygon) ringDepth(i int) int {
+	if len(poly[i]) == 0 {
 		return 0
 	}
-	return area
+	vertex := poly[i][0]
+	depth := 0
+	for j, other := range poly {
+		if i == j {
+			continue
+		}
+		if (Polygon{other}).Covers(vertex) {
+			depth++
+		}
+	}
+	return depth
 }
 
 // AreaM2 sums the planar area of every member polygon in square

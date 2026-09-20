@@ -19,6 +19,11 @@ type Ring []Point
 // union (the shape some upstreams use to pack several detached parcels into one
 // "Polygon"), while a *nested* inner ring subtracts. Overlapping rings are
 // degenerate input and produce the symmetric difference.
+//
+// Every method honours that one rule, so ring ORDER never changes the shape:
+// Covers, AreaM2, BoundaryDistanceM and Bound all agree about what is inside.
+// (Centroid is the exception and says so: it is ring 0's, a representative
+// point rather than a measurement.)
 type Polygon []Ring
 
 // MultiPolygon is a set of polygons making up one logical area (e.g. a commune
