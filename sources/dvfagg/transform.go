@@ -16,7 +16,25 @@ import (
 	"github.com/bpineau/gazetteer/sources/dvf"
 )
 
-// sanity bounds, identical to the validated screening methodology.
+// Plausibility bounds on a single kept sale, from the validated
+// screening methodology. A row outside them is dropped, never clamped,
+// so a published median can sit ON a bound but never past it.
+//
+// They are TIGHTER than the sibling bounds in sources/dvf
+// (SurfaceMaxM2 1 000, PricePerM2Min 100, PricePerM2Max 50 000), and
+// deliberately: this cohort is APARTMENTS only, where dvf's is every
+// built local. 250 m² is a very large flat and 1 000 m² is a manor; an
+// apartment at 100 EUR/m² is a mislabelled garage or a family transfer,
+// where a rural house on its land at that price is ordinary.
+//
+// What the bounds do to the shipped aggregate, measured on it: no
+// commune median or p75 reaches maxPPM (the highest median is 17 000
+// and the highest p75 16 865, both Paris), so the cap only trims the
+// far tail of the deepest markets. Four of the 9 090 communes have a
+// median of exactly minPPM, each on a single sale — the floor is at the
+// edge of the real distribution down there, not above it. How many
+// sub-floor rows were dropped cannot be read back from an aggregate;
+// it needs the geo-dvf bulk files a refresh downloads.
 const (
 	minSurface = 9.0
 	maxSurface = 250.0
