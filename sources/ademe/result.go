@@ -99,6 +99,21 @@ type Evidence struct {
 	// the picked row is on a different voie (a wrong-street pick).
 	StreetMatched bool `json:"street_matched"`
 
+	// SurfaceAnchorM2 is the Listing.SurfaceM2 the picker ranked on, 0
+	// when the caller supplied none.
+	SurfaceAnchorM2 float64 `json:"surface_anchor_m2,omitempty"`
+
+	// SurfaceComparable is true when BOTH the anchor and the picked
+	// row's surface_habitable_logement are known, so the two could be
+	// compared at all. False means "not checked", never "mismatch".
+	SurfaceComparable bool `json:"surface_comparable"`
+
+	// SurfaceMatched is true when they were compared and agree within
+	// SurfaceAgreementTolerance. A false here with SurfaceComparable
+	// true is the tell-tale of a neighbour's certificate: the only DPE
+	// at that street number, for a dwelling of another size.
+	SurfaceMatched bool `json:"surface_matched"`
+
 	// URL is the full data-fair URL the Source queried. Empty when the
 	// Source bailed before building a URL (insufficient inputs).
 	URL string `json:"url,omitempty"`
