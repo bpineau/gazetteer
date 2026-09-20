@@ -67,3 +67,33 @@ func TestDeptMatchKey_CrossCorsica(t *testing.T) {
 			deptMatchKey("20000"), deptMatchKey("20200"))
 	}
 }
+
+// TestZipsShareDepartment_CollectivitesAndMalformed pins the two cases a bare
+// prefix gets wrong: the collectivités that kept a 971xx postal code, and a
+// zip whose leading zero was eaten upstream.
+func TestZipsShareDepartment_CollectivitesAndMalformed(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		a, b string
+		want bool
+		why  string
+	}{
+		{"97133", "97190", false, "Saint-Barthélemy (977) vs Le Gosier, Guadeloupe (971)"},
+		{"97150", "97110", false, "Saint-Martin (978) vs Pointe-à-Pitre, Guadeloupe (971)"},
+		{"97133", "97150", false, "Saint-Barthélemy vs Saint-Martin, two collectivités"},
+		{"97133", "97133", true, "same zip"},
+		{"97110", "97190", true, "both Guadeloupe"},
+		{"1000", "10000", false, "Bourg-en-Bresse unpadded (01) vs Troyes (10)"},
+		{"1000", "1000", true, "malformed but equal"},
+		{"750", "75001", false, "truncated zip must not fold onto Paris"},
+		{"75001", "75020", true, "both Paris"},
+		{"20000", "20600", true, "Corsica folds to one key by design"},
+		{"97400", "97410", true, "both Réunion"},
+		{"97400", "97300", false, "Réunion vs Guyane"},
+	}
+	for _, c := range cases {
+		if got := ZipsShareDepartment(c.a, c.b); got != c.want {
+			t.Errorf("ZipsShareDepartment(%q, %q) = %v, want %v — %s", c.a, c.b, got, c.want, c.why)
+		}
+	}
+}
