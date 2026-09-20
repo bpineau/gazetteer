@@ -23,7 +23,13 @@ const Name = "qpv"
 //     when the Listing carries coordinates, answers the real "is THIS
 //     address inside a QPV?". Falls back to the commune-level list (lower
 //     confidence) only when coordinates are absent.
-const sourceVersion = 2 // v2
+//   - v3: the nearest-QPV hint measures to the nearest EDGE of a perimeter
+//     instead of its nearest VERTEX. NearestCode, NearestDistanceM and
+//     IsEmpty() move wherever a contour carries a long straight stretch
+//     (the shipped artifact's longest edge is 3 961 m), so a v2 reading of
+//     those fields must be re-derived, not reused from a cache. HasQPV for
+//     a point INSIDE a QPV is unaffected.
+const sourceVersion = 3 // v3
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.

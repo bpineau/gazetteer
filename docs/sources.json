@@ -63,7 +63,7 @@
   },
   {
     "name": "cadastre",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "Cadastral parcel id + contenance + viewer link (optional bâti emprise).",
     "inputs": [
@@ -219,7 +219,7 @@
   },
   {
     "name": "dvfagg",
-    "version": 2,
+    "version": 3,
     "default": true,
     "summary": "Per-commune DVF aggregate — median €/m² + quartiles (3-year window, apartment sales, offline).",
     "inputs": [
@@ -508,7 +508,7 @@
   },
   {
     "name": "qpv",
-    "version": 2,
+    "version": 3,
     "default": true,
     "summary": "With coordinates, answers via point-in-polygon whether THIS address is inside a Quartier Prioritaire (QPV 2024 contours). Without coordinates, falls back to the commune-level QPV list (lower confidence).",
     "inputs": [
@@ -558,7 +558,7 @@
   },
   {
     "name": "sensible",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "Flags addresses inside (or within 400 m of) the State's hardest-neighbourhood perimeters: the 62 QRR police-priority zones (official polygons, far more selective than QPV), the 4 ORCOD-IN copropriétés dégradées (décrets) and a small documented curated overlay (e.g. Les 4000, NPNRU). Informational, not scored.",
     "inputs": [
