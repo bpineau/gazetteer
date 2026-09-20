@@ -235,8 +235,7 @@ func (s *Source) runBati(ctx context.Context, feature Feature, parcel *Parcel, o
 		return
 	}
 
-	filtered := filterBatiInParcel(polys, parcelGeom)
-	totalM2 := sumBatiArea(filtered)
+	filtered, totalM2 := filterBatiInParcel(polys, parcelGeom)
 	count := len(filtered)
 	out.BatiCount = &count
 	out.BatiM2 = &totalM2

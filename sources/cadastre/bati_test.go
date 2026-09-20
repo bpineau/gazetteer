@@ -46,20 +46,25 @@ func TestLoadBatiPolygons_PrecomputesCentroidAndArea(t *testing.T) {
 		if len(p.Geometry) == 0 {
 			t.Errorf("polys[%d] has empty geometry", i)
 		}
-		if p.AreaM2 <= 0 {
-			t.Errorf("polys[%d].AreaM2 = %v, want >0", i, p.AreaM2)
+		if p.AreaM2() <= 0 {
+			t.Errorf("polys[%d].AreaM2() = %v, want >0", i, p.AreaM2())
 		}
-		// Centroid must lie inside the polygon — sanity for the
-		// downstream PIP filter.
-		if !p.Geometry.Covers(p.Centroid) {
-			t.Errorf("polys[%d] centroid %+v not inside its own geometry", i, p.Centroid)
+		if len(p.Parts) != len(p.Geometry) {
+			t.Errorf("polys[%d] has %d parts for %d member polygons", i, len(p.Parts), len(p.Geometry))
+		}
+		// Every part's Inside point must lie inside the geometry — the
+		// invariant the whole in-parcel filter rests on.
+		for j, part := range p.Parts {
+			if !p.Geometry.Covers(part.Inside) {
+				t.Errorf("polys[%d] part %d: Inside %+v is not inside its own geometry", i, j, part.Inside)
+			}
 		}
 	}
 }
 
-// TestFilterBatiInParcel_CentroidPIP exercises the centroid-PIP filter:
-// 2 polygons are inside a synthetic parcel polygon, 2 outside.
-func TestFilterBatiInParcel_CentroidPIP(t *testing.T) {
+// TestFilterBatiInParcel exercises the in-parcel filter: 2 polygons are
+// inside a synthetic parcel polygon, 2 outside.
+func TestFilterBatiInParcel(t *testing.T) {
 	t.Parallel()
 
 	body := mustReadFixture(t, "batiments_small.json")
@@ -82,20 +87,19 @@ func TestFilterBatiInParcel_CentroidPIP(t *testing.T) {
 			},
 		},
 	}
-	got := filterBatiInParcel(polys, parcel)
+	got, total := filterBatiInParcel(polys, parcel)
 	if len(got) != 2 {
 		t.Errorf("filterBatiInParcel kept %d, want 2", len(got))
 	}
-	total := sumBatiArea(got)
 	if total <= 0 {
-		t.Errorf("sumBatiArea = %v, want >0", total)
+		t.Errorf("in-parcel area = %v, want >0", total)
 	}
 }
 
 func TestFilterBatiInParcel_EmptyInputs(t *testing.T) {
 	t.Parallel()
 
-	if got := filterBatiInParcel(nil, geopoly.MultiPolygon{}); got != nil {
-		t.Errorf("filterBatiInParcel(nil, empty) = %v, want nil", got)
+	if got, area := filterBatiInParcel(nil, geopoly.MultiPolygon{}); got != nil || area != 0 {
+		t.Errorf("filterBatiInParcel(nil, empty) = %v, %v; want nil, 0", got, area)
 	}
 }

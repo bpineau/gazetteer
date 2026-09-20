@@ -7,23 +7,58 @@ import (
 	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
-// BatiPolygon is the cached shape of one building footprint. Stored
-// pre-parsed (typed MultiPolygon + pre-computed centroid + planar
-// area) so the centroid PIP filter doesn't re-pay decode + math costs
-// on subsequent Query calls for the same INSEE.
+// BatiPolygon is the cached shape of one building footprint, stored pre-parsed
+// so the in-parcel filter doesn't re-pay decode + math costs on subsequent
+// Query calls for the same INSEE.
+//
+// It is kept PER PART rather than as one centroid and one total area, because
+// a building is not always one blob: a feature with two wings used to be
+// tested for containment on the FIRST wing's centroid and then credited with
+// BOTH wings' area. Whether a wing outside the parcel counted therefore
+// depended on the order the wings appear in the GeoJSON — same geometry,
+// different BatiM2.
 type BatiPolygon struct {
 	// Geometry is the typed building footprint. Always at least one
 	// polygon — empty geometries are dropped at cache-load time.
 	Geometry geopoly.MultiPolygon
 
-	// Centroid is the area-weighted centroid of the first polygon —
-	// the point we test for parcel containment. Cached for cheap
-	// repeated lookups.
-	Centroid geopoly.Point
+	// Parts carries one entry per member polygon of Geometry, in the same
+	// order. Empty only for a geometry that encloses nothing.
+	Parts []BatiPart
+}
 
-	// AreaM2 is the planar area of the whole MultiPolygon in m². Cached
-	// for cheap sum during the in-parcel filter.
+// BatiPart is one member polygon of a building footprint: a point known to be
+// inside it, and its own planar area.
+type BatiPart struct {
+	// Inside is a point GUARANTEED to lie within this part (via
+	// geopoly.Polygon.RepresentativePoint, not its centroid — an L-shaped
+	// footprint sits around its centroid, not on it).
+	Inside geopoly.Point
+
+	// AreaM2 is this part's planar area in m².
 	AreaM2 float64
+}
+
+// AreaM2 is the footprint's whole planar area in m², every part summed.
+func (b BatiPolygon) AreaM2() float64 {
+	var total float64
+	for _, p := range b.Parts {
+		total += p.AreaM2
+	}
+	return total
+}
+
+// AreaInM2 is the planar area of the parts that lie inside parcel, in m².
+// Zero when no part does — which is how the caller tells a building on this
+// parcel from one merely nearby in the commune dump.
+func (b BatiPolygon) AreaInM2(parcel geopoly.MultiPolygon) float64 {
+	var total float64
+	for _, p := range b.Parts {
+		if parcel.Covers(p.Inside) {
+			total += p.AreaM2
+		}
+	}
+	return total
 }
 
 // BatiCache is the contract for the per-INSEE building polygon cache.
