@@ -36,7 +36,7 @@ is the authoritative reference; this page is the map.
 | Package | What it gives you | Reach for it when |
 |---|---|---|
 | [`helpers/geodist`](../helpers/geodist) | Haversine distances (`MetersBetween`, `KmBetween`). | Point-to-point distance. That's it; it's tiny on purpose. |
-| [`helpers/geopoly`](../helpers/geopoly) | The polygon kernel: even-odd point-in-polygon (`Covers`), distance to the nearest boundary EDGE (`BoundaryDistanceM`, never the nearest vertex), a point guaranteed inside a shape (`RepresentativePoint`, which a centroid is not), bounding boxes, centroids, equirectangular areas in m². | Point-in-area tests against GeoJSON-shaped geometry. |
+| [`helpers/geopoly`](../helpers/geopoly) | The polygon kernel: even-odd point-in-polygon (`Covers`), distance to the nearest boundary EDGE (`BoundaryDistanceM`, never the nearest vertex), a point guaranteed inside a shape (`RepresentativePoint`, which a centroid is not), bounding boxes, centroids, equirectangular areas in m² (`AreaM2` applies the same even-odd rule as `Covers`, so it measures exactly what `Covers` calls inside, ring order included). | Point-in-area tests against GeoJSON-shaped geometry. |
 | [`helpers/geoindex`](../helpers/geoindex) | The embedded-polygon-index layer over geopoly: a compact wire format for polygon datasets, GeoJSON decoding, and a bbox-prefiltered first-cover `Resolve` / nearest-boundary `Nearest` index. This is what an out-of-tree **spatial source** should build on (iris, qpv and encadrement do). | Shipping your own "which zone is this point in" dataset. |
 | [`helpers/stats`](../helpers/stats) | Median, percentiles (numpy-linear), decimal rounding, MAD outlier masks. | Small numeric reductions without pulling a stats dependency. |
 

@@ -83,13 +83,71 @@ func TestPolygonAreaM2_SubtractsHoles(t *testing.T) {
 	}
 }
 
-func TestPolygonAreaM2_FloorsAtZero(t *testing.T) {
+// TestPolygonAreaM2_RingOrderDoesNotMatter: under the even-odd rule
+// Covers applies, {small, big} and {big, small} are the SAME shape — a
+// big square with a small square punched out of it — so they must
+// measure the same. The old implementation subtracted every ring after
+// the first, so listing the hole first measured 0 for a shape whose
+// Covers says 9 900 m² are inside.
+func TestPolygonAreaM2_RingOrderDoesNotMatter(t *testing.T) {
 	small := squareAtLat(2.35, 48.85, 10)
 	big := squareAtLat(2.35, 48.85, 100)
-	// Degenerate input (hole bigger than the boundary) must not go
-	// negative.
-	if got := (Polygon{small, big}).AreaM2(); got != 0 {
-		t.Errorf("Polygon.AreaM2(degenerate) = %v, want 0", got)
+	want := 10000.0 - 100.0
+	for _, tc := range []struct {
+		name string
+		poly Polygon
+	}{
+		{"boundary_first", Polygon{big, small}},
+		{"hole_first", Polygon{small, big}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.poly.AreaM2()
+			if relErr := math.Abs(got-want) / want; relErr > 0.005 {
+				t.Errorf("Polygon.AreaM2 = %.2f, want %.2f (relErr %.4f)", got, want, relErr)
+			}
+		})
+	}
+}
+
+// TestPolygonAreaM2_DisjointRingsUnion is the trap the Polygon godoc
+// named and the area did not honour: "two disjoint rings union (the
+// shape some upstreams use to pack several detached parcels into one
+// Polygon)". Covers agreed with that. AreaM2 subtracted the second ring
+// from the first, so two detached 10 000 m² parcels measured 0 m²
+// together while both answered Covers true.
+func TestPolygonAreaM2_DisjointRingsUnion(t *testing.T) {
+	a := squareAtLat(2.35, 48.85, 100)
+	b := squareAtLat(2.45, 48.85, 100) // ~7 km east, nowhere near a
+	poly := Polygon{a, b}
+
+	for _, r := range []Ring{a, b} {
+		if p := r.Centroid(); !poly.Covers(p) {
+			t.Fatalf("Covers(%v) = false: the two rings must both be inside", p)
+		}
+	}
+	got := poly.AreaM2()
+	want := 20000.0
+	if relErr := math.Abs(got-want) / want; relErr > 0.005 {
+		t.Errorf("Polygon.AreaM2(two disjoint squares) = %.2f, want %.2f (relErr %.4f)", got, want, relErr)
+	}
+}
+
+// TestPolygonAreaM2_IslandInHole: nesting two deep adds the area back,
+// which is what Covers does for a point inside the island (three ring
+// crossings, odd, inside).
+func TestPolygonAreaM2_IslandInHole(t *testing.T) {
+	outer := squareAtLat(2.35, 48.85, 100)
+	hole := squareAtLat(2.35, 48.85, 50)
+	island := squareAtLat(2.35, 48.85, 20)
+	poly := Polygon{outer, hole, island}
+
+	if p := island.Centroid(); !poly.Covers(p) {
+		t.Fatal("Covers(island centre) = false, want true")
+	}
+	got := poly.AreaM2()
+	want := 10000.0 - 2500.0 + 400.0
+	if relErr := math.Abs(got-want) / want; relErr > 0.005 {
+		t.Errorf("Polygon.AreaM2(island in hole) = %.2f, want %.2f (relErr %.4f)", got, want, relErr)
 	}
 }
 

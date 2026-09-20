@@ -39,7 +39,13 @@ closed: the first and last vertex need not be repeated.
 - Boundary points (exactly on an edge or vertex) have undefined
   membership; real geocoded coordinates never land there.
 - Centroids are Shoelace representative points, not mass centroids of
-  holed shapes.
+  holed shapes. `RepresentativePoint` is the one that is guaranteed
+  inside the shape.
+- One rule, everywhere: `AreaM2` applies the same even-odd rule as
+  `Covers`, ring by ring, so it measures exactly the region `Covers`
+  calls inside and the ring ORDER never changes the shape. Two disjoint
+  rings in one `Polygon` union (their areas add); a nested ring
+  subtracts; a ring nested two deep adds back.
 
 ## Public API
 
