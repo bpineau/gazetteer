@@ -20,18 +20,18 @@ import "strings"
 //
 // What each precision is good for:
 //
-//   - PrecisionHouseNumber — the address itself, metres away. Everything
+//   - PrecisionHouseNumber: the address itself, metres away. Everything
 //     works: a cadastral parcel lookup, a DPE match, a distance to the
 //     nearest station, a point-in-polygon test against a QPV contour.
-//   - PrecisionStreet — the street's centroid, tens to a few hundred
+//   - PrecisionStreet: the street's centroid, tens to a few hundred
 //     metres away depending on its length. Fine for anything measured at
 //     neighbourhood scale (a QPV or a sensitive-zone perimeter, a transit
 //     distance, an IRIS). NOT fine for a parcel: the parcel under a
 //     street centroid belongs to whoever lives mid-street.
-//   - PrecisionLocality — a place name (hameau, lieu-dit) with no street
+//   - PrecisionLocality: a place name (hameau, lieu-dit) with no street
 //     granularity, typically rural and up to kilometres wide. Commune-
 //     level readings only.
-//   - PrecisionMunicipality — the commune's own centre. The coordinate
+//   - PrecisionMunicipality: the commune's own centre. The coordinate
 //     answers "which commune", nothing finer. Perfect for the commune-
 //     keyed sources (price aggregates, taxe foncière, delinquance), and
 //     wrong for every per-address reading, silently, because a commune
@@ -87,7 +87,7 @@ func (p Precision) Rank() int {
 // be compared.
 func (p Precision) Known() bool { return p.Rank() > 0 }
 
-// CoarserThan reports whether p is known to be coarser than min — the
+// CoarserThan reports whether p is known to be coarser than min - the
 // predicate a precision-sensitive caller gates on:
 //
 //	if prec.CoarserThan(banx.PrecisionStreet) { // refuse or downgrade }

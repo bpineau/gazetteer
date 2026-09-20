@@ -10,8 +10,8 @@ import (
 // regression for the unbounded surface tie-break.
 //
 // PickBestByNumber returns the row whose surface is CLOSEST to the
-// caller's, however far the closest one is. That is the right pick — it
-// is the only certificate at that street number — but for a 30 m²
+// caller's, however far the closest one is. That is the right pick - it
+// is the only certificate at that street number - but for a 30 m²
 // studio at an address where ADEME holds nothing under 38 m², the
 // answer is a neighbour's DPE, and it used to come back at
 // ConfidenceHigh because the address legs all agreed.
@@ -50,7 +50,7 @@ func TestSource_SurfaceMismatchIsNotHighConfidence(t *testing.T) {
 	}
 
 	// A 140 m² flat: the closest row is 38.2 m², which is not it. Same
-	// street, same number, real DPE label — and not the same dwelling.
+	// street, same number, real DPE label - and not the same dwelling.
 	res = newQuery(140)
 	if res.Confidence != ConfidenceMedium {
 		t.Errorf("Confidence = %q for a 140 m² anchor against a 38.2 m² row, want medium", res.Confidence)

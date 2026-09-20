@@ -14,7 +14,7 @@ import (
 // BAN answers every query it can parse, so an address it cannot find
 // comes back as its commune's CENTRE, with a coordinate that looks like
 // any other. Run point-in-polygon on that and the Source answers about
-// the mairie, at MatchLevelPoint / ConfidenceHigh — a confident,
+// the mairie, at MatchLevelPoint / ConfidenceHigh - a confident,
 // precise-looking reading of a point nobody asked about.
 //
 // The fix is not to refuse: a commune-level coordinate deserves the

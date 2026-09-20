@@ -99,7 +99,7 @@ type Options struct {
 	// A parcel is a property, so the coordinate had better be the
 	// property's. BAN answers every query it can parse: ask it for a
 	// street that does not exist and it returns the commune's centre,
-	// which has a parcel of its own — the mairie's, or whoever owns the
+	// which has a parcel of its own - the mairie's, or whoever owns the
 	// square. Nothing about that Result says so. The floor applies both
 	// to the Listing's own CoordPrecision and to the Source's own
 	// geocoder fallback; a listing or a geocoder that reports no
@@ -117,7 +117,7 @@ type Options struct {
 // A locality or municipality match is about a place, not an address, and
 // the parcel under it belongs to a stranger. A street centroid still
 // picks the wrong parcel on a long street, which is why Result carries
-// MatchDistanceM and Evidence carries CoordPrecision — but it is at
+// MatchDistanceM and Evidence carries CoordPrecision - but it is at
 // least on the right street, and refusing it would drop every rural
 // address BAN knows no house number for. Callers that need a doorstep
 // say so through Options.

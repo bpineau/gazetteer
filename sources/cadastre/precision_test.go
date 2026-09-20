@@ -34,7 +34,7 @@ func (g *coarseGeocoder) Geocode(_ context.Context, _ banx.GeocodeQuery) (banx.G
 
 // TestSource_RefusesCoarseGeocode pins the parcel lookup's precision
 // floor on the geocoder fallback. A commune-centre match has a parcel of
-// its own — the mairie's, or whoever owns the square — and returning it
+// its own - the mairie's, or whoever owns the square - and returning it
 // is indistinguishable from returning the property's.
 func TestSource_RefusesCoarseGeocode(t *testing.T) {
 	t.Parallel()

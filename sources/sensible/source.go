@@ -65,7 +65,7 @@ func (s *Source) Datasets() []dataset.Set { return []dataset.Set{set} }
 // will answer from: a street centroid or finer.
 //
 // A perimeter question is a question about a place inside a commune, so
-// a commune-centre coordinate cannot answer it — and would answer it
+// a commune-centre coordinate cannot answer it - and would answer it
 // confidently, since the mairie is a perfectly ordinary point that is
 // either inside a QRR or not. A street centroid is on the right street,
 // which is the scale these contours are drawn at. Coarser than that, the
@@ -77,7 +77,7 @@ const MinCoordPrecision = banx.PrecisionStreet
 //
 //  1. Require listing coordinates (Listing.Coords, so the (0, 0) null-island
 //     sentinel counts as absent) at MinCoordPrecision or finer. Otherwise the
-//     Source emits gazetteer.ErrInsufficientInputs — a commune-level fallback
+//     Source emits gazetteer.ErrInsufficientInputs - a commune-level fallback
 //     would defeat the point (the QPV source already answers at that grain).
 //  2. Test the point against every QRR polygon and curated circle: inside →
 //     Result.In, boundary within NearbyMeters → Result.Nearby.

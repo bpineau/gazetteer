@@ -108,14 +108,14 @@ No transitive dependency on any other internal package.
   are kept as-is even though the package was renamed from `geocode` to
   `banx`, so existing persistent caches stay warm.
 - BAN forward scores below 0.7 are not trusted by default for the
-  INSEE — adjust `INSEEResolver.MinForwardScore` to tune. That gate is
+  INSEE - adjust `INSEEResolver.MinForwardScore` to tune. That gate is
   about the COMMUNE, and a commune-centre match passes it easily: the
   lat/lon it hands back are only as precise as
   `INSEEResolution.Precision` says.
 - `GeocodeResult.Precision` is what the coordinate is the position OF
   (`housenumber` / `street` / `locality` / `municipality`, from BAN's
-  `type`). Anything reading at address granularity — a cadastral parcel,
-  a DPE match, a point-in-polygon test — must gate on it:
+  `type`). Anything reading at address granularity - a cadastral parcel,
+  a DPE match, a point-in-polygon test - must gate on it:
   `ResolveLatLonAt(..., banx.PrecisionStreet, 0)` returns
   `ErrCoarseMatch` instead of the commune centre BAN answers a
   nonexistent address with. An unreported precision is never refused.

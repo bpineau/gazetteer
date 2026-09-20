@@ -10,20 +10,20 @@ var MapBaseURL = "https://cadastre.data.gouv.fr/map"
 
 // ParcelID composes the 14-char Etalab id from its four components:
 //
-//	INSEE   — 5 chars (commune or arrondissement code, "2A"/"2B" for Corsica).
+//	INSEE   - 5 chars (commune or arrondissement code, "2A"/"2B" for Corsica).
 //	Prefixe — 3 chars (usually "000"; the API exposes it as "com_abs").
 //	Section — 2 chars (left-zero-padded if 1-char source).
 //	Numero  — 4 chars (left-zero-padded if shorter).
 //
 // The three trailing components are padded on the LEFT, and truncated
-// from the left when too long — the cadastre id semantics define the
+// from the left when too long - the cadastre id semantics define the
 // LAST N chars as the canonical payload (cf. dvfSectionCode in
 // sources/dvf/cadastre.go, which applies the same rule).
 //
 // The INSEE is not padded at all: it is either five characters or it is
 // not an INSEE, and ParcelID returns "" for anything else. A numeric
 // code that lost its leading zero on the way in ("1053" for Ambérieux
-// 01053) used to be padded on the RIGHT, producing "10530" — a
+// 01053) used to be padded on the RIGHT, producing "10530" - a
 // well-formed code for a commune of the Aube, 350 km away, inside a
 // 14-character id that looks perfect and a map deeplink that opens a
 // stranger's parcel. Guessing which digit went missing is not this
