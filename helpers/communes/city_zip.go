@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -132,6 +133,45 @@ func (t *Table) AltZipsForINSEE(insee string) []string {
 	dup := make([]string, len(alts))
 	copy(dup, alts)
 	return dup
+}
+
+// ZipMatchesINSEE reports whether zip is one of the postal codes that
+// serve the commune insee — its primary code or any of its alternates.
+// Paris / Lyon / Marseille arrondissement codes are folded onto their
+// parent commune first, since the CP table keys those three by parent
+// only and the BAN geocoder answers with the arrondissement.
+//
+// known says whether the INSEE was in the embedded CP table at all. A
+// caller that guards against cross-département drift must branch on it:
+// (false, false) means "not checkable here", not "mismatch", and a
+// commune created after the embedded snapshot lands there.
+//
+// This is the correct form of the "do this INSEE and this postcode
+// belong together?" test. Comparing their first two characters does
+// NOT answer it: 23 (INSEE, CP) pairs of the embedded table straddle a
+// département boundary, because a postal round is drawn for the postman
+// and not for the préfet. Curbans is INSEE 04066 in the
+// Alpes-de-Haute-Provence and is served by 05110 Tallard in the
+// Hautes-Alpes; Paray-Vieille-Poste is 91479 in the Essonne under
+// 94390, its neighbour's code in the Val-de-Marne.
+func (t *Table) ZipMatchesINSEE(insee, zip string) (match, known bool) {
+	if t == nil || insee == "" || zip == "" {
+		return false, false
+	}
+	store, err := loadCP()
+	if err != nil || store == nil {
+		return false, false
+	}
+	insee = FoldArrondissement(strings.TrimSpace(insee))
+	zip = strings.TrimSpace(zip)
+	primary, ok := store.primary[insee]
+	if !ok {
+		return false, false
+	}
+	if primary == zip {
+		return true, true
+	}
+	return slices.Contains(store.alts[insee], zip), true
 }
 
 // CityZip returns the unambiguous 5-digit postal code for a (city name,
