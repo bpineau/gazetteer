@@ -151,7 +151,7 @@ List every Source registered with the library plus its version:
 
 ```bash
 $ gazetteer sources list
-ademe           v3
+ademe           v4
 anct            v1
 bdnb            v2  (opt-in via --source)
 bpe             v1

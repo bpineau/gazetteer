@@ -20,13 +20,22 @@ const Name = "ademe"
 // sourceVersion bumps when the Source's internal logic changes.
 // Stateful callers gate cache invalidation on it.
 //
-// v3: street-aware matching. Among rows matching the listing's house
-// number, those on the same voie (street type word + name tokens, e.g.
-// "rue petites ecuries" vs "cour petites ecuries") are preferred, and
-// only a number+street+DPE match earns "high" confidence — a
-// number-matched but wrong-street row is no longer a false-positive
-// "high".
-const sourceVersion = 3
+// History:
+//   - v3: street-aware matching. Among rows matching the listing's house
+//     number, those on the same voie (street type word + name tokens,
+//     e.g. "rue petites ecuries" vs "cour petites ecuries") are
+//     preferred, and only a number+street+DPE match earns "high"
+//     confidence — a number-matched but wrong-street row is no longer a
+//     false-positive "high".
+//   - v4: surface-aware confidence. The surface tie-break returns the
+//     CLOSEST row among those at the address, however far the closest
+//     one is, so a 30 m² studio at a number where ADEME holds only a
+//     250 m² duplex came back with the duplex's certificate at
+//     ConfidenceHigh. A picked row whose surface contradicts the
+//     caller's anchor (SurfaceAgrees) is now ConfidenceMedium, and
+//     Evidence carries the anchor and the verdict. Result.Confidence
+//     moves for those rows, so a stored one must be re-derived.
+const sourceVersion = 4
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -216,18 +225,31 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	// fallback paths — rather than threading it out of the picker.
 	streetMatched := streetMatches(wantStreetKey, row)
 
+	// The surface tie-break returns the CLOSEST row, however far the
+	// closest one is, so agreement has to be checked on the answer.
+	surfaceAgrees, surfaceComparable := SurfaceAgrees(wantSurface, row.SurfaceHabitableLogement)
+
 	out := buildResult(row)
 	out.SampleSize = 1
-	out.Confidence = PickConfidence(true, numberMatched, streetMatched, row.EtiquetteDPE)
+	out.Confidence = PickConfidence(MatchQuality{
+		Found:            true,
+		Number:           numberMatched,
+		Street:           streetMatched,
+		SurfaceDisagrees: surfaceComparable && !surfaceAgrees,
+		EtiquetteDPE:     row.EtiquetteDPE,
+	})
 	out.Evidence = Evidence{
-		MatchStrategy: MatchByZipFulltext,
-		Zip:           resolvedZip,
-		Query:         query,
-		RawCount:      len(rows),
-		PickedIndex:   idx,
-		NumberMatched: numberMatched,
-		StreetMatched: streetMatched,
-		URL:           u,
+		MatchStrategy:     MatchByZipFulltext,
+		Zip:               resolvedZip,
+		Query:             query,
+		RawCount:          len(rows),
+		PickedIndex:       idx,
+		NumberMatched:     numberMatched,
+		StreetMatched:     streetMatched,
+		SurfaceAnchorM2:   wantSurface,
+		SurfaceComparable: surfaceComparable,
+		SurfaceMatched:    surfaceAgrees,
+		URL:               u,
 	}
 	return out, nil
 }

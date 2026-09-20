@@ -78,6 +78,16 @@ dataset on data.gouv.fr.
   candidate), `Confidence` and `SampleSize` (1 when a row was picked, 0 on a
   skipped/empty result). The picked candidate's distance + match score live in
   `Evidence`.
+- **Which dwelling**: ADEME holds one certificate per dwelling, so an
+  apartment building answers with several rows at the same street number.
+  `Listing.SurfaceM2` picks the closest one — but the tie-break is
+  unbounded (the closest row wins however far it is, being the only
+  certificate there), so the CONFIDENCE carries the bound: a picked row
+  whose surface contradicts the anchor is `medium`, never `high`, and
+  `Evidence.Surface{AnchorM2,Comparable,Matched}` says why. The band is
+  wide on purpose: loi Carrez and surface habitable are different
+  conventions. Supply `SurfaceM2` whenever you have it; without it the
+  Source cannot tell the dwelling from its neighbour.
 - **`IsEmpty()`**: true when the API returns `results: []`.
 - **Eligibility**: residential only; commercial/land returns `Skipped`
   via the typed Result rather than an error.

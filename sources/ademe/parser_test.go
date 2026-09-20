@@ -335,25 +335,60 @@ func TestPickConfidence(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name      string
-		matched   bool
-		num       bool
-		street    bool
-		etiquette string
-		want      string
+		name string
+		m    MatchQuality
+		want string
 	}{
-		{"unmatched", false, false, false, "", ConfidenceLow},
-		{"num+street+etiquette", true, true, true, "D", ConfidenceHigh},
-		{"num+etiquette wrong street", true, true, false, "D", ConfidenceMedium},
-		{"num only", true, true, false, "", ConfidenceMedium},
-		{"etiquette only", true, false, false, "F", ConfidenceMedium},
-		{"matched but neither", true, false, false, "", ConfidenceLow},
+		{"unmatched", MatchQuality{}, ConfidenceLow},
+		{"num+street+etiquette", MatchQuality{Found: true, Number: true, Street: true, EtiquetteDPE: "D"}, ConfidenceHigh},
+		{"num+etiquette wrong street", MatchQuality{Found: true, Number: true, EtiquetteDPE: "D"}, ConfidenceMedium},
+		{"num only", MatchQuality{Found: true, Number: true}, ConfidenceMedium},
+		{"etiquette only", MatchQuality{Found: true, EtiquetteDPE: "F"}, ConfidenceMedium},
+		{"matched but neither", MatchQuality{Found: true}, ConfidenceLow},
+		// The whole address agrees and the dwelling is the wrong size:
+		// the only DPE at that number, for somebody else's flat.
+		{"perfect address, neighbour's surface",
+			MatchQuality{Found: true, Number: true, Street: true, SurfaceDisagrees: true, EtiquetteDPE: "D"},
+			ConfidenceMedium},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := PickConfidence(tc.matched, tc.num, tc.street, tc.etiquette); got != tc.want {
-				t.Errorf("PickConfidence(%v,%v,%v,%q) = %q, want %q",
-					tc.matched, tc.num, tc.street, tc.etiquette, got, tc.want)
+			if got := PickConfidence(tc.m); got != tc.want {
+				t.Errorf("PickConfidence(%+v) = %q, want %q", tc.m, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestSurfaceAgrees pins the band the confidence leg reads. It is wide
+// on purpose (loi Carrez and surface habitable are not the same
+// convention) and is meant to catch a dwelling of another class, not a
+// couple of square metres.
+func TestSurfaceAgrees(t *testing.T) {
+	t.Parallel()
+
+	f := func(v float64) *float64 { return &v }
+	cases := []struct {
+		name            string
+		want            float64
+		row             *float64
+		agrees, canTell bool
+	}{
+		{"exact", 62, f(62), true, true},
+		{"carrez_vs_habitable_gap", 62, f(65), true, true},
+		{"studio_within_the_floor", 20, f(24), true, true},
+		{"studio_against_a_duplex", 30, f(250), false, true},
+		{"neighbours_bigger_flat", 62, f(95), false, true},
+		{"no_anchor", 0, f(62), false, false},
+		{"row_has_no_surface", 62, nil, false, false},
+		{"row_surface_zero", 62, f(0), false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			agrees, canTell := SurfaceAgrees(tc.want, tc.row)
+			if agrees != tc.agrees || canTell != tc.canTell {
+				t.Errorf("SurfaceAgrees(%v, %v) = (%v, %v), want (%v, %v)",
+					tc.want, tc.row, agrees, canTell, tc.agrees, tc.canTell)
 			}
 		})
 	}
