@@ -58,11 +58,18 @@ func LoadBatiPolygons(body []byte) ([]BatiPolygon, int, error) {
 		if err != nil || len(mp) == 0 {
 			continue
 		}
-		out = append(out, BatiPolygon{
-			Geometry: mp,
-			Centroid: mp.Centroid(),
-			AreaM2:   mp.AreaM2(),
-		})
+		parts := make([]BatiPart, 0, len(mp))
+		for _, poly := range mp {
+			inside, ok := poly.RepresentativePoint()
+			if !ok {
+				continue // encloses nothing
+			}
+			parts = append(parts, BatiPart{Inside: inside, AreaM2: poly.AreaM2()})
+		}
+		if len(parts) == 0 {
+			continue
+		}
+		out = append(out, BatiPolygon{Geometry: mp, Parts: parts})
 	}
 	return out, raw, nil
 }
@@ -188,33 +195,31 @@ func sharedFetchContext(ctx context.Context, fallback time.Duration) (context.Co
 	return context.WithTimeout(detached, fallback)
 }
 
-// filterBatiInParcel walks `polys` and keeps the ones whose centroid
-// sits inside `parcel`. Returns the filtered slice (typically much
-// smaller than `polys` — the dump has every building on the commune).
+// filterBatiInParcel walks `polys` and keeps the ones with at least one part
+// inside `parcel`, returning them (typically far fewer than `polys` — the dump
+// holds every building on the commune) and the total area of the parts that
+// are actually inside.
+//
+// Counting only the inside parts is what makes the answer independent of the
+// order the parts appear in the GeoJSON: a building with a wing on each side
+// of the boundary contributes the wing that is on this parcel, every time.
 //
 // `parcel` is the API Carto parcel geometry; using a MultiPolygon
 // directly matches what API Carto actually returns and dodges a
 // Polygon-vs-MultiPolygon split at the call site.
-func filterBatiInParcel(polys []BatiPolygon, parcel geopoly.MultiPolygon) []BatiPolygon {
+func filterBatiInParcel(polys []BatiPolygon, parcel geopoly.MultiPolygon) ([]BatiPolygon, float64) {
 	if len(polys) == 0 || len(parcel) == 0 {
-		return nil
+		return nil, 0
 	}
 	out := make([]BatiPolygon, 0)
+	var areaM2 float64
 	for _, p := range polys {
-		if parcel.Covers(p.Centroid) {
+		if a := p.AreaInM2(parcel); a > 0 {
 			out = append(out, p)
+			areaM2 += a
 		}
 	}
-	return out
-}
-
-// sumBatiArea sums the planar area of every cached polygon.
-func sumBatiArea(polys []BatiPolygon) float64 {
-	var total float64
-	for _, p := range polys {
-		total += p.AreaM2
-	}
-	return total
+	return out, areaM2
 }
 
 // errBatiSkipped is sentinelled to nil — the bâti path NEVER returns

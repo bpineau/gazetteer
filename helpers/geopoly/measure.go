@@ -1,6 +1,9 @@
 package geopoly
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // EarthRadiusM is the mean Earth radius used to convert angular
 // distances (degrees) to meters. The IUGG mean is 6_371_000 m; that's
@@ -76,10 +79,14 @@ func (poly Polygon) Centroid() Point {
 	return poly[0].Centroid()
 }
 
-// Centroid returns the centroid of the first member polygon —
-// sufficient as a representative point for "is this shape inside that
-// area?" filters, where any point inside the shape works. Returns the
-// zero Point for an empty MultiPolygon.
+// Centroid returns the centroid of the first member polygon. Returns the zero
+// Point for an empty MultiPolygon.
+//
+// It is NOT a representative point for "is this shape inside that area?": it
+// ignores every member but the first, and even for that one the shoelace
+// centroid of a concave ring can fall outside the ring. Use
+// Polygon.RepresentativePoint per member instead — sources/cadastre does, and
+// the bug that taught it is written up there.
 func (mp MultiPolygon) Centroid() Point {
 	if len(mp) == 0 {
 		return Point{}
@@ -159,4 +166,72 @@ func (mp MultiPolygon) AreaM2() float64 {
 		sum += p.AreaM2()
 	}
 	return sum
+}
+
+// RepresentativePoint returns a point GUARANTEED to lie inside the polygon
+// (holes excluded), or ok=false for a polygon that encloses nothing.
+//
+// Centroid is not that point. The shoelace centroid of a concave ring can fall
+// outside the ring entirely — an L-shaped building sits around its own
+// centroid, not on it — and Polygon.Centroid ignores holes, so a ring-shaped
+// polygon puts it in the courtyard. Both read as "this shape is not inside
+// that area" to any Covers-based filter, which is how a building wholly inside
+// its parcel came back with a zero footprint.
+//
+// Method: take the centroid when it is genuinely covered; otherwise sweep the
+// horizontal line through it, collect the spans where that line is inside the
+// polygon, and return the midpoint of the widest one. That is the standard
+// "pole of inaccessibility, cheap edition" and it is exact for the simple
+// polygons cadastral and administrative data are made of.
+func (poly Polygon) RepresentativePoint() (Point, bool) {
+	if len(poly) == 0 {
+		return Point{}, false
+	}
+	if c := poly.Centroid(); poly.Covers(c) {
+		return c, true
+	}
+	// Sweep at the outer ring's centroid latitude. Every crossing of any ring
+	// toggles inside/outside, exactly as Covers does, so holes are handled by
+	// the same even-odd rule rather than by a special case.
+	y := poly[0].Centroid().Lat
+	xs := ringCrossingsAt(poly, y)
+	if len(xs) < 2 {
+		return Point{}, false
+	}
+	sort.Float64s(xs)
+	bestMid, bestWidth := 0.0, 0.0
+	// Spans alternate inside/outside starting inside, so only even indices
+	// open an interior span.
+	for i := 0; i+1 < len(xs); i += 2 {
+		if w := xs[i+1] - xs[i]; w > bestWidth {
+			bestWidth, bestMid = w, (xs[i]+xs[i+1])/2
+		}
+	}
+	if bestWidth <= 0 {
+		return Point{}, false
+	}
+	return Point{Lon: bestMid, Lat: y}, true
+}
+
+// ringCrossingsAt returns the longitudes at which the horizontal line at
+// latitude y crosses any of the polygon's ring edges. A half-open rule on the
+// latitude span (lower end inclusive, upper end exclusive) counts a vertex
+// exactly once, matching Covers.
+func ringCrossingsAt(poly Polygon, y float64) []float64 {
+	var xs []float64
+	for _, r := range poly {
+		if len(r) < 3 {
+			continue
+		}
+		j := len(r) - 1
+		for i := range r {
+			a, b := r[j], r[i]
+			j = i
+			if (a.Lat > y) == (b.Lat > y) {
+				continue
+			}
+			xs = append(xs, a.Lon+(y-a.Lat)/(b.Lat-a.Lat)*(b.Lon-a.Lon))
+		}
+	}
+	return xs
 }
