@@ -11,17 +11,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/httpx"
 	"github.com/bpineau/gazetteer/helpers/kvcache"
 	"github.com/bpineau/gazetteer/helpers/kvcache/memcache"
 )
 
 // ErrIncoherentBANResponse is returned by validateCoherence when the
-// BAN response has both CityCode and PostCode populated but their
-// departement prefixes (first 2 chars) disagree outside of the legit
-// Corsica / DOM-TOM cases. Used as a write-time guard in CachedGeocoder
-// so cross-department drift never enters the persistent cache.
-var ErrIncoherentBANResponse = errors.New("banx: incoherent BAN response (CityCode/PostCode dept prefix mismatch)")
+// BAN response has both CityCode and PostCode populated but the commune
+// table says that postcode does not serve that commune. Used as a
+// write-time guard in CachedGeocoder so cross-commune drift never enters
+// the persistent cache.
+var ErrIncoherentBANResponse = errors.New("banx: incoherent BAN response (PostCode does not serve CityCode's commune)")
 
 // ErrDepartmentMismatch is returned by CachedGeocoder.Geocode when the
 // caller provided an explicit input zip on the query but BAN returned a
@@ -37,17 +38,40 @@ var ErrIncoherentBANResponse = errors.New("banx: incoherent BAN response (CityCo
 // is skipped so a transient drift does not poison persistent storage.
 var ErrDepartmentMismatch = errors.New("banx: BAN returned a candidate outside the input zip's département")
 
-// validateCoherence checks that the departement prefix of CityCode
-// (INSEE) and PostCode agree. Returns ErrIncoherentBANResponse on
-// disagreement. Exceptions:
-//   - Corsica: INSEE prefix in {"2A","2B"} ↔ PostCode prefix == "20".
-//   - DOM-TOM: both prefixes in {"97","98"} → coherent (any 97x/98x
-//     combo, the 3rd digit identifies the territory and may legitimately
-//     drift between INSEE and postal numbering).
+// validateCoherence checks that the PostCode BAN returned really serves
+// the commune its CityCode names. Returns ErrIncoherentBANResponse when
+// it does not.
+//
+// The question is answered by the commune table (communes.ZipMatchesINSEE),
+// which knows each commune's primary and alternate postal codes. It used
+// to be answered by comparing the first two characters of the two codes,
+// which is a different question and blames 23 correct BAN answers: a
+// postal round is drawn for the postman, not for the préfet, so Curbans
+// (INSEE 04066, Alpes-de-Haute-Provence) is served by 05110 in the
+// Hautes-Alpes and Paray-Vieille-Poste (91479, Essonne) by 94390 in the
+// Val-de-Marne. Each of those was refused the cache and logged as a
+// warning on every lookup, forever.
+//
+// Exceptions, in order:
 //   - Either field empty → no validation; we only guard data we have.
+//   - INSEE unknown to the table (a commune younger than the embedded
+//     snapshot) → fall back to the département-prefix comparison, which
+//     is the best test available without the row. Corsica (INSEE 2A/2B ↔
+//     postal 20) and the DOM-TOM (any 97x/98x combo) stay carved out
+//     there, since their two numberings differ by construction.
 func validateCoherence(res GeocodeResult) error {
 	if len(res.CityCode) < 2 || len(res.PostCode) < 2 {
 		return nil
+	}
+	// A nil table (embedded data unreadable) answers "not known" and
+	// falls through to the prefix comparison rather than panicking on a
+	// cache write.
+	table, _ := communes.Default()
+	if match, known := table.ZipMatchesINSEE(res.CityCode, res.PostCode); known {
+		if match {
+			return nil
+		}
+		return ErrIncoherentBANResponse
 	}
 	cc := res.CityCode[:2]
 	pc := res.PostCode[:2]
