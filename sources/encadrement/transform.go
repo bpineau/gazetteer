@@ -60,6 +60,13 @@ const (
 	rawEstEnsembleZonesName = "encadrement_est_ensemble_zones.raw.geojson"
 	rawEstEnsembleZonesURL  = "https://static.data.gouv.fr/resources/encadrement-des-loyers-de-est-ensemble/20220608-121232/quartier-est-ensemble-geodata.json"
 
+	// lyonBaremeYear is the first year of the Métropole de Lyon barème the WFS
+	// layer publishes ("carencadrmtloyer_<year>_<year+1>"). It is gated by the
+	// same vintage legality test as the Paris and EPT vintages, and a test
+	// checks it against rawLyonURL, so bumping the layer without the constant
+	// (or the reverse) fails rather than shipping a stale arrêté in silence.
+	lyonBaremeYear = 2025
+
 	rawLyonName = "encadrement_lyon_villeurbanne.raw.geojson"
 	rawLyonURL  = "https://download.data.grandlyon.com/wfs/grandlyon?SERVICE=WFS&VERSION=2.0.0&request=GetFeature&typename=metropole-de-lyon:car_care.carencadrmtloyer_2025_2026&outputFormat=application/json&SRSNAME=EPSG:4326"
 )
