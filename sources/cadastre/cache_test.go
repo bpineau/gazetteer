@@ -18,14 +18,13 @@ func TestDefaultBatiCache_GetPutHappy(t *testing.T) {
 	want := []BatiPolygon{
 		{
 			Geometry: geopoly.MultiPolygon{{{{Lon: 0, Lat: 0}}}},
-			Centroid: geopoly.Point{Lon: 0, Lat: 0},
-			AreaM2:   42,
+			Parts:    []BatiPart{{Inside: geopoly.Point{Lon: 0, Lat: 0}, AreaM2: 42}},
 		},
 	}
 	c.Put("75104", want)
 	got, ok := c.Get("75104")
-	if !ok || len(got) != 1 || got[0].AreaM2 != 42 {
-		t.Errorf("Get after Put = (%+v, %v), want length 1 / AreaM2=42", got, ok)
+	if !ok || len(got) != 1 || got[0].AreaM2() != 42 {
+		t.Errorf("Get after Put = (%+v, %v), want length 1 / AreaM2()=42", got, ok)
 	}
 	if _, ok := c.Get("missing"); ok {
 		t.Error("Get on unset key returned ok=true")
@@ -48,7 +47,7 @@ func TestDefaultBatiCache_RaceFree(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			insee := "750" + string(rune('0'+i%10)) + "0"
-			c.Put(insee, []BatiPolygon{{AreaM2: float64(i)}})
+			c.Put(insee, []BatiPolygon{{Parts: []BatiPart{{AreaM2: float64(i)}}}})
 		}(i)
 	}
 	for i := 0; i < readers; i++ {
@@ -70,14 +69,14 @@ func TestDefaultBatiCache_CapEvictsLeastRecentlyUsed(t *testing.T) {
 	t.Parallel()
 
 	c := &DefaultBatiCache{MaxCommunes: 2}
-	c.Put("75101", []BatiPolygon{{AreaM2: 1}})
-	c.Put("75102", []BatiPolygon{{AreaM2: 2}})
+	c.Put("75101", []BatiPolygon{{Parts: []BatiPart{{AreaM2: 1}}}})
+	c.Put("75102", []BatiPolygon{{Parts: []BatiPart{{AreaM2: 2}}}})
 
 	// Touch 75101 so 75102 becomes the least-recently-used commune.
 	if _, ok := c.Get("75101"); !ok {
 		t.Fatal("Get(75101) missed right after Put")
 	}
-	c.Put("75103", []BatiPolygon{{AreaM2: 3}})
+	c.Put("75103", []BatiPolygon{{Parts: []BatiPart{{AreaM2: 3}}}})
 
 	if _, ok := c.Get("75102"); ok {
 		t.Error("Get(75102) hit, want the least-recently-used commune evicted")
@@ -98,7 +97,7 @@ func TestDefaultBatiCache_ZeroValueBounded(t *testing.T) {
 	c := &DefaultBatiCache{}
 	inseeAt := func(i int) string { return fmt.Sprintf("%05d", 10000+i) }
 	for i := range DefaultBatiCacheMaxCommunes + 3 {
-		c.Put(inseeAt(i), []BatiPolygon{{AreaM2: float64(i)}})
+		c.Put(inseeAt(i), []BatiPolygon{{Parts: []BatiPart{{AreaM2: float64(i)}}}})
 	}
 	var kept int
 	for i := range DefaultBatiCacheMaxCommunes + 3 {
@@ -126,7 +125,7 @@ func TestDefaultBatiCache_NegativeMaxIsUnlimited(t *testing.T) {
 	c := &DefaultBatiCache{MaxCommunes: -1}
 	const n = DefaultBatiCacheMaxCommunes * 4
 	for i := range n {
-		c.Put(fmt.Sprintf("%05d", 10000+i), []BatiPolygon{{AreaM2: float64(i)}})
+		c.Put(fmt.Sprintf("%05d", 10000+i), []BatiPolygon{{Parts: []BatiPart{{AreaM2: float64(i)}}}})
 	}
 	for i := range n {
 		if _, ok := c.Get(fmt.Sprintf("%05d", 10000+i)); !ok {
