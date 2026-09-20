@@ -58,7 +58,13 @@ const Name = "dvf"
 //     already applied. Same bump: the date filter takes a Window, so
 //     Listing.AsOf bounds the cohort on BOTH ends and an as-of query can no
 //     longer answer with prices from after its own reference date.
-const sourceVersion = 5
+//   - v6: the `neighborhood` tier finally means what it says. It asks
+//     communes.Neighbors for the communes within 5 km, which used to
+//     stop at the département boundary below a 10 km radius, so a
+//     border address priced a market half the size: Bezons (95063) saw
+//     2 of its 10 neighbours, Paray-Vieille-Poste (91479) 7 of 14. Any
+//     stored reading whose tier is `neighborhood` must be re-derived.
+const sourceVersion = 6
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.

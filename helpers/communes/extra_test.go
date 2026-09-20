@@ -52,11 +52,13 @@ func TestLookup_NilReceiver_AndMissing(t *testing.T) {
 	}
 }
 
-// TestNeighbors_EdgeCases covers the three branches uncovered by the
+// TestNeighbors_EdgeCases covers the branches uncovered by the
 // happy-path Paris-7e test: zero radius (returns just self), unknown
-// INSEE (returns nil), and the cross-department fan-out triggered by a
-// >10 km radius (we assert at least one foreign-department hit when
-// querying Boulogne-Billancourt 92012 which sits 4 km from Paris-15e).
+// INSEE (returns nil), a nil receiver, and the cross-department reach
+// (we assert at least one foreign-department hit when querying
+// Boulogne-Billancourt 92012, which sits 4 km from Paris-15e). That
+// reach used to need a radius above 10 km; it no longer does, and
+// TestNeighbors_CrossesDepartmentBorders is the test for that.
 func TestNeighbors_EdgeCases(t *testing.T) {
 	tbl, err := Default()
 	if err != nil {
