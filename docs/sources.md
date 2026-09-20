@@ -183,6 +183,15 @@ offline batch complement to the live, per-address `dvf` source.
   synthesis can clear its MinSources=2 floor from embedded data alone —
   pairing with the live `dvf` reading instead of forcing `price_confidence`
   structurally Low.
+- **Plausibility bounds**: a kept sale is 9–250 m² at 300–25 000 €/m²;
+  anything outside is dropped, never clamped. These are TIGHTER than
+  `dvf`'s (9–1 000 m², 100–50 000 €/m²) because the cohorts differ:
+  `dvfagg` aggregates APARTMENTS only, `dvf` every built local. Measured
+  on the shipped aggregate, the cap never binds (the highest commune
+  median is 17 000 €/m² and the highest p75 16 865, both Paris) and four
+  of the 9 090 communes have a median of exactly 300 €/m², each on a
+  single sale. Do not compare a `dvfagg` median with a `dvf` median as
+  if they measured the same population.
 - **Build**: `gazetteer refresh -go-embed-update dvfagg` downloads the
   geo-dvf bulk files (dept × last 3 years, currently 2023-2025), keeps
   single-lot apartment *Vente* mutations, and writes the embedded
