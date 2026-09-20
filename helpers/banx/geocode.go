@@ -65,18 +65,26 @@ func containsToken(s, tok string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(tok))
 }
 
-// ZipsShareDepartment reports whether two 5-digit FR postcodes share the
-// same département prefix. Uses a 2-digit prefix for métropolitain zips
-// and a 3-digit prefix for DOM-TOM (97xxx / 98xxx, where the third digit
-// distinguishes territories: 971 Guadeloupe, 972 Martinique, 973 Guyane,
-// 974 Réunion, 975 Saint-Pierre-et-Miquelon, 976 Mayotte, 977/978
-// Saint-Barthélemy/Saint-Martin, 986/987/988 Polynésie/Wallis/Nouvelle-
-// Calédonie).
+// ZipsShareDepartment reports whether two 5-digit FR postcodes fall in the
+// same département. Uses a 2-digit prefix for métropolitain zips and a
+// 3-digit prefix for DOM-TOM (97xxx / 98xxx: 971 Guadeloupe, 972 Martinique,
+// 973 Guyane, 974 Réunion, 975 Saint-Pierre-et-Miquelon, 976 Mayotte,
+// 986/987/988 Polynésie/Wallis/Nouvelle-Calédonie).
+//
+// Saint-Barthélemy (977) and Saint-Martin (978) are NOT separated by their
+// prefix: both kept 971xx postal codes when they were split off Guadeloupe in
+// 2007, so 97133 and 97150 are mapped by hand. Without that, a BAN answer in
+// Guadeloupe was accepted for a Saint-Barthélemy query — 230 km away, and
+// exactly what this guard exists to reject.
 //
 // Empty inputs are treated as "no anchor → no rejection" (returns true),
 // matching the existing semantics in the castorus / bienici /
-// meilleursagents enricher pickers .
-// Malformed inputs shorter than 2 chars fall back to equality.
+// meilleursagents enricher pickers.
+//
+// Anything that is not a well-formed 5-digit zip falls back to equality, so a
+// zip that lost its leading zero cannot fold onto the wrong département:
+// "1000" (Bourg-en-Bresse, Ain) shares nothing with "10000" (Troyes, Aube),
+// where a blind 2-character prefix made them the same.
 //
 // Exported here so the BAN cache layer and any future geo consumer can
 // share a single dept-guard predicate, rather than each enricher
