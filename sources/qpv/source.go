@@ -7,6 +7,7 @@ import (
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/communes"
 )
 
@@ -28,7 +29,10 @@ const Name = "qpv"
 //     IsEmpty() move wherever a contour carries a long straight stretch
 //     (the shipped artifact's longest edge is 3 961 m), so a v2 reading of
 //     those fields must be re-derived, not reused from a cache. HasQPV for
-//     a point INSIDE a QPV is unaffected.
+//     a point INSIDE a QPV is unaffected. v3 also sends a listing whose
+//     coordinates are only commune-precise (MinCoordPrecision) down the
+//     commune-level path, instead of answering about the mairie at
+//     MatchLevelPoint / ConfidenceHigh.
 const sourceVersion = 3 // v3
 
 // Version exposes sourceVersion so callers that wrap the Source can
@@ -40,6 +44,19 @@ const Version = sourceVersion
 // QPV boundary lies within this distance. A hint only — it never affects
 // HasQPV. ~1 km is "the next street over could be a QPV" territory.
 const NearestQPVMaxMeters = 1000.0
+
+// MinCoordPrecision is the coarsest geocoder granularity the
+// point-in-polygon path will accept: a street centroid or finer.
+//
+// A QPV is a neighbourhood. A street centroid is inside one or outside
+// one and the answer means something; a commune CENTRE is just the
+// mairie, which is inside a QPV in a handful of communes and outside it
+// in the rest, for reasons that have nothing to do with the address
+// asked about. Since the coarse answer would come back as
+// MatchLevelPoint / ConfidenceHigh, it is the commune-level path
+// (MatchLevelCommune / ConfidenceMedium) that such a listing gets: same
+// grain as its coordinates, and labelled as such.
+const MinCoordPrecision = banx.PrecisionStreet
 
 // Options configures a qpv Source.
 type Options struct {
@@ -90,7 +107,8 @@ func (s *Source) index() (*Index, error) {
 //     answer for most addresses). Both are MatchLevelPoint /
 //     ConfidenceHigh. An outside hit optionally records a NearestQPV hint
 //     when a QPV lies within NearestQPVMaxMeters.
-//  3. If coordinates are absent: fall back to the commune-level list
+//  3. If coordinates are absent, or are only as precise as the commune
+//     itself (MinCoordPrecision): fall back to the commune-level list
 //     (arrondissements folded), MatchLevelCommune / ConfidenceMedium.
 //
 // Property type is irrelevant — QPV designation is geographic.
@@ -107,12 +125,15 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	}
 
 	// Point-in-polygon path — the authoritative answer when we have
-	// coordinates ((0,0) is the "unset coords" sentinel, see Coords).
-	if lat, lon, ok := l.Coords(); ok {
+	// coordinates ((0,0) is the "unset coords" sentinel, see Coords)
+	// precise enough to stand for the address rather than for the
+	// commune (see MinCoordPrecision).
+	if lat, lon, ok := l.CoordsAtLeast(MinCoordPrecision); ok {
 		return s.queryPoint(idx, lat, lon), nil
 	}
 
-	// Commune-level fallback — no coordinates.
+	// Commune-level fallback — no coordinates, or coordinates that are
+	// only commune-level themselves.
 	return s.queryCommune(idx, insee), nil
 }
 

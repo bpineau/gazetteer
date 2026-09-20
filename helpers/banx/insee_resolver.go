@@ -66,10 +66,22 @@ type INSEEQuery struct {
 // which step of the cascade resolved it (`ban_forward` or `ban_reverse`)
 // for traceability in enricher payloads.
 type INSEEResolution struct {
-	INSEE  string
-	Lat    float64
-	Lon    float64
-	Source string // "ban_forward" | "ban_reverse"
+	INSEE string
+	// Lat/Lon are a BY-PRODUCT of resolving the commune, and are only as
+	// precise as Precision says. The cascade's job is the INSEE, for
+	// which a commune-centre match is the RIGHT answer, so it applies no
+	// precision floor: on the forward step these are whatever BAN
+	// matched, which for "Montreuil 93100" is the middle of Montreuil.
+	// Anything reading at address granularity must check Precision, or
+	// geocode again through ResolveLatLonAt, before using them.
+	Lat float64
+	Lon float64
+	// Precision is the granularity Lat/Lon were matched at, empty when
+	// the geocoder reported none. The reverse step echoes the caller's
+	// OWN input coordinates back, so it leaves this empty: the caller
+	// knows where those came from.
+	Precision Precision
+	Source    string // "ban_forward" | "ban_reverse"
 }
 
 // Resolve runs the cascade. Returns ErrNotFound when no step yields an
@@ -100,10 +112,11 @@ func (r *INSEEResolver) Resolve(ctx context.Context, q INSEEQuery) (INSEEResolut
 			// Real BAN always reports Score in (0, 1].
 			if fwd.CityCode != "" && (fwd.Score == 0 || fwd.Score >= minScore) {
 				return INSEEResolution{
-					INSEE:  fwd.CityCode,
-					Lat:    fwd.Lat,
-					Lon:    fwd.Lon,
-					Source: "ban_forward",
+					INSEE:     fwd.CityCode,
+					Lat:       fwd.Lat,
+					Lon:       fwd.Lon,
+					Precision: fwd.Precision,
+					Source:    "ban_forward",
 				}, nil
 			}
 			// Forward returned but below threshold → fallback if coords.

@@ -6,6 +6,7 @@ import (
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
 )
 
 // Name is the canonical Source identifier.
@@ -22,7 +23,10 @@ const Name = "sensible"
 //     IsEmpty() move wherever a contour carries a long straight stretch
 //     (7 of the 62 shipped zones have an edge longer than twice the 400 m
 //     window), so a v1 reading must be re-derived, not reused from a
-//     cache. A point INSIDE a perimeter is unaffected.
+//     cache. A point INSIDE a perimeter is unaffected. v2 also refuses a
+//     (0, 0) coordinate (the "unset" sentinel, which v1 measured from,
+//     answering "no sensitive zone nearby") and one coarser than
+//     MinCoordPrecision.
 const sourceVersion = 2
 
 // Version exposes sourceVersion so callers can mirror it.
@@ -57,21 +61,38 @@ func (s *Source) Version() int { return sourceVersion }
 // Datasets implements gazetteer.DatasetProvider.
 func (s *Source) Datasets() []dataset.Set { return []dataset.Set{set} }
 
+// MinCoordPrecision is the coarsest geocoder granularity this Source
+// will answer from: a street centroid or finer.
+//
+// A perimeter question is a question about a place inside a commune, so
+// a commune-centre coordinate cannot answer it — and would answer it
+// confidently, since the mairie is a perfectly ordinary point that is
+// either inside a QRR or not. A street centroid is on the right street,
+// which is the scale these contours are drawn at. Coarser than that, the
+// Source refuses: it has no commune-level fallback on purpose (the qpv
+// Source already answers at that grain).
+const MinCoordPrecision = banx.PrecisionStreet
+
 // Query implements gazetteer.Source. Pipeline:
 //
-//  1. Require listing coordinates (Lat/Lon). Without them the Source emits
-//     gazetteer.ErrInsufficientInputs — a commune-level fallback would defeat
-//     the point (the QPV source already answers at that grain).
+//  1. Require listing coordinates (Listing.Coords, so the (0, 0) null-island
+//     sentinel counts as absent) at MinCoordPrecision or finer. Otherwise the
+//     Source emits gazetteer.ErrInsufficientInputs — a commune-level fallback
+//     would defeat the point (the QPV source already answers at that grain).
 //  2. Test the point against every QRR polygon and curated circle: inside →
 //     Result.In, boundary within NearbyMeters → Result.Nearby.
 //  3. Return (*Result, nil). Neither inside nor near anything → IsEmpty().
 //
 // Property type is irrelevant.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
-	if l.Lat == nil || l.Lon == nil {
+	lat, lon, ok := l.Coords()
+	if !ok {
 		return nil, fmt.Errorf("sensible: %w: listing coordinates required", gazetteer.ErrInsufficientInputs)
 	}
-	lat, lon := *l.Lat, *l.Lon
+	if l.CoordPrecision.CoarserThan(MinCoordPrecision) {
+		return nil, fmt.Errorf("sensible: %w: %w: listing coordinates are %q, where %q or finer is required to test a perimeter",
+			gazetteer.ErrInsufficientInputs, banx.ErrCoarseMatch, l.CoordPrecision, MinCoordPrecision)
+	}
 
 	idx := s.opts.Index
 	if idx == nil {

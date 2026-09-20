@@ -339,7 +339,7 @@
   },
   {
     "name": "gpe",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "Nearest FUTURE Grand Paris Express station + line + distance (informational, not scored).",
     "inputs": [
