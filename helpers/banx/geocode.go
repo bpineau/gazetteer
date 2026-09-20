@@ -45,10 +45,22 @@ func (q GeocodeQuery) String() string {
 // GeocodeResult is the BAN-flavoured response. CityCode is the 5-digit
 // INSEE code; it is always extracted because every downstream caller
 // keyed on the commune (cadastre, DVF, tax, …) needs it.
+//
+// Lat/Lon alone do not say WHAT they are the position of. Read Precision
+// (and Score) before handing them to anything reading at address
+// granularity: BAN answers every query it can parse, so a nonexistent
+// street comes back as its commune's centre, with coordinates that look
+// exactly like an address.
 type GeocodeResult struct {
-	Lat, Lon  float64
-	Label     string
-	Score     float64
+	Lat, Lon float64
+	Label    string
+	// Score is BAN's own confidence, in (0, 1]. Zero means the payload
+	// carried none (a stub, a proxy), never "no confidence".
+	Score float64
+	// Precision is the granularity the coordinate was matched at,
+	// decoded from BAN's `type` property. See the Precision godoc for
+	// what each value can be read for; the zero value means unreported.
+	Precision Precision
 	CityCode  string // INSEE / "citycode" returned by BAN
 	PostCode  string
 	Source    string // "ban"

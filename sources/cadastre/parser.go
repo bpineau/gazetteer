@@ -130,28 +130,55 @@ func outerRing(pts [][2]float64) geopoly.Ring {
 	return ring
 }
 
-// PickFeature returns the first feature whose polygon contains the
-// query point, falling back to the first feature when none claim the
-// point (typical edge case: the listing's lat/lon landed on a parcel
-// boundary). Returns (-1, false) on an empty list.
+// Pick says which parcel feature answered a point query, and how.
+type Pick struct {
+	// Index is the position of the chosen feature in the input slice.
+	Index int
+
+	// Contains is true when the query point is inside the chosen
+	// parcel — the only case where the parcel is certainly the one the
+	// point stands on.
+	Contains bool
+
+	// DistanceM is the distance in metres from the query point to the
+	// chosen parcel's boundary: 0 when Contains, and -1 when no
+	// feature's geometry could be parsed, so nothing could be measured.
+	//
+	// This is what tells a near-miss from a wrong answer. API Carto
+	// filters to parcels near the point, so a fallback is normally a few
+	// metres out — but a fallback is a fallback, and 900 000 m reads
+	// exactly like 9 m in a Result that does not carry the number.
+	DistanceM float64
+}
+
+// PickFeature returns the first feature whose polygon contains the query
+// point. When none claims it — typically a point on a parcel boundary —
+// it falls back to the NEAREST feature by boundary distance and says so
+// on the returned Pick (Contains false, DistanceM > 0). ok is false on
+// an empty list, and on that call only.
 //
-// The fallback is deliberate — API Carto already filtered to parcels
-// near the query point, so the "first feature" is by construction a
-// near-miss rather than a random pick.
-func PickFeature(features []Feature, lon, lat float64) (int, bool) {
+// The fallback is deliberate: API Carto already filtered to parcels near
+// the query point, so the nearest one is by construction a near-miss.
+// It used to be feature 0, the order the upstream happened to serialize
+// in, and the returned bool was true either way, so a caller could not
+// tell a containment from a guess.
+func PickFeature(features []Feature, lon, lat float64) (Pick, bool) {
 	if len(features) == 0 {
-		return -1, false
+		return Pick{Index: -1, DistanceM: -1}, false
 	}
 	p := geopoly.Point{Lon: lon, Lat: lat}
+	best := Pick{Index: 0, DistanceM: -1}
 	for i, f := range features {
 		mp, err := ParsePolygonGeometry(f.Geometry)
 		if err != nil {
 			continue
 		}
 		if mp.Covers(p) {
-			return i, true
+			return Pick{Index: i, Contains: true}, true
+		}
+		if d := mp.BoundaryDistanceM(lat, lon); best.DistanceM < 0 || d < best.DistanceM {
+			best.Index, best.DistanceM = i, d
 		}
 	}
-	// No containment hit — first feature wins by convention.
-	return 0, true
+	return best, true
 }

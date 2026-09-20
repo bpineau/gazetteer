@@ -27,7 +27,10 @@ const Name = "cadastre"
 //     tested on a point geopoly.RepresentativePoint guarantees lies inside
 //     it. BatiM2 and EmpriseRatio move for every multi-wing or concave
 //     (L-shaped, U-shaped) building, so a v1 reading of those two fields
-//     must be re-derived, not reused from a cache.
+//     must be re-derived, not reused from a cache. v2 also refuses a
+//     coordinate coarser than Options.MinCoordPrecision (a commune
+//     centre has a parcel of its own), and reports how far the returned
+//     parcel is from the queried point (Result.MatchDistanceM).
 const sourceVersion = 2
 
 // Version exposes sourceVersion so callers that wrap the Source can
@@ -86,7 +89,36 @@ type Options struct {
 	// bounded to DefaultBatiCacheMaxCommunes whole-commune dumps, oldest
 	// use evicted first.
 	BatiCache BatiCache
+
+	// MinCoordPrecision is the coarsest geocoder granularity this Source
+	// will look a parcel up from. Zero means DefaultMinCoordPrecision.
+	//
+	// A parcel is a property, so the coordinate had better be the
+	// property's. BAN answers every query it can parse: ask it for a
+	// street that does not exist and it returns the commune's centre,
+	// which has a parcel of its own — the mairie's, or whoever owns the
+	// square. Nothing about that Result says so. The floor applies both
+	// to the Listing's own CoordPrecision and to the Source's own
+	// geocoder fallback; a listing or a geocoder that reports no
+	// precision passes, since "unreported" is not "coarse".
+	//
+	// Raise it to banx.PrecisionHouseNumber to accept doorstep matches
+	// only; set it to banx.PrecisionMunicipality to restore the
+	// pre-v0.8.1 behaviour of taking whatever came back.
+	MinCoordPrecision banx.Precision
 }
+
+// DefaultMinCoordPrecision is the floor Options.MinCoordPrecision falls
+// back to: a street centroid or finer.
+//
+// A locality or municipality match is about a place, not an address, and
+// the parcel under it belongs to a stranger. A street centroid still
+// picks the wrong parcel on a long street, which is why Result carries
+// MatchDistanceM and Evidence carries CoordPrecision — but it is at
+// least on the right street, and refusing it would drop every rural
+// address BAN knows no house number for. Callers that need a doorstep
+// say so through Options.
+const DefaultMinCoordPrecision = banx.PrecisionStreet
 
 // Source implements gazetteer.Source for the French cadastre. Use
 // NewSource to construct.
@@ -124,9 +156,10 @@ func (s *Source) Version() int { return sourceVersion }
 
 // Query implements gazetteer.Source. It resolves the listing's
 // lat/lon (preferring the Listing's pointers; falling back to a
-// Geocoder when configured), fetches the API Carto cadastre parcelle
-// FeatureCollection, picks the feature containing the point (with
-// fallback to the first feature), and returns a *Result. When
+// Geocoder when configured) at Options.MinCoordPrecision or finer,
+// fetches the API Carto cadastre parcelle FeatureCollection, picks the
+// feature containing the point (falling back to the NEAREST one, with
+// Result.MatchDistanceM saying how far), and returns a *Result. When
 // IncludeBati is true, the Source also fetches the per-commune
 // building dump and computes BatiM2 / BatiCount / EmpriseRatio.
 //
@@ -134,6 +167,8 @@ func (s *Source) Version() int { return sourceVersion }
 // the table in gazetteer/source.go):
 //
 //   - Missing lat/lon → gazetteer.ErrInsufficientInputs (wrapped)
+//   - Coordinates coarser than Options.MinCoordPrecision →
+//     gazetteer.ErrInsufficientInputs wrapping banx.ErrCoarseMatch
 //   - URL builder rejects coords → gazetteer.ErrInsufficientInputs (wrapped)
 //   - API Carto HTTP 5xx / 429 / transport / parse failure → gazetteer.ErrUpstreamUnavailable (wrapped)
 //   - API Carto HTTP 4xx (other than 404 / 429) → gazetteer.ErrUpstreamPermanent (wrapped)
@@ -148,7 +183,7 @@ func (s *Source) Version() int { return sourceVersion }
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	logger := gazetteer.LoggerFrom(ctx).With(slog.String("source", Name))
 
-	lat, lon, err := s.resolveLatLon(ctx, l)
+	lat, lon, prec, err := s.resolveLatLon(ctx, l)
 	if err != nil {
 		return nil, fmt.Errorf("cadastre: %w: %w", gazetteer.ErrInsufficientInputs, err)
 	}
@@ -172,6 +207,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	ev := Evidence{
 		Lat:            lat,
 		Lon:            lon,
+		CoordPrecision: prec,
 		ParcelleAPIURL: u,
 	}
 
@@ -183,8 +219,9 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		return &Result{Parcels: nil, Evidence: ev}, nil
 	}
 
-	idx, _ := PickFeature(fc.Features, lon, lat)
-	props := fc.Features[idx].Properties
+	pick, _ := PickFeature(fc.Features, lon, lat)
+	ev.ParcelContains = pick.Contains
+	props := fc.Features[pick.Index].Properties
 	parcel := MakeParcel(
 		props.IDU,
 		props.CodeInsee,
@@ -193,13 +230,17 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		props.Numero,
 		props.Contenance,
 	)
+	dist := pick.DistanceM
 	out := &Result{
 		Parcels:  []Parcel{parcel},
 		Evidence: ev,
 	}
+	if dist >= 0 {
+		out.MatchDistanceM = &dist
+	}
 
 	if s.opts.IncludeBati {
-		s.runBati(ctx, fc.Features[idx], &parcel, out, logger)
+		s.runBati(ctx, fc.Features[pick.Index], &parcel, out, logger)
 	}
 
 	return out, nil
@@ -341,19 +382,39 @@ func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
 	})
 }
 
-// resolveLatLon returns (lat, lon) for the listing: the Listing's own
-// coordinates when usable (Listing.Coords), else the Geocoder fallback
-// via banx.ResolveLatLon.
-func (s *Source) resolveLatLon(ctx context.Context, l gazetteer.Listing) (float64, float64, error) {
-	if lat, lon, ok := l.Coords(); ok {
-		return lat, lon, nil
+// resolveLatLon returns the point to look a parcel up under, and the
+// granularity it was matched at: the Listing's own coordinates when they
+// are usable AND at least as precise as the floor (Listing.CoordsAtLeast),
+// else the Geocoder fallback under the same floor (banx.ResolveLatLonAt).
+//
+// A coordinate coarser than the floor is refused, not downgraded: there
+// is no such thing as an approximate parcel, and the one under a commune
+// centre reads as an ordinary answer.
+func (s *Source) resolveLatLon(ctx context.Context, l gazetteer.Listing) (float64, float64, banx.Precision, error) {
+	min := s.minCoordPrecision()
+	if lat, lon, ok := l.CoordsAtLeast(min); ok {
+		return lat, lon, l.CoordPrecision, nil
 	}
-	lat, lon, err := banx.ResolveLatLon(ctx, s.opts.Geocoder,
-		strings.TrimSpace(l.Address+" "+l.Zip+" "+l.City), l.City, l.Zip)
+	if _, _, ok := l.Coords(); ok {
+		// Coordinates are present; only their precision disqualified them.
+		return 0, 0, l.CoordPrecision, fmt.Errorf("cadastre: %w: listing coordinates are %q, where %q or finer is required for a parcel lookup",
+			banx.ErrCoarseMatch, l.CoordPrecision, min)
+	}
+	lat, lon, prec, err := banx.ResolveLatLonAt(ctx, s.opts.Geocoder,
+		strings.TrimSpace(l.Address+" "+l.Zip+" "+l.City), l.City, l.Zip, min, 0)
 	if err != nil {
-		return 0, 0, fmt.Errorf("cadastre: %w", err)
+		return 0, 0, prec, fmt.Errorf("cadastre: %w", err)
 	}
-	return lat, lon, nil
+	return lat, lon, prec, nil
+}
+
+// minCoordPrecision resolves the configured floor, defaulting to
+// DefaultMinCoordPrecision.
+func (s *Source) minCoordPrecision() banx.Precision {
+	if s.opts.MinCoordPrecision != "" {
+		return s.opts.MinCoordPrecision
+	}
+	return DefaultMinCoordPrecision
 }
 
 // Query is the atomic helper for callers who don't want the builder.

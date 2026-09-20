@@ -13,9 +13,14 @@ const Name = "gpe"
 
 // sourceVersion bumps when the Source's internal logic changes.
 //
-// v1 returns the nearest future Grand Paris Express station + line +
-// distance, plus station counts within 1.5 km / 3 km.
-const sourceVersion = 1
+// History:
+//   - v1: returns the nearest future Grand Paris Express station + line +
+//     distance, plus station counts within 1.5 km / 3 km.
+//   - v2: a (0, 0) coordinate is the "unset" sentinel, not Null Island.
+//     v1 measured from it and answered "no station nearby" with an empty
+//     Result, so a listing whose coordinates never resolved was recorded
+//     as having no future transit. Those rows must be re-derived.
+const sourceVersion = 2
 
 // Version exposes sourceVersion so callers can mirror it.
 const Version = sourceVersion
@@ -51,17 +56,18 @@ func (s *Source) Datasets() []dataset.Set { return []dataset.Set{set} }
 
 // Query implements gazetteer.Source. Pipeline:
 //
-//  1. Require listing coordinates (Lat/Lon). Without them the Source emits
+//  1. Require listing coordinates (Listing.Coords, so the (0, 0) null-island
+//     sentinel counts as absent). Without them the Source emits
 //     gazetteer.ErrInsufficientInputs.
 //  2. Find the nearest future GPE station + the counts within 1.5 km / 3 km.
 //  3. Return (*Result, nil). No station within MaxRelevantMeters → IsEmpty().
 //
 // Property type is irrelevant.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
-	if l.Lat == nil || l.Lon == nil {
+	lat, lon, ok := l.Coords()
+	if !ok {
 		return nil, fmt.Errorf("gpe: %w: listing coordinates required", gazetteer.ErrInsufficientInputs)
 	}
-	lat, lon := *l.Lat, *l.Lon
 
 	idx := s.opts.Index
 	if idx == nil {

@@ -170,7 +170,7 @@ encadrement     v4
 filoiris        v1
 filosofi        v1
 georisques      v1
-gpe             v1
+gpe             v2
 ips_ecoles      v1
 iris            v1
 links           v3

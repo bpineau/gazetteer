@@ -70,6 +70,12 @@ func (n *BANNormalizer) Normalize(ctx context.Context, addr string) (Listing, er
 		INSEE:   r.CityCode,
 		Lat:     &lat,
 		Lon:     &lon,
+		// What the coordinates are the position OF. BAN answers every
+		// query it can parse, so a street that does not exist comes back
+		// as its commune's centre; carrying the granularity is what lets
+		// the per-address Sources refuse it while the commune-keyed ones
+		// carry on.
+		CoordPrecision: r.Precision,
 	}
 	if n.communes != nil && r.CityCode != "" {
 		if c, ok := n.communes.Lookup(r.CityCode); ok {

@@ -106,11 +106,19 @@ Building-level facts from the Base de Données Nationale des Bâtiments
 French cadastral parcel under a listing's lat/lon, with an optional
 building-footprint analysis (count + total emprise + ratio).
 
-- **Needs**: lat/lon (resolved via Geocoder when absent).
+- **Needs**: lat/lon (resolved via Geocoder when absent), at
+  `Options.MinCoordPrecision` or finer — a street centroid by default.
+  A commune centre has a cadastral parcel of its own (the mairie's), so
+  a coordinate that coarse is refused with `banx.ErrCoarseMatch` rather
+  than answered with a stranger's parcel. Raise the floor to
+  `banx.PrecisionHouseNumber` for doorstep-only matching.
 - **Result**: `cadastre.Result` carries a one-element `Parcels` slice
   with the 14-char Etalab id, contenance in m² / ares / hectares and
-  a deeplink to the Etalab cadastre viewer. When `IncludeBati: true`,
-  also carries `BatiM2`, `BatiCount`, `EmpriseRatio`.
+  a deeplink to the Etalab cadastre viewer, plus `MatchDistanceM` (0
+  when the point is INSIDE the parcel, the distance to the nearest one
+  otherwise — read it before treating the parcel as the property's).
+  When `IncludeBati: true`, also carries `BatiM2`, `BatiCount`,
+  `EmpriseRatio`.
 - **`IsEmpty()`**: true when the API returns zero features (typical
   when the point falls on unsurveyed land or in a Livre-Foncier area
   not covered by the cadastre tradition).
@@ -504,7 +512,8 @@ Nearest **future** Grand Paris Express station — the new IDF metro
 a major rental-demand and capital-appreciation driver for the "near a
 station, not Paris" thesis (pairs with the `transport` ZoneScore profile).
 
-- **Needs**: lat/lon.
+- **Needs**: lat/lon (a (0, 0) pair is the "unset" sentinel, not Null
+  Island, and is refused rather than measured from).
 - **Result**: nearest station name + line (verbatim SGP label, e.g. `L15`
   or `L16/L17` at an interchange) + distance, plus station counts within
   1.5 km / 3 km. Empty beyond 6 km.
@@ -723,7 +732,9 @@ is the listing **inside** a QPV? Answered by point-in-polygon over the QPV
 2024 contours when coordinates are present, with a commune-level fallback.
 
 - **Needs**: INSEE; Lat/Lon strongly recommended (unlocks the address-level
-  point-in-polygon path; without them the answer is commune-level only).
+  point-in-polygon path; without them, or with coordinates only as precise
+  as the commune itself — `qpv.MinCoordPrecision` — the answer is
+  commune-level only, and says so through `MatchLevel`).
 - **Result**: `qpv.Result` with `HasQPV`, `MatchLevel` (`point` | `commune`),
   the matched QPV code(s) + labels, and — for a point outside every QPV — a
   `Nearest{Code,Label,Meters}` hint (within 1 km) kept out of `HasQPV`.
@@ -744,7 +755,10 @@ dégradées d'intérêt national (décrets en Conseil d'État — the classic
 judicial-auction trap)? The lists are administrative snapshots (QRR frozen
 since 2021): a stable photo of structurally distressed areas, not a live feed.
 
-- **Needs**: Lat/Lon (no commune-level fallback — that grain is `qpv`'s job).
+- **Needs**: Lat/Lon at `sensible.MinCoordPrecision` (a street centroid) or
+  finer; no commune-level fallback, that grain is `qpv`'s job. A (0, 0)
+  pair is the "unset" sentinel, not Null Island, and a commune-centre
+  coordinate is refused rather than answered about the mairie.
 - **Result**: `sensible.Result` with `Sensitive` (inside ≥ 1 zone), `In`
   (containing zones) and `Nearby` (boundary within 400 m — absorbs geocoding
   imprecision), each a `Zone{Name, Kind (qrr|orcod|curated), Dep, Vague,
