@@ -40,6 +40,19 @@ const (
 	// (commune, neighborhood, department, address_radius) benefits.
 	MaxMutationsPerParcelle = 4
 
+	// Plausibility bounds on a single kept sale. A row outside them is
+	// dropped, never clamped, so a published statistic can sit ON a
+	// bound but never past it.
+	//
+	// They are WIDER than the sibling bounds in sources/dvfagg, and
+	// deliberately: this cohort is every BUILT local (apartment, house,
+	// "Local commercial"), the one a per-address comparison needs, while
+	// dvfagg aggregates APARTMENTS only. 1 000 m² is a manor, not a
+	// flat; 100 EUR/m² is a rural house on its land, and an apartment at
+	// that price is a mislabelled garage. The upper 50 000 EUR/m² covers
+	// prime Paris, where the bundled dvfagg aggregate's richest commune
+	// median is 17 000 and its richest p75 is 16 865 (Paris 6e), so the
+	// cap bites only in the far tail of the deepest markets.
 	SurfaceMinM2  = 9.0
 	SurfaceMaxM2  = 1000.0
 	PricePerM2Min = 100.0
