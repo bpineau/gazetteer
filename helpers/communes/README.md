@@ -74,7 +74,7 @@ small in-memory CSV.
 | `ParseCSV(r io.Reader) (*Table, error)` | Parse a CSV with the canonical header. |
 | `FranceCSVBytes() []byte` | Raw embedded bytes, for inspection. |
 | `(*Table).Lookup(insee string) (Commune, bool)` | Direct INSEE lookup. |
-| `(*Table).Neighbors(insee string, radiusKm float64) []string` | Haversine sweep. |
+| `(*Table).Neighbors(insee string, radiusKm float64) []string` | Haversine sweep over the whole table, département boundaries included. |
 | `(*Table).SameDepartment(insee string) []string` | All INSEE codes in the dept. |
 | `(*Table).CityDepts(name string) []string` | Reverse name → dept codes. |
 | `(*Table).ZipForINSEE(insee string) (string, bool, bool)` | Primary postal code (+ "has alternates"). |

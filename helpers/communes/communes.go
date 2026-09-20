@@ -98,9 +98,23 @@ func (t *Table) Lookup(insee string) (Commune, bool) {
 	return t.rows[i], true
 }
 
-// Neighbors implements Communes.Neighbors. Linear scan over the rows of
-// the same department first (cheap O(K) where K = ~600 for a typical
-// department). For very large radii this fans out across departments.
+// kmPerDegreeLat is one degree of latitude in kilometres on the sphere
+// geodist measures on. Used for the bounding-box prefilter in Neighbors;
+// a degree of longitude is this times cos(lat).
+const kmPerDegreeLat = 111.195
+
+// Neighbors implements Communes.Neighbors: EVERY commune whose centroid
+// is within radiusKm, whatever département it belongs to.
+//
+// It scans the whole table, behind a bounding-box prefilter that costs
+// two comparisons per row and leaves the haversine to the handful of
+// candidates. The obvious optimisation — scan the same département
+// first, widen only for a large radius — was there and was wrong at
+// exactly the addresses that need it: a commune on a département
+// boundary has half its neighbours on the other side. Neighbors("95063",
+// 5.0) returned 2 communes where 10 lie within 5 km of Bezons, and
+// Paray-Vieille-Poste (91479) 7 where 14 do. The DVF "neighborhood"
+// tier runs at 5 km and read a market half the size it documents.
 func (t *Table) Neighbors(insee string, radiusKm float64) []string {
 	if t == nil {
 		return nil
@@ -115,34 +129,31 @@ func (t *Table) Neighbors(insee string, radiusKm float64) []string {
 	out := []string{insee}
 	seen := map[string]struct{}{insee: {}}
 
-	// Most callers stay within the same department; check it first.
-	for _, otherINSEE := range t.byDpt[c.Dept] {
-		if otherINSEE == insee {
+	dLat := radiusKm / kmPerDegreeLat
+	cosLat := math.Cos(c.Lat * math.Pi / 180)
+	if cosLat < 0.01 { // near the poles a degree of longitude is nothing
+		cosLat = 0.01
+	}
+	dLon := radiusKm / (kmPerDegreeLat * cosLat)
+
+	for i := range t.rows {
+		other := t.rows[i]
+		if math.Abs(other.Lat-c.Lat) > dLat {
 			continue
 		}
-		other := t.rows[t.byID[otherINSEE]]
-		if HaversineKm(c.Lat, c.Lon, other.Lat, other.Lon) <= radiusKm {
-			if _, dup := seen[otherINSEE]; !dup {
-				out = append(out, otherINSEE)
-				seen[otherINSEE] = struct{}{}
-			}
+		dl := math.Abs(other.Lon - c.Lon)
+		if dl > 180 { // the short way round, for the Pacific collectivités
+			dl = 360 - dl
 		}
-	}
-
-	// For radii > ~10 km, also widen across departments (e.g. for IDF
-	// arrondissements near a department border). Bounded full scan.
-	if radiusKm > 10 {
-		for i := range t.rows {
-			other := t.rows[i]
-			if other.Dept == c.Dept {
-				continue
-			}
-			if HaversineKm(c.Lat, c.Lon, other.Lat, other.Lon) <= radiusKm {
-				if _, dup := seen[other.INSEE]; !dup {
-					out = append(out, other.INSEE)
-					seen[other.INSEE] = struct{}{}
-				}
-			}
+		if dl > dLon {
+			continue
+		}
+		if HaversineKm(c.Lat, c.Lon, other.Lat, other.Lon) > radiusKm {
+			continue
+		}
+		if _, dup := seen[other.INSEE]; !dup {
+			out = append(out, other.INSEE)
+			seen[other.INSEE] = struct{}{}
 		}
 	}
 	sort.Strings(out)
