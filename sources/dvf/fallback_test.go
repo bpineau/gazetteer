@@ -22,7 +22,7 @@ func newLadderHarness(t *testing.T, auctionLat, auctionLon *float64) (*Source, *
 	})
 	tc := &tierContext{
 		target:     "Appartement",
-		cutoff:     time.Now().AddDate(-CutoffYears, 0, 0),
+		window:     WindowEndingAt(time.Now()),
 		auctionLat: auctionLat,
 		auctionLon: auctionLon,
 		memo:       newQueryMemo(),

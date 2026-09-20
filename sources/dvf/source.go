@@ -48,7 +48,17 @@ const Name = "dvf"
 //     dossier's total-value field and on every appraisal aggregate.
 //     n-per-id_parcelle cap of 4 applied globally to FilterMutations
 //     as a defensive guard.
-const sourceVersion = 4
+//   - v5: the per-m² denominator is finally the surface the price bought.
+//     `valeur_fonciere` prices the whole MUTATION and geo-dvf repeats it on
+//     every one of its rows, so a multi-lot sale used to enter the median
+//     once per lot at the full price over that lot's surface alone (the
+//     packaged Paris 7e fixture's 2024-1216400 scored 47 031 and 22 463 €/m²
+//     for a 15 202 €/m² transaction). FilterMutations now keeps only the
+//     mutations carrying a single built local, which is the rule dvfagg
+//     already applied. Same bump: the date filter takes a Window, so
+//     Listing.AsOf bounds the cohort on BOTH ends and an as-of query can no
+//     longer answer with prices from after its own reference date.
+const sourceVersion = 5
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -287,11 +297,9 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	if !l.AsOf.IsZero() {
 		asOf = l.AsOf
 	}
-	cutoff := asOf.AddDate(-CutoffYears, 0, 0)
-
 	tc := &tierContext{
 		target:     target,
-		cutoff:     cutoff,
+		window:     WindowEndingAt(asOf),
 		auctionLat: l.Lat,
 		auctionLon: l.Lon,
 		memo:       newQueryMemo(),

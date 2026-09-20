@@ -75,3 +75,25 @@ func TestQuery_AtomicHelper(t *testing.T) {
 		t.Fatalf("unexpected Result: %+v (evidence %+v)", r, r.Evidence)
 	}
 }
+
+// TestQuery_ArrondissementParentIsRefused pins the loud failure: geo-dvf ships
+// no row for 75056 / 69123 / 13055, and answering "no qualifying sale" for
+// Paris, Lyon or Marseille would be believed. communes.ResolveINSEE("Paris",
+// "75000") hands a caller exactly one of these codes.
+func TestQuery_ArrondissementParentIsRefused(t *testing.T) {
+	t.Parallel()
+	for _, insee := range []string{"75056", "69123", "13055"} {
+		_, err := Query(context.Background(), Options{}, gazetteer.Listing{INSEE: insee})
+		if !errors.Is(err, gazetteer.ErrInsufficientInputs) {
+			t.Errorf("Query(%s) err = %v, want ErrInsufficientInputs", insee, err)
+		}
+	}
+	// The arrondissement itself answers normally.
+	res, err := Query(context.Background(), Options{}, gazetteer.Listing{INSEE: "75101"})
+	if err != nil {
+		t.Fatalf("Query(75101): %v", err)
+	}
+	if res.IsEmpty() || res.PriceMedianEURM2 <= 0 {
+		t.Errorf("Query(75101) = %+v, want a populated Paris 1er aggregate", res)
+	}
+}

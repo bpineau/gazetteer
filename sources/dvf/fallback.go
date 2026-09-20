@@ -29,7 +29,6 @@ package dvf
 import (
 	"context"
 	"log/slog"
-	"time"
 
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/fallback"
@@ -39,8 +38,8 @@ import (
 // over. Source.Query constructs one of these at the start of the call,
 // builds the ladder, and walks it.
 type tierContext struct {
-	target string    // type_local filter, e.g. "Appartement"
-	cutoff time.Time // filter date floor (now - CutoffYears)
+	target string // type_local filter, e.g. "Appartement"
+	window Window // the date range the cohort is drawn from (AsOf - CutoffYears .. AsOf)
 
 	// Auction-level inputs the address_radius tier needs:
 	// auctionLat/auctionLon are the post-filter anchor — when either is
@@ -67,7 +66,7 @@ type tierContext struct {
 // buildLadder returns the 4-tier DVF ladder for the given INSEE.
 //
 // The ladder is rebuilt for every Query call because each tier closes
-// over per-call state (target type_local, cutoff date, INSEE list,
+// over per-call state (target type_local, date window, INSEE list,
 // scratch counters for methodParams). The cost is negligible — four
 // struct allocations.
 func (s *Source) buildLadder(insee string, tc *tierContext) []fallback.Tier {
@@ -128,7 +127,7 @@ func (s *Source) makeTryLevel(communesINSEE []string, tc *tierContext, levelName
 			return fallback.Output{}, err
 		}
 		muts, secCount := s.fetchMutationsForCommunes(ctx, tc.memo, communesINSEE)
-		filtered := FilterMutations(muts, tc.target, tc.cutoff)
+		filtered := FilterMutations(muts, tc.target, tc.window)
 
 		// Persist the scratch counters so Query's Evidence reflects
 		// the WINNING tier's fan-out — not the cumulative effort across
@@ -186,7 +185,7 @@ func (s *Source) makeTryAddressRadius(communesINSEE []string, tc *tierContext) f
 		}
 
 		muts, secCount := s.fetchAddressRadiusMutations(ctx, tc.memo, communesINSEE, *tc.auctionLat, *tc.auctionLon)
-		communeFiltered := FilterMutations(muts, tc.target, tc.cutoff)
+		communeFiltered := FilterMutations(muts, tc.target, tc.window)
 
 		// Pre-compute the pre-radius median from the same (prefiltered)
 		// pool, for telemetry. Cheap (single Quartiles call); avoids a

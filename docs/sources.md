@@ -156,7 +156,15 @@ des loyers).
 Per-commune DVF sale-price aggregate (median €/m² + dispersion), the
 offline batch complement to the live, per-address `dvf` source.
 
-- **Needs**: INSEE.
+- **Needs**: INSEE — the **arrondissement** code for Paris / Lyon / Marseille.
+  geo-dvf keys those three communes by arrondissement only (75101..75120,
+  69381..69389, 13201..13216) and ships no row for the parent codes 75056 /
+  69123 / 13055, which `communes.ResolveINSEE("Paris", "75000")` returns. A
+  parent code is refused with `ErrInsufficientInputs` rather than answered
+  with an empty Result: "no qualifying sale in Paris" is a lie a caller would
+  believe. Note the direction — this dataset needs the OPPOSITE of
+  `communes.FoldArrondissement`, and `communes.IsArrondissementParent` is the
+  test for it.
 - **Result**: `PriceMedianEURM2` / `PriceP25EURM2` / `PriceP75EURM2`
   (dispersion over single-lot apartment sales; a wide spread flags a
   bimodal commune), `PriceMedianSmallEURM2` (18–55 m², to pair with a
@@ -171,7 +179,9 @@ offline batch complement to the live, per-address `dvf` source.
   geo-dvf bulk files (dept × last 3 years, currently 2023-2025), keeps
   single-lot apartment *Vente* mutations, and writes the embedded
   `dvf_communes.csv` (~9 k communes). Excludes 57/67/68 (Livre Foncier)
-  and 976 (not in DVF).
+  and 976 (not in DVF). Those four départements are therefore absent from
+  `Codes()` and from every `overview` screen — a commune there returns no row,
+  which is a coverage gap and not a market with no sales.
 
 ## `sources/dvf`
 
@@ -185,6 +195,21 @@ data.gouv.fr Etalab.
   `ValueEURCents` (total = per-m² × surface, when surface is known),
   `SampleSize` (mutations behind the median) and `Confidence`
   (`high`/`medium`/`low`). Also satisfies `appraisal.PriceEstimator`.
+- **Cohort**: only `nature_mutation == "Vente"` (VEFA, adjudication,
+  échange, expropriation and terrain-à-bâtir are excluded), only the target
+  `type_local`, and only mutations carrying **exactly one built local**.
+  That last rule is the one that decides whether the €/m² is arithmetic or
+  fiction: `valeur_fonciere` prices the whole MUTATION and geo-dvf repeats it
+  verbatim on each of its rows, so a sale bundling several lots would
+  otherwise contribute one bogus reading per lot, each at the full price over
+  that lot's surface alone. A bundled *Dépendance* (cave, parking) does not
+  disqualify a mutation — DVF publishes no surface for it — so its value stays
+  in the numerator and biases the reading up by whatever the parking was
+  worth. That residual is inherent to DVF and shared with `dvfagg`, which
+  applies the same rule via `dvf.IsBuiltLocal`.
+- **Window**: `Listing.AsOf` (default: now) sets BOTH ends of the 5-year
+  cohort (`dvf.Window`, `dvf.WindowEndingAt`), so an as-of valuation never
+  answers with sales made after its own reference date.
 - **Ladder**: 4-tier `helpers/fallback.Walk`:
   1. `address_radius` — 500 m disk around `(Lat, Lon)`, MinSample 12
   2. `commune` — listing's INSEE

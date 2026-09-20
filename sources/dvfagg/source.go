@@ -7,6 +7,7 @@ import (
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/communes"
 )
 
 // Options configures a dvfagg Source. Zero value is usable (embedded only).
@@ -37,10 +38,22 @@ func (s *Source) Datasets() []dataset.Set { return []dataset.Set{theSet} }
 // Query implements gazetteer.Source: returns the commune aggregate for the
 // listing's INSEE. Without an INSEE it emits gazetteer.ErrInsufficientInputs;
 // a present-but-unmatched commune surfaces as IsEmpty() (no qualifying sale).
+//
+// A Paris / Lyon / Marseille PARENT code (75056, 69123, 13055) also emits
+// ErrInsufficientInputs rather than an empty Result. geo-dvf keys those three
+// communes by arrondissement only, so the parent code matches no row — and
+// answering "no qualifying sale in Paris" for the country's deepest market is
+// the kind of wrong that gets believed. communes.ResolveINSEE("Paris",
+// "75000") returns exactly that parent code, so the case is reachable from
+// ordinary inputs; the caller's fix is to pass the arrondissement.
 func (s *Source) Query(_ context.Context, l gazetteer.Listing) (any, error) {
 	insee := strings.TrimSpace(l.INSEE)
 	if insee == "" {
 		return nil, fmt.Errorf("dvfagg: %w: listing.INSEE required", gazetteer.ErrInsufficientInputs)
+	}
+	if communes.IsArrondissementParent(insee) {
+		return nil, fmt.Errorf("dvfagg: %w: %s is a Paris/Lyon/Marseille parent commune, which geo-dvf keys by arrondissement only; pass the arrondissement INSEE",
+			gazetteer.ErrInsufficientInputs, insee)
 	}
 	idx := s.opts.Index
 	if idx == nil {

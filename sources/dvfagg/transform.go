@@ -13,6 +13,7 @@ import (
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/helpers/stats"
+	"github.com/bpineau/gazetteer/sources/dvf"
 )
 
 // sanity bounds, identical to the validated screening methodology.
@@ -69,7 +70,7 @@ func accumulate(src io.Reader, m map[string]*acc) error {
 			continue
 		}
 		tl := rec[col["type_local"]]
-		if tl != "Appartement" && tl != "Maison" && !strings.HasPrefix(tl, "Local") {
+		if !dvf.IsBuiltLocal(tl) {
 			continue // ignore Dépendance / Terrain etc.
 		}
 		id := rec[col["id_mutation"]]
@@ -87,7 +88,7 @@ func accumulate(src io.Reader, m map[string]*acc) error {
 			case x.tl == "Appartement":
 				apts++
 				a = x
-			case x.tl == "Maison", strings.HasPrefix(x.tl, "Local"):
+			case dvf.IsBuiltLocal(x.tl):
 				bad = true
 			}
 		}
