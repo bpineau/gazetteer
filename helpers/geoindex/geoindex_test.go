@@ -240,13 +240,17 @@ func TestIndexNearest(t *testing.T) {
 		NewFeature(payload{"A"}, square(0, 0, 0.001).MultiPolygon()),
 		NewFeature(payload{"B"}, square(1, 1, 0.001).MultiPolygon()),
 	})
-	// A point just outside A's corner; A is far nearer than B.
-	got, dist, ok := idx.Nearest(0, 0, 100000)
+	// A point just outside A's south-west corner, on the diagonal: 0.001
+	// degrees out on both axes is ~157 m from the vertex at the equator.
+	// Querying the corner itself would read exactly 0 and assert nothing,
+	// and a point ON a vertex is a coverage verdict geopoly leaves
+	// undefined, so the reading could differ between platforms.
+	got, dist, ok := idx.Nearest(-0.001, -0.001, 100000)
 	if !ok || got.id != "A" {
 		t.Fatalf("Nearest = %v,%v,%v want A", got, dist, ok)
 	}
-	if dist < 0 {
-		t.Fatalf("distance should be non-negative, got %v", dist)
+	if dist < 100 || dist > 250 {
+		t.Fatalf("distance = %v m, want the ~157 m diagonal to A's corner", dist)
 	}
 	// A tight cap excludes everything.
 	if _, _, ok := idx.Nearest(50, 50, 1); ok {

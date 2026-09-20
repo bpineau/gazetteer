@@ -79,7 +79,7 @@ func TestSource_HappyPath(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	s := NewSource(Options{BaseURL: srv.URL + "/records"})
+	s := NewSource(Options{BaseURL: srv.URL + "/records", HTTPClient: srv.Client()})
 	data, err := s.Query(context.Background(), gazetteer.Listing{INSEE: "75111"})
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -145,7 +145,7 @@ func TestSource_EmptyCommune(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	s := NewSource(Options{BaseURL: srv.URL + "/records"})
+	s := NewSource(Options{BaseURL: srv.URL + "/records", HTTPClient: srv.Client()})
 	data, err := s.Query(context.Background(), gazetteer.Listing{INSEE: "99999"})
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -178,7 +178,7 @@ func TestSource_Upstream5xx_Transient(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	s := NewSource(Options{BaseURL: srv.URL + "/records"})
+	s := NewSource(Options{BaseURL: srv.URL + "/records", HTTPClient: srv.Client()})
 	_, err := s.Query(context.Background(), gazetteer.Listing{INSEE: "75111"})
 	if !errors.Is(err, gazetteer.ErrUpstreamUnavailable) {
 		t.Errorf("err = %v, want ErrUpstreamUnavailable", err)
@@ -192,7 +192,7 @@ func TestSource_Upstream4xx_Permanent(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	s := NewSource(Options{BaseURL: srv.URL + "/records"})
+	s := NewSource(Options{BaseURL: srv.URL + "/records", HTTPClient: srv.Client()})
 	_, err := s.Query(context.Background(), gazetteer.Listing{INSEE: "75111"})
 	if !errors.Is(err, gazetteer.ErrUpstreamPermanent) {
 		t.Errorf("err = %v, want ErrUpstreamPermanent", err)
@@ -206,7 +206,7 @@ func TestSource_Upstream404_EmptyResult(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	s := NewSource(Options{BaseURL: srv.URL + "/records"})
+	s := NewSource(Options{BaseURL: srv.URL + "/records", HTTPClient: srv.Client()})
 	data, err := s.Query(context.Background(), gazetteer.Listing{INSEE: "75111"})
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -225,7 +225,7 @@ func TestSource_GarbageBody_Transient(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	s := NewSource(Options{BaseURL: srv.URL + "/records"})
+	s := NewSource(Options{BaseURL: srv.URL + "/records", HTTPClient: srv.Client()})
 	_, err := s.Query(context.Background(), gazetteer.Listing{INSEE: "75111"})
 	if !errors.Is(err, gazetteer.ErrUpstreamUnavailable) {
 		t.Errorf("err = %v, want ErrUpstreamUnavailable", err)
@@ -241,7 +241,7 @@ func TestQuery_TypedHelper(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	res, err := Query(context.Background(), Options{BaseURL: srv.URL + "/records"}, gazetteer.Listing{INSEE: "75111"})
+	res, err := Query(context.Background(), Options{BaseURL: srv.URL + "/records", HTTPClient: srv.Client()}, gazetteer.Listing{INSEE: "75111"})
 	if err != nil {
 		t.Fatalf("Query helper: %v", err)
 	}

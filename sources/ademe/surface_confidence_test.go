@@ -26,7 +26,7 @@ func TestSource_SurfaceMismatchIsNotHighConfidence(t *testing.T) {
 	newQuery := func(surface float64) *Result {
 		t.Helper()
 		srv := newStubServer(t, http.StatusOK, body)
-		s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{postCode: "75011"}})
+		s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{postCode: "75011"}, HTTPClient: srv.Client()})
 		l := newListingParis11()
 		if surface > 0 {
 			l.SurfaceM2 = &surface

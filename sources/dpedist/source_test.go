@@ -147,7 +147,7 @@ func TestSource_ThinSample(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	res, err := Query(context.Background(), Options{BaseURL: srv.URL + "/values_agg"}, gazetteer.Listing{INSEE: "12345"})
+	res, err := Query(context.Background(), Options{BaseURL: srv.URL + "/values_agg", HTTPClient: srv.Client()}, gazetteer.Listing{INSEE: "12345"})
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestSource_NullBucketFoldedToN(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	res, err := Query(context.Background(), Options{BaseURL: srv.URL + "/values_agg"}, gazetteer.Listing{INSEE: "12345"})
+	res, err := Query(context.Background(), Options{BaseURL: srv.URL + "/values_agg", HTTPClient: srv.Client()}, gazetteer.Listing{INSEE: "12345"})
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
