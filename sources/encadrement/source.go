@@ -89,9 +89,10 @@ func (s *Source) Datasets() []dataset.Set {
 //
 //  1. Reject non-residential property types with
 //     gazetteer.ErrUnsupportedPropertyType.
-//  2. Try Paris (zip 75001..75020 / 75116, or INSEE 75101..75120).
+//  2. Try Paris (INSEE 75101..75120, or zip 75001..75020 / 75116 when the
+//     listing carries no INSEE).
 //  3. Otherwise try Lyon / Villeurbanne (INSEE 69381..69389 / 69266, or
-//     zip 69001..69009 / 69100).
+//     zip 69001..69009 / 69100 likewise).
 //  4. Otherwise try the Seine-Saint-Denis EPTs (Plaine Commune, Est
 //     Ensemble): point-in-polygon on the embedded zonage resolves the
 //     sub-communal zone from the listing's coordinates, with an
@@ -102,9 +103,9 @@ func (s *Source) Datasets() []dataset.Set {
 // Rooms and BuildYear both narrow the grille cell, and both are optional:
 // an absent one spans every published bucket for that axis and is recorded
 // in the Evidence (an absent Rooms additionally caps the Confidence at
-// ConfidenceLow, because the cap per m² varies by a third from a studio to
-// a four-room flat). SurfaceM2 is not consulted: this Source publishes a
-// per-m² cap, and multiplying by a surface is the caller's step.
+// ConfidenceLow, because the cap per m² falls by a fifth to a third from a
+// studio to a four-room flat). SurfaceM2 is not consulted: this Source
+// publishes a per-m² cap, and multiplying by a surface is the caller's step.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	if !propertyTypeEligible(string(l.PropertyType)) {
 		return nil, fmt.Errorf("encadrement: %w: %q", gazetteer.ErrUnsupportedPropertyType, l.PropertyType)
@@ -126,9 +127,9 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		buildYear: usableBuildYear(l.BuildYear, time.Now()),
 	}
 
-	// Paris. Either identifier resolves the arrondissement: a hand-built
-	// Listing routinely carries one without the other, and treating an
-	// INSEE-only Paris address as unregulated is the worst possible answer.
+	// Paris. Either identifier resolves the arrondissement, INSEE first: a
+	// hand-built Listing routinely carries one without the other, and treating
+	// an INSEE-only Paris address as unregulated is the worst possible answer.
 	if arr := parisArrondissement5(zip, insee); arr != "" {
 		entries := idx.LookupParis(arr)
 		if len(entries) == 0 {
