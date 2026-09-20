@@ -136,7 +136,7 @@ type Pick struct {
 	Index int
 
 	// Contains is true when the query point is inside the chosen
-	// parcel — the only case where the parcel is certainly the one the
+	// parcel - the only case where the parcel is certainly the one the
 	// point stands on.
 	Contains bool
 
@@ -146,13 +146,13 @@ type Pick struct {
 	//
 	// This is what tells a near-miss from a wrong answer. API Carto
 	// filters to parcels near the point, so a fallback is normally a few
-	// metres out — but a fallback is a fallback, and 900 000 m reads
+	// metres out - but a fallback is a fallback, and 900 000 m reads
 	// exactly like 9 m in a Result that does not carry the number.
 	DistanceM float64
 }
 
 // PickFeature returns the first feature whose polygon contains the query
-// point. When none claims it — typically a point on a parcel boundary —
+// point. When none claims it - typically a point on a parcel boundary -
 // it falls back to the NEAREST feature by boundary distance and says so
 // on the returned Pick (Contains false, DistanceM > 0). ok is false on
 // an empty list, and on that call only.

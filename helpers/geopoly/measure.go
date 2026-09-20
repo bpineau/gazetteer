@@ -140,8 +140,8 @@ func (r Ring) AreaM2() float64 {
 // AreaM2 returns the planar area of the polygon in square meters, under
 // the SAME even-odd rule Covers applies: a ring nested inside an odd
 // number of the polygon's other rings is subtracted, a ring nested
-// inside an even number is added. The ordinary GeoJSON shape — ring 0
-// the boundary, rings 1+ the holes — therefore measures boundary minus
+// inside an even number is added. The ordinary GeoJSON shape - ring 0
+// the boundary, rings 1+ the holes - therefore measures boundary minus
 // holes; two DISJOINT rings measure the sum of both; an island inside a
 // hole is added back.
 //
@@ -171,7 +171,7 @@ func (poly Polygon) AreaM2() float64 {
 }
 
 // ringDepth counts how many of the polygon's OTHER rings enclose ring i.
-// Even means the ring adds area, odd means it takes some away — the
+// Even means the ring adds area, odd means it takes some away - the
 // per-ring form of the even-odd rule Covers applies per crossing.
 //
 // Containment is tested on a VERTEX of ring i, not on a point of its

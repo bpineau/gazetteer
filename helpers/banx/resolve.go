@@ -21,7 +21,7 @@ import (
 // It applies NO precision and NO score floor: whatever BAN matched comes
 // back, including the commune centre it answers with for an address that
 // does not exist. That is the right answer for a commune-level reading
-// and the wrong one for a per-address reading, so the caller decides —
+// and the wrong one for a per-address reading, so the caller decides -
 // with ResolveLatLonAt.
 func ResolveLatLon(ctx context.Context, g Geocoder, address, city, zip string) (lat, lon float64, err error) {
 	lat, lon, _, err = ResolveLatLonAt(ctx, g, address, city, zip, PrecisionUnknown, 0)

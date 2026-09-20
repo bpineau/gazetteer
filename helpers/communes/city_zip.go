@@ -136,7 +136,7 @@ func (t *Table) AltZipsForINSEE(insee string) []string {
 }
 
 // ZipMatchesINSEE reports whether zip is one of the postal codes that
-// serve the commune insee — its primary code or any of its alternates.
+// serve the commune insee - its primary code or any of its alternates.
 // Paris / Lyon / Marseille arrondissement codes are folded onto their
 // parent commune first, since the CP table keys those three by parent
 // only and the BAN geocoder answers with the arrondissement.

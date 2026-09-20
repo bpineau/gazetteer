@@ -84,8 +84,8 @@ func TestPolygonAreaM2_SubtractsHoles(t *testing.T) {
 }
 
 // TestPolygonAreaM2_RingOrderDoesNotMatter: under the even-odd rule
-// Covers applies, {small, big} and {big, small} are the SAME shape — a
-// big square with a small square punched out of it — so they must
+// Covers applies, {small, big} and {big, small} are the SAME shape - a
+// big square with a small square punched out of it - so they must
 // measure the same. The old implementation subtracted every ring after
 // the first, so listing the hole first measured 0 for a shape whose
 // Covers says 9 900 m² are inside.

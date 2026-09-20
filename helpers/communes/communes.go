@@ -108,8 +108,8 @@ const kmPerDegreeLat = 111.195
 //
 // It scans the whole table, behind a bounding-box prefilter that costs
 // two comparisons per row and leaves the haversine to the handful of
-// candidates. The obvious optimisation — scan the same département
-// first, widen only for a large radius — was there and was wrong at
+// candidates. The obvious optimisation - scan the same département
+// first, widen only for a large radius - was there and was wrong at
 // exactly the addresses that need it: a commune on a département
 // boundary has half its neighbours on the other side. Neighbors("95063",
 // 5.0) returned 2 communes where 10 lie within 5 km of Bezons, and

@@ -32,7 +32,7 @@ type Result struct {
 	//
 	// Read it before treating the parcel as the property's. API Carto
 	// filters to parcels near the query point, so a fallback is normally
-	// a few metres out — but the number is the only thing that says so,
+	// a few metres out - but the number is the only thing that says so,
 	// and it is only as meaningful as the point it was measured from
 	// (Evidence.CoordPrecision).
 	MatchDistanceM *float64 `json:"match_distance_m,omitempty"`
@@ -71,7 +71,7 @@ type Parcel struct {
 	// "75104000AE0003".
 	ID string `json:"id"`
 
-	// INSEE is the 5-char commune code the parcel anchors on — the
+	// INSEE is the 5-char commune code the parcel anchors on - the
 	// first five characters of ID, by construction. For Paris / Lyon /
 	// Marseille this is the ARRONDISSEMENT code (75104, not 75056),
 	// which is what the Etalab id embeds; fold it with

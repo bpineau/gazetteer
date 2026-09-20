@@ -13,7 +13,7 @@ import (
 // survives a JSON round-trip or a struct built from a partially-filled
 // record, and gpe used to take them at face value: it measured from Null
 // Island, found no station within MaxRelevantMeters, and answered
-// IsEmpty() — "no future Grand Paris Express station near this address",
+// IsEmpty() - "no future Grand Paris Express station near this address",
 // about an address it never located.
 //
 // gazetteer.Listing.Coords is the canonical test and now answers it.

@@ -132,7 +132,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		return s.queryPoint(idx, lat, lon), nil
 	}
 
-	// Commune-level fallback — no coordinates, or coordinates that are
+	// Commune-level fallback - no coordinates, or coordinates that are
 	// only commune-level themselves.
 	return s.queryCommune(idx, insee), nil
 }

@@ -28,8 +28,8 @@ const Name = "osm_transit"
 //     empty for ~89 % of stations.
 //   - v4: classifyType applies the mode precedence it states. The
 //     `tram=yes` FLAG was read above every other mode, so a station
-//     node carrying both a tram and a métro flag — which is what a
-//     tram/métro interchange is — was published as a tram, the slowest
+//     node carrying both a tram and a métro flag - which is what a
+//     tram/métro interchange is - was published as a tram, the slowest
 //     mode of the set. The flag now sits between light_rail and train;
 //     `railway=tram_stop`, which says what the element IS rather than
 //     what it also serves, still settles the question first.
