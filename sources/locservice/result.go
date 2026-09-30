@@ -16,7 +16,7 @@ const (
 )
 
 // Score range observed on the LocService gauge images
-// (fleche0.png..fleche8.png). Scores beyond this range are treated as
+// (nine dial positions today, fleche0.png..fleche8.png before). Scores beyond this range are treated as
 // invalid.
 const (
 	ScoreMin = 0
@@ -52,7 +52,7 @@ type Result struct {
 	// caller MUST check IsEmpty() (or Evidence.NoData) first.
 	TensionLabel string `json:"tension_label"`
 
-	// TensionScore is the raw 0..8 LocService arrow value for the
+	// TensionScore is the raw 0..8 LocService dial (formerly arrow) value for the
 	// "Facilite a trouver une location" gauge (= rental supply
 	// tightness; high means landlord-friendly). Nil on the no-data
 	// branch.
@@ -66,7 +66,7 @@ type Result struct {
 	// friendly = high supply tightness). Same nil-on-no-data rule.
 	SupplyScore *int `json:"supply_score,omitempty"`
 
-	// BudgetScore is the raw 0..8 LocService arrow value for the
+	// BudgetScore is the raw 0..8 LocService dial (formerly arrow) value for the
 	// "Budget des locataires" gauge (= tenant solvency). Nil when the
 	// second arrow could not be extracted.
 	BudgetScore *int `json:"budget_score,omitempty"`
