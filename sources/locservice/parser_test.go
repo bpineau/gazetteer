@@ -156,3 +156,105 @@ func TestScoreToLabel(t *testing.T) {
 		}
 	}
 }
+
+// The 2026-09 redesign: UTF-8 pages, CSS dials instead of arrow images.
+// Every fixture below is a live capture of 2026-10-01. The expected
+// scores were read off the needle angles, then cross-checked against
+// the verdict zone the page prints next to each dial.
+func TestParse_V2Dials(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		fixture         string
+		tension, budget int
+		label           TensionLabel
+		city            string
+		descWord        string
+	}{
+		// needles 0deg / 113deg, verdicts "Très difficile" / "Détendu"
+		{"v2_paris02_all.html", 8, 5, LabelTresTendu, "Paris 02", "tendu"},
+		// needles 0deg / 68deg, verdicts "Très difficile" / "Tendu"
+		{"v2_paris02_t2.html", 8, 3, LabelTresTendu, "Paris 02", "tendu"},
+		// needles 113deg / 113deg, verdicts "Facile" / "Détendu"
+		{"v2_troyes_all.html", 3, 5, LabelDetendu, "Troyes", ""},
+		// needles 180deg / 90deg, verdicts "Très facile" / "Équilibré"
+		{"v2_limoges_chambre.html", 0, 4, LabelTresDetendu, "Limoges", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.fixture, func(t *testing.T) {
+			got, err := Parse(mustReadFixture(t, tc.fixture))
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if !got.HasData {
+				t.Fatalf("expected HasData=true, got false (no-data message %q)", got.NoDataMessage)
+			}
+			if got.TensionScore != tc.tension || got.Label != tc.label {
+				t.Errorf("tension = %d (%q), want %d (%q)", got.TensionScore, got.Label, tc.tension, tc.label)
+			}
+			if !got.HasBudget || got.BudgetScore != tc.budget {
+				t.Errorf("budget = (has=%v, %d), want (true, %d)", got.HasBudget, got.BudgetScore, tc.budget)
+			}
+			if got.CityLabel != tc.city {
+				t.Errorf("CityLabel = %q, want %q", got.CityLabel, tc.city)
+			}
+			if tc.descWord != "" && !strings.Contains(strings.ToLower(got.Description), tc.descWord) {
+				t.Errorf("Description = %q, want containing %q", got.Description, tc.descWord)
+			}
+			if got.Description == "" {
+				t.Errorf("Description is empty")
+			}
+		})
+	}
+}
+
+func TestParse_V2NoData(t *testing.T) {
+	t.Parallel()
+
+	got, err := Parse(mustReadFixture(t, "v2_lyon_f3_no_data.html"))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got.HasData {
+		t.Fatalf("expected HasData=false, got tension %d", got.TensionScore)
+	}
+	if !strings.Contains(got.NoDataMessage, "pas suffisamment actif") {
+		t.Errorf("NoDataMessage = %q, want the no-data sentence", got.NoDataMessage)
+	}
+	if got.CityLabel != "Lyon" {
+		t.Errorf("CityLabel = %q, want %q", got.CityLabel, "Lyon")
+	}
+}
+
+// The dial arithmetic: nine positions 22.5 degrees apart, the tension
+// dial reversed, the budget dial not, rounded angles accepted.
+func TestDialScores(t *testing.T) {
+	t.Parallel()
+
+	page := func(a, b string) string {
+		return `<span class="rental-tension-dial-needle" style="--rental-tension-angle: ` + a + `deg"></span>` +
+			`<span class="rental-tension-dial-needle" style="--rental-tension-angle: ` + b + `deg"></span>`
+	}
+	cases := []struct {
+		a, b string
+		want []int
+	}{
+		{"0", "180", []int{8, 8}},
+		{"180", "0", []int{0, 0}},
+		{"90", "90", []int{4, 4}},
+		{"113", "68", []int{3, 3}},
+		{"157.5", "22.5", []int{1, 1}},
+	}
+	for _, tc := range cases {
+		got, ok := dialScores(page(tc.a, tc.b))
+		if !ok || len(got) != 2 || got[0] != tc.want[0] || got[1] != tc.want[1] {
+			t.Errorf("dialScores(%s, %s) = %v, %v; want %v", tc.a, tc.b, got, ok, tc.want)
+		}
+	}
+	if _, ok := dialScores(page("200", "0")); ok {
+		t.Errorf("an angle past 180deg must be refused")
+	}
+	if _, ok := dialScores("<p>no dial</p>"); ok {
+		t.Errorf("a page without a needle must report no dial")
+	}
+}
