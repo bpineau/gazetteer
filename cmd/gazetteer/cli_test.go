@@ -231,3 +231,59 @@ func usageOf(t *testing.T, cmd string) string {
 	}
 	return string(out)
 }
+
+// TestExplainFlagFeedsBothSubcommands is the mirror of
+// TestProfileFlagIsAppraiseOnly: --explain sits on the SAME shared flag set,
+// but here both users of that set collect a Dossier, so the honest fix was to
+// wire it rather than to unregister it. runAppraise used to ignore the flag it
+// advertised, printing the plain summary; `appraise --explain` must now print
+// the diagnosis and keep the synthesis. Both sub-commands are asserted on the
+// three surfaces that can drift apart: parsing, the -h transcript, and the
+// renderer they share.
+func TestExplainFlagFeedsBothSubcommands(t *testing.T) {
+	for _, cmd := range []string{"query", cmdAppraise} {
+		q, err := parseQueryFlags(cmd, []string{"--explain", "12 rue X, Paris"})
+		if err != nil {
+			t.Fatalf("%s --explain: %v", cmd, err)
+		}
+		if !q.explain {
+			t.Errorf("%s --explain not captured: %+v", cmd, q)
+		}
+		if got := usageOf(t, cmd); !strings.Contains(got, "-explain") {
+			t.Errorf("`%s -h` does not offer --explain:\n%s", cmd, got)
+		}
+	}
+
+	// oll carries INSEE + rooms, so its emptiness is a coverage verdict, not a
+	// missing input: the diagnosis says so, the summary table cannot.
+	rooms := 2
+	d := gazetteer.Dossier{
+		Listing: gazetteer.Listing{Address: "12 rue X", INSEE: "75110", Rooms: &rooms},
+		Results: map[string]gazetteer.Result{
+			"dvf": {Name: "dvf", Version: 3, Status: gazetteer.StatusOK, Data: &filledResult{}},
+			"oll": {Name: "oll", Version: 1, Status: gazetteer.StatusOKEmpty, Data: &emptyResult{}},
+		},
+	}
+
+	var buf bytes.Buffer
+	printSourceBlock(&buf, d, true)
+	explained := buf.String()
+	for _, want := range []string{
+		"Listing (after normalisation)", "Per-source diagnosis",
+		"no data for this address", "1 source(s) returned data, 1 empty, 0 failed",
+	} {
+		if !strings.Contains(explained, want) {
+			t.Errorf("explain output missing %q:\n%s", want, explained)
+		}
+	}
+
+	buf.Reset()
+	printSourceBlock(&buf, d, false)
+	summary := buf.String()
+	if !strings.Contains(summary, "results:") {
+		t.Errorf("summary output is not the per-source table:\n%s", summary)
+	}
+	if strings.Contains(summary, "Per-source diagnosis") {
+		t.Errorf("summary output carries the diagnosis without --explain:\n%s", summary)
+	}
+}
