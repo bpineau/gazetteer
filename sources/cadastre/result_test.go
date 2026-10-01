@@ -53,9 +53,9 @@ func TestMakeParcel_DerivedFields(t *testing.T) {
 func TestMakeParcel_FallbackRecomposesIDWhenIDUEmpty(t *testing.T) {
 	t.Parallel()
 
-	p := MakeParcel("", "78005", "000", "A", "0285", 432)
-	if p.ID != "780050000A0285" {
-		t.Errorf("ID = %q, want recomposed 780050000A0285", p.ID)
+	p := MakeParcel("", "93066", "000", "A", "0123", 432)
+	if p.ID != "930660000A0123" {
+		t.Errorf("ID = %q, want recomposed 930660000A0123", p.ID)
 	}
 	if p.MapURL == "" {
 		t.Error("MapURL is empty on a recomposed id")
@@ -65,7 +65,7 @@ func TestMakeParcel_FallbackRecomposesIDWhenIDUEmpty(t *testing.T) {
 func TestMakeParcel_ZeroContenance(t *testing.T) {
 	t.Parallel()
 
-	p := MakeParcel("X", "78005", "000", "A", "0285", 0)
+	p := MakeParcel("X", "93066", "000", "A", "0123", 0)
 	if p.ContenanceAres != 0 || p.ContenanceHa != 0 {
 		t.Errorf("zero contenance leaks: ares=%v ha=%v", p.ContenanceAres, p.ContenanceHa)
 	}

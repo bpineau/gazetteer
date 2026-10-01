@@ -30,11 +30,11 @@ func TestQueryNoMatchEmpty(t *testing.T) {
 }
 
 func TestQueryProjection(t *testing.T) {
-	// 2020..2025, Started blank for 2025 (provisional), like Achères.
+	// 2020..2025, Started blank for 2025 (provisional), like a real commune in the provisional millésime.
 	idx := &Index{
 		Meta: Meta{DataMillesime: "2026-06"},
 		Communes: map[string]Entry{
-			"78005": {
+			"93066": {
 				YearStart: 2020,
 				Auth:      []int{10, 12, 20, 5, 3, 6},
 				Started:   []int{8, 9, 15, 30, 71, missing},
@@ -42,7 +42,7 @@ func TestQueryProjection(t *testing.T) {
 			},
 		},
 	}
-	r, err := Query(context.Background(), Options{Index: idx}, gazetteer.Listing{INSEE: "78005"})
+	r, err := Query(context.Background(), Options{Index: idx}, gazetteer.Listing{INSEE: "93066"})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
