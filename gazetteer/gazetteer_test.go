@@ -348,3 +348,83 @@ func TestPerSourceTimeout_ZeroDisablesCut(t *testing.T) {
 		t.Errorf("slow ElapsedMS = %d, want > 0", got.ElapsedMS)
 	}
 }
+
+// gateSource records every Query and then blocks until the Collect ctx is
+// done. Several instances share the counter and the `started` channel, so a
+// test can wait for the first one to enter Query.
+type gateSource struct {
+	name    string
+	calls   *atomic.Int32
+	started chan struct{}
+}
+
+func (g *gateSource) Name() string { return g.name }
+func (g *gateSource) Version() int { return 1 }
+func (g *gateSource) Query(ctx context.Context, _ Listing) (any, error) {
+	g.calls.Add(1)
+	select {
+	case g.started <- struct{}{}:
+	default:
+	}
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// The concurrency cap governs EXECUTION, not just goroutines: once the
+// Collect is abandoned, the Sources still queued behind the semaphore must
+// not be run at all. Before the ctx arm on the acquisition, a cancelled
+// Collect kept draining its backlog and issued every remaining Query.
+func TestCollect_CancelledCollectDoesNotRunQueuedSources(t *testing.T) {
+	var calls atomic.Int32
+	started := make(chan struct{}, 1)
+	b := NewBuilder().WithMaxConcurrency(1)
+	names := []string{"one", "two", "three", "four"}
+	for _, n := range names {
+		b = b.With(&gateSource{name: n, calls: &calls, started: started})
+	}
+	c, err := b.Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan Dossier, 1)
+	go func() { done <- c.Collect(ctx, Listing{}) }()
+
+	<-started // one Source holds the single slot
+	cancel()
+	d := <-done
+
+	if got := calls.Load(); got != 1 {
+		t.Errorf("Query calls = %d, want 1 (the queued Sources must not run)", got)
+	}
+	if len(d.Results) != len(names) {
+		t.Fatalf("Results count = %d, want %d (every Source must carry a Result)", len(d.Results), len(names))
+	}
+	notRun := 0
+	for _, n := range names {
+		r, ok := d.Results[n]
+		if !ok {
+			t.Fatalf("Results[%q] missing", n)
+		}
+		if r.Status != StatusFailedTransient {
+			t.Errorf("Results[%q].Status = %v, want %v", n, r.Status, StatusFailedTransient)
+		}
+		if r.Err == nil || !errors.Is(r.Err, context.Canceled) {
+			t.Errorf("Results[%q].Err = %v, want a context.Canceled chain", n, r.Err)
+		}
+		if strings.Contains(fmt.Sprint(r.Err), "not run") {
+			notRun++
+			if r.ElapsedMS != 0 {
+				t.Errorf("Results[%q].ElapsedMS = %d, want 0 (never ran)", n, r.ElapsedMS)
+			}
+			if r.Version != 1 {
+				t.Errorf("Results[%q].Version = %d, want the Source's version", n, r.Version)
+			}
+		}
+	}
+	if notRun != len(names)-1 {
+		t.Errorf("%d Results marked not run, want %d", notRun, len(names)-1)
+	}
+	cancel()
+}

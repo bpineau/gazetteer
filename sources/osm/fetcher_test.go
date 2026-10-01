@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -72,4 +73,49 @@ func setMirrorTimeoutForTest(t *testing.T, d time.Duration) func() {
 	old := overpassMirrorTimeout
 	overpassMirrorTimeout = d
 	return func() { overpassMirrorTimeout = old }
+}
+
+// SetLogger races with Query: the live Source keeps a long-lived fetcher and
+// the refresher swaps its logger, so the logger field must be published
+// safely. Run under -race, this test reports a data race whenever the field
+// is a plain, unsynchronized *slog.Logger.
+func TestSetLogger_ConcurrentWithQuery(t *testing.T) {
+	// Deliberately NOT t.Parallel(): Query reads the package-level
+	// overpassMirrorTimeout, which the parallel fallback test rewrites
+	// through setMirrorTimeoutForTest. Staying sequential keeps this test
+	// (and -race) about the logger field, not about that test seam.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"elements":[]}`))
+	}))
+	defer srv.Close()
+
+	// A high per-host rate: the point is the race, not the politeness
+	// (HTTPClient().Do still goes through httpx's limiting transport).
+	hc, err := httpx.New(httpx.Options{RateLimitPerHost: 1000, BurstPerHost: 1000})
+	if err != nil {
+		t.Fatalf("httpx: %v", err)
+	}
+	f := NewHTTPOverpassFetcher(hc, srv.URL)
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	f.SetLogger(quiet)
+
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for range 50 {
+			if _, err := f.Query(ctx, "[out:json];node(1);out;"); err != nil {
+				t.Errorf("Query: %v", err)
+				return
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for range 50 {
+			f.SetLogger(slog.New(slog.NewTextHandler(io.Discard, nil)))
+		}
+	}()
+	wg.Wait()
 }

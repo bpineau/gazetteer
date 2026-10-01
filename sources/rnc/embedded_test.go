@@ -61,5 +61,5 @@ func TestEmbedded_Query_ParisAddress(t *testing.T) {
 		t.Fatal("expected a copropriété match for a real Paris address, got empty")
 	}
 	t.Logf("matched imm=%s nom=%q conf=%s dist=%.0fm",
-		res.Immatriculation, res.NomUsage, res.Confidence, res.Evidence.MatchDistance)
+		res.Immatriculation, res.NomUsage, res.Confidence, res.Evidence.MatchDistanceM)
 }

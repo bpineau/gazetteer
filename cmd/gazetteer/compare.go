@@ -62,43 +62,19 @@ func runCompare(ctx context.Context, args []string) error {
 		return fmt.Errorf("build gazetteer client: %w", err)
 	}
 
-	// Normalize the candidates in parallel — each is a live BAN HTTP
-	// round-trip, so a serial loop costs one RTT per address. The fan-out is
-	// bounded like zonescore's maxParallelListings collect; listings[i] keeps
-	// the input order, and (as in the serial version) the run aborts on the
-	// first failing address (lowest index, for determinism).
-	listings := make([]gazetteer.Listing, len(addrs))
-	normErrs := make([]error, len(addrs))
-	sem := make(chan struct{}, maxParallelNormalize)
-	var wg sync.WaitGroup
-	for i, a := range addrs {
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(i int, a string) {
-			defer wg.Done()
-			defer func() { <-sem }()
-			l, err := deps.Normalizer.Normalize(ctx, a)
-			if err != nil {
-				normErrs[i] = fmt.Errorf("normalize %q: %w", a, err)
-				return
-			}
-			l.PropertyType = pt
-			if cf.surface > 0 {
-				s := cf.surface
-				l.SurfaceM2 = &s
-			}
-			if cf.rooms > 0 {
-				r := cf.rooms
-				l.Rooms = &r
-			}
-			listings[i] = l
-		}(i, a)
-	}
-	wg.Wait()
-	for _, err := range normErrs {
-		if err != nil {
-			return err
+	listings, err := normalizeCandidates(ctx, deps.Normalizer, addrs, func(l *gazetteer.Listing) {
+		l.PropertyType = pt
+		if cf.surface > 0 {
+			s := cf.surface
+			l.SurfaceM2 = &s
 		}
+		if cf.rooms > 0 {
+			r := cf.rooms
+			l.Rooms = &r
+		}
+	})
+	if err != nil {
+		return err
 	}
 
 	if cf.timeout > 0 {
@@ -115,6 +91,70 @@ func runCompare(ctx context.Context, args []string) error {
 	}
 	printComparison(os.Stdout, cmp)
 	return nil
+}
+
+// normalizeCandidates resolves every address to a Listing in parallel: each
+// is a live BAN HTTP round-trip, so a serial loop costs one RTT per address.
+// The fan-out is bounded by maxParallelNormalize (zonescore's collect cap on
+// the other side of the pipe), decorate stamps the caller's property
+// type/surface/rooms onto each resolved Listing, and the returned slice keeps
+// the input order.
+//
+// The run aborts on the FIRST failing address by index (not by arrival), so
+// the reported error is deterministic. Cancelling ctx stops the fan-out: the
+// addresses still queued are never sent upstream and the cancellation is
+// reported as their error.
+func normalizeCandidates(ctx context.Context, n gazetteer.Normalizer, addrs []string, decorate func(*gazetteer.Listing)) ([]gazetteer.Listing, error) {
+	listings := make([]gazetteer.Listing, len(addrs))
+	normErrs := make([]error, len(addrs))
+	sem := make(chan struct{}, maxParallelNormalize)
+	var wg sync.WaitGroup
+	// queued is the first address that never got a slot: the loop is
+	// sequential, so the tail [queued, len) was never normalized.
+	queued := len(addrs)
+loop:
+	for i, a := range addrs {
+		// An abandoned compare must not keep geocoding, so the ctx is checked
+		// both before and after the select: a select whose two arms are both
+		// ready picks pseudo-randomly.
+		if ctx.Err() != nil {
+			queued = i
+			break
+		}
+		select {
+		case sem <- struct{}{}:
+			if ctx.Err() != nil {
+				<-sem // hand the slot back
+				queued = i
+				break loop
+			}
+		case <-ctx.Done():
+			queued = i
+			break loop
+		}
+		wg.Add(1)
+		go func(i int, a string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			l, err := n.Normalize(ctx, a)
+			if err != nil {
+				normErrs[i] = fmt.Errorf("normalize %q: %w", a, err)
+				return
+			}
+			decorate(&l)
+			listings[i] = l
+		}(i, a)
+	}
+	wg.Wait()
+	for i := queued; i < len(addrs); i++ {
+		normErrs[i] = fmt.Errorf("normalize %q: %w", addrs[i], context.Cause(ctx))
+	}
+	for _, err := range normErrs {
+		if err != nil {
+			return nil, err
+		}
+	}
+	return listings, nil
 }
 
 // parseCompareFlags reuses the query flag set but takes every positional as a

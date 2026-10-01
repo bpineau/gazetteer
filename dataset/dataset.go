@@ -181,6 +181,8 @@ const (
 	OriginEmbed
 )
 
+// String renders the Origin as the lowercase token the CLI prints:
+// "datadir", "embed", or "none".
 func (o Origin) String() string {
 	switch o {
 	case OriginDatadir:
@@ -272,6 +274,8 @@ func validName(name string) error {
 	return nil
 }
 
+// isFile reports whether p exists and is a regular file (a directory or a
+// stat error both read as "absent").
 func isFile(p string) bool {
 	fi, err := os.Stat(p)
 	return err == nil && fi.Mode().IsRegular()

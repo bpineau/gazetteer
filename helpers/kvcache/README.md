@@ -13,6 +13,12 @@ two production needs:
 - **Out-of-band garbage collection**: `DeleteExpired` lets an operator
   cron reclaim space without the read path paying for it.
 
+The in-memory backend is additionally **bounded**: `memcache` keeps
+`DefaultMaxEntries` rows (override with `memcache.WithMaxEntries(n)`,
+`n <= 0` for unlimited) and, at the ceiling, sweeps the expired rows before
+evicting the least-recently-used one. Below the ceiling nothing is swept, so
+stale-while-revalidate reads keep working.
+
 ## Quick start
 
 ```go
@@ -48,14 +54,17 @@ func TestMyBackend(t *testing.T) {
 ```
 
 Persistent backends are intentionally out-of-scope for the library; the
-in-memory `memcache` reference backend is fine for tests and
-short-lived processes.
+in-memory `memcache` reference backend is fine for tests, for short-lived
+processes and, being bounded, for the process-lifetime memos a long-lived
+server keeps.
 
 ## Public API
 
 See `go doc github.com/bpineau/gazetteer/helpers/kvcache`:
 
 - `type Cache interface`, `type Entry`
+- `memcache.New(...Option)`, `memcache.WithMaxEntries(int)`,
+  `memcache.DefaultMaxEntries`
 - `func Set(ctx, Cache, key, value, ...SetOption) error`,
   `func WithTTL(time.Duration) SetOption`
 - `var ErrNotFound`

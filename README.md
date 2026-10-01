@@ -107,6 +107,13 @@ pass a deny-list:
 client, _ := factory.NewDefaultWith(ctx, factory.Options{Exclude: []string{"bdnb"}})
 ```
 
+A factory-built Client also bounds every Source inside `Collect` at
+`factory.DefaultPerSourceTimeout` (45 s), so one wedged upstream degrades the
+Dossier to a partial answer instead of hanging the call. Raise, lower or
+disable it with `factory.Options.PerSourceTimeout` (a negative value means no
+bound); a hand-built `gazetteer.Builder` is unbounded unless you call
+`WithPerSourceTimeout`.
+
 `Exclude` is applied to the full default roster, so in-tree Sources added
 later still flow in automatically. (The `gazetteer` CLI omits `bdnb` from
 its default `query`/`appraise` set for the same quota reason; pass
@@ -198,7 +205,8 @@ neighbourhoods diverge within a commune.
 ## Reusable building blocks
 
 The packages the sources are made of are usable standalone — a polite
-rate-limited HTTP client with disk cache (`helpers/httpx`), circuit
+rate-limited HTTP client with disk cache, single-flighted misses and an
+explicit `PruneCache` (`helpers/httpx`), circuit
 breakers (`helpers/circuit`), BAN geocoding with caching and coherence
 guards (`helpers/banx`), the embedded commune table with offline INSEE
 resolution (`helpers/communes`), French text/number/address parsing

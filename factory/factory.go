@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
@@ -34,10 +35,23 @@ import (
 	"github.com/bpineau/gazetteer/sources/iris"
 )
 
+// DefaultPerSourceTimeout is the per-Source ceiling a factory-built Client
+// applies inside Collect (Options.PerSourceTimeout overrides it). 45 s is the
+// value gazetteer.Builder.WithPerSourceTimeout recommends: longer than any
+// single HTTP request, short enough to cap the worst case. A Source that
+// overruns loses only its own contribution, so the Dossier degrades to a
+// partial answer instead of hanging.
+//
+// The raw gazetteer.Builder deliberately defaults to NO bound ("the data is
+// the product": a multi-request Source may legitimately run for minutes). The
+// factory is the batteries-included path, so it opts in on the caller's
+// behalf; Options.PerSourceTimeout < 0 returns to the unbounded behaviour.
+const DefaultPerSourceTimeout = 45 * time.Second
+
 // Options tunes the defaults wired by NewDefault.
 //
-// The zero value is valid and produces a Client identical to the one
-// the gazetteer CLI uses.
+// The zero value is valid and produces the Client the gazetteer CLI's roster
+// builds, plus the DefaultPerSourceTimeout ceiling.
 type Options struct {
 	// HTTPClient overrides the default httpx.Client. When nil, the
 	// factory builds one with httpx.New(httpx.Options{}).
@@ -90,6 +104,21 @@ type Options struct {
 	// would otherwise silently leave the default in place. To ADD a
 	// source (a plugin), use Builder.With instead.
 	SourceOverrides map[string]func(Deps) (gazetteer.Source, error)
+
+	// PerSourceTimeout bounds how long any single Source may run inside a
+	// Collect on the built Client (see
+	// gazetteer.Builder.WithPerSourceTimeout for the exact semantics: the
+	// Source is cut, its Result is StatusFailedTransient, its siblings
+	// complete). Units: a duration.
+	//
+	//   - 0 (zero value) means DefaultPerSourceTimeout (45 s).
+	//   - n > 0 sets that ceiling instead.
+	//   - n < 0 disables the bound: no Source deadline at all, the raw
+	//     gazetteer.Builder default.
+	//
+	// A caller chaining .WithPerSourceTimeout on the Builder returned by
+	// BuilderDefault wins over this field, since it is applied later.
+	PerSourceTimeout time.Duration
 
 	// RNCDepts restricts the RNC copropriété source to these departments
 	// (by INSEE prefix). Empty loads the national registry (~500 MB
@@ -166,6 +195,9 @@ func liveNames(live bool) []string {
 // osm_transit pairs its embedded station catalog with a live Overpass
 // fallback.
 //
+// Each Source is bounded by DefaultPerSourceTimeout (45 s) inside Collect;
+// NewDefaultWith's Options.PerSourceTimeout raises, lowers or disables it.
+//
 // On any wiring failure (httpx, BAN, communes, Source construction)
 // NewDefault returns a non-nil error and a nil *Client.
 func NewDefault(ctx context.Context) (*gazetteer.Client, error) {
@@ -213,7 +245,8 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 	rdeps := roster.Deps{HTTP: deps.HTTP, Geocoder: deps.Geocoder, Communes: deps.Communes, DataDir: deps.DataDir, RNCDepts: opts.RNCDepts}
 
 	b := gazetteer.NewBuilder().
-		WithHTTPClient(hc.HTTPClient())
+		WithHTTPClient(hc.HTTPClient()).
+		WithPerSourceTimeout(perSourceTimeout(opts.PerSourceTimeout))
 
 	// One Source per roster entry — the same single roster the CLI
 	// consumes, so the two wirings cannot drift. SourceOverrides swap
@@ -255,6 +288,16 @@ func BuilderDefault(ctx context.Context, opts Options) (*gazetteer.Builder, erro
 		b = b.Without(opts.Exclude...)
 	}
 	return b, nil
+}
+
+// perSourceTimeout maps Options.PerSourceTimeout onto the duration handed to
+// gazetteer.Builder.WithPerSourceTimeout: unset (0) takes the factory default,
+// a negative value passes through and disables the bound.
+func perSourceTimeout(d time.Duration) time.Duration {
+	if d == 0 {
+		return DefaultPerSourceTimeout
+	}
+	return d
 }
 
 // resolveDataDir maps factory Options.DataDir onto a concrete directory.

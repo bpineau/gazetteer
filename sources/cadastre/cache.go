@@ -1,6 +1,7 @@
 package cadastre
 
 import (
+	"container/list"
 	"sync"
 
 	"github.com/bpineau/gazetteer/helpers/geopoly"
@@ -38,29 +39,93 @@ type BatiCache interface {
 	Put(insee string, polygons []BatiPolygon)
 }
 
-// DefaultBatiCache is the in-process sync.Map implementation used when
-// Options.BatiCache is nil. No TTL — a single gazetteer process is
-// short-lived enough that the underlying cadastre data (refreshed
-// monthly upstream) cannot meaningfully change during a run.
+// DefaultBatiCacheMaxCommunes is the number of communes DefaultBatiCache
+// keeps before it starts evicting. Each entry is a WHOLE commune's building
+// footprints (a Paris arrondissement is tens of thousands of polygons, tens
+// of MB once parsed), so the ceiling is deliberately small: it holds the
+// working set of a batch run over one department or city while keeping a
+// long-lived server's footprint bounded and predictable.
+const DefaultBatiCacheMaxCommunes = 16
+
+// DefaultBatiCache is the in-process, bounded building-polygon cache used
+// when Options.BatiCache is nil.
+//
+// There is no TTL: the upstream cadastre dump is refreshed monthly, so what
+// is cached cannot go stale inside one run. There IS a ceiling, because the
+// values are whole-commune dumps: past MaxCommunes entries the
+// least-recently-used commune is dropped. A server that geocodes addresses
+// all day therefore holds at most MaxCommunes dumps rather than every
+// commune it has ever seen.
+//
+// The zero value is ready to use (and applies DefaultBatiCacheMaxCommunes).
+// Safe for concurrent use.
 type DefaultBatiCache struct {
-	m sync.Map // insee → []BatiPolygon
+	// MaxCommunes overrides DefaultBatiCacheMaxCommunes: the number of
+	// per-commune dumps kept before the least-recently-used one is
+	// evicted. Set it before the first Get/Put (the cache reads it when it
+	// initialises). 0 means DefaultBatiCacheMaxCommunes; a negative value
+	// means UNLIMITED, for a short-lived process that would rather trade
+	// memory for zero refetches.
+	MaxCommunes int
+
+	mu    sync.Mutex
+	byIns map[string]*list.Element // insee -> element holding *batiEntry
+	lru   *list.List               // front = most recently used
+	max   int                      // resolved ceiling; < 0 = unlimited
 }
 
-// Get returns the cached polygons for insee, or (nil, false) on miss.
+// batiEntry is one commune's cached dump as stored in an LRU element.
+type batiEntry struct {
+	insee    string
+	polygons []BatiPolygon
+}
+
+// Get returns the cached polygons for insee, or (nil, false) on miss, and
+// marks the commune as most-recently-used.
 func (c *DefaultBatiCache) Get(insee string) ([]BatiPolygon, bool) {
-	v, ok := c.m.Load(insee)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	el, ok := c.byIns[insee]
 	if !ok {
 		return nil, false
 	}
-	polys, ok := v.([]BatiPolygon)
-	if !ok {
-		return nil, false
-	}
-	return polys, true
+	c.lru.MoveToFront(el)
+	return el.Value.(*batiEntry).polygons, true
 }
 
-// Put stores polygons under insee. The slice header is captured by
-// reference — callers must not mutate the slice after Put.
+// Put stores polygons under insee, evicting the least-recently-used
+// commune when the cache is at its ceiling. The slice header is captured by
+// reference: callers must not mutate the slice after Put.
 func (c *DefaultBatiCache) Put(insee string, polygons []BatiPolygon) {
-	c.m.Store(insee, polygons)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.init()
+	if el, ok := c.byIns[insee]; ok {
+		el.Value.(*batiEntry).polygons = polygons
+		c.lru.MoveToFront(el)
+		return
+	}
+	for c.max >= 0 && len(c.byIns) >= c.max {
+		oldest := c.lru.Back()
+		if oldest == nil {
+			break
+		}
+		delete(c.byIns, oldest.Value.(*batiEntry).insee)
+		c.lru.Remove(oldest)
+	}
+	c.byIns[insee] = c.lru.PushFront(&batiEntry{insee: insee, polygons: polygons})
+}
+
+// init lazily prepares the map, the recency list and the resolved ceiling so
+// the zero value works. Caller holds mu.
+func (c *DefaultBatiCache) init() {
+	if c.byIns != nil {
+		return
+	}
+	c.byIns = make(map[string]*list.Element)
+	c.lru = list.New()
+	c.max = c.MaxCommunes
+	if c.max == 0 {
+		c.max = DefaultBatiCacheMaxCommunes
+	}
 }

@@ -6,9 +6,13 @@ import (
 	"github.com/bpineau/gazetteer/helpers/geodist"
 )
 
-// EarthRadiusMeters — deprecated, kept for back-compat with callers
-// that did `EarthRadiusMeters * c`. New code should use
-// `geodist.EarthRadiusKm * 1000`. Value byte-identical (6 371 000 m).
+// EarthRadiusMeters is the Earth's mean radius in metres, kept for
+// back-compat with callers that did `EarthRadiusMeters * c`. Its value is
+// byte-identical to the canonical constant (6 371 000 m).
+//
+// Deprecated: use geodist.EarthRadiusKm * 1000, or call
+// geodist.MetersBetween (HaversineMeters below) instead of doing the
+// great-circle arithmetic by hand.
 const EarthRadiusMeters = geodist.EarthRadiusKm * 1000
 
 // WalkSinuosityMultiplier scales straight-line (haversine) distance up

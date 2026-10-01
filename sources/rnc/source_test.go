@@ -2,7 +2,9 @@ package rnc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/bpineau/gazetteer/gazetteer"
@@ -78,5 +80,44 @@ func TestLoad_Embedded(t *testing.T) {
 	}
 	if n := idx.Count(); n > 0 && n < 100000 {
 		t.Errorf("Count = %d; a real RNC artifact should hold the national set (~600k)", n)
+	}
+}
+
+// TestEvidenceJSONTagsStable pins the Evidence sidecar's wire format. The Go
+// field carrying the geo distance is named for its unit (MatchDistanceM, per
+// the repo-wide "unit in the name" rule) while its JSON tag stays
+// `match_distance_m`: a rename must never move the wire format under a
+// consumer that already reads the persisted Evidence blob.
+func TestEvidenceJSONTagsStable(t *testing.T) {
+	t.Parallel()
+	b, err := json.Marshal(Evidence{
+		INSEE:          "75104",
+		QueryLat:       48.8566,
+		QueryLon:       2.3522,
+		MatchDistanceM: 12.5,
+		VoieQuery:      "de rivoli",
+		VoieMatched:    "de rivoli",
+		RowCount:       3,
+		DataVintage:    "2026-07",
+	})
+	if err != nil {
+		t.Fatalf("marshal Evidence: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatalf("unmarshal Evidence: %v", err)
+	}
+	want := map[string]any{
+		"insee":            "75104",
+		"query_lat":        48.8566,
+		"query_lon":        2.3522,
+		"match_distance_m": 12.5,
+		"voie_query":       "de rivoli",
+		"voie_matched":     "de rivoli",
+		"row_count":        float64(3),
+		"data_vintage":     "2026-07",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Evidence JSON = %v, want %v", got, want)
 	}
 }

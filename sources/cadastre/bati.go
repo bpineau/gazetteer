@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/geopoly"
@@ -91,9 +92,43 @@ func (s *Source) applyBatiBaseURL(u string) string {
 	return s.opts.BatiBaseURL + strings.TrimPrefix(u, BatiBaseURL)
 }
 
+// batiSharedFetchTimeout bounds a coalesced bâti fetch when the initiating
+// caller's context carries no deadline of its own. The shared fetch is
+// detached from that caller's CANCELLATION (see resolveBatiPolygons), so
+// without a bound of its own a hung upstream would pin the goroutine, and the
+// several MB of dump it is buffering, for the life of the process.
+const batiSharedFetchTimeout = 2 * time.Minute
+
+// batiDump is what one coalesced fetch yields to every waiter on it.
+type batiDump struct {
+	// polygons is the parsed, cache-ready building footprint set.
+	polygons []BatiPolygon
+	// rawCount is the number of features the dump carried before the
+	// malformed-geometry filter (Evidence.BatiRawCount).
+	rawCount int
+}
+
 // resolveBatiPolygons returns the per-commune building polygons for
 // `insee`, fetching + caching them on miss. The cache is keyed by
 // INSEE; cached hits set `cached` to true.
+//
+// A miss is expensive (a whole commune's PCI dump: a few MB over the wire,
+// tens of thousands of polygons to parse), so misses for the same commune
+// are COALESCED through s.batiSF: parallel Query calls on nearby addresses
+// pay for one download between them, and the last one out reads the cache
+// the flight populated. Two properties make that safe:
+//
+//   - Context isolation. The shared fetch runs on the initiator's context
+//     values (HTTP client, logger) with its cancellation detached, so an
+//     initiator that gives up cannot cancel the fetch its fellow waiters
+//     are still blocked on. It stays BOUNDED: the initiator's own deadline
+//     when it has one, else batiSharedFetchTimeout. Every waiter selects on
+//     its OWN context, so a cancelled waiter returns immediately.
+//
+//   - Error fidelity. singleflight hands the (value, error) pair to every
+//     waiter, so a failed fetch surfaces AS an error to all of them (each
+//     soft-failing per the bâti contract) and is never cached, nor shared
+//     as an empty success.
 func (s *Source) resolveBatiPolygons(ctx context.Context, insee string) (polys []BatiPolygon, rawCount int, cached bool, queriedURL string, err error) {
 	cache := s.opts.BatiCache
 	if cache == nil {
@@ -111,16 +146,46 @@ func (s *Source) resolveBatiPolygons(ctx context.Context, insee string) (polys [
 		return nil, 0, false, "", err
 	}
 	urlToHit := s.applyBatiBaseURL(rawURL)
-	body, err := s.fetchBati(ctx, urlToHit)
-	if err != nil {
-		return nil, 0, false, urlToHit, err
+
+	ch := s.batiSF.DoChan(insee, func() (any, error) {
+		fetchCtx, cancel := sharedFetchContext(ctx, batiSharedFetchTimeout)
+		defer cancel()
+		body, err := s.fetchBati(fetchCtx, urlToHit)
+		if err != nil {
+			return nil, err
+		}
+		loaded, raw, err := LoadBatiPolygons(body)
+		if err != nil {
+			return nil, fmt.Errorf("cadastre: bati: parse: %w: %w", gazetteer.ErrUpstreamUnavailable, err)
+		}
+		cache.Put(insee, loaded)
+		return batiDump{polygons: loaded, rawCount: raw}, nil
+	})
+
+	select {
+	case <-ctx.Done():
+		return nil, 0, false, urlToHit, ctx.Err()
+	case res := <-ch:
+		if res.Err != nil {
+			return nil, 0, false, urlToHit, res.Err
+		}
+		dump := res.Val.(batiDump)
+		return dump.polygons, dump.rawCount, false, urlToHit, nil
 	}
-	polys, raw, err := LoadBatiPolygons(body)
-	if err != nil {
-		return nil, 0, false, urlToHit, fmt.Errorf("cadastre: bati: parse: %w: %w", gazetteer.ErrUpstreamUnavailable, err)
+}
+
+// sharedFetchContext derives the context a coalesced fetch runs on: the
+// initiating caller's VALUES (injected HTTP client, logger) with its
+// cancellation detached, bounded by that caller's own deadline when it has
+// one and by fallback otherwise. Detaching the cancellation is the point:
+// the caller that happens to start a flight must not be able to cancel it
+// out from under the waiters that joined it.
+func sharedFetchContext(ctx context.Context, fallback time.Duration) (context.Context, context.CancelFunc) {
+	detached := context.WithoutCancel(ctx)
+	if deadline, ok := ctx.Deadline(); ok {
+		return context.WithDeadline(detached, deadline)
 	}
-	cache.Put(insee, polys)
-	return polys, raw, false, urlToHit, nil
+	return context.WithTimeout(detached, fallback)
 }
 
 // filterBatiInParcel walks `polys` and keeps the ones whose centroid

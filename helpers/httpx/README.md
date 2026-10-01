@@ -44,6 +44,16 @@ one place those layers live; every consumer embeds it.
   empty; drop snapshots by leaving `SnapshotDir` empty; drop
   rate-limiting by setting `RateLimitPerHost` extremely high. No
   flag fiddling required.
+- **One upstream trip per cache key.** Concurrent misses (or
+  revalidations) of the same key are coalesced: a cold cache hit by a
+  burst of identical requests costs one request, and the caller that
+  started it cannot cancel it for the callers that joined it. Failures
+  reach every waiter as errors and are never cached.
+- **Pruning is the caller's call.** The disk cache never evicts on its
+  own. `(*Client) PruneCache(PruneOptions{MaxAge, MaxBytes})` removes old
+  and excess entries (plus any half-written ones) when *you* run it: a
+  cron, a maintenance endpoint, a startup hook. A batch job that wants to
+  keep its corpus simply never calls it.
 - **Errors are typed.** `*ErrHTTP`, `*ErrTransport`,
   `*ErrTooManyRetries` all play with `errors.Is` / `errors.As`. No
   string matching, ever.
@@ -94,6 +104,8 @@ godoc-rendered surface. The headline types and functions:
 - `(*Client) GetBytes(ctx, url, http.Header) ([]byte, *Response, error)`
 - `(*Client) GetJSON(ctx, url, http.Header, any) error`
 - `(*Client) Download(ctx, url, dest, DownloadOptions) (DownloadResult, error)`
+- `(*Client) PruneCache(PruneOptions) (PruneStats, error)`: explicit,
+  never-automatic disk-cache pruning (`ErrCacheDisabled` without a cache dir)
 - `(*Client) Transport() http.RoundTripper` — for colly / custom callers
 - `(*Client) HTTPClient() *http.Client` — escape hatch for multipart, etc.
 - `type Options struct { … }` and `type HostOptions struct { … }`
@@ -110,7 +122,12 @@ the spec rather than reading the resolver.
   `httptest.Server`'s transport for tests, or a custom `http2.Transport`
   for HTTP/2 pinning experiments).
 - **Skip the cache for one request.** Wrap the context with
-  `httpx.WithBypassCache(ctx)` — the cache layer reads neither nor writes.
+  `httpx.WithBypassCache(ctx)`: the cache layer reads neither nor writes,
+  and the request is not coalesced with anyone else's.
+- **Reclaim disk.** `cli.PruneCache(httpx.PruneOptions{MaxAge: 30 * 24 *
+  time.Hour, MaxBytes: 2 << 30})` drops entries fetched over a month ago,
+  then the oldest survivors until the cache fits 2 GiB, and reports what it
+  removed. Safe to run while requests are in flight.
 - **Snapshot a single run.** Wrap the context with
   `httpx.WithSnapshot(ctx, dir)` (or set `Options.SnapshotDir` globally).
   The snapshot middleware writes raw request + response under

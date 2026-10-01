@@ -121,16 +121,43 @@ type Result struct {
 	Evidence Evidence `json:"-"`
 }
 
-// Evidence captures reproducibility metadata for one query.
+// Evidence captures reproducibility metadata for one query: the inputs the
+// match consumed, the index it ran against, and how far the winning
+// copropriété sat from the queried point.
 type Evidence struct {
-	INSEE         string  `json:"insee,omitempty"`
-	QueryLat      float64 `json:"query_lat,omitempty"`
-	QueryLon      float64 `json:"query_lon,omitempty"`
-	MatchDistance float64 `json:"match_distance_m,omitempty"`
-	VoieQuery     string  `json:"voie_query,omitempty"`
-	VoieMatched   string  `json:"voie_matched,omitempty"`
-	RowCount      int     `json:"row_count,omitempty"`
-	DataVintage   string  `json:"data_vintage,omitempty"`
+	// INSEE is the commune code the match was scoped to (the trimmed
+	// Listing.INSEE). Candidates are only ever drawn from this commune.
+	INSEE string `json:"insee,omitempty"`
+
+	// QueryLat / QueryLon are the Listing's coordinates in decimal degrees
+	// (WGS 84), as handed to the geo-proximity match. Both 0 when the
+	// Listing carried no usable coordinates (the street-only path).
+	QueryLat float64 `json:"query_lat,omitempty"`
+	QueryLon float64 `json:"query_lon,omitempty"`
+
+	// MatchDistanceM is the great-circle distance in METRES between
+	// (QueryLat, QueryLon) and the matched copropriété's own coordinates.
+	// 0 when the match came from the street-only path (MatchVoie), which
+	// consumes no coordinates, and when nothing matched.
+	MatchDistanceM float64 `json:"match_distance_m,omitempty"`
+
+	// VoieQuery is the queried address reduced to its canonical street
+	// tokens (house number and street-type markers dropped): the exact
+	// form the street comparison consumes.
+	VoieQuery string `json:"voie_query,omitempty"`
+
+	// VoieMatched is that same canonical form for the MATCHED
+	// copropriété's address. Empty when nothing matched. Read it against
+	// VoieQuery to see whether the street agreed.
+	VoieMatched string `json:"voie_matched,omitempty"`
+
+	// RowCount is the number of copropriétés resident in the index the
+	// query ran against (national, or the subset Options.Depts loaded).
+	RowCount int `json:"row_count,omitempty"`
+
+	// DataVintage is the loaded RNC extract's vintage stamp, "YYYY-MM"
+	// (e.g. "2026-07"), as carried by the dataset's own metadata.
+	DataVintage string `json:"data_vintage,omitempty"`
 }
 
 // IsEmpty reports the "ran fine, no copro matched" sentinel.
