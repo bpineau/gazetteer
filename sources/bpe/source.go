@@ -19,7 +19,10 @@ const Name = "bpe"
 // History:
 //   - v1: initial release. Curated 16-bucket subset of INSEE BPE 2024
 //     per-commune counts, gzipped JSON embed.
-const sourceVersion = 1
+//   - v2: sport_terrain counts tennis (F103) as documented; v1 counted
+//     athletics facilities (F107) under that name. Data moved to the BPE
+//     2025 vintage.
+const sourceVersion = 2
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.

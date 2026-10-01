@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -71,5 +72,43 @@ func TestParseEffectiveDate(t *testing.T) {
 		if got := parseEffectiveDate(in); got != want {
 			t.Errorf("parseEffectiveDate(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// TestTransform_2026Revision runs the 2026 file shape: the zone header
+// reworded to "Zonage ABC en vigueur depuis le <date>", no reclassement
+// column, no BOM, CRLF line ends. The zone column is still found by its
+// prefix and the effective date read off it.
+func TestTransform_2026Revision(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	if err := transform(context.Background(), fixtureRawSet{"testdata/zonage_abc_2026.csv"}, &buf); err != nil {
+		t.Fatalf("transform: %v", err)
+	}
+	idx, err := parseIndex(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		t.Fatalf("parseIndex: %v", err)
+	}
+	want := map[string]Zone{"01001": ZoneC, "94002": ZoneA, "75056": ZoneAbis}
+	if idx.Count() != len(want) {
+		t.Errorf("count = %d, want %d", idx.Count(), len(want))
+	}
+	for insee, zone := range want {
+		if got, ok := idx.Lookup(insee); !ok || got != zone {
+			t.Errorf("%s: got (%q,%v), want %q", insee, got, ok, zone)
+		}
+	}
+	if idx.Meta.EffectiveDate != "2026-06-26" {
+		t.Errorf("EffectiveDate = %q, want 2026-06-26", idx.Meta.EffectiveDate)
+	}
+}
+
+// TestRawURL_StableResource pins the raw URL to data.gouv.fr's stable
+// resource form: the dated static path of a revision 404s once the next
+// arrêté's list replaces it, which broke the refresh once.
+func TestRawURL_StableResource(t *testing.T) {
+	t.Parallel()
+	if !strings.HasPrefix(rawCSVURL, "https://www.data.gouv.fr/fr/datasets/r/") {
+		t.Errorf("rawCSVURL %q is not a stable data.gouv.fr resource URL", rawCSVURL)
 	}
 }

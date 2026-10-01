@@ -1,5 +1,5 @@
 // Package bpe is a gazetteer.Source that returns a curated subset of
-// INSEE's Base Permanente des Équipements (BPE) 2024 counts for the
+// INSEE's Base Permanente des Équipements (BPE) counts (2025 vintage) for the
 // commune of a Listing. Each commune is summarised by a small set of
 // rental-investor-relevant buckets (post office, supermarket, bakery,
 // general practitioner, pharmacy, school, daycare, train station,
@@ -32,7 +32,7 @@
 //	BucketGare               : E107 nationale + E108 régionale + E109 locale
 //	BucketSportSalle         : F121 Salles multisports / gymnases
 //	BucketSportPiscine       : F101 Bassin de natation
-//	BucketSportTerrain       : F107 Terrain de tennis
+//	BucketSportTerrain       : F103 Tennis
 //
 // The Source is fully offline: the aggregate ships embedded as gzipped
 // JSON under `data/`.

@@ -17,10 +17,11 @@ const rawName = "cartofriches_friches.raw.csv"
 
 // rawURL is the Cerema "Sites référencés dans Cartofriches" national
 // extract (friches-standard.csv) published on data.gouv.fr (dataset slug
-// sites-references-dans-cartofriches). data.gouv mints a dated static path
-// per revision; bump this when Cerema republishes the export (the slug page
-// lists the current CSV resource). One row per referenced friche site.
-const rawURL = "https://static.data.gouv.fr/resources/sites-references-dans-cartofriches/20260429-124852/friches-standard-2026-04-15.csv"
+// sites-references-dans-cartofriches), addressed by its stable resource id:
+// data.gouv.fr redirects it to the current dated upload, which Cerema
+// replaces at every export (the dated static path 404s once superseded).
+// One row per referenced friche site.
+const rawURL = "https://www.data.gouv.fr/fr/datasets/r/74feb3ed-5f9f-4ef8-8fab-b0128d569a99"
 
 // metaSource is the provenance string recorded in the rebuilt artifact.
 const metaSource = "data.gouv.fr / Cerema — Cartofriches (sites de friches référencés)"
