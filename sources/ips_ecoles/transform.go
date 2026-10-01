@@ -124,7 +124,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	}
 	for insee, xs := range values {
 		idx.Communes[insee] = Entry{
-			IPSMedian:   stats.Median(xs),
+			IPSMedian:   stats.Round(stats.Median(xs), 2), // upstream IPS has one decimal; a two-school median adds one, never more
 			IPSMin:      minOf(xs),
 			IPSMax:      maxOf(xs),
 			SchoolCount: len(xs),
