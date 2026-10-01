@@ -95,8 +95,9 @@ var overpassMirrorTimeout = 60 * time.Second
 // maxOverpassBodyBytes caps one Overpass answer. The refresh's largest
 // sub-query (all rail stations of a dense department) is a few MiB, so 64 MiB
 // is far above any legitimate payload while still bounding what a wedged
-// mirror can push into memory.
-const maxOverpassBodyBytes = int64(64 << 20)
+// mirror can push into memory. A var so tests can shrink it instead of
+// streaming 64 MiB through an httptest server.
+var maxOverpassBodyBytes = int64(64 << 20)
 
 const (
 	// mirrorSkipThreshold is the consecutive-failure streak after which
@@ -194,6 +195,19 @@ func (f *HTTPOverpassFetcher) Query(ctx context.Context, ql string) ([]byte, err
 		attemptCtx, cancel := context.WithTimeout(ctx, overpassMirrorTimeout)
 		body, err := f.queryOne(attemptCtx, ep, ql)
 		cancel()
+		// A caller that walked away (Ctrl-C, an abandoned Collect) is not a
+		// mirror failure. Folding it into the streak pushes EVERY mirror of
+		// the rotation towards mirrorSkipThreshold on each cancellation, and
+		// a long-lived fetcher (the live Source holds one for the process
+		// lifetime) then skips perfectly healthy mirrors for the next
+		// mirrorProbeEvery-1 calls. Walking the remaining mirrors under a
+		// dead context is pointless too, so give up here. A DEADLINE is the
+		// opposite and still counts: a budget the caller set for this fetch
+		// expiring is exactly the "upstream hung" signal the skip logic
+		// exists for. Same rule as helpers/circuit's ObserveCtx.
+		if err != nil && errors.Is(ctx.Err(), context.Canceled) {
+			return nil, err
+		}
 		f.observe(ep, err)
 		if err == nil {
 			return body, nil

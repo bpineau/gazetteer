@@ -205,6 +205,8 @@ var FranceDepartmentBBoxes = []DeptBBox{ //nolint:gochecknoglobals // package-le
 //   - disused:railway=*, abandoned:railway=*, station:disused=yes
 //     (ghost stations).
 //   - station=funicular / monorail / aerialway (out of scope at MVP).
+//     The QL is the only gate: a funicular tagged railway=station that
+//     reaches the parser anyway is classified as a generic train.
 //
 // Output mode `out center` returns (lat, lon) for every node AND ways /
 // relations (Overpass synthesises a centroid for non-node geometries),
