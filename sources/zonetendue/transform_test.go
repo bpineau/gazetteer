@@ -26,14 +26,17 @@ func TestTransform_Golden(t *testing.T) {
 		t.Fatalf("parseIndex: %v", err)
 	}
 
-	// Non-tendue communes (01999) are dropped; only tendue/touristique kept.
+	// Non-tendue communes (01999) are dropped, EXCEPT one that left the zone
+	// but was on the 2013 TLV list (38030): it is kept so FlaggedTLV2013
+	// survives, with its current non_tendue tier.
 	want := map[string]Entry{
 		"01030": {TLV2013: true, Tier: TierTendue},
 		"01045": {TLV2013: false, Tier: TierTendueTouristique},
 		"75056": {TLV2013: true, Tier: TierTendue},
+		"38030": {TLV2013: true, Tier: TierNonTendue},
 	}
-	if idx.CountTendue() != len(want) {
-		t.Fatalf("kept = %d, want %d (non-tendue must be dropped)", idx.CountTendue(), len(want))
+	if idx.CountTendue() != 3 {
+		t.Fatalf("CountTendue = %d, want 3 (the kept 2013-only commune is not tendue)", idx.CountTendue())
 	}
 	for insee, w := range want {
 		got, ok := idx.Lookup(insee)
@@ -45,8 +48,8 @@ func TestTransform_Golden(t *testing.T) {
 		t.Error("01999 (non-tendue) must be absent from the compact file")
 	}
 
-	if idx.Meta.RowCountCommunes != 4 {
-		t.Errorf("RowCountCommunes = %d, want 4 (total scanned)", idx.Meta.RowCountCommunes)
+	if idx.Meta.RowCountCommunes != 5 {
+		t.Errorf("RowCountCommunes = %d, want 5 (total scanned)", idx.Meta.RowCountCommunes)
 	}
 	if idx.Meta.RowCountKept != len(want) {
 		t.Errorf("RowCountKept = %d, want %d", idx.Meta.RowCountKept, len(want))
