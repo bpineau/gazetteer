@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/bpineau/gazetteer/appraisal"
@@ -16,17 +15,28 @@ import (
 // zonescoreOptions resolves the --profile flag to a zonescore.Options slice
 // (empty when unset → default yield-first weights). An unknown profile name
 // is a usage error listing the valid presets.
-func (q *queryFlags) zonescoreOptions() ([]zonescore.Options, error) {
+func (q *queryFlags) zonescoreOptions(w streams) ([]zonescore.Options, error) {
 	if q.profile == "" {
 		return nil, nil
 	}
-	w, ok := zonescore.WeightsForProfile(q.profile)
+	weights, ok := zonescore.WeightsForProfile(q.profile)
 	if !ok {
-		fmt.Fprintf(os.Stderr, "gazetteer: unknown --profile %q (valid: %s)\n",
+		fmt.Fprintf(w.err, "gazetteer: unknown --profile %q (valid: %s)\n",
 			q.profile, strings.Join(zonescore.ProfileNames(), ", "))
 		return nil, errUsage
 	}
-	return []zonescore.Options{{Weights: w}}, nil
+	return []zonescore.Options{{Weights: weights}}, nil
+}
+
+// profileLabel names the weighting thesis a printed header announces. An
+// unset --profile is the default yield-first preset; anything else must be
+// named for what it is, or the header contradicts the weights the score was
+// actually computed with.
+func profileLabel(profile string) string {
+	if profile == "" || profile == zonescore.ProfileYield {
+		return "yield-first"
+	}
+	return profile
 }
 
 // runAppraise implements `gazetteer appraise [--source ...] [--json]
@@ -38,16 +48,16 @@ func (q *queryFlags) zonescoreOptions() ([]zonescore.Options, error) {
 // --explain swaps the per-source summary for the why-nothing diagnosis
 // and keeps the synthesis: a thin appraisal is exactly the case where the
 // operator needs to know which Sources came back empty, and why.
-func runAppraise(ctx context.Context, args []string) error {
-	q, err := parseQueryFlags("appraise", args)
+func runAppraise(ctx context.Context, args []string, w streams) error {
+	q, err := parseQueryFlags(cmdAppraise, args, w)
 	if err != nil {
 		return err
 	}
-	zopts, err := q.zonescoreOptions() // validate --profile before the network work
+	zopts, err := q.zonescoreOptions(w) // validate --profile before the network work
 	if err != nil {
 		return err
 	}
-	dossier, err := executeQuery(ctx, q)
+	dossier, err := executeQuery(ctx, q, w)
 	if err != nil {
 		return err
 	}
@@ -58,7 +68,7 @@ func runAppraise(ctx context.Context, args []string) error {
 	score := zonescore.Compute(dossier, zopts...)
 
 	if q.jsonOut {
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(w.out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(appraisalEnvelope{
 			Dossier:   dossier,
@@ -68,10 +78,10 @@ func runAppraise(ctx context.Context, args []string) error {
 			ZoneScore: score,
 		})
 	}
-	printSourceBlock(os.Stdout, dossier, q.explain)
-	fmt.Fprintln(os.Stdout)
-	printAppraisal(os.Stdout, price, rent, hazard)
-	printZoneScore(os.Stdout, score)
+	printSourceBlock(w.out, dossier, q.explain)
+	fmt.Fprintln(w.out)
+	printAppraisal(w.out, price, rent, hazard)
+	printZoneScore(w.out, score, profileLabel(q.profile))
 	return nil
 }
 
@@ -149,10 +159,12 @@ func printAppraisal(out io.Writer, p appraisal.PriceConsolidated, r appraisal.Re
 	}
 }
 
-// printZoneScore renders the yield-first composite zone score and its
-// explainable per-axis breakdown.
-func printZoneScore(out io.Writer, s zonescore.Score) {
-	fmt.Fprintln(out, "  zone_score (yield-first):")
+// printZoneScore renders the composite zone score and its explainable
+// per-axis breakdown. profile is the label of the weight preset the score
+// was computed with (see profileLabel): the header used to hard-code
+// "yield-first" whatever --profile asked for.
+func printZoneScore(out io.Writer, s zonescore.Score, profile string) {
+	fmt.Fprintf(out, "  zone_score (%s):\n", profile)
 	fmt.Fprintf(out, "    composite      %.1f / 100  (confidence=%s)\n", s.Composite, s.Confidence.String())
 	for _, a := range s.Axes {
 		if !a.Present {

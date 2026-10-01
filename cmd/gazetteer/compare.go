@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"sync"
 	"time"
 
@@ -23,21 +22,21 @@ const maxParallelNormalize = 8
 // It normalises each (separately-quoted) address, collects every candidate in
 // parallel, scores them with the same yield-first profile, and prints them
 // ranked best-first.
-func runCompare(ctx context.Context, args []string) error {
-	cf, addrs, err := parseCompareFlags(args)
+func runCompare(ctx context.Context, args []string, w streams) error {
+	cf, addrs, err := parseCompareFlags(args, w)
 	if err != nil {
 		return err
 	}
 	if len(addrs) < 2 {
-		fmt.Fprintln(os.Stderr, "compare needs at least two addresses (quote each separately)")
+		fmt.Fprintln(w.err, "compare needs at least two addresses (quote each separately)")
 		return errUsage
 	}
-	zopts, err := cf.zonescoreOptions() // validate --profile before the network work
+	zopts, err := cf.zonescoreOptions(w) // validate --profile before the network work
 	if err != nil {
 		return err
 	}
 
-	logger := cf.common.setupLogger()
+	logger := cf.common.setupLogger(w.err)
 	deps, err := newRuntimeDeps()
 	if err != nil {
 		return fmt.Errorf("setup: %w", err)
@@ -85,11 +84,11 @@ func runCompare(ctx context.Context, args []string) error {
 	cmp := zonescore.Compare(ctx, client, listings, zopts...)
 
 	if cf.jsonOut {
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(w.out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(cmp)
 	}
-	printComparison(os.Stdout, cmp)
+	printComparison(w.out, cmp, profileLabel(cf.profile))
 	return nil
 }
 
@@ -159,10 +158,10 @@ loop:
 
 // parseCompareFlags reuses the query flag set but takes every positional as a
 // separate address (rather than joining them into one).
-func parseCompareFlags(args []string) (*queryFlags, []string, error) {
+func parseCompareFlags(args []string, w streams) (*queryFlags, []string, error) {
 	var q queryFlags
 	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(w.err)
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(),
 			"Usage: gazetteer compare [--property-type ...] [--surface m²] [--rooms N] [--source ...] [--json] [--verbose] \"<addr1>\" \"<addr2>\" [...]\n")
@@ -187,9 +186,11 @@ func parseCompareFlags(args []string) (*queryFlags, []string, error) {
 }
 
 // printComparison renders the ranked candidates as a compact table plus the
-// winner's axis breakdown.
-func printComparison(out io.Writer, cmp zonescore.Comparison) {
-	fmt.Fprintln(out, "compare (yield-first):")
+// winner's axis breakdown. profile labels the weighting thesis the ranking
+// used (see profileLabel), which the header used to hard-code as
+// "yield-first" even under --profile patrimoine.
+func printComparison(out io.Writer, cmp zonescore.Comparison, profile string) {
+	fmt.Fprintf(out, "compare (%s):\n", profile)
 	fmt.Fprintf(out, "  %-4s %-44s %7s %7s %9s %9s %s\n", "rank", "address", "score", "yield", "price/m²", "rent/m²", "conf")
 	for _, e := range cmp.Entries {
 		fmt.Fprintf(out, "  #%-3d %-44s %7.1f %6.1f%% %9.0f %9.1f %s\n",

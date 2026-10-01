@@ -27,9 +27,9 @@ import (
 //	  --force             re-download raw even if already present
 //	  --go-embed-update   also copy the rebuilt artifact into sources/<name>/data/ for re-commit
 //	  --list              report per-source state and exit (no download)
-func runRefresh(ctx context.Context, args []string) error {
+func runRefresh(ctx context.Context, args []string, w streams) error {
 	fs := flag.NewFlagSet("refresh", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(w.err)
 	var (
 		dataDir     string
 		force       bool
@@ -73,28 +73,28 @@ func runRefresh(ctx context.Context, args []string) error {
 	}
 
 	if list {
-		return listDatasets(os.Stdout, bySource, selected, dir)
+		return listDatasets(w.out, bySource, selected, dir)
 	}
 
 	sets := flattenSets(bySource, selected)
 	logEvent := func(ev dataset.Event) {
 		if ev.Err != nil {
-			fmt.Fprintf(os.Stderr, "  %-16s %-9s %s: %v\n", ev.Source, ev.Phase, ev.File, ev.Err)
+			fmt.Fprintf(w.err, "  %-16s %-9s %s: %v\n", ev.Source, ev.Phase, ev.File, ev.Err)
 			return
 		}
-		fmt.Fprintf(os.Stderr, "  %-16s %-9s %s\n", ev.Source, ev.Phase, ev.File)
+		fmt.Fprintf(w.err, "  %-16s %-9s %s\n", ev.Source, ev.Phase, ev.File)
 	}
 
-	fmt.Fprintf(os.Stdout, "refresh: datadir %s\n", dir)
+	fmt.Fprintf(w.out, "refresh: datadir %s\n", dir)
 	report, refreshErr := dataset.Refresh(ctx, deps.HTTP, sets, dataset.RefreshOptions{
 		Dir:   dir,
 		Force: force,
 		Log:   logEvent,
 	})
-	printReport(os.Stdout, report)
+	printReport(w.out, report)
 
 	if embedUpdate {
-		if err := copyToEmbed(report, dir); err != nil {
+		if err := copyToEmbed(w.out, report, dir); err != nil {
 			return err
 		}
 	}
@@ -206,7 +206,7 @@ func printReport(w io.Writer, report dataset.Report) {
 // rebuilt processed artifact from the datadir into the in-repo embed
 // directory sources/<source>/data/<name>, so the operator can re-commit the
 // refreshed embedded data. It requires being run inside the module checkout.
-func copyToEmbed(report dataset.Report, dir string) error {
+func copyToEmbed(w io.Writer, report dataset.Report, dir string) error {
 	root, err := moduleRoot()
 	if err != nil {
 		return fmt.Errorf("--go-embed-update: %w", err)
@@ -234,7 +234,7 @@ func copyToEmbed(report dataset.Report, dir string) error {
 		if err := atomicfs.CopyFile(src, dst, 0o644); err != nil {
 			return fmt.Errorf("--go-embed-update: copy %s: %w", r.Processed, err)
 		}
-		fmt.Fprintf(os.Stdout, "embed-update: %s -> %s\n", r.Processed, relTo(root, dst))
+		fmt.Fprintf(w, "embed-update: %s -> %s\n", r.Processed, relTo(root, dst))
 	}
 	return nil
 }

@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/bpineau/gazetteer/gazetteer"
 )
@@ -14,13 +13,13 @@ import (
 // runNormalize implements `gazetteer normalize [--json] <addr>`. Calls
 // the lib's BAN-backed Normalizer (via Client.Normalize) and prints
 // the resulting Listing.
-func runNormalize(ctx context.Context, args []string) error {
+func runNormalize(ctx context.Context, args []string, w streams) error {
 	var (
 		flags   commonFlags
 		jsonOut bool
 	)
 	fs := flag.NewFlagSet("normalize", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(w.err)
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Usage: gazetteer normalize [--json] [--verbose] <addr>")
 		fmt.Fprintln(fs.Output())
@@ -40,7 +39,7 @@ func runNormalize(ctx context.Context, args []string) error {
 		return err
 	}
 
-	flags.setupLogger()
+	flags.setupLogger(w.err)
 
 	deps, err := newRuntimeDeps()
 	if err != nil {
@@ -53,11 +52,11 @@ func runNormalize(ctx context.Context, args []string) error {
 	}
 
 	if jsonOut {
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(w.out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(listing)
 	}
-	printListing(os.Stdout, listing)
+	printListing(w.out, listing)
 	return nil
 }
 

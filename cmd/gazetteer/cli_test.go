@@ -3,8 +3,6 @@ package main
 import (
 	"bytes"
 	"errors"
-	"io"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -17,7 +15,7 @@ func TestParseQueryFlags(t *testing.T) {
 	q, err := parseQueryFlags("query", []string{
 		"--property-type", "house", "--surface", "80", "--rooms", "4",
 		"--source", "dvf,carteloyers", "--json", "12 rue X, 93100 Montreuil",
-	})
+	}, discardStreams())
 	if err != nil {
 		t.Fatalf("parseQueryFlags: %v", err)
 	}
@@ -34,7 +32,7 @@ func TestParseQueryFlags(t *testing.T) {
 
 func TestParseQueryFlags_InterleavedAndErrors(t *testing.T) {
 	// Flags may come after the positional address.
-	q, err := parseQueryFlags("query", []string{"1 rue de Rivoli, Paris", "--rooms", "2"})
+	q, err := parseQueryFlags("query", []string{"1 rue de Rivoli, Paris", "--rooms", "2"}, discardStreams())
 	if err != nil {
 		t.Fatalf("interleaved: %v", err)
 	}
@@ -42,10 +40,10 @@ func TestParseQueryFlags_InterleavedAndErrors(t *testing.T) {
 		t.Errorf("interleaved parse: %+v", q)
 	}
 
-	if _, err := parseQueryFlags("query", nil); err == nil {
+	if _, err := parseQueryFlags("query", nil, discardStreams()); err == nil {
 		t.Error("missing <addr> should error")
 	}
-	if _, err := parseQueryFlags("query", []string{"--rooms", "NaN", "x"}); !errors.Is(err, errUsage) {
+	if _, err := parseQueryFlags("query", []string{"--rooms", "NaN", "x"}, discardStreams()); !errors.Is(err, errUsage) {
 		t.Errorf("bad flag value should map to errUsage, got %v", err)
 	}
 }
@@ -53,7 +51,7 @@ func TestParseQueryFlags_InterleavedAndErrors(t *testing.T) {
 func TestParseCompareFlags(t *testing.T) {
 	q, addrs, err := parseCompareFlags([]string{
 		"--profile", "balanced", "addr one", "addr two",
-	})
+	}, discardStreams())
 	if err != nil {
 		t.Fatalf("parseCompareFlags: %v", err)
 	}
@@ -189,7 +187,7 @@ func TestUsageListsEverySubcommand(t *testing.T) {
 // invalid preset passed silently; it must now be unknown there (a loud usage
 // error) and still work on `appraise`. `compare` keeps its own registration.
 func TestProfileFlagIsAppraiseOnly(t *testing.T) {
-	q, err := parseQueryFlags("appraise", []string{"--profile", "patrimoine", "12 rue X, Paris"})
+	q, err := parseQueryFlags("appraise", []string{"--profile", "patrimoine", "12 rue X, Paris"}, discardStreams())
 	if err != nil {
 		t.Fatalf("appraise --profile: %v", err)
 	}
@@ -197,7 +195,7 @@ func TestProfileFlagIsAppraiseOnly(t *testing.T) {
 		t.Errorf("appraise profile = %q, want %q", q.profile, "patrimoine")
 	}
 
-	if _, err := parseQueryFlags("query", []string{"--profile", "patrimoine", "12 rue X, Paris"}); !errors.Is(err, errUsage) {
+	if _, err := parseQueryFlags("query", []string{"--profile", "patrimoine", "12 rue X, Paris"}, discardStreams()); !errors.Is(err, errUsage) {
 		t.Errorf("query --profile err = %v, want errUsage (the flag must not exist there)", err)
 	}
 
@@ -210,26 +208,13 @@ func TestProfileFlagIsAppraiseOnly(t *testing.T) {
 	}
 }
 
-// usageOf captures what `gazetteer <cmd> -h` prints. parseQueryFlags writes
-// its Usage banner to os.Stderr, so the test swaps in a pipe for the call.
+// usageOf captures what `gazetteer <cmd> -h` prints. The flag set writes its
+// Usage banner to the streams it was handed, so a buffer suffices.
 func usageOf(t *testing.T, cmd string) string {
 	t.Helper()
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
-	orig := os.Stderr
-	os.Stderr = w
-	_, _ = parseQueryFlags(cmd, []string{"-h"})
-	os.Stderr = orig
-	if err := w.Close(); err != nil {
-		t.Fatalf("close pipe: %v", err)
-	}
-	out, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatalf("read pipe: %v", err)
-	}
-	return string(out)
+	var c capture
+	_, _ = parseQueryFlags(cmd, []string{"-h"}, c.streams())
+	return c.stderr.String()
 }
 
 // TestExplainFlagFeedsBothSubcommands is the mirror of
@@ -242,7 +227,7 @@ func usageOf(t *testing.T, cmd string) string {
 // renderer they share.
 func TestExplainFlagFeedsBothSubcommands(t *testing.T) {
 	for _, cmd := range []string{"query", cmdAppraise} {
-		q, err := parseQueryFlags(cmd, []string{"--explain", "12 rue X, Paris"})
+		q, err := parseQueryFlags(cmd, []string{"--explain", "12 rue X, Paris"}, discardStreams())
 		if err != nil {
 			t.Fatalf("%s --explain: %v", cmd, err)
 		}

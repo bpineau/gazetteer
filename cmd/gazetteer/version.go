@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"runtime/debug"
 )
 
@@ -17,9 +16,9 @@ var version = "dev"
 // plus the embedded VCS info from runtime/debug.BuildInfo when
 // available (commit, dirty flag, build time) — useful when investigating
 // a stale binary on a remote host.
-func runVersion(_ context.Context, args []string) error {
+func runVersion(_ context.Context, args []string, w streams) error {
 	fs := flag.NewFlagSet("version", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(w.err)
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Usage: gazetteer version")
 	}
@@ -27,14 +26,14 @@ func runVersion(_ context.Context, args []string) error {
 		return errUsage
 	}
 
-	fmt.Printf("gazetteer %s\n", version)
+	fmt.Fprintf(w.out, "gazetteer %s\n", version)
 	if info, ok := debug.ReadBuildInfo(); ok {
-		fmt.Printf("  go      %s\n", info.GoVersion)
-		fmt.Printf("  module  %s\n", info.Main.Path)
+		fmt.Fprintf(w.out, "  go      %s\n", info.GoVersion)
+		fmt.Fprintf(w.out, "  module  %s\n", info.Main.Path)
 		for _, s := range info.Settings {
 			switch s.Key {
 			case "vcs.revision", "vcs.time", "vcs.modified":
-				fmt.Printf("  %-14s %s\n", s.Key, s.Value)
+				fmt.Fprintf(w.out, "  %-14s %s\n", s.Key, s.Value)
 			}
 		}
 	}

@@ -30,16 +30,16 @@ var sourceDimensions = []struct {
 
 // runSourcesDimensions implements `gazetteer sources dimensions`: the sources
 // grouped by investor-evaluation dimension, each with its one-line summary.
-func runSourcesDimensions(args []string) error {
+func runSourcesDimensions(args []string, w streams) error {
 	if len(args) > 0 {
 		return fmt.Errorf("sources dimensions takes no arguments")
 	}
 	for _, g := range sourceDimensions {
-		fmt.Printf("%s\n", g.Dimension)
+		fmt.Fprintf(w.out, "%s\n", g.Dimension)
 		for _, name := range g.Sources {
-			fmt.Printf("    %-14s %s\n", name, sourceDescriptors[name].Summary)
+			fmt.Fprintf(w.out, "    %-14s %s\n", name, sourceDescriptors[name].Summary)
 		}
-		fmt.Println()
+		fmt.Fprintln(w.out)
 	}
 	return nil
 }
