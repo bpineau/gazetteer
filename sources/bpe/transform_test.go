@@ -1,6 +1,7 @@
 package bpe
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"io"
@@ -80,11 +81,12 @@ func TestTransform_Golden(t *testing.T) {
 	if idx.Meta.RowCountCommunes != len(want) {
 		t.Errorf("RowCountCommunes = %d, want %d", idx.Meta.RowCountCommunes, len(want))
 	}
-	if idx.Meta.Source != metaSource {
-		t.Errorf("Source = %q, want %q", idx.Meta.Source, metaSource)
+	// The vintage (2024 in the fixture) is read off the member name.
+	if want := "INSEE BPE 2024: dénombrement des équipements (curated bucket subset)"; idx.Meta.Source != want {
+		t.Errorf("Source = %q, want %q", idx.Meta.Source, want)
 	}
-	if idx.Meta.ReferenceDate != referenceDate {
-		t.Errorf("ReferenceDate = %q, want %q", idx.Meta.ReferenceDate, referenceDate)
+	if idx.Meta.ReferenceDate != "2024-01-01" {
+		t.Errorf("ReferenceDate = %q, want 2024-01-01", idx.Meta.ReferenceDate)
 	}
 
 	// BucketTotals sum across communes, excluding the dropped rows.
@@ -119,5 +121,74 @@ func TestBucketMapMatchesDocOrder(t *testing.T) {
 	}
 	if len(covered) != len(AllBuckets) {
 		t.Errorf("bucketByFacilityType maps to %d buckets, want %d (AllBuckets)", len(covered), len(AllBuckets))
+	}
+}
+
+// zipOf builds an in-memory ZIP holding the named members (all with body).
+func zipOf(t *testing.T, body string, names ...string) *zip.Reader {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, n := range names {
+		w, err := zw.Create(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(w, body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return zr
+}
+
+// TestDataMember pins the vintage-tolerant member lookup: INSEE keeps the
+// archive URL across vintages and renames the CSV inside (DS_BPE_2024_data
+// became DS_BPE_2025_data, which broke the refresh once). Any year is
+// accepted, the newest wins whatever the member order, and the metadata
+// CSV is never taken for the data.
+func TestDataMember(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		members  []string
+		wantName string
+		wantYear int
+	}{
+		{"2025 vintage", []string{"DS_BPE_2025_data.csv", "DS_BPE_2025_metadata.csv"}, "DS_BPE_2025_data.csv", 2025},
+		{"metadata listed first", []string{"DS_BPE_2026_metadata.csv", "DS_BPE_2026_data.csv"}, "DS_BPE_2026_data.csv", 2026},
+		{"newest of two", []string{"DS_BPE_2026_data.csv", "DS_BPE_2025_data.csv"}, "DS_BPE_2026_data.csv", 2026},
+		{"nested folder", []string{"bpe/DS_BPE_2025_data.csv"}, "bpe/DS_BPE_2025_data.csv", 2025},
+	}
+	for _, tt := range tests {
+		f, year, err := dataMember(zipOf(t, "x", tt.members...))
+		if err != nil {
+			t.Errorf("%s: %v", tt.name, err)
+			continue
+		}
+		if f.Name != tt.wantName || year != tt.wantYear {
+			t.Errorf("%s: got %s / %d, want %s / %d", tt.name, f.Name, year, tt.wantName, tt.wantYear)
+		}
+	}
+	if _, _, err := dataMember(zipOf(t, "x", "DS_BPE_2025_metadata.csv", "readme.txt")); err == nil {
+		t.Error("an archive without a data member must fail loudly")
+	}
+}
+
+// TestTennisCode guards the sport_terrain bucket against the athletics code:
+// BPE's F107 is "Athlétisme", tennis is F103.
+func TestTennisCode(t *testing.T) {
+	t.Parallel()
+	if bucketByFacilityType["F103"] != BucketSportTerrain {
+		t.Errorf("F103 (Tennis) must map to %s", BucketSportTerrain)
+	}
+	if _, ok := bucketByFacilityType["F107"]; ok {
+		t.Error("F107 is Athlétisme, not tennis: it must not feed sport_terrain")
 	}
 }

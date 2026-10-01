@@ -122,9 +122,25 @@ supersedes, when the upstream has a newer vintage) its committed artifact.
 
 `gazetteer refresh --list` shows `refreshable: yes` for every block-dataset
 artifact (~33 artifacts across ~24 block sources, and growing). The upstream
-resource URLs and dataset vintages are pinned in each source's `transform.go`;
-bump them (and re-commit the embedded data via `--go-embed-update`) when a new
-edition ships.
+resource URLs live in each source's `transform.go`. Prefer one that survives
+the next upload, since a dated file URL dies when it is superseded:
+
+- a data.gouv.fr resource by its stable id,
+  `https://www.data.gouv.fr/fr/datasets/r/<resource-id>` (it redirects to the
+  current upload; the dated `static.data.gouv.fr/resources/...` path 404s
+  once replaced). The dataset API,
+  `https://www.data.gouv.fr/api/1/datasets/<slug>/`, lists the resource ids;
+- an endpoint that serves the latest edition, with the edition read from the
+  data rather than pinned (`sitadel` downloads the DIDO datafile without a
+  millésime, plus its metadata to learn which one it got);
+- a transform tolerant to the edition marks the upstream moves every year
+  (`lovac` reads the newest year-suffixed columns, `bpe` the newest
+  `DS_BPE_<YYYY>_data.csv` member).
+
+Where only a dated URL exists (INSEE names some files after their last
+quarter or year: `chomage`), bump it and re-commit the embedded data via
+`--go-embed-update` when a new edition ships. `refresh` accepts its flags
+before or after the source names.
 
 Reading an xlsx upstream (`chomage`) pulls in `github.com/xuri/excelize/v2`;
 every other transform uses only the standard library plus the project HTTP

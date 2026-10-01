@@ -156,6 +156,17 @@ func TestRunDispatch(t *testing.T) {
 			stdoutHas: []string{"datadir:", "SOURCE", "REFRESHABLE", "delinquance"},
 		},
 		{
+			// Flags after the source names are still flags, not more names.
+			name:      "refresh_accepts_flags_after_sources",
+			args:      []string{"refresh", "all", "--list"},
+			stdoutHas: []string{"datadir:", "SOURCE", "delinquance"},
+		},
+		{
+			name:      "refresh_accepts_flags_after_a_named_source",
+			args:      []string{"refresh", "lovac", "-list"},
+			stdoutHas: []string{"lovac_communes.csv"},
+		},
+		{
 			name:    "refresh_rejects_a_non_dataset_source",
 			args:    []string{"refresh", "dvf"},
 			wantErr: `unknown dataset source "dvf"`,

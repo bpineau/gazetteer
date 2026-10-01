@@ -5,30 +5,39 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 	"testing"
 )
 
-// rawSetStub feeds the transform a single in-memory raw file.
-type rawSetStub struct {
-	name string
-	data []byte
-}
+// rawSetStub feeds the transform in-memory raw files by name.
+type rawSetStub map[string][]byte
 
 func (s rawSetStub) Open(name string) (io.ReadCloser, error) {
-	if name != s.name {
+	b, ok := s[name]
+	if !ok {
 		return nil, os.ErrNotExist
 	}
-	return io.NopCloser(bytes.NewReader(s.data)), nil
+	return io.NopCloser(bytes.NewReader(b)), nil
 }
 
-func TestTransformGolden(t *testing.T) {
+// sampleMeta is the DIDO metadata matching testdata/sample.csv: the
+// millésime it is labelled with and its data row count.
+const sampleMeta = `{"rid":"9c90a880-4ba0-49b4-b99d-d7dd6c810dd0","millesime":"2026-09","rows":24,"temporal_coverage":{"start":"2013-01-01","end":"2025-12-31"}}`
+
+// sampleRaw returns the raw set for testdata/sample.csv with the given
+// metadata.
+func sampleRaw(t *testing.T, meta string) rawSetStub {
+	t.Helper()
 	csv, err := os.ReadFile("testdata/sample.csv")
 	if err != nil {
 		t.Fatalf("read sample: %v", err)
 	}
+	return rawSetStub{rawName: csv, rawMetaName: []byte(meta)}
+}
 
+func TestTransformGolden(t *testing.T) {
 	var buf bytes.Buffer
-	if err := transform(context.Background(), rawSetStub{name: rawName, data: csv}, &buf); err != nil {
+	if err := transform(context.Background(), sampleRaw(t, sampleMeta), &buf); err != nil {
 		t.Fatalf("transform: %v", err)
 	}
 
@@ -37,8 +46,9 @@ func TestTransformGolden(t *testing.T) {
 		t.Fatalf("parseIndex: %v", err)
 	}
 
-	if idx.Meta.DataMillesime != dataMillesime {
-		t.Errorf("DataMillesime = %q, want %q", idx.Meta.DataMillesime, dataMillesime)
+	// The millésime is the one the DIDO metadata names.
+	if idx.Meta.DataMillesime != "2026-09" {
+		t.Errorf("DataMillesime = %q, want 2026-09", idx.Meta.DataMillesime)
 	}
 
 	// Paris arrondissement row (75101) must be dropped; the aggregate
@@ -98,4 +108,32 @@ func equalInts(a, b []int) bool {
 		}
 	}
 	return true
+}
+
+// TestTransformRejectsMillesimeMismatch pins the consistency check between
+// the two latest-millésime downloads: a CSV whose row count differs from the
+// metadata's belongs to another millésime and must not be labelled with it.
+// Metadata without a millésime is refused too.
+func TestTransformRejectsMillesimeMismatch(t *testing.T) {
+	for name, meta := range map[string]string{
+		"row count of another millésime": `{"millesime":"2026-12","rows":25}`,
+		"no millésime":                   `{"rows":24}`,
+		"not JSON":                       `<html>maintenance</html>`,
+	} {
+		var buf bytes.Buffer
+		if err := transform(context.Background(), sampleRaw(t, meta), &buf); err == nil {
+			t.Errorf("%s: transform must fail", name)
+		}
+	}
+}
+
+// TestRawURLsServeTheLatestMillesime keeps the millésime out of the raw URLs:
+// DIDO stops serving a superseded millésime, so a pinned one breaks the
+// refresh at the next publication.
+func TestRawURLsServeTheLatestMillesime(t *testing.T) {
+	for _, f := range set.Raw {
+		if strings.Contains(f.URL, "millesime=") {
+			t.Errorf("%s: URL %q pins a millésime", f.Name, f.URL)
+		}
+	}
 }

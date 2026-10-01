@@ -66,9 +66,36 @@ type agg struct {
 	years                                   []int
 }
 
+// GASPAR column names, each with the spellings the export has used: the
+// 2026 export renamed cod_nat_catnat, cod_commune and dat_deb to id_gaspar,
+// code_commune and date_debut (and its dates gained a time of day, which
+// yearOf ignores). Matching is case-insensitive.
+var (
+	colDecree  = []string{"id_gaspar", "cod_nat_catnat"} // decree id (NOR)
+	colCommune = []string{"code_commune", "cod_commune"} // commune INSEE
+	colRisk    = []string{"lib_risque_jo"}               // peril label (JO)
+	colStart   = []string{"date_debut", "dat_deb"}       // event start date
+)
+
+// column returns the index of the first of names present in col.
+func column(col map[string]int, names []string) (int, bool) {
+	for _, n := range names {
+		if i, ok := col[n]; ok {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
 // aggregate parses the catnat CSV and folds it into per-commune rows. The recent
 // window is measured against the latest event year in the data, so the output is
 // deterministic (independent of when the transform runs).
+//
+// A row is one (decree, commune, peril, event) recognition. The export has
+// carried exact duplicates of such rows (some 12 600 in 2025), which would
+// count one recognition twice, so a repeated (decree, commune, peril, start
+// date) is skipped. Two distinct decrees for the same event (a rectifying
+// decree) both count, as in the official register.
 func aggregate(csvBytes []byte) (processed, error) {
 	r := csv.NewReader(dataset.BOMReader(bytes.NewReader(csvBytes)))
 	r.Comma = ';'
@@ -83,14 +110,16 @@ func aggregate(csvBytes []byte) (processed, error) {
 	for i, h := range header {
 		col[strings.ToLower(strings.TrimSpace(h))] = i
 	}
-	ciCom, ok1 := col["cod_commune"]
-	ciRisk, ok2 := col["lib_risque_jo"]
-	ciDeb, ok3 := col["dat_deb"]
-	if !ok1 || !ok2 || !ok3 {
+	ciDecree, ok0 := column(col, colDecree)
+	ciCom, ok1 := column(col, colCommune)
+	ciRisk, ok2 := column(col, colRisk)
+	ciDeb, ok3 := column(col, colStart)
+	if !ok0 || !ok1 || !ok2 || !ok3 {
 		return processed{}, fmt.Errorf("catnat: missing columns (have %v)", header)
 	}
 
 	byCom := map[string]*agg{}
+	seen := map[[4]string]bool{}
 	maxYear := 0
 	for {
 		rec, err := r.Read()
@@ -104,7 +133,13 @@ func aggregate(csvBytes []byte) (processed, error) {
 		if insee == "" {
 			continue
 		}
-		year := yearOf(at(rec, ciDeb))
+		start := strings.TrimSpace(at(rec, ciDeb))
+		key := [4]string{strings.TrimSpace(at(rec, ciDecree)), insee, strings.TrimSpace(at(rec, ciRisk)), dateOf(start)}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		year := yearOf(start)
 		a := byCom[insee]
 		if a == nil {
 			a = &agg{}
@@ -190,6 +225,17 @@ func yearOf(isoDate string) int {
 		return 0
 	}
 	return y
+}
+
+// dateOf returns the calendar-date part of a GASPAR timestamp
+// ("1999-12-25 12:00:00" → "1999-12-25"); a plain date is returned as is.
+// The time of day the 2026 export appends varies between rows of one decree
+// (00:00, 01:00, 02:00, 12:00) and carries no meaning.
+func dateOf(s string) string {
+	if d, _, ok := strings.Cut(s, " "); ok {
+		return d
+	}
+	return s
 }
 
 // at returns the i-th field of rec, or "" when out of range.

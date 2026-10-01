@@ -154,11 +154,11 @@ $ gazetteer sources list
 ademe           v4
 anct            v1
 bdnb            v2  (opt-in via --source)
-bpe             v1
+bpe             v2
 cadastre        v2
 carteloyers     v1
 cartofriches    v1
-catnat          v1
+catnat          v2
 cdsr            v1
 chomage         v1
 delinquance     v3

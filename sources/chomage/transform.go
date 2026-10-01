@@ -29,11 +29,16 @@ const (
 // quarterly series (ZE2020), an xlsx covering 2003-T1 onward. appartURL is
 // the INSEE "Table d'appartenance géographique des communes" ZIP, whose
 // xlsx member carries the commune → ZE2020 crosswalk and the ZE labels.
-// Bump both — together with latestQuarter below — when INSEE publishes a
-// newer edition.
+//
+// INSEE names the rates file after its last quarter and removes the
+// previous one when the next quarter ships (the old name then answers HTTP
+// 500, not 404), so this pin breaks every quarter: take the current name
+// from https://www.insee.fr/fr/statistiques/1893230 and move latestQuarter
+// below with it. The appartenance table follows the yearly COG
+// (https://www.insee.fr/fr/information/7671844).
 const (
-	ratesURL  = "https://www.insee.fr/fr/statistiques/fichier/1893230/chomage-zone-t1-2003-t4-2025.xlsx"
-	appartURL = "https://www.insee.fr/fr/statistiques/fichier/7671844/table-appartenance-geo-communes-2025.zip"
+	ratesURL  = "https://www.insee.fr/fr/statistiques/fichier/1893230/chomage-zone-t1-2003-t2-2026.xlsx"
+	appartURL = "https://www.insee.fr/fr/statistiques/fichier/7671844/table-appartenance-geo-communes-2026.zip"
 )
 
 // Sheet names inside the two workbooks.
@@ -56,11 +61,11 @@ const (
 
 // keptQuarters is the number of trailing quarters retained from the rates
 // series (oldest-first). Pinned, delinquance-style; latestQuarter records
-// the most recent quarter of the published edition for provenance. Bump
-// both — with the URLs above — on a refresh.
+// the most recent quarter of the published edition, and the transform
+// refuses a file that ends on another one. Move it with ratesURL.
 const (
 	keptQuarters  = 20
-	latestQuarter = "2025-T4"
+	latestQuarter = "2026-T2"
 )
 
 // metaSource / metaNote mirror the committed artifact's meta.

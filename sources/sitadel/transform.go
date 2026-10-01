@@ -3,9 +3,11 @@ package sitadel
 import (
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,17 +16,54 @@ import (
 	"github.com/bpineau/gazetteer/helpers/communes"
 )
 
-// rawName is the datadir filename for the upstream raw CSV.
-const rawName = "sitadel.raw.csv"
+// Datadir filenames of the two upstream raw inputs: the data CSV and the
+// DIDO metadata of the same datafile.
+const (
+	rawName     = "sitadel.raw.csv"
+	rawMetaName = "sitadel.raw.meta.json"
+)
 
-// rawURL is the SDES Sitadel annual file served by the DIDO API (semicolon
-// CSV, UTF-8, header row). The millésime query parameter selects the
-// 2026-06 publication. Bump this URL — and dataMillesime — when SDES
-// publishes a fresh millésime.
-const rawURL = "https://data.statistiques.developpement-durable.gouv.fr/dido/api/v1/datafiles/9c90a880-4ba0-49b4-b99d-d7dd6c810dd0/csv?millesime=2026-06&withColumnName=true"
+// didoDatafile is the DIDO API endpoint of the SDES Sitadel annual communal
+// datafile ("Données annuelles communales - Logements").
+const didoDatafile = "https://data.statistiques.developpement-durable.gouv.fr/dido/api/v1/datafiles/9c90a880-4ba0-49b4-b99d-d7dd6c810dd0"
 
-// dataMillesime is the upstream publication millésime of rawURL.
-const dataMillesime = "2026-06"
+// rawURL is that datafile as a semicolon CSV (UTF-8, header row), and
+// rawMetaURL its DIDO metadata. Neither names a millésime, so both serve the
+// latest one: DIDO stops serving a superseded millésime (a pinned
+// ?millesime=2026-06 answered HTTP 404 once 2026-09 was out), which made any
+// pin a quarterly break. The metadata records which millésime that is
+// (didoMeta), and its row count lets transform check that the two downloads
+// saw the same one.
+const (
+	rawURL     = didoDatafile + "/csv?withColumnName=true"
+	rawMetaURL = didoDatafile
+)
+
+// didoMeta is the part of the DIDO datafile metadata the transform reads.
+type didoMeta struct {
+	Millesime string `json:"millesime"` // e.g. "2026-09"
+	Rows      int    `json:"rows"`      // data rows of that millésime's CSV
+}
+
+// millesimeRE is the shape of a DIDO millésime ("YYYY-MM").
+var millesimeRE = regexp.MustCompile(`^\d{4}-\d{2}$`)
+
+// readDidoMeta decodes and checks the datafile metadata raw input.
+func readDidoMeta(raw dataset.RawSet) (didoMeta, error) {
+	rc, err := raw.Open(rawMetaName)
+	if err != nil {
+		return didoMeta{}, err
+	}
+	defer func() { _ = rc.Close() }()
+	var m didoMeta
+	if err := json.NewDecoder(rc).Decode(&m); err != nil {
+		return didoMeta{}, fmt.Errorf("sitadel: decode DIDO metadata: %w", err)
+	}
+	if !millesimeRE.MatchString(m.Millesime) || m.Rows <= 0 {
+		return didoMeta{}, fmt.Errorf("sitadel: DIDO metadata without a millésime or a row count: %+v", m)
+	}
+	return m, nil
+}
 
 // metaSource is the provenance string recorded in the rebuilt artifact.
 const metaSource = "SDES Sitadel — logements autorisés et commencés par commune (DIDO datafile 9c90a880-4ba0-49b4-b99d-d7dd6c810dd0)"
@@ -73,6 +112,10 @@ func newAcc() *acc {
 // parent commune, drops communes with no non-zero authorised data, and emits
 // the compact gzipped JSON index.
 func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
+	meta, err := readDidoMeta(raw)
+	if err != nil {
+		return err
+	}
 	rc, err := raw.Open(rawName)
 	if err != nil {
 		return err
@@ -99,6 +142,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	maxC := maxInt(yearC, inseeC, typeC, authC, comC)
 
 	byCommune := map[string]*acc{}
+	rows := 0
 	for {
 		rec, err := cr.Read()
 		if err == io.EOF {
@@ -107,6 +151,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("sitadel: read row: %w", err)
 		}
+		rows++
 		if len(rec) <= maxC {
 			continue
 		}
@@ -144,10 +189,16 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		}
 	}
 
+	// The CSV must be the millésime the metadata names: a new one published
+	// between the two downloads would otherwise be labelled with the old name.
+	if rows != meta.Rows {
+		return fmt.Errorf("sitadel: CSV has %d rows, DIDO metadata of millésime %s says %d: the millésime changed mid-download, refresh again", rows, meta.Millesime, meta.Rows)
+	}
+
 	idx := Index{
 		Meta: Meta{
 			Source:        metaSource,
-			DataMillesime: dataMillesime,
+			DataMillesime: meta.Millesime,
 			Note:          metaNote,
 		},
 		Communes: map[string]Entry{},

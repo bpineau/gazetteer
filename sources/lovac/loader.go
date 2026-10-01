@@ -31,8 +31,8 @@ var set = dataset.Set{
 // commune. All percentages are 0..100 floats.
 type Entry struct {
 	InseeCode      string
-	VacancePct     float64 // taux de logements vacants 2025 (parc privé)
-	VacanceLongPct float64 // taux de logements vacants > 2 ans 2025
+	VacancePct     float64 // taux de logements vacants (parc privé), embedded LOVAC edition
+	VacanceLongPct float64 // taux de logements vacants > 2 ans, same edition
 }
 
 // Index is the per-INSEE lookup index.
@@ -88,11 +88,13 @@ func parseIndex(r io.Reader) (*Index, error) {
 	for i, name := range header {
 		col[strings.TrimSpace(name)] = i
 	}
-	required := []string{"INSEE_C", "taux_vacance_25_pct", "taux_vacance_long_25_pct"}
-	for _, name := range required {
-		if _, ok := col[name]; !ok {
-			return nil, fmt.Errorf("missing column %q in header %v", name, header)
-		}
+	// The rate columns carry no edition year since the 2026 edition; an
+	// artifact built from the 2025 edition named them with a "_25_" infix.
+	iInsee, okI := col[colOutINSEE]
+	iRate, okR := firstColumn(col, colOutRate, legacyRateCol)
+	iLong, okL := firstColumn(col, colOutLong, legacyLongCol)
+	if !okI || !okR || !okL {
+		return nil, fmt.Errorf("missing INSEE / rate columns in header %v", header)
 	}
 	out := make(map[string]Entry, 16_000)
 	for {
@@ -103,11 +105,11 @@ func parseIndex(r io.Reader) (*Index, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read row: %w", err)
 		}
-		insee := strings.TrimSpace(rec[col["INSEE_C"]])
+		insee := strings.TrimSpace(field(rec, iInsee))
 		if insee == "" {
 			continue
 		}
-		rateStr := strings.TrimSpace(rec[col["taux_vacance_25_pct"]])
+		rateStr := strings.TrimSpace(field(rec, iRate))
 		if rateStr == "" {
 			// Pre-processed file may keep the row for the long-term
 			// number even if the headline rate is masked. We skip
@@ -119,7 +121,7 @@ func parseIndex(r io.Reader) (*Index, error) {
 			continue
 		}
 		longRate := 0.0
-		if s := strings.TrimSpace(rec[col["taux_vacance_long_25_pct"]]); s != "" {
+		if s := strings.TrimSpace(field(rec, iLong)); s != "" {
 			if v, err := strconv.ParseFloat(s, 64); err == nil {
 				longRate = v
 			}
@@ -131,4 +133,22 @@ func parseIndex(r io.Reader) (*Index, error) {
 		}
 	}
 	return &Index{byInsee: out}, nil
+}
+
+// firstColumn returns the index of the first of names present in col.
+func firstColumn(col map[string]int, names ...string) (int, bool) {
+	for _, n := range names {
+		if i, ok := col[n]; ok {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+// field returns rec[i], or "" when the row is shorter than the header.
+func field(rec []string, i int) string {
+	if i < 0 || i >= len(rec) {
+		return ""
+	}
+	return rec[i]
 }

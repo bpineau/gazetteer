@@ -14,7 +14,14 @@ import (
 const Name = "catnat"
 
 // sourceVersion bumps when the Source's internal logic changes.
-const sourceVersion = 1
+//
+// History:
+//   - v1: initial release, per-commune aggregate of the GASPAR CatNat table.
+//   - v2: reads the renamed 2026 GASPAR columns and counts an exact
+//     duplicate row (same decree, commune, peril and start date) once;
+//     the 2025 export carried about 12 600 such duplicate rows, which
+//     inflated TotalArretes and the per-category counts by about 5 %.
+const sourceVersion = 2
 
 // Version exposes sourceVersion so callers that wrap the Source can mirror it.
 const Version = sourceVersion

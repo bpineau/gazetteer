@@ -18,14 +18,16 @@ const (
 // Result is the typed payload returned by Source.Query. Exposes the
 // commune-level vacancy + long-term vacancy split.
 type Result struct {
-	// VacancePct is the taux de logements vacants 2025 in the parc
-	// privé (%). Zero when the commune was filtered out at LOVAC
-	// ingestion (small commune with masked statistics — "secret
-	// statistique").
+	// VacancePct is the taux de logements vacants in the parc privé (%)
+	// of the embedded LOVAC edition (2026 at the last refresh: vacant
+	// dwellings at 1 January 2025 over the private park at 1 January
+	// 2024). Zero when the commune was filtered out at LOVAC ingestion
+	// (small commune with masked statistics: "secret statistique").
 	VacancePct float64 `json:"vacance_pct"`
 
-	// VacanceLongPct is the taux de logements vacants > 2 ans 2025
-	// (%). Zero when the upstream did not publish a long-term split.
+	// VacanceLongPct is the taux de logements vacants > 2 ans (%), same
+	// edition and denominator as VacancePct. Zero when the upstream did
+	// not publish a long-term split.
 	VacanceLongPct float64 `json:"vacance_long_pct,omitempty"`
 
 	// Confidence is "high" when a row was found (LOVAC is a direct

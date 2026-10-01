@@ -8,36 +8,38 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
 
-// rawName is the datadir filename for the upstream raw input — INSEE's
-// BPE 2024 "dénombrement" ZIP (a CSV pair inside).
+// rawName is the datadir filename for the upstream raw input: INSEE's BPE
+// "dénombrement" ZIP (a CSV pair inside).
 const rawName = "bpe_csv.zip"
 
-// rawURL is the INSEE BPE 2024 general equipment-count file
-// (DS_BPE_CSV_FR.zip), published under the "Dénombrement et
-// géolocalisation des équipements en 2024" release. The ZIP holds
-// DS_BPE_2024_data.csv (one row per GEO × FACILITY_TYPE with a count)
-// and a metadata CSV. Bump this when INSEE publishes a new BPE vintage
-// (and the Source's referenceDate/note with it).
+// rawURL is the INSEE BPE general equipment-count file (DS_BPE_CSV_FR.zip),
+// published under the "Dénombrement des équipements" release. INSEE keeps
+// this URL across vintages and swaps the archive's content: it holds
+// DS_BPE_<YYYY>_data.csv (one row per GEO × FACILITY_TYPE with a count) and
+// a DS_BPE_<YYYY>_metadata.csv of code labels, the year moving with each
+// vintage. dataMember finds the data CSV whatever its year.
 const rawURL = "https://www.insee.fr/fr/statistiques/fichier/8217527/DS_BPE_CSV_FR.zip"
 
-// csvMemberName is the data CSV inside the ZIP. The archive also carries
-// DS_BPE_2024_metadata.csv (code labels), which the transform ignores.
-const csvMemberName = "DS_BPE_2024_data.csv"
+// dataMemberRe matches the data CSV inside the ZIP and captures its vintage
+// year. The metadata CSV beside it is ignored.
+var dataMemberRe = regexp.MustCompile(`^DS_BPE_(\d{4})_data\.csv$`)
 
-// metaSource is the provenance string recorded in the rebuilt artifact —
-// kept byte-identical to the committed embed so a refresh is a no-op diff.
-const metaSource = "INSEE BPE 2024 — dénombrement des équipements (curated bucket subset)"
+// metaSourceFormat is the provenance string recorded in the rebuilt
+// artifact, formatted with the vintage year.
+const metaSourceFormat = "INSEE BPE %d: dénombrement des équipements (curated bucket subset)"
 
-// referenceDate is the BPE vintage reference date (1 January of the
-// dénombrement year). The data CSV carries TIME_PERIOD=2024 inline but not
-// a full date; keep this in sync with the upstream release.
-const referenceDate = "2024-01-01"
+// referenceDateFormat is the BPE vintage reference date, 1 January of the
+// dénombrement year, formatted with that year. INSEE writes the year in the
+// archive member name and the TIME_PERIOD column, never as a full date.
+const referenceDateFormat = "%d-01-01"
 
 // metaNote documents the artifact semantics; byte-identical to the embed.
 const metaNote = "Curated rental-investor subset: services, commerce, santé, petite enfance, éducation, transport, sport. Equipment counts aggregated per commune."
@@ -79,10 +81,10 @@ var bucketByFacilityType = map[string]Bucket{
 	// Sport
 	"F121": BucketSportSalle,   // Salles multisports / gymnases
 	"F101": BucketSportPiscine, // Bassin de natation
-	"F107": BucketSportTerrain, // Terrain de tennis
+	"F103": BucketSportTerrain, // Tennis
 }
 
-// Upstream column headers in DS_BPE_2024_data.csv.
+// Upstream column headers in DS_BPE_<YYYY>_data.csv.
 const (
 	colGEO       = "GEO"           // commune/dep/region/... code
 	colGEOObject = "GEO_OBJECT"    // geographic level (we keep "COM")
@@ -98,7 +100,7 @@ const (
 const geoObjectCommune = "COM"
 
 // transform rebuilds the processed bpe artifact from the upstream INSEE ZIP.
-// It reads DS_BPE_2024_data.csv from the archive, keeps GEO_OBJECT=COM rows
+// It reads the newest DS_BPE_<YYYY>_data.csv from the archive, keeps GEO_OBJECT=COM rows
 // whose FACILITY_TYPE is in the curated bucket map, sums OBS_VALUE per
 // (commune, bucket), and writes the gzipped Index to dst.
 func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
@@ -118,22 +120,17 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		return fmt.Errorf("bpe: open zip: %w", err)
 	}
 
-	var member io.ReadCloser
-	for _, f := range zr.File {
-		if f.Name == csvMemberName {
-			member, err = f.Open()
-			if err != nil {
-				return fmt.Errorf("bpe: open %s: %w", csvMemberName, err)
-			}
-			break
-		}
+	zf, year, err := dataMember(zr)
+	if err != nil {
+		return err
 	}
-	if member == nil {
-		return fmt.Errorf("bpe: %s not found in zip", csvMemberName)
+	member, err := zf.Open()
+	if err != nil {
+		return fmt.Errorf("bpe: open %s: %w", zf.Name, err)
 	}
 	defer func() { _ = member.Close() }()
 
-	idx, err := buildIndex(member)
+	idx, err := buildIndex(member, year)
 	if err != nil {
 		return err
 	}
@@ -144,9 +141,35 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	return nil
 }
 
-// buildIndex parses the (already-decompressed) BPE data CSV and aggregates
-// it into the curated per-commune Index.
-func buildIndex(r io.Reader) (*Index, error) {
+// dataMember returns the archive's data CSV and its vintage year. INSEE
+// ships one vintage per archive, but should two data members ever sit side
+// by side the newest year wins, so the choice never depends on the
+// archive's member order.
+func dataMember(zr *zip.Reader) (*zip.File, int, error) {
+	var (
+		best *zip.File
+		year int
+	)
+	names := make([]string, 0, len(zr.File))
+	for _, f := range zr.File {
+		names = append(names, f.Name)
+		m := dataMemberRe.FindStringSubmatch(path.Base(f.Name))
+		if m == nil {
+			continue
+		}
+		if y, err := strconv.Atoi(m[1]); err == nil && y > year {
+			best, year = f, y
+		}
+	}
+	if best == nil {
+		return nil, 0, fmt.Errorf("bpe: no DS_BPE_<YYYY>_data.csv in zip (members: %v)", names)
+	}
+	return best, year, nil
+}
+
+// buildIndex parses the (already-decompressed) BPE data CSV of the given
+// vintage year and aggregates it into the curated per-commune Index.
+func buildIndex(r io.Reader, year int) (*Index, error) {
 	cr := csv.NewReader(dataset.BOMReader(r))
 	cr.Comma = ';'
 	cr.FieldsPerRecord = -1
@@ -203,8 +226,8 @@ func buildIndex(r io.Reader) (*Index, error) {
 
 	return &Index{
 		Meta: Meta{
-			Source:           metaSource,
-			ReferenceDate:    referenceDate,
+			Source:           fmt.Sprintf(metaSourceFormat, year),
+			ReferenceDate:    fmt.Sprintf(referenceDateFormat, year),
 			RowCountCommunes: len(communes),
 			BucketTotals:     bucketTotals,
 			Note:             metaNote,

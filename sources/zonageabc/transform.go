@@ -18,10 +18,12 @@ import (
 const rawCSVName = "zonage_abc.raw.csv"
 
 // rawCSVURL is the "Liste ensemble des communes - Zonage ABC" CSV published
-// on data.gouv.fr (dataset slug liste-des-communes-selon-le-zonage-abc).
-// data.gouv mints a dated static path per revision; bump this when a new
-// arrêté is published (the slug page lists the current resource).
-const rawCSVURL = "https://static.data.gouv.fr/resources/liste-des-communes-selon-le-zonage-abc/20250910-150516/liste-des-communes-zonage-abc-5-septembre-2025.csv"
+// on data.gouv.fr (dataset slug liste-des-communes-selon-le-zonage-abc),
+// addressed by its stable resource id: data.gouv.fr redirects it to the
+// current dated upload, which the ministry replaces at each arrêté (the
+// dated static path 404s once superseded). The zone column header carries
+// the effective date, so a new revision needs no code change.
+const rawCSVURL = "https://www.data.gouv.fr/fr/datasets/r/13f7282b-8a25-43ab-9713-8bb4e476df55"
 
 // metaSource is the provenance string recorded in the rebuilt artifact.
 const metaSource = "data.gouv.fr/datasets/liste-des-communes-selon-le-zonage-abc"

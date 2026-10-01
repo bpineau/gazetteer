@@ -4,8 +4,11 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"math"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/xuri/excelize/v2"
@@ -142,8 +145,8 @@ func TestTransform_Golden(t *testing.T) {
 
 	// keptQuarters trailing columns are retained; pad with extra leading
 	// quarters that must be dropped, and end on latestQuarter.
-	allQuarters := []string{"2020-T3", "2020-T4"}
-	allQuarters = append(allQuarters, goldenQuarters()...)
+	allQuarters := quartersEndingOnLatest(keptQuarters + 2)
+	firstKept := allQuarters[2]
 
 	// Three ZEs. Rates for the kept window; the leading two quarters carry
 	// throwaway values that must not survive the keep-last-N trim.
@@ -188,8 +191,8 @@ func TestTransform_Golden(t *testing.T) {
 	if len(idx.Quarters) != keptQuarters {
 		t.Fatalf("quarters = %d, want %d", len(idx.Quarters), keptQuarters)
 	}
-	if idx.Quarters[0] != "2021-T1" || idx.Quarters[len(idx.Quarters)-1] != latestQuarter {
-		t.Errorf("quarter window = %s..%s, want 2021-T1..%s", idx.Quarters[0], idx.Quarters[len(idx.Quarters)-1], latestQuarter)
+	if idx.Quarters[0] != firstKept || idx.Quarters[len(idx.Quarters)-1] != latestQuarter {
+		t.Errorf("quarter window = %s..%s, want %s..%s", idx.Quarters[0], idx.Quarters[len(idx.Quarters)-1], firstKept, latestQuarter)
 	}
 
 	// Per-ZE rate series: the kept window only (no padding leakage).
@@ -241,7 +244,7 @@ func TestTransform_Golden(t *testing.T) {
 	if idx.Meta.Source != metaSource {
 		t.Errorf("meta.Source = %q, want %q", idx.Meta.Source, metaSource)
 	}
-	if idx.Meta.SeriesStart != "2021-T1" || idx.Meta.SeriesEnd != latestQuarter {
+	if idx.Meta.SeriesStart != firstKept || idx.Meta.SeriesEnd != latestQuarter {
 		t.Errorf("meta series window = %s..%s", idx.Meta.SeriesStart, idx.Meta.SeriesEnd)
 	}
 	if idx.Meta.QuarterCount != keptQuarters {
@@ -300,43 +303,20 @@ func TestNationalSeries_SkipsEmptyCells(t *testing.T) {
 	}
 }
 
-// goldenQuarters returns 2021-T1 .. latestQuarter (keptQuarters labels).
-func goldenQuarters() []string {
-	out := make([]string, 0, keptQuarters)
-	year := 2021
-	q := 1
-	for len(out) < keptQuarters {
-		out = append(out, formatQuarter(year, q))
-		q++
-		if q > 4 {
-			q = 1
-			year++
+// quartersEndingOnLatest returns the n consecutive quarter labels that end
+// on latestQuarter, oldest first, so the fixtures follow the pinned edition
+// instead of hard-coding its window.
+func quartersEndingOnLatest(n int) []string {
+	year, _ := strconv.Atoi(latestQuarter[:4])
+	q := int(latestQuarter[6] - '0')
+	out := make([]string, n)
+	for i := n - 1; i >= 0; i-- {
+		out[i] = fmt.Sprintf("%d-T%d", year, q)
+		if q--; q == 0 {
+			q, year = 4, year-1
 		}
 	}
 	return out
-}
-
-func formatQuarter(year, q int) string {
-	return itoa(year) + "-T" + itoa(q)
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	var b []byte
-	for n > 0 {
-		b = append([]byte{byte('0' + n%10)}, b...)
-		n /= 10
-	}
-	if neg {
-		b = append([]byte{'-'}, b...)
-	}
-	return string(b)
 }
 
 // pad prepends n zero quarters to series (throwaway leading values the
@@ -347,4 +327,16 @@ func pad(n int, series []float64) []float64 {
 		out = append(out, 99.0)
 	}
 	return append(out, series...)
+}
+
+// TestRatesURLMatchesLatestQuarter keeps the two halves of the quarterly pin
+// together: INSEE names the rates file after its last quarter
+// (chomage-zone-t1-2003-t2-2026.xlsx ends on 2026-T2), so a URL moved
+// without latestQuarter, or the reverse, fails here instead of at refresh.
+func TestRatesURLMatchesLatestQuarter(t *testing.T) {
+	t.Parallel()
+	want := fmt.Sprintf("-t%c-%s.xlsx", latestQuarter[6], latestQuarter[:4])
+	if !strings.HasSuffix(ratesURL, want) {
+		t.Errorf("ratesURL %q does not end on latestQuarter %s (want suffix %q)", ratesURL, latestQuarter, want)
+	}
 }

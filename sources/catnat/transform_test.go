@@ -118,3 +118,72 @@ type rawSetStub struct{ b []byte }
 func (s rawSetStub) Open(string) (io.ReadCloser, error) {
 	return io.NopCloser(bytes.NewReader(s.b)), nil
 }
+
+// sampleCSV2026 is the 2026 GASPAR export shape: renamed columns (id_gaspar,
+// code_commune, date_debut, ...) and timestamps whose time of day varies.
+// A1 is listed twice (an exact duplicate of the kind the 2025 export carried
+// by the thousand) and A1 again with another clock time: one recognition.
+// R1 is a rectifying decree for the same 2016 event: a distinct decree that
+// counts.
+const sampleCSV2026 = "id_gaspar;code_commune;libelle_commune;num_risque_jo;lib_risque_jo;date_debut;date_fin;date_signature_arrete;date_publication_jo;date_modification\r\n" +
+	"A1;91471;Ville;ICB;Inondations et/ou Coulées de Boue;2016-05-30 02:00:00;2016-06-04 02:00:00;2016-06-08 02:00:00;2016-06-09 02:00:00;2022-05-24 02:00:00.000\r\n" +
+	"A1;91471;Ville;ICB;Inondations et/ou Coulées de Boue;2016-05-30 02:00:00;2016-06-04 02:00:00;2016-06-08 02:00:00;2016-06-09 02:00:00;2022-05-24 02:00:00.000\r\n" +
+	"A1;91471;Ville;ICB;Inondations et/ou Coulées de Boue;2016-05-30 00:00:00;2016-06-04 00:00:00;2016-06-08 00:00:00;2016-06-09 00:00:00;2022-05-20 15:55:55.682\r\n" +
+	"R1;91471;Ville;ICB;Inondations et/ou Coulées de Boue;2016-05-30 02:00:00;2016-06-04 02:00:00;2016-09-16 02:00:00;2016-10-20 02:00:00;2022-05-24 02:00:00.000\r\n" +
+	"A1;91471;Ville;MVT;Mouvement de Terrain;2016-05-30 02:00:00;2016-06-04 02:00:00;2016-06-08 02:00:00;2016-06-09 02:00:00;2022-05-24 02:00:00.000\r\n" +
+	"A2;91471;Ville;SEC;Sécheresse;2025-07-01 12:00:00;2025-09-30 12:00:00;2026-04-01 12:00:00;2026-04-05 12:00:00;2026-04-05 12:00:00.000\r\n" +
+	"A3;77001;Autre;TMP;Tempête;1999-12-25 12:00:00;1999-12-29 12:00:00;1999-12-29 12:00:00;1999-12-30 12:00:00;2022-05-24 11:17:06.954\r\n"
+
+// TestTransform_2026Export runs the 2026 archive shape end to end: a dated
+// catnat member among the other GASPAR tables, the renamed columns, and the
+// duplicate rows that must count once.
+func TestTransform_2026Export(t *testing.T) {
+	t.Parallel()
+	var zbuf bytes.Buffer
+	zw := zip.NewWriter(&zbuf)
+	for name, body := range map[string]string{
+		"catnat_gaspar_2026-09-21.csv": sampleCSV2026,
+		"pprn_gaspar_2026-09-21.csv":   "id_gaspar;code_commune\r\nP1;91471\r\n",
+		"azi_gaspar_2026-09-21.csv":    "id_gaspar;code_commune\r\nZ1;91471\r\n",
+	} {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write([]byte(body))
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := transform(context.Background(), rawSetStub{zbuf.Bytes()}, &out); err != nil {
+		t.Fatalf("transform: %v", err)
+	}
+	gz, err := gzip.NewReader(bytes.NewReader(out.Bytes()))
+	if err != nil {
+		t.Fatalf("gunzip: %v", err)
+	}
+	var p processed
+	if err := json.NewDecoder(gz).Decode(&p); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if p.RefYear != 2025 {
+		t.Errorf("RefYear = %d, want 2025 (date_debut year, time of day ignored)", p.RefYear)
+	}
+	byInsee := map[string]Entry{}
+	for _, c := range p.Communes {
+		byInsee[c.INSEE] = c
+	}
+	// 91471: A1 inond (three copies → 1) + R1 inond + A1 mvt + A2 sech = 4.
+	v := byInsee["91471"]
+	if v.Total != 4 || v.Inond != 2 || v.Mvt != 1 || v.Sech != 1 {
+		t.Errorf("91471 = %+v, want total 4 / inond 2 / mvt 1 / sech 1", v)
+	}
+	if v.LastYear != 2025 || v.Recent != 4 {
+		t.Errorf("91471 last %d recent %d, want 2025 / 4", v.LastYear, v.Recent)
+	}
+	if a := byInsee["77001"]; a.Total != 1 || a.Temp != 1 || a.LastYear != 1999 {
+		t.Errorf("77001 = %+v, want one 1999 tempête", a)
+	}
+}

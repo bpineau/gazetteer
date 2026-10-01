@@ -26,15 +26,30 @@ const (
 //     (datasets programme-action-coeur-de-ville / programme-petites-villes-de-demain).
 //   - ORT is the national "Liste des communes couvertes par des opérations
 //     de revitalisation de territoire" published by the Ministère de la
-//     Cohésion des territoires (a Grist CSV export).
+//     Cohésion des territoires (a Grist document).
 //
-// data.gouv mints a dated static path per revision; bump these when ANCT /
-// the ministry publish a new resource (the dataset pages list the current
-// URL). The lists grow over time as new conventions are signed.
+// ACV and PVD are addressed by their stable data.gouv.fr resource ids, which
+// redirect to the current dated upload, so a new list uploaded over the same
+// resource is picked up as is. ORT is the CSV export of the Grist document's
+// raw BDD table, every row of it: an export taken through a view section
+// (viewSection=N) inherits whatever filter or linking that page carries in
+// the document, and one such page silently narrowed the export to a single
+// département. The lists grow over time as new conventions are signed.
 const (
-	rawACVURL = "https://static.data.gouv.fr/resources/programme-action-coeur-de-ville/20250924-154200/liste-acv-com2025-20250704.csv"
-	rawPVDURL = "https://static.data.gouv.fr/resources/programme-petites-villes-de-demain/20260427-160836/liste-pvd-com2025-20260427.csv"
-	rawORTURL = "https://grist.numerique.gouv.fr/o/dgaln/api/docs/j4i9oKD3jzFtgEUuM9sXnL/download/csv?viewSection=3&tableId=BDD&activeSortSpec=%5B102%5D&filters=%5B%5D&linkingFilter=%7B%22filters%22%3A%7B%7D%2C%22operations%22%3A%7B%7D%7D"
+	rawACVURL = "https://www.data.gouv.fr/fr/datasets/r/8b6f422b-cbdf-459a-9a16-d6be4b92d91a"
+	rawPVDURL = "https://www.data.gouv.fr/fr/datasets/r/1fa831ec-d912-4277-8b95-a8b998bf951e"
+	rawORTURL = "https://grist.numerique.gouv.fr/o/dgaln/api/docs/j4i9oKD3jzFtgEUuM9sXnL/download/csv?tableId=BDD"
+)
+
+// Publication floors checked by validate. Each list only grows as
+// conventions are signed (ORT also loses the conventions that end), and
+// stood at 245 ACV, about 1 640 PVD and about 2 200 signed ORT communes in
+// 2026. A rebuild far below these is a truncated or filtered upstream
+// export, not a policy change, and must not replace the embedded data.
+const (
+	minACV = 200
+	minPVD = 1200
+	minORT = 1500
 )
 
 // metaSource is the provenance string recorded in the rebuilt artifact.
@@ -123,7 +138,8 @@ func mergeACV(raw dataset.RawSet, idx *Index) (int, error) {
 }
 
 // mergePVD folds the Petites Villes de Demain list into idx, returning the
-// number of PVD communes. Its signature date is already ISO (YYYY-MM-DD).
+// number of PVD communes. Its signature date was ISO (YYYY-MM-DD) until the
+// 2026 list switched to DD/MM/YYYY; dmyToISO takes both.
 func mergePVD(raw dataset.RawSet, idx *Index) (int, error) {
 	rows, err := readCSV(raw, rawPVDName, ',', []string{colINSEE, colLib, colDate})
 	if err != nil {
@@ -137,7 +153,7 @@ func mergePVD(raw dataset.RawSet, idx *Index) (int, error) {
 		}
 		e := idx.Communes[insee]
 		e.PVD = true
-		e.PVDSignedAt = strings.TrimSpace(r[colDate])
+		e.PVDSignedAt = dmyToISO(r[colDate])
 		if e.Label == "" {
 			if lib := strings.TrimSpace(r[colLib]); lib != "" {
 				e.Label = lib
@@ -152,7 +168,8 @@ func mergePVD(raw dataset.RawSet, idx *Index) (int, error) {
 // mergeORT folds the signed ORT conventions into idx, returning the number
 // of signed-ORT communes. Only rows whose "Signée ?" is "Signée" count; the
 // ORT list carries no usable label (its "Commune" column embeds the
-// department prefix), so labels are left to ACV / PVD. Date is ISO.
+// department prefix), so labels are left to ACV / PVD. A convention whose
+// status reads "Terminée" has ended and does not count. Date is ISO.
 func mergeORT(raw dataset.RawSet, idx *Index) (int, error) {
 	rows, err := readCSV(raw, rawORTName, ',', []string{colORTINSEE, colORTSigned, colORTDate})
 	if err != nil {
@@ -169,7 +186,7 @@ func mergeORT(raw dataset.RawSet, idx *Index) (int, error) {
 		}
 		e := idx.Communes[insee]
 		e.ORT = true
-		e.ORTSignedAt = strings.TrimSpace(r[colORTDate])
+		e.ORTSignedAt = dmyToISO(r[colORTDate])
 		idx.Communes[insee] = e
 		n++
 	}
@@ -224,23 +241,26 @@ func readCSV(raw dataset.RawSet, name string, comma rune, want []string) ([]map[
 	return out, nil
 }
 
-// dmyToISO converts a "DD-MM-YYYY" date to "YYYY-MM-DD". Inputs already in
-// ISO form (or unrecognised) are returned trimmed/unchanged. The ACV list
-// uses day-first French dates.
+// dmyToISO converts a day-first "DD-MM-YYYY" or "DD/MM/YYYY" date to
+// "YYYY-MM-DD". Inputs already in ISO form (or unrecognised) are returned
+// trimmed/unchanged. The ACV list uses day-first French dates with dashes,
+// the PVD list since 2026 with slashes.
 func dmyToISO(s string) string {
 	s = strings.TrimSpace(s)
-	p := strings.Split(s, "-")
+	p := strings.FieldsFunc(s, func(r rune) bool { return r == '-' || r == '/' })
 	if len(p) != 3 {
 		return s
 	}
-	if len(p[0]) == 2 && len(p[2]) == 4 { // DD-MM-YYYY
+	if len(p[0]) == 2 && len(p[1]) == 2 && len(p[2]) == 4 { // DD-MM-YYYY, DD/MM/YYYY
 		return p[2] + "-" + p[1] + "-" + p[0]
 	}
 	return s // already YYYY-MM-DD (or unknown)
 }
 
-// validate gates publication: the rebuilt artifact must parse and be
-// non-empty.
+// validate gates publication: the rebuilt artifact must parse and each
+// programme list must reach its floor (minACV, minPVD, minORT), so a
+// truncated or filtered upstream export fails the refresh instead of
+// silently dropping communes from the embedded data.
 func validate(r io.Reader) error {
 	idx, err := parseIndex(r)
 	if err != nil {
@@ -248,6 +268,11 @@ func validate(r io.Reader) error {
 	}
 	if idx.Count() == 0 {
 		return errors.New("anct: validated artifact has no communes")
+	}
+	m := idx.Meta
+	if m.RowCountACV < minACV || m.RowCountPVD < minPVD || m.RowCountORT < minORT {
+		return fmt.Errorf("anct: a programme list is below its floor (ACV %d, min %d; PVD %d, min %d; ORT %d, min %d): truncated upstream export?",
+			m.RowCountACV, minACV, m.RowCountPVD, minPVD, m.RowCountORT, minORT)
 	}
 	return nil
 }

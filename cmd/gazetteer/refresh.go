@@ -48,7 +48,11 @@ func runRefresh(ctx context.Context, args []string, w streams) error {
 		fmt.Fprintln(fs.Output())
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	// Flags may follow the source names (`refresh all --force`): Go's flag
+	// package alone would stop at the first name and read every later flag as
+	// one more source name.
+	positional, err := parseInterleaved(fs, args)
+	if err != nil {
 		return errUsage
 	}
 
@@ -67,7 +71,7 @@ func runRefresh(ctx context.Context, args []string, w streams) error {
 		return fmt.Errorf("no dataset sources registered")
 	}
 
-	selected, err := selectSources(bySource, names, fs.Args())
+	selected, err := selectSources(bySource, names, positional)
 	if err != nil {
 		return err
 	}

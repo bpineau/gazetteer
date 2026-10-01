@@ -31,7 +31,7 @@ The table below summarises each Source. Detailed contracts follow.
 | `ademe`          | address / zip                                  | data.gouv.fr `dpe03existant`|
 | `anct`           | INSEE                                          | offline ANCT programme list |
 | `bdnb`           | address + INSEE                                | data.gouv.fr BDNB PostgREST |
-| `bpe`            | INSEE                                          | offline INSEE BPE 2024 subset |
+| `bpe`            | INSEE                                          | offline INSEE BPE 2025 subset |
 | `cadastre`       | lat/lon                                        | apicarto.ign.fr + cadastre.data.gouv.fr |
 | `carteloyers`    | INSEE + property_type + rooms                  | offline ANIL / DHUP dataset |
 | `dvfagg`         | INSEE                                          | offline geo-dvf price aggregate |
@@ -58,11 +58,11 @@ The table below summarises each Source. Detailed contracts follow.
 | `qpv`            | INSEE + lat/lon (point-in-polygon)             | offline ANCT QPV 2024 contours |
 | `rpls`           | INSEE                                          | offline data.gouv SRU 2024  |
 | `sensible`       | lat/lon                                        | offline QRR contours (min. Intérieur) + ORCOD-IN décrets |
-| `sitadel`        | INSEE (arrondissement-folding)                 | offline SDES Sitadel 2026-06 |
+| `sitadel`        | INSEE (arrondissement-folding)                 | offline SDES Sitadel 2026-09 |
 | `taxefonciere`   | INSEE + surface_m2                             | offline DGFiP rates         |
-| `lovac`          | INSEE                                          | offline LOVAC 2025 (fiscal) |
+| `lovac`          | INSEE                                          | offline LOVAC 2026 (fiscal) |
 | `vacance`        | INSEE (arrondissement-aware)                   | offline INSEE RP 2021       |
-| `zonageabc`      | INSEE                                          | offline arrêté 2025-09-05   |
+| `zonageabc`      | INSEE                                          | offline, in force 2026-06-26 |
 | `zonetendue`     | INSEE                                          | offline décret 2013-392     |
 | `links`          | lat/lon (or INSEE / address)                   | built in-process (no backend)|
 
@@ -578,13 +578,19 @@ Per-commune `taxe foncière` estimate.
 
 ## `sources/lovac`
 
-Per-commune FISCAL vacancy status from the LOVAC 2025 dataset (TLV
+Per-commune FISCAL vacancy status from the LOVAC dataset, 2026 edition (TLV
 2013 / THRS perimeter — the dataset Bercy uses to assess the Taxe sur
 les Logements Vacants).
 
 - **Needs**: INSEE.
 - **Result**: vacancy rate %, long-term vacancy split. Missing
   communes (secret statistique) surface as `IsEmpty()`.
+- **Edition**: the rate is the edition's vacant private dwellings over the
+  private park counted one year earlier (2026 edition: 1 January 2025 over
+  1 January 2024). LOVAC has documented series breaks (2023 and 2025, the
+  move from the taxe d'habitation to the GMBI declarations), so rates are
+  not comparable across editions; the refresh reads whichever edition is
+  the newest in the upstream file.
 - **Disambiguation**: for the DEMOGRAPHIC vacancy rate from the INSEE
   census, see `sources/vacance`. Distinct datasets — the two signals
   are correlated but not interchangeable.
@@ -647,7 +653,7 @@ to the existing stock.
   tier): absolute counts scale with commune size, so per-stock
   normalisation belongs in the appraisal layer.
 - **Backend**: gzipped JSON embedded under `data/` (~35 k communes; SDES
-  Sitadel 2026-06 millésime, years 2013→2025). Blank upstream cells are
+  Sitadel 2026-09 millésime, years 2013→2025). Blank upstream cells are
   kept distinct from a real 0.
 - **`IsEmpty()`**: true when the commune is absent, or present with no
   non-zero authorised dwelling in any year.
@@ -698,11 +704,12 @@ commune.
 
 ## `sources/bpe`
 
-Curated subset of INSEE's Base Permanente des Équipements (BPE) 2024
+Curated subset of INSEE's Base Permanente des Équipements (BPE) 2025
 counts: ~25 of the 188 type codes folded into 16 rental-investor
 buckets (poste, grande_surface, supérette, boulangerie, école
 primaire, collège, lycée, structure_sante, médecin_généraliste,
-infirmier, pharmacie, crèche, gare, sport_salle / piscine / terrain).
+infirmier, pharmacie, crèche, gare, sport_salle / piscine / terrain,
+the last one being tennis courts).
 
 - **Needs**: INSEE.
 - **Result**: `bpe.Result` carrying `Counts map[Bucket]int` +
@@ -710,8 +717,8 @@ infirmier, pharmacie, crèche, gare, sport_salle / piscine / terrain).
   `IsEmpty()` — small rural communes that only carry A129 Mairie fall
   in this bucket on purpose (a Mairie is not a meaningful tenancy
   signal).
-- **Backend**: gzipped JSON embedded under `data/`. ~21 700 communes
-  × 16 buckets, ~233 KB on disk.
+- **Backend**: gzipped JSON embedded under `data/`. ~22 700 communes
+  × 16 buckets, ~210 KB on disk.
 - **Property type irrelevant** — equipment density applies to the
   whole commune.
 
