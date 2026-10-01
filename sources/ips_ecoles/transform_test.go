@@ -53,6 +53,11 @@ func TestTransform_Golden(t *testing.T) {
 			t.Errorf("%s: got %+v, want %+v", insee, got, w)
 		}
 	}
+	// The stored median is rounded to the two decimals it can carry (IPS has
+	// one, a two-school average adds one): 87.95, not 87.94999999999999.
+	if got, _ := idx.Lookup("01014"); got.IPSMedian != 87.95 {
+		t.Errorf("01014 median stored as %v, want exactly 87.95", got.IPSMedian)
+	}
 	if _, ok := idx.Lookup("94046"); ok {
 		t.Errorf("94046: NS-only commune must not appear")
 	}
