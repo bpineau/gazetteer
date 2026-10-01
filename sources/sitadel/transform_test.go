@@ -73,28 +73,28 @@ func TestTransformGolden(t *testing.T) {
 		t.Errorf("01004 should be present (zero-padded INSEE preserved)")
 	}
 
-	e, ok := idx.Lookup("78005")
+	e, ok := idx.Lookup("93066")
 	if !ok {
-		t.Fatalf("78005 missing from artifact")
+		t.Fatalf("93066 missing from artifact")
 	}
 	if e.YearStart != 2020 {
-		t.Errorf("78005 YearStart = %d, want 2020", e.YearStart)
+		t.Errorf("93066 YearStart = %d, want 2020", e.YearStart)
 	}
 	// Authorised "Tous Logements" 2020..2025: 10,12,20,5,3,6
 	wantAuth := []int{10, 12, 20, 5, 3, 6}
 	if !equalInts(e.Auth, wantAuth) {
-		t.Errorf("78005 Auth = %v, want %v", e.Auth, wantAuth)
+		t.Errorf("93066 Auth = %v, want %v", e.Auth, wantAuth)
 	}
 	// Started "Tous Logements" 2020..2024 then 2025 BLANK (missing = -1):
 	// 8,9,15,30,71,-1
 	wantStarted := []int{8, 9, 15, 30, 71, missing}
 	if !equalInts(e.Started, wantStarted) {
-		t.Errorf("78005 Started = %v, want %v", e.Started, wantStarted)
+		t.Errorf("93066 Started = %v, want %v", e.Started, wantStarted)
 	}
 	// Collectif authorised 2020..2025: 6,8,14,4,2,5
 	wantColl := []int{6, 8, 14, 4, 2, 5}
 	if !equalInts(e.CollAuth, wantColl) {
-		t.Errorf("78005 CollAuth = %v, want %v", e.CollAuth, wantColl)
+		t.Errorf("93066 CollAuth = %v, want %v", e.CollAuth, wantColl)
 	}
 }
 
