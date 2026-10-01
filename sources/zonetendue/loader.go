@@ -87,11 +87,19 @@ func (idx *Index) Lookup(insee string) (Entry, bool) {
 	return e, ok
 }
 
-// CountTendue returns the number of communes explicitly stored in the
-// dataset.
+// CountTendue returns the number of communes the dataset classifies as
+// tendue or tendue touristique. The index also stores communes that left
+// the zone but were on the 2013 TLV list (to keep their historical flag),
+// so this is not len(idx.Communes).
 func (idx *Index) CountTendue() int {
 	if idx == nil {
 		return 0
 	}
-	return len(idx.Communes)
+	n := 0
+	for _, e := range idx.Communes {
+		if e.Tier != TierNonTendue {
+			n++
+		}
+	}
+	return n
 }

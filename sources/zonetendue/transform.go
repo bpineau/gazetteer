@@ -89,11 +89,14 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		}
 		total++
 		tier := classifyTLV(rec[colCur])
-		if tier == TierNonTendue {
+		tlv2013 := strings.EqualFold(strings.TrimSpace(rec[col2013]), "TLV")
+		if tier == TierNonTendue && !tlv2013 {
 			continue // non-tendue communes are implicit; keep the file compact
 		}
+		// A commune that left the zone but was on the 2013 list is kept:
+		// absence would read as "never tendue" and drop FlaggedTLV2013.
 		idx.Communes[insee] = Entry{
-			TLV2013: strings.EqualFold(strings.TrimSpace(rec[col2013]), "TLV"),
+			TLV2013: tlv2013,
 			Tier:    tier,
 		}
 	}

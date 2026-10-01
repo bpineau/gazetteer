@@ -24,7 +24,7 @@ const rawURL = "https://www.data.gouv.fr/fr/datasets/r/3ea8e2c3-0038-464a-b17e-c
 
 const (
 	metaSource  = "Registre National d'Immatriculation des Copropriétés (ANAH, data.gouv.fr, with-qpv)"
-	dataVintage = "2026-07"
+	dataVintage = "2026-10"
 )
 
 // Upstream column headers (data.gouv "with-qpv" daily file, confirmed).
