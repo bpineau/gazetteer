@@ -18,7 +18,8 @@ const Name = "zonageabc"
 //
 // History:
 //   - v1: initial. Per-commune A/Abis/B1/B2/C lookup against the
-//     5 septembre 2025 arrêté revision (data.gouv.fr).
+//     5 septembre 2025 arrêté revision (data.gouv.fr); later revisions are
+//     data refreshes under v1 (the 26 juin 2026 list at the last one).
 const sourceVersion = 1
 
 // Version exposes sourceVersion so callers that wrap the Source can

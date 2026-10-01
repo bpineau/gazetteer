@@ -1,0 +1,6 @@
+Région,Département,EPCI,Code commune,ACV,PVD,Statut de la commune,Signée ?,"Si signée, date de signature",Durée (en années),Date de fin estimée,"Si non signée, date de signature envisagée",Remarques,Commune,Code postal,Données actualisées ?,Commune signataire,Nombre de convention ORT,Nombre de conventions d'ORT pluri-communales,Avancement,Dernière actualisation,Actualisé par,doublon,longitude,latitude,VA
+Auvergne-Rhône-Alpes,Drôme,Valence Romans Agglo,26362,true,false,1. Commune ACV,Signée,2020-02-27,7,,,"Avenant signé,
+puis prolongé",26 - Valence,26000,true,true,1,0,Phase opérationnelle,01-01-2026 00:00,X,false,4.89,44.93,false
+Auvergne-Rhône-Alpes,Ain,CC Bugey Sud,01034,false,true,2. Commune PVD,Signée,2022-11-21,5,,,,01 - Belley,01300,true,true,1,0,Phase opérationnelle,01-01-2026 00:00,X,false,5.68,45.75,false
+Auvergne-Rhône-Alpes,Rhône,Métropole de Lyon,69123,false,false,4. Autre,Terminée,2019-03-01,5,01-03-2024,,,69 - Lyon,69001,true,true,1,0,Terminée,01-01-2026 00:00,X,false,4.83,45.76,false
+Bretagne,Finistère,Brest Métropole,29019,false,false,4. Autre,Non signée,,,,2027-01-01,,29 - Brest,29200,true,true,0,0,Projet,01-01-2026 00:00,X,false,-4.48,48.39,false

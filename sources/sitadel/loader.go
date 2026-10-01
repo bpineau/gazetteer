@@ -12,14 +12,17 @@ import (
 var embedFS embed.FS
 
 // set binds the embedded SDES Sitadel extract to the datadir/refresh
-// pipeline. Refresh downloads the upstream DIDO CSV and rebuilds the gzipped
-// JSON via transform.
+// pipeline. Refresh downloads the latest DIDO millésime (CSV + metadata) and
+// rebuilds the gzipped JSON via transform.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
 	Processed: dataset.File{Name: "sitadel.json.gz"},
-	Raw:       []dataset.File{{Name: rawName, URL: rawURL}},
+	Raw: []dataset.File{
+		{Name: rawName, URL: rawURL},
+		{Name: rawMetaName, URL: rawMetaURL},
+	},
 	Transform: transform,
 	Validate:  validate,
 }

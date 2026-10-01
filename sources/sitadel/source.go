@@ -19,7 +19,8 @@ const Name = "sitadel"
 //
 // History:
 //   - v1: initial release. Embeds the SDES Sitadel 2026-06 millésime
-//     (per-commune dwellings authorised + started, 2013→2025).
+//     (per-commune dwellings authorised + started, 2013→2025); a newer
+//     millésime is a data refresh under v1.
 const sourceVersion = 1
 
 // Version exposes sourceVersion so callers that wrap the Source can mirror it

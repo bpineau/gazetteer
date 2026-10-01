@@ -29,8 +29,10 @@ const (
 // Result is the typed payload returned by Source.Query: the commune's CatNat
 // history.
 type Result struct {
-	// TotalArretes is the number of CatNat decrees the commune accumulated
-	// since 1982 (every category).
+	// TotalArretes is the number of CatNat recognitions the commune
+	// accumulated since 1982 (every category), one per decree and peril: a
+	// decree recognising both a flood and a landslide counts twice, a
+	// rectifying decree for an event already recognised counts again.
 	TotalArretes int `json:"total_arretes"`
 
 	// RecentCount is the number of decrees whose event began in the recent

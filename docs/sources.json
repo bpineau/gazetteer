@@ -48,7 +48,7 @@
   },
   {
     "name": "bpe",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "INSEE BPE — curated commerce / health / services facility counts per commune.",
     "inputs": [
@@ -113,7 +113,7 @@
   },
   {
     "name": "catnat",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "Per-commune history of recognised natural-disaster (CatNat) decrees + recent-frequency tier.",
     "inputs": [

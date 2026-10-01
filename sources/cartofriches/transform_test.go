@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"regexp"
 	"testing"
 )
 
@@ -106,6 +107,20 @@ func TestParseSurface(t *testing.T) {
 		got, ok := parseSurface(c.in)
 		if got != c.want || ok != c.ok {
 			t.Errorf("parseSurface(%q) = (%d,%v), want (%d,%v)", c.in, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+// TestRawURL_StableResource pins the raw URL to data.gouv.fr's stable
+// resource form. The dated static.data.gouv.fr path of an export 404s as
+// soon as Cerema uploads the next one, which broke the refresh once; the
+// /datasets/r/<resource-id> form follows the resource to its current upload.
+func TestRawURL_StableResource(t *testing.T) {
+	t.Parallel()
+	stable := regexp.MustCompile(`^https://www\.data\.gouv\.fr/fr/datasets/r/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	for _, f := range set.Raw {
+		if !stable.MatchString(f.URL) {
+			t.Errorf("%s: URL %q is not a stable data.gouv.fr resource URL", f.Name, f.URL)
 		}
 	}
 }
