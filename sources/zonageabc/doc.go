@@ -30,7 +30,7 @@
 //	}
 //	r := data.(*zonageabc.Result)
 //	if r.IsEmpty() {
-//	    fmt.Println("commune absent from the September 2025 zonage")
+//	    fmt.Println("commune absent from the embedded zonage revision")
 //	    return
 //	}
 //	fmt.Printf("zone=%s tension=%d\n", r.Zone, r.TensionScore)
@@ -44,7 +44,7 @@ package zonageabc
 // package's constants. The Source returns ConfidenceHigh on every
 // match (the dataset is the legal reference itself) and ConfidenceNone
 // for communes missing from the dataset (rare; only fires for INSEE
-// codes that do not exist in the September 2025 revision — typically
+// codes that do not exist in the embedded revision, typically
 // historic communes that have since been fused or split).
 const (
 	ConfidenceHigh = "high"

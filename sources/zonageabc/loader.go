@@ -67,7 +67,7 @@ func parseIndex(r io.Reader) (*Index, error) {
 
 // Lookup returns the zonage classification for the given INSEE. `ok`
 // is false when the commune is absent (rare; only fires for INSEE
-// codes that do not exist in the September 2025 revision).
+// codes that do not exist in the embedded revision).
 func (idx *Index) Lookup(insee string) (Zone, bool) {
 	if idx == nil {
 		return ZoneUnknown, false
