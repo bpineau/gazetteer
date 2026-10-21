@@ -69,7 +69,15 @@ const Name = "encadrement"
 // so a furnished letting could only be held to the unfurnished ceiling, which
 // is lower on every cell (Paris 1er, 1 room, pre-1946: 42.60 against 48.60
 // EUR/m2/month).
-const sourceVersion = 9
+//
+// v10 tells a decreed rent-cap territory without a shipped grille from an
+// unregulated commune. Lille, Bordeaux, Montpellier, the Pays basque and
+// Grenoble-Alpes Métropole cap rents, yet v9 answered for them exactly as for
+// Toulouse (empty, ConfidenceNone), which reads as "no cap". They now carry
+// Regulation (RegulationNotCovered, or RegulationPartialCommune for the
+// Grenoble communes covered in part), Territory and an Evidence.Note, at
+// ConfidenceNone and with no cap figure; IsEmpty is false for them.
+const sourceVersion = 10
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -167,9 +175,12 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		if len(entries) == 0 {
 			return &Result{
 				Confidence: ConfidenceNone,
+				Regulation: RegulationNotCovered,
+				Territory:  "Paris",
 				Evidence: Evidence{
 					Zip:            zip,
 					Arrondissement: arr,
+					Note:           "Paris is capped (décret n° 2019-315) but the embedded grille has no cell for arrondissement " + arr,
 				},
 			}, nil
 		}
@@ -236,7 +247,15 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		}, m.conf), nil
 	}
 
-	// Outside every shipped zone: a none-confidence result records the absence.
+	// A decreed territory whose grille is not shipped: the rent IS capped, by
+	// a figure this Source does not carry. Reporting it like the commune next
+	// door would tell the caller there is no cap at all.
+	if t, partial, ok := lookupTerritory(insee); ok {
+		return uncoveredResult(t, partial, Evidence{Zip: zip, INSEE: insee}), nil
+	}
+
+	// Outside every decreed territory: a none-confidence result records the
+	// absence.
 	return &Result{
 		Confidence: ConfidenceNone,
 		Evidence: Evidence{
@@ -244,6 +263,24 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 			INSEE: insee,
 		},
 	}, nil
+}
+
+// uncoveredResult is the reading for a commune of a decreed rent-cap territory
+// whose grille the Source does not ship: no cap figure, ConfidenceNone, and a
+// Regulation that says the rent is (or, for a partial commune, may be) capped.
+func uncoveredResult(t territory, partial bool, ev Evidence) *Result {
+	reg := RegulationNotCovered
+	ev.Note = fmt.Sprintf("%s is a rent-cap territory (%s, art. 140 loi 2018-1021); its grille is not embedded, so the cap is unknown, not absent", t.name, t.decree)
+	if partial {
+		reg = RegulationPartialCommune
+		ev.Note = fmt.Sprintf("part of this commune (a set of IRIS listed in the annex of the %s) is a rent-cap territory of %s; the perimeter and its grille are not embedded, so the address may be capped", t.decree, t.name)
+	}
+	return &Result{
+		Confidence: ConfidenceNone,
+		Regulation: reg,
+		Territory:  t.name,
+		Evidence:   ev,
+	}
 }
 
 // propertyTypeEligible accepts the two residential types the grilles cover.
@@ -348,8 +385,13 @@ func collapse(entries []Entry, label, zoneSource string, sel cellFilter, ev Evid
 	ev.Epoque = epoque
 	ev.NbCellsMatched = len(majs)
 	if len(majs) == 0 {
+		// Inside a shipped zone, so the rent is capped; the grille simply has
+		// no cell for this selection.
+		ev.Note = "the address lies in a shipped rent-cap zone but no grille cell matched the selection"
 		return &Result{
 			Confidence: ConfidenceNone,
+			Regulation: RegulationNotCovered,
+			Territory:  label,
 			Evidence:   ev,
 		}
 	}
@@ -362,6 +404,7 @@ func collapse(entries []Entry, label, zoneSource string, sel cellFilter, ev Evid
 		Zone:                  label,
 		ZoneSource:            zoneSource,
 		Confidence:            conf,
+		Regulation:            RegulationCapped,
 	}
 	furnished := sel
 	furnished.meuble = true

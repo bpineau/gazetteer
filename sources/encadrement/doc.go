@@ -3,6 +3,14 @@
 // Seine-Saint-Denis EPTs (Plaine Commune, Est Ensemble) and
 // Lyon / Villeurbanne.
 //
+// The other territories a decree has placed under the same regime (Lille,
+// Montpellier, Bordeaux, the Pays basque, Grenoble-Alpes Métropole) ship no
+// grille, and an address there is NOT reported as unregulated: its Result
+// carries no cap figure, ConfidenceNone, Regulation = RegulationNotCovered
+// (RegulationPartialCommune for a commune the decree covers only in part),
+// Territory and an Evidence.Note, and IsEmpty is false. Read Result.Regulation,
+// never the zero caps alone, to decide whether a rent is free.
+//
 // The Source matches the listing to a zone:
 //
 //   - Paris by INSEE (75101..75120), or by zip (75001..75020, 75116) when

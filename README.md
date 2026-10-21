@@ -151,7 +151,7 @@ Market data:
 | `locservice`   | Rental-market tension (supply tightness + tenant-budget scores)  |
 | `carteloyers`  | National rent observatory tiers                                  |
 | `oll`          | Observed market rents by zone (Observatoires Locaux des Loyers)  |
-| `encadrement`  | Rent control caps (Paris, Plaine Commune + Est Ensemble 93, Lyon) |
+| `encadrement`  | Rent control caps, unfurnished and furnished (Paris, Plaine Commune + Est Ensemble 93, Lyon); the other decreed territories read as capped, figure unknown |
 | `lovac`        | Vacancy rate per commune from the LOVAC fiscal file              |
 | `sitadel`      | New-housing pipeline per commune - permits authorised + housing starts (SDES Sitadel) |
 | `taxefonciere` | Property tax ratios by commune                                   |

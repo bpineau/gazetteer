@@ -18,9 +18,10 @@ import (
 // Returns (cap, true) for every commune the embedded encadrement artifacts
 // cover: Paris (75101–75120), Lyon and Villeurbanne (69381–69389, 69266), and
 // the two Seine-Saint-Denis EPT perimeters (Plaine Commune, Est Ensemble).
-// Returns (0, false) for all other communes — which is what sets
-// CommuneOverview.Encadree, so a territory missing here is screened as
-// unregulated and its market rent goes uncapped.
+// Returns (0, false) for all other communes, including the decreed rent-cap
+// territories whose grille is not embedded (encadrement.UncoveredTerritory),
+// which Build flags with CommuneOverview.EncadrementNotCovered instead of
+// screening them as unregulated.
 func RepresentativeT2Majore(idx *encadrement.Index, insee string) (float64, bool) {
 	if idx == nil || len(insee) != 5 {
 		return 0, false

@@ -110,8 +110,11 @@ func TestQuery_Villeurbanne(t *testing.T) {
 func TestQuery_OutsidePerimeter(t *testing.T) {
 	t.Parallel()
 	l := gazetteer.Listing{
-		Zip:          "33000", // Bordeaux — outside the shipped Paris/Lyon/PC perimeter.
-		INSEE:        "33063",
+		// Toulouse: in no decreed rent-cap territory. (This fixture used to be
+		// Bordeaux, which IS capped since 15 July 2022 and was wrongly
+		// reported as unregulated: see TestQuery_DecreedTerritoryWithoutGrille.)
+		Zip:          "31000",
+		INSEE:        "31555",
 		PropertyType: gazetteer.PropertyApartment,
 	}
 	res, err := Query(context.Background(), Options{}, l)
@@ -121,8 +124,8 @@ func TestQuery_OutsidePerimeter(t *testing.T) {
 	if res == nil {
 		t.Fatalf("nil result")
 	}
-	if !res.IsEmpty() {
-		t.Errorf("IsEmpty() = false, want true for Bordeaux")
+	if !res.IsEmpty() || res.Regulation != "" {
+		t.Errorf("IsEmpty() = %v, Regulation = %q, want an empty reading for Toulouse", res.IsEmpty(), res.Regulation)
 	}
 	if res.Confidence != ConfidenceNone {
 		t.Errorf("Confidence = %q, want %q", res.Confidence, ConfidenceNone)
@@ -413,12 +416,12 @@ func TestQuery_NotControlledStaysNotControlled(t *testing.T) {
 		{INSEE: "75056", Zip: "75000", Rooms: intp(3)}, // Paris parent code
 		{INSEE: "69123", Rooms: intp(3)},               // Lyon parent code
 		{INSEE: "69029", Zip: "69380", Rooms: intp(3)}, // Chasselay, Métropole but unregulated
-		{INSEE: "13201", Zip: "13001", Rooms: intp(3)}, // Marseille: no grille ships
+		{INSEE: "13201", Zip: "13001", Rooms: intp(3)}, // Marseille: no decree delimits a territory
 		{INSEE: "93029", Zip: "93700", Rooms: intp(3)}, // Drancy, in neither 93 EPT
 		// A set INSEE is authoritative: a contradicting zip must not promote
 		// an out-of-perimeter commune into Paris or Lyon.
-		{INSEE: "33063", Zip: "75001", Rooms: intp(3)},
-		{INSEE: "33063", Zip: "69003", Rooms: intp(3)},
+		{INSEE: "31555", Zip: "75001", Rooms: intp(3)},
+		{INSEE: "31555", Zip: "69003", Rooms: intp(3)},
 	} {
 		res := query(t, l)
 		if !res.IsEmpty() {

@@ -260,7 +260,7 @@
   },
   {
     "name": "encadrement",
-    "version": 9,
+    "version": 10,
     "default": true,
     "summary": "Legal rent-control caps (loyer de référence + majoré), unfurnished and furnished (meublé).",
     "inputs": [
@@ -269,7 +269,7 @@
       "rooms",
       "lat/lon (for 93)"
     ],
-    "coverage": "Paris + Plaine Commune \u0026 Est Ensemble (93) + Lyon/Villeurbanne",
+    "coverage": "Paris + Plaine Commune \u0026 Est Ensemble (93) + Lyon/Villeurbanne; the other decreed territories (Lille, Bordeaux, Montpellier, Pays basque, Grenoble-Alpes Métropole) read as regulated, cap unknown",
     "feeds": [
       "appraisal.RentValue"
     ],

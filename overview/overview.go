@@ -56,7 +56,18 @@ type CommuneOverview struct {
 	// Rent (carte des loyers, apt 1-2 pièces, HC)
 	RentMarketEURM2HC float64  `json:"rent_market_eur_m2_hc"`
 	RentCapEURM2HC    *float64 `json:"rent_cap_eur_m2_hc,omitempty"`
-	Encadree          bool     `json:"encadree"`
+	// Encadree is true when rents in the commune are capped (encadrement des
+	// loyers), wholly or, for EncadrementNotCovered communes, possibly in
+	// part. RentCapEURM2HC is nil when the cap figure is not embedded.
+	Encadree bool `json:"encadree"`
+	// EncadrementNotCovered is true for a commune of a decreed rent-cap
+	// territory whose grille the encadrement Source does not ship (Lille,
+	// Bordeaux, Montpellier, Pays basque, Grenoble-Alpes Métropole, see
+	// encadrement.UncoveredTerritory): its rents ARE capped, by a figure
+	// unknown here, so EffectiveRentEURM2HC (the market rent, uncapped) is an
+	// upper bound, not the chargeable rent. Some Grenoble-Alpes Métropole
+	// communes are covered only in part.
+	EncadrementNotCovered bool `json:"encadrement_not_covered,omitempty"`
 
 	// Socio-economic
 	DelinquanceLevel string   `json:"delinquance_level"`
@@ -163,6 +174,9 @@ func Build(o Options) ([]CommuneOverview, error) {
 		if cap, ok := RepresentativeT2Majore(enc, insee); ok {
 			row.Encadree = true
 			row.RentCapEURM2HC = &cap
+		} else if _, _, ok := encadrement.UncoveredTerritory(insee); ok {
+			row.Encadree = true
+			row.EncadrementNotCovered = true
 		}
 
 		// Délinquance level.

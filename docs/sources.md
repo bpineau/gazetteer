@@ -367,6 +367,21 @@ Lyon / Villeurbanne.
     resolve at `ConfidenceMedium`; the two multi-zone communes
     (Saint-Denis, Montreuil) collapse across their zones at
     `ConfidenceLow`. `Evidence.ZoneID` records the resolved zone(s).
+- **Decreed territories without a grille**: every other territory a decree
+  has delimited under art. 140 caps rents too, and is NOT reported as
+  unregulated: Lille (with Hellemmes and Lomme, décret 2020-41), Montpellier
+  (2021-1144), Bordeaux (2021-1145), the 24 communes of the Pays basque
+  (2023-981) and Grenoble-Alpes Métropole (2023-1046: 13 communes in full,
+  8 in part, by IRIS). An address there, keyed by INSEE, gets no cap figure
+  at `ConfidenceNone` but `Regulation = regulated_not_covered` (or
+  `partial_commune` for the 8 partly covered Grenoble communes, whose IRIS
+  perimeter is not embedded), `Territory` and an `Evidence.Note`, and
+  `IsEmpty()` is false: the cap is unknown, not absent. A capped reading
+  carries `Regulation = capped`; an empty `Regulation` means no decreed
+  territory. The list follows ANIL's census of the experiment (no
+  Aix-Marseille territory has been decreed) and each decree on Légifrance;
+  `encadrement.UncoveredTerritory(insee)` exposes it, and `overview` flags
+  those communes `EncadrementNotCovered`.
 - **Eligibility**: residential only.
 - **Vintages**: Paris 2026 (arrêté of 12 June 2026, in force from 1 July;
   transcribed from the arrêté because opendata.paris.fr still stops at 2025,
@@ -961,6 +976,11 @@ rows, _ := overview.Build(overview.Options{Depts: []string{"75", "93"}})
 // encadrement cap, income (filosofi), vacancy, taxe foncière, QPV, zonage,
 // zone tendue, distance-to-Paris and nearby transit lines — all offline.
 ```
+
+A commune of a decreed rent-cap territory whose grille is not embedded
+(Bordeaux, Lille, ...) comes back `Encadree` with `EncadrementNotCovered`
+and a nil `RentCapEURM2HC`: its rents are capped by a figure the row does not
+carry, so its `EffectiveRentEURM2HC` is an upper bound.
 
 `overview.Build` does no network I/O; it iterates the communes `dvfagg` has
 price data for (`Depts` empty = national). It is the batch/screening

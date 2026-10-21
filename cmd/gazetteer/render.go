@@ -268,6 +268,12 @@ func renderCarteloyers(r *carteloyers.Result) (string, []string) {
 }
 
 func renderEncadrement(r *encadrement.Result) (string, []string) {
+	switch r.Regulation {
+	case encadrement.RegulationNotCovered:
+		return fmt.Sprintf("rent-capped territory %s, cap unknown (grille not embedded)", r.Territory), nil
+	case encadrement.RegulationPartialCommune:
+		return fmt.Sprintf("commune partly in rent-capped territory %s, address not resolved", r.Territory), nil
+	}
 	headline := fmt.Sprintf("loyer ref %.2f €/m²/mois HC, majoré %.2f", r.LoyerRefEURPerM2HC, r.LoyerRefMajEURPerM2HC)
 	if r.LoyerRefMajMeubleEURPerM2HC > 0 {
 		headline += fmt.Sprintf("; meublé ref %.2f, majoré %.2f", r.LoyerRefMeubleEURPerM2HC, r.LoyerRefMajMeubleEURPerM2HC)

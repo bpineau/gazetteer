@@ -29,6 +29,22 @@ const (
 	ConfidenceNone = ""
 )
 
+// Regulation values returned in Result.Regulation. Stable strings.
+const (
+	// RegulationCapped: the address lies in a shipped zone and the Result
+	// carries its cap.
+	RegulationCapped = "capped"
+	// RegulationNotCovered: the address lies in a decreed rent-cap territory,
+	// so its rent is capped, but the Source ships no grille for it (or no
+	// cell of the shipped grille matched). The caps are zero and
+	// Confidence is ConfidenceNone: the figure is unknown, not absent.
+	RegulationNotCovered = "regulated_not_covered"
+	// RegulationPartialCommune: the decree covers only part of the commune
+	// (a set of IRIS) and the Source does not resolve which part, so the
+	// address may or may not be capped.
+	RegulationPartialCommune = "partial_commune"
+)
+
 // ZoneSource enumerates the published zones encadrées this Source covers.
 // Surfaced verbatim in Result.ZoneSource so the UI can label the section
 // correctly.
@@ -85,6 +101,23 @@ type Result struct {
 	// whose cap was collapsed across the spanned cells. ConfidenceNone
 	// otherwise. Evidence.Piece / Epoque say which axes were pinned.
 	Confidence string `json:"confidence"`
+
+	// Regulation says what the law does at this address, which a zero cap
+	// alone cannot: one of the Regulation* constants. RegulationCapped when
+	// the Result carries the cap; RegulationNotCovered when the address lies
+	// in a decreed rent-cap territory whose grille this Source does not ship
+	// (its rent IS capped, by a figure unknown here, so never read the zero
+	// caps as "no cap"); RegulationPartialCommune when the decree covers only
+	// part of the commune and the Source cannot tell which. Empty when the
+	// address lies in no decreed territory, or carries neither an INSEE nor
+	// a zip the Source can place.
+	Regulation string `json:"regulation,omitempty"`
+
+	// Territory is the decreed rent-cap territory behind a
+	// RegulationNotCovered or RegulationPartialCommune reading ("Bordeaux",
+	// "Pays basque", "Grenoble-Alpes Métropole"). Empty otherwise: a capped
+	// reading names its zone in Zone / ZoneSource.
+	Territory string `json:"territory,omitempty"`
 
 	// Evidence captures reproducibility metadata about the query that
 	// produced this Result. Not part of the wire data (json:"-") —
@@ -150,6 +183,12 @@ type Evidence struct {
 	// two counts agree; zero when the furnished pair is zero.
 	NbMeubleCellsMatched int `json:"nb_meuble_cells_matched,omitempty"`
 
+	// Note explains, in plain words, a reading that carries no cap although
+	// the law may cap the rent (Regulation not empty and not
+	// RegulationCapped): which territory and decree, and what is missing.
+	// Empty otherwise.
+	Note string `json:"note,omitempty"`
+
 	// ZoneID is the resolved zone identifier inside the source: the Plaine
 	// Commune / Est Ensemble zone number (e.g. "311"), the Paris quartier's
 	// code_grand_quartier (e.g. "7511350") or the Lyon IRIS (e.g.
@@ -159,14 +198,18 @@ type Evidence struct {
 	ZoneID string `json:"zone_id,omitempty"`
 }
 
-// IsEmpty satisfies gazetteer.EmptyReporter. Returns true when the
-// source found no zone-encadrement cell for the listing — the framework
-// records Status == StatusOKEmpty in this case.
+// IsEmpty satisfies gazetteer.EmptyReporter. Returns true when the source
+// has nothing to say about the listing: no cap and no Regulation reading,
+// i.e. an address outside every decreed rent-cap territory (the framework
+// records Status == StatusOKEmpty then). A RegulationNotCovered or
+// RegulationPartialCommune reading is NOT empty even though its caps are
+// zero: "this rent is capped, by an unknown figure" is data, and reporting it
+// as empty would read as "no cap".
 func (r *Result) IsEmpty() bool {
 	if r == nil {
 		return true
 	}
-	return r.LoyerRefMajEURPerM2HC <= 0
+	return r.LoyerRefMajEURPerM2HC <= 0 && r.Regulation == ""
 }
 
 // RentEstimate satisfies appraisal.RentEstimator. The encadrement

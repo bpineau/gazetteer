@@ -81,3 +81,33 @@ func TestRepresentativeT2Majore_Lyon(t *testing.T) {
 		t.Error("RepresentativeT2Majore(69123) = _, true; want false (parent commune, no grille)")
 	}
 }
+
+// A decreed rent-cap territory whose grille is not embedded (Bordeaux) used to
+// be screened Encadree=false, as if its rents were free. It is now Encadree
+// with EncadrementNotCovered and no cap figure; Toulouse, in no decreed
+// territory, stays unregulated.
+func TestBuild_DecreedTerritoryWithoutGrille(t *testing.T) {
+	t.Parallel()
+	rows, err := Build(Options{Depts: []string{"31", "33"}})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	found := map[string]CommuneOverview{}
+	for _, r := range rows {
+		found[r.INSEE] = r
+	}
+	bdx, ok := found["33063"]
+	if !ok {
+		t.Fatal("no Bordeaux row")
+	}
+	if !bdx.Encadree || !bdx.EncadrementNotCovered || bdx.RentCapEURM2HC != nil {
+		t.Errorf("Bordeaux: Encadree %v NotCovered %v cap %v, want true true nil", bdx.Encadree, bdx.EncadrementNotCovered, bdx.RentCapEURM2HC)
+	}
+	tls, ok := found["31555"]
+	if !ok {
+		t.Fatal("no Toulouse row")
+	}
+	if tls.Encadree || tls.EncadrementNotCovered {
+		t.Errorf("Toulouse: Encadree %v NotCovered %v, want false false", tls.Encadree, tls.EncadrementNotCovered)
+	}
+}
