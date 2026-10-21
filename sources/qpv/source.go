@@ -8,7 +8,6 @@ import (
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/banx"
-	"github.com/bpineau/gazetteer/helpers/communes"
 )
 
 // Name is the canonical Source identifier. Stable; used as the
@@ -33,7 +32,15 @@ const Name = "qpv"
 //     coordinates are only commune-precise (MinCoordPrecision) down the
 //     commune-level path, instead of answering about the mairie at
 //     MatchLevelPoint / ConfidenceHigh.
-const sourceVersion = 3 // v3
+//   - v4: the commune index resolves Paris, Lyon and Marseille per
+//     ARRONDISSEMENT. The contours name only the parent commune, and the
+//     index folded every arrondissement onto it, so Query answered Paris 7e
+//     with the 21 Paris QPVs while Index.HasQPV, which did not fold,
+//     answered Paris 18e "no QPV" (and so did every overview row keyed by
+//     arrondissement). The refresh now tags each PLM QPV with the
+//     arrondissements its contour lies in, from geo.api.gouv.fr's
+//     arrondissement contours.
+const sourceVersion = 4
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -171,10 +178,11 @@ func (s *Source) queryPoint(idx *Index, lat, lon float64) *Result {
 
 // queryCommune runs the coordinate-less commune-level fallback.
 func (s *Source) queryCommune(idx *Index, insee string) *Result {
-	// Paris / Lyon / Marseille arrondissements share the parent commune's
-	// QPV list. Folding is only needed on this path — point-in-polygon
-	// needs no commune at all.
-	insee = communes.FoldArrondissement(insee)
+	// A Paris / Lyon / Marseille arrondissement answers for itself when the
+	// artifact resolves membership per arrondissement (it does since qpv v4)
+	// and falls back on its parent's list otherwise. Point-in-polygon needs
+	// no commune at all.
+	insee = idx.communeKey(insee)
 	ev := Evidence{
 		INSEE:            insee,
 		PolygonCount:     idx.PolygonCount(),

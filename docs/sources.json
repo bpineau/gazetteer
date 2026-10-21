@@ -508,7 +508,7 @@
   },
   {
     "name": "qpv",
-    "version": 3,
+    "version": 4,
     "default": true,
     "summary": "With coordinates, answers via point-in-polygon whether THIS address is inside a Quartier Prioritaire (QPV 2024 contours). Without coordinates, falls back to the commune-level QPV list (lower confidence).",
     "inputs": [

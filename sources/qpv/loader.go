@@ -15,14 +15,15 @@ import (
 var embedFS embed.FS
 
 // set binds the embedded contours to the datadir/refresh pipeline. Refresh
-// downloads the upstream ANCT QPV 2024 contours ZIP and rebuilds the compact
-// gzipped artifact via transform.
+// downloads the upstream ANCT QPV 2024 contours ZIP and the PLM
+// arrondissement contours, and rebuilds the compact gzipped artifact via
+// transform.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
 	Processed: dataset.File{Name: "qpv.json.gz"},
-	Raw:       []dataset.File{{Name: rawName, URL: rawURL}},
+	Raw:       []dataset.File{{Name: rawName, URL: rawURL}, {Name: rawArrName, URL: rawArrURL}},
 	Transform: transform,
 	Validate:  validate,
 }
@@ -64,6 +65,13 @@ type Index struct {
 	Meta      Meta
 	geo       *geoindex.Index[QPV]
 	byCommune map[string]Entry
+
+	// plmResolved records the Paris / Lyon / Marseille parents whose
+	// artifact carries per-arrondissement membership (the transform
+	// resolves it from the arrondissement contours). For those, an
+	// arrondissement answers for itself; for an artifact that names only
+	// the parent, an arrondissement falls back on the parent's list.
+	plmResolved map[string]bool
 }
 
 // resolvePoint returns the QPV whose polygon contains (lat, lon), or nil when
@@ -99,7 +107,7 @@ func (idx *Index) lookupCommune(insee string) (Entry, bool) {
 	if idx == nil {
 		return Entry{}, false
 	}
-	insee = strings.TrimSpace(insee)
+	insee = idx.communeKey(insee)
 	if insee == "" {
 		return Entry{}, false
 	}
@@ -107,9 +115,24 @@ func (idx *Index) lookupCommune(insee string) (Entry, bool) {
 	return e, ok
 }
 
+// communeKey is the key a commune INSEE is looked up under: the code itself,
+// except a Paris / Lyon / Marseille arrondissement whose artifact carries no
+// per-arrondissement membership, which falls back on its parent commune.
+func (idx *Index) communeKey(insee string) string {
+	insee = strings.TrimSpace(insee)
+	if parent := communes.FoldArrondissement(insee); parent != insee && !idx.plmResolved[parent] {
+		return parent
+	}
+	return insee
+}
+
 // HasQPV reports whether the commune identified by its INSEE code hosts at
 // least one QPV. This is a coordinate-free commune-level test; it does not
 // check whether a specific point falls inside a QPV polygon.
+//
+// A Paris / Lyon / Marseille arrondissement answers for itself: Paris 18e
+// hosts QPVs, Paris 7e none, though the contours name both "Paris". The
+// parent code (75056, 69123, 13055) answers for the whole city.
 func (idx *Index) HasQPV(insee string) bool {
 	_, ok := idx.lookupCommune(insee)
 	return ok
@@ -144,11 +167,11 @@ type FeatureForTest struct {
 // production callers use Load. Commune membership folds arrondissements, same
 // as the real build.
 func NewIndexForTest(feats []FeatureForTest) *Index {
-	idx := &Index{byCommune: map[string]Entry{}}
+	idx := &Index{byCommune: map[string]Entry{}, plmResolved: map[string]bool{}}
 	gfeats := make([]geoindex.Feature[QPV], 0, len(feats))
 	for _, f := range feats {
 		gfeats = append(gfeats, geoindex.NewFeature(QPV{Code: f.Code, Label: f.Label}, f.Polygons))
-		addCommunes(idx.byCommune, f.INSEE, f.Code, f.Label)
+		idx.addCommunes(f.INSEE, f.Code, f.Label)
 	}
 	idx.geo = geoindex.New(gfeats)
 	idx.Meta = Meta{RowCountQPV: idx.geo.Len(), RowCountCom: len(idx.byCommune)}
@@ -156,16 +179,30 @@ func NewIndexForTest(feats []FeatureForTest) *Index {
 }
 
 // addCommunes inserts a QPV into the commune→QPVs index under every hosting
-// INSEE, folding arrondissements to the parent commune (Paris/Lyon/Marseille).
-func addCommunes(m map[string]Entry, insees []string, code, label string) {
+// INSEE. An arrondissement code is indexed under itself AND under its parent
+// commune (once per QPV), and marks the parent as resolved per
+// arrondissement; a parent code is indexed under the parent.
+func (idx *Index) addCommunes(insees []string, code, label string) {
+	q := QPV{Code: code, Label: label}
+	added := map[string]bool{}
+	add := func(key string) {
+		if key == "" || added[key] {
+			return
+		}
+		added[key] = true
+		e := idx.byCommune[key]
+		e.QPVs = append(e.QPVs, q)
+		idx.byCommune[key] = e
+	}
 	for _, raw := range insees {
-		ins := communes.FoldArrondissement(strings.TrimSpace(raw))
-		if ins == "" {
+		ins := strings.TrimSpace(raw)
+		if parent := communes.FoldArrondissement(ins); parent != ins {
+			idx.plmResolved[parent] = true
+			add(ins)
+			add(parent)
 			continue
 		}
-		e := m[ins]
-		e.QPVs = append(e.QPVs, QPV{Code: code, Label: label})
-		m[ins] = e
+		add(ins)
 	}
 }
 
@@ -186,11 +223,11 @@ func parseIndex(r io.Reader) (*Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	idx := &Index{Meta: p.Meta, byCommune: map[string]Entry{}}
+	idx := &Index{Meta: p.Meta, byCommune: map[string]Entry{}, plmResolved: map[string]bool{}}
 	gfeats := make([]geoindex.Feature[QPV], 0, len(p.QPVs))
 	for _, r := range p.QPVs {
 		gfeats = append(gfeats, geoindex.NewFeature(QPV{Code: r.Code, Label: r.Label}, r.Polygons.MultiPolygon()))
-		addCommunes(idx.byCommune, r.INSEE, r.Code, r.Label)
+		idx.addCommunes(r.INSEE, r.Code, r.Label)
 	}
 	idx.geo = geoindex.New(gfeats)
 	return idx, nil

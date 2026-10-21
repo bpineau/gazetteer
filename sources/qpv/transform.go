@@ -13,7 +13,9 @@ import (
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
+	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/geoindex"
+	"github.com/bpineau/gazetteer/helpers/geopoly"
 )
 
 // coordDecimals rounds contour coordinates to ~11 m — well within QPV boundary
@@ -32,6 +34,16 @@ const rawName = "qpv_geo.zip"
 // dated static path per revision; bump this when the ANCT republishes (the
 // slug page lists the current resource).
 const rawURL = "https://static.data.gouv.fr/resources/quartiers-prioritaires-de-la-politique-de-la-ville-qpv/20260115-204323/qpv-2024-geojson.zip"
+
+// rawArrName / rawArrURL are the Paris, Lyon and Marseille arrondissement
+// contours (geo.api.gouv.fr, 45 features). The QPV contours name only the
+// parent commune of a PLM QPV (75056, 69123, 13055); the transform tags each
+// such QPV with the arrondissements its contour lies in, so the commune
+// index can answer per arrondissement.
+const (
+	rawArrName = "qpv_plm_arrondissements.geojson"
+	rawArrURL  = "https://geo.api.gouv.fr/communes?type=arrondissement-municipal&format=geojson&geometry=contour&fields=code,nom,codeParent"
+)
 
 // geojsonMemberMarker selects the WGS84 hexagonale + outre-mer GeoJSON member
 // inside the ZIP. The other members are Lambert-93 / UTM (reprojection we
@@ -99,6 +111,11 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		return fmt.Errorf("qpv: decode geojson: %w", err)
 	}
 
+	arrs, err := loadArrondissements(raw)
+	if err != nil {
+		return err
+	}
+
 	out := make([]qpvRow, 0, len(fc.Features))
 	communeSet := map[string]struct{}{}
 	for _, f := range fc.Features {
@@ -117,6 +134,7 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		for _, ins := range insees {
 			communeSet[ins] = struct{}{}
 		}
+		insees = append(insees, arrs.of(insees, polys.MultiPolygon())...)
 		out = append(out, qpvRow{
 			Code:     code,
 			Label:    strProp(f.Properties, propLibQP),
@@ -141,6 +159,108 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 		QPVs: out,
 	}
 	return dataset.WriteGzJSON(dst, p)
+}
+
+// arrondissement is one Paris / Lyon / Marseille arrondissement contour.
+type arrondissement struct {
+	code, parent string
+	shape        geopoly.MultiPolygon
+}
+
+// arrondissements is the set of PLM arrondissement contours, by parent code.
+type arrondissements map[string][]arrondissement
+
+// arrMarginM is how far inside an arrondissement a QPV vertex must sit to
+// count as lying in it. The contours are rounded to ~11 m (coordDecimals) and
+// a QPV often follows the boulevard an arrondissement boundary runs along, so
+// a vertex ON the line says nothing about which side the quartier is on.
+const arrMarginM = 25.0
+
+// loadArrondissements decodes the arrondissement contours raw file
+// (geo.api.gouv.fr, type=arrondissement-municipal).
+func loadArrondissements(raw dataset.RawSet) (arrondissements, error) {
+	rc, err := raw.Open(rawArrName)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rc.Close() }()
+	var fc struct {
+		Features []feature `json:"features"`
+	}
+	if err := json.NewDecoder(dataset.BOMReader(rc)).Decode(&fc); err != nil {
+		return nil, fmt.Errorf("qpv: decode arrondissements: %w", err)
+	}
+	out := arrondissements{}
+	n := 0
+	for _, f := range fc.Features {
+		code, parent := strProp(f.Properties, "code"), strProp(f.Properties, "codeParent")
+		c, err := geoindex.DecodeGeoJSONGeometry(f.Geometry.Type, f.Geometry.Coordinates, 6)
+		if err != nil {
+			return nil, fmt.Errorf("qpv: arrondissement %s: %w", code, err)
+		}
+		if code == "" || communes.FoldArrondissement(code) != parent || len(c) == 0 {
+			return nil, fmt.Errorf("qpv: arrondissement feature %q (parent %q) is not a PLM arrondissement with a contour", code, parent)
+		}
+		out[parent] = append(out[parent], arrondissement{code: code, parent: parent, shape: c.MultiPolygon()})
+		n++
+	}
+	if n != len(communes.ArrondissementParents()) {
+		return nil, fmt.Errorf("qpv: %d arrondissement contours, want %d", n, len(communes.ArrondissementParents()))
+	}
+	return out, nil
+}
+
+// of returns the arrondissements a QPV lies in, for every PLM parent among
+// its hosting communes, sorted. An arrondissement counts when at least one of
+// the QPV's vertices sits arrMarginM inside it; a QPV whose every vertex hugs
+// a boundary falls back on the arrondissement holding its representative
+// point, so a parent's QPV is never left without one.
+func (a arrondissements) of(insees []string, qpv geopoly.MultiPolygon) []string {
+	var out []string
+	for _, parent := range insees {
+		cands := a[parent]
+		if len(cands) == 0 {
+			continue
+		}
+		var hit []string
+		for _, arr := range cands {
+			if lies(qpv, arr.shape) {
+				hit = append(hit, arr.code)
+			}
+		}
+		if len(hit) == 0 {
+			for _, poly := range qpv {
+				if p, ok := poly.RepresentativePoint(); ok {
+					for _, arr := range cands {
+						if arr.shape.Covers(p) {
+							hit = append(hit, arr.code)
+							break
+						}
+					}
+				}
+				if len(hit) > 0 {
+					break
+				}
+			}
+		}
+		out = append(out, hit...)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// lies reports whether some vertex of qpv sits arrMarginM inside shape.
+func lies(qpv, shape geopoly.MultiPolygon) bool {
+	for _, poly := range qpv {
+		for _, ring := range poly {
+			for _, v := range ring {
+				if shape.Covers(v) && shape.BoundaryDistanceM(v.Lat, v.Lon) > arrMarginM {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // openGeoJSONMember returns a reader over the WGS84 GeoJSON member of the ZIP.

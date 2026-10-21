@@ -809,9 +809,14 @@ is the listing **inside** a QPV? Answered by point-in-polygon over the QPV
   `Nearest{Code,Label,Meters}` hint (within 1 km) kept out of `HasQPV`.
   A point inside a QPV returns that single QPV at high confidence; a
   coordinate-less query falls back to the commune's QPV list at medium
-  confidence.
+  confidence. A Paris / Lyon / Marseille arrondissement answers for itself
+  (`Index.HasQPV("75107")` is false, `"75118"` true); the parent code
+  answers for the whole city.
 - **Backend**: offline gzipped polygon contours under `data/` (ANCT,
-  data.gouv.fr, WGS84 GeoJSON, métropole + outre-mer, ~1 584 QPV).
+  data.gouv.fr, WGS84 GeoJSON, métropole + outre-mer, ~1 584 QPV). The
+  contours name only the parent commune of a PLM QPV, so the refresh also
+  downloads geo.api.gouv.fr's 45 arrondissement contours and tags each such
+  QPV with the arrondissements it lies in (a vertex at least 25 m inside).
 
 ## `sources/sensible`
 

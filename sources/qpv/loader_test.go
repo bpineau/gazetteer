@@ -18,9 +18,9 @@ func TestIndex_HasQPV(t *testing.T) {
 	if !idx.HasQPV("93066") {
 		t.Fatal("HasQPV(93066) = false, want true (Saint-Denis has QPVs)")
 	}
-	// 75016 = Paris 16e: no QPV
-	if idx.HasQPV("75016") {
-		t.Fatal("HasQPV(75016) = true, want false (Paris 16e has no QPV)")
+	// 75116 = Paris 16e (INSEE; 75016 is its postcode): no QPV
+	if idx.HasQPV("75116") {
+		t.Fatal("HasQPV(75116) = true, want false (Paris 16e has no QPV)")
 	}
 }
 

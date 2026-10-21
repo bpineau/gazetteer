@@ -4,16 +4,44 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/bpineau/gazetteer/helpers/communes"
 )
 
-// zipRawSet wraps an on-disk .zip and serves it under rawName, implementing
+// zipRawSet wraps an on-disk .zip and serves it under rawName, and the
+// synthetic arrondissement contours under rawArrName, implementing
 // dataset.RawSet for the transform under test (the upstream raw is a ZIP).
 type zipRawSet struct{ path string }
 
-func (z zipRawSet) Open(string) (io.ReadCloser, error) { return os.Open(z.path) }
+func (z zipRawSet) Open(name string) (io.ReadCloser, error) {
+	if name == rawArrName {
+		return io.NopCloser(strings.NewReader(fakeArrondissements())), nil
+	}
+	return os.Open(z.path)
+}
+
+// fakeArrondissements lays the 45 PLM arrondissements out as 0.1-degree
+// squares in a row from lon 10, except Paris 18e, which covers the fixture's
+// Goutte d'Or square [2.0, 2.1] x [48.0, 48.1] (and a little more).
+func fakeArrondissements() string {
+	var feats []string
+	i := 0
+	for code, parent := range communes.ArrondissementParents() {
+		lon0, lat0, lon1, lat1 := 10+0.2*float64(i), 40.0, 10.1+0.2*float64(i), 40.1
+		if code == "75118" {
+			lon0, lat0, lon1, lat1 = 1.99, 47.99, 2.11, 48.11
+		}
+		i++
+		feats = append(feats, fmt.Sprintf(`{"type":"Feature","properties":{"code":%q,"codeParent":%q},"geometry":{"type":"Polygon","coordinates":[[[%g,%g],[%g,%g],[%g,%g],[%g,%g],[%g,%g]]]}}`,
+			code, parent, lon0, lat0, lon0, lat1, lon1, lat1, lon1, lat0, lon0, lat0))
+	}
+	return `{"type":"FeatureCollection","features":[` + strings.Join(feats, ",") + `]}`
+}
 
 // makeZip builds a tiny zip in memory containing the sample GeoJSON under a
 // member name that mirrors the upstream layout (GEOJSON/...WGS84.geojson), so
@@ -84,6 +112,14 @@ func TestTransform_Golden(t *testing.T) {
 	// "2691" must be zero-padded to "02691".
 	if e, ok := idx.lookupCommune("75056"); !ok || len(e.QPVs) != 1 || e.QPVs[0].Code != "QN07511M" {
 		t.Errorf("75056 commune entry = %+v ok=%t, want [QN07511M]", e, ok)
+	}
+	// The arrondissement whose contour holds it answers for itself; the
+	// others no longer inherit the parent's list.
+	if e, ok := idx.lookupCommune("75118"); !ok || len(e.QPVs) != 1 || e.QPVs[0].Code != "QN07511M" {
+		t.Errorf("75118 commune entry = %+v ok=%t, want [QN07511M]", e, ok)
+	}
+	if idx.HasQPV("75107") {
+		t.Error("HasQPV(75107) = true, want false (its contour holds no QPV)")
 	}
 	if e, ok := idx.lookupCommune("02691"); !ok || len(e.QPVs) != 1 || e.QPVs[0].Code != "QN00201M" {
 		t.Errorf("02691 commune entry = %+v ok=%t, want [QN00201M] (zero-padded)", e, ok)

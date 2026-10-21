@@ -18,10 +18,12 @@
 //     returns HasQPV=false (high confidence) plus, when one is within
 //     NearestQPVMaxMeters, a NearestQPV hint that is deliberately kept
 //     OUT of HasQPV. This is the address-level answer.
-//   - Without Lat/Lon: commune-level fallback (arrondissements folded to
-//     the parent commune), returning every QPV in the commune at
-//     MatchLevel "commune", medium confidence — the coarse "does this
-//     town host QPVs?" signal.
+//   - Without Lat/Lon: commune-level fallback, returning every QPV in the
+//     commune at MatchLevel "commune", medium confidence: the coarse "does
+//     this town host QPVs?" signal. A Paris / Lyon / Marseille
+//     arrondissement answers for itself (the refresh tags each QPV with the
+//     arrondissements its contour lies in), so Paris 7e hosts none while
+//     Paris 18e hosts its own; the parent code answers for the whole city.
 //
 // The Source is fully offline: the QPV 2024 contour polygons (ANCT,
 // data.gouv.fr, WGS84 GeoJSON, métropole + outre-mer) ship embedded and

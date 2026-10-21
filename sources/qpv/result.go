@@ -108,8 +108,9 @@ type Result struct {
 // Sidecar — not part of the wire data. Travels in-process from
 // Source.Query to the adapter.
 type Evidence struct {
-	// INSEE is the 5-digit commune code the Source filtered on (after
-	// arrondissement folding on the commune fallback path).
+	// INSEE is the 5-digit commune code the Source filtered on, on the
+	// commune fallback path: the arrondissement itself for Paris / Lyon /
+	// Marseille (the parent only for an artifact older than qpv v4).
 	INSEE string `json:"insee"`
 
 	// CommuneLabel is the human-readable commune name. Useful for
