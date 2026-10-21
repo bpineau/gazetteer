@@ -198,7 +198,7 @@
   },
   {
     "name": "dvf",
-    "version": 7,
+    "version": 8,
     "default": true,
     "summary": "Demandes de Valeurs Foncières — historical transaction price €/m² (median + quartiles).",
     "inputs": [
@@ -219,7 +219,7 @@
   },
   {
     "name": "dvfagg",
-    "version": 4,
+    "version": 5,
     "default": true,
     "summary": "Per-commune DVF aggregate — median €/m² + quartiles (3-year window, apartment sales, offline).",
     "inputs": [

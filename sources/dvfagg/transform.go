@@ -55,7 +55,9 @@ type acc struct {
 // €/m² of every single-lot apartment Vente into m, keyed by INSEE. A
 // mutation is kept only when it holds exactly one Appartement and no other
 // built local (Maison / commercial) — this drops multi-lot sales whose
-// valeur_fonciere covers several lots.
+// valeur_fonciere covers several lots. Locals are counted DISTINCT: geo-dvf
+// repeats a local once per nature de culture of its parcel, and an apartment
+// published on two such rows is still one apartment.
 func accumulate(src io.Reader, m map[string]*acc) error {
 	r := csv.NewReader(src)
 	r.FieldsPerRecord = -1
@@ -73,9 +75,21 @@ func accumulate(src io.Reader, m map[string]*acc) error {
 			return fmt.Errorf("dvfagg: missing column %q", n)
 		}
 	}
-	// Group rows by mutation so we can apply the single-lot filter.
-	type row struct{ tl, insee, dept, vf, surf string }
+	// optional reads a column the single-lot rule uses to tell locals apart
+	// but can live without (an older export): "" when the file lacks it.
+	optional := func(rec []string, name string) string {
+		if i, ok := col[name]; ok && i < len(rec) {
+			return strings.TrimSpace(rec[i])
+		}
+		return ""
+	}
+	// Group rows by mutation so we can apply the single-lot filter. key
+	// identifies the local a row describes: geo-dvf repeats a local once per
+	// nature de culture of its parcel, and those rows are one local (the
+	// rule dvf.FilterMutations applies). A row with no parcel id is its own.
+	type row struct{ tl, insee, dept, vf, surf, key string }
 	muts := map[string][]row{}
+	n := 0
 	for {
 		rec, err := r.Read()
 		if err == io.EOF {
@@ -92,16 +106,27 @@ func accumulate(src io.Reader, m map[string]*acc) error {
 			continue // ignore Dépendance / Terrain etc.
 		}
 		id := rec[col["id_mutation"]]
+		surf := rec[col["surface_reelle_bati"]]
+		n++
+		key := fmt.Sprintf("row#%d", n)
+		if parcelle := optional(rec, "id_parcelle"); parcelle != "" {
+			key = strings.Join([]string{parcelle, tl, surf, optional(rec, "nombre_pieces_principales"), optional(rec, "lot1_numero")}, "|")
+		}
 		muts[id] = append(muts[id], row{
 			tl: tl, insee: rec[col["code_commune"]], dept: rec[col["code_departement"]],
-			vf: rec[col["valeur_fonciere"]], surf: rec[col["surface_reelle_bati"]],
+			vf: rec[col["valeur_fonciere"]], surf: surf, key: key,
 		})
 	}
 	for _, rows := range muts {
 		apts := 0
 		var a row
 		bad := false
+		seen := map[string]bool{}
 		for _, x := range rows {
+			if seen[x.key] {
+				continue // the same local on another culture row
+			}
+			seen[x.key] = true
 			switch {
 			case x.tl == "Appartement":
 				apts++

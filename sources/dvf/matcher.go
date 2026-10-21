@@ -1,6 +1,7 @@
 package dvf
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -143,15 +144,43 @@ func IsBuiltLocal(typeLocal string) bool {
 		strings.HasPrefix(t, "Local")
 }
 
-// builtLocalsPerMutation counts the built locals each `id_mutation` carries.
-// Rows with an empty id cannot be grouped and are left out of the tally, so
-// singleBuiltLocal keeps them (see its godoc).
+// localKey identifies the built local a row describes within its mutation.
+//
+// geo-dvf publishes one row per (local, nature de culture of its parcel), so a
+// house whose parcel is part "sols", part "terrains d'agrément" comes back on
+// two rows that repeat the same local: same parcel, type, surface, rooms and
+// lot. Those rows are ONE local. A row with no parcel id cannot be matched to
+// another and is its own local (the key is then unique to the row), which is
+// the conservative reading: an unmatched pair stays a bundle and stays out.
+func localKey(m Mutation, row int) string {
+	if m.IDParcelle == "" {
+		return fmt.Sprintf("row#%d", row)
+	}
+	pieces := -1
+	if m.NombrePiecesPrinc != nil {
+		pieces = *m.NombrePiecesPrinc
+	}
+	return fmt.Sprintf("%s|%s|%g|%d|%s", m.IDParcelle, strings.ToLower(strings.TrimSpace(m.TypeLocal)),
+		m.Surface(), pieces, m.Lot1Numero)
+}
+
+// builtLocalsPerMutation counts the DISTINCT built locals each `id_mutation`
+// carries (see localKey: a local repeated once per nature de culture counts
+// once). Rows with an empty id cannot be grouped and are left out of the
+// tally, so FilterMutations keeps them (see its godoc).
 func builtLocalsPerMutation(in []Mutation) map[string]int {
+	seen := make(map[string]struct{}, len(in))
 	n := make(map[string]int, len(in))
-	for _, m := range in {
-		if m.IDMutation != "" && IsBuiltLocal(m.TypeLocal) {
-			n[m.IDMutation]++
+	for i, m := range in {
+		if m.IDMutation == "" || !IsBuiltLocal(m.TypeLocal) {
+			continue
 		}
+		k := m.IDMutation + "|" + localKey(m, i)
+		if _, dup := seen[k]; dup {
+			continue
+		}
+		seen[k] = struct{}{}
+		n[m.IDMutation]++
 	}
 	return n
 }
@@ -182,6 +211,13 @@ func builtLocalsPerMutation(in []Mutation) map[string]int {
 // already applies (dvfagg.accumulate), so the two DVF-backed Sources now
 // measure the same cohort.
 //
+// The locals are counted DISTINCT (localKey): geo-dvf publishes one row per
+// nature de culture of the local's parcel, so a house on a part-"sols",
+// part-"terrains d'agrément" parcel comes back twice, same parcel, surface,
+// rooms and lot. Counting rows read every such house as a two-house bundle
+// and dropped it (14 of 32 house sales kept on four live sections of
+// 77284); counting locals keeps it, on ONE row, so it enters the median once.
+//
 // A bundled Dépendance does NOT disqualify a mutation: it has no published
 // surface, and dropping every flat sold with a cave would gut the sample.
 // Its value stays in the numerator, which biases the reading up by whatever
@@ -203,8 +239,9 @@ func builtLocalsPerMutation(in []Mutation) map[string]int {
 // together by the cap.
 func FilterMutations(in []Mutation, target string, window Window) []Mutation {
 	built := builtLocalsPerMutation(in)
+	kept := make(map[string]struct{}, len(in))
 	out := make([]Mutation, 0, len(in))
-	for _, m := range in {
+	for i, m := range in {
 		if m.NatureMutation != NatureMutationVente {
 			continue
 		}
@@ -213,6 +250,15 @@ func FilterMutations(in []Mutation, target string, window Window) []Mutation {
 		}
 		if built[m.IDMutation] > 1 {
 			continue
+		}
+		// One row per local: the culture rows that repeat it must not enter
+		// the median once each.
+		if m.IDMutation != "" {
+			k := m.IDMutation + "|" + localKey(m, i)
+			if _, dup := kept[k]; dup {
+				continue
+			}
+			kept[k] = struct{}{}
 		}
 		d, err := time.Parse("2006-01-02", m.DateMutation)
 		if err != nil || !window.contains(d) {

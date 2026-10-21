@@ -115,9 +115,13 @@ type Mutation struct {
 	SurfaceReelleBati *float64 `json:"surface_reelle_bati"`
 	NombrePiecesPrinc *int     `json:"nombre_pieces_principales"`
 	SurfaceTerrain    *float64 `json:"surface_terrain"`
-	SectionPrefixe    string   `json:"section_prefixe"`
-	Longitude         *float64 `json:"longitude"`
-	Latitude          *float64 `json:"latitude"`
+	// Lot1Numero is the first copropriété lot number of the row ("51"),
+	// empty outside a copro. It tells two flats of one parcel apart when
+	// FilterMutations counts the distinct locals of a mutation.
+	Lot1Numero     string   `json:"lot1_numero"`
+	SectionPrefixe string   `json:"section_prefixe"`
+	Longitude      *float64 `json:"longitude"`
+	Latitude       *float64 `json:"latitude"`
 }
 
 // Valeur returns valeur_fonciere as a float64, in euros (NOT cents).

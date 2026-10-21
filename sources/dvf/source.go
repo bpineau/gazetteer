@@ -68,7 +68,12 @@ const Name = "dvf"
 //     finer (Listing.CoordsAtLeast). A commune-centre match used to win it
 //     with a 500 m disk around the mairie, published as the address's
 //     micro-market at ConfidenceHigh; it now starts at the commune tier.
-const sourceVersion = 7
+//   - v8: the single-built-local rule counts DISTINCT locals. geo-dvf repeats
+//     a local once per nature de culture of its parcel, so a house with a
+//     garden read as a two-house bundle and was dropped: 18 of 32 house
+//     sales on four live sections of 77284, the survivors skewed to houses
+//     without one (median 3 180 EUR/m2 where the full cohort reads 3 011).
+const sourceVersion = 8
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.

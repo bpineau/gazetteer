@@ -233,7 +233,10 @@ data.gouv.fr Etalab.
   (`high`/`medium`/`low`). Also satisfies `appraisal.PriceEstimator`.
 - **Cohort**: only `nature_mutation == "Vente"` (VEFA, adjudication,
   échange, expropriation and terrain-à-bâtir are excluded), only the target
-  `type_local`, and only mutations carrying **exactly one built local**.
+  `type_local`, and only mutations carrying **exactly one built local**,
+  counted DISTINCT: geo-dvf repeats a local once per nature de culture of
+  its parcel (a house on "sols" plus "terrains d'agrément" comes back on two
+  identical rows), and those rows are one local, kept once.
   That last rule is the one that decides whether the €/m² is arithmetic or
   fiction: `valeur_fonciere` prices the whole MUTATION and geo-dvf repeats it
   verbatim on each of its rows, so a sale bundling several lots would

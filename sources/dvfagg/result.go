@@ -23,7 +23,12 @@ const Name = "dvfagg"
 //   - v4: a listing typed as a house, a shop or land is refused with
 //     ErrUnsupportedPropertyType. v3 answered it with the APARTMENT median,
 //     which appraisal.PricePerM2 then blended into the house's price.
-const Version = 4
+//   - v5: the refresh transform counts DISTINCT locals per mutation, as
+//     dvf.FilterMutations does: an apartment repeated on one row per nature
+//     de culture of its parcel is one apartment, not a two-flat bundle. The
+//     embedded aggregate predates the rule and changes at its next refresh
+//     (`gazetteer refresh --go-embed-update dvfagg`).
+const Version = 5
 
 // Result is the per-commune DVF price aggregate, in EUR/m², 3-year window.
 // Built at refresh time from single-lot apartment sales; see transform.go.
