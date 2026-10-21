@@ -439,7 +439,9 @@ Observed market rents from the Observatoires Locaux des Loyers (OLL) — the
 field-measured median €/m²/month (hors charges), the most representative rent
 signal, complementing `encadrement` (legal cap) and `carteloyers` (model).
 
-- **Needs**: INSEE; rooms optional (refines the bucket, else the zone-level
+- **Needs**: INSEE and an apartment (the cells are the OLL "Appartement"
+  cohort; a house is refused with `ErrUnsupportedPropertyType`); rooms
+  optional (refines the bucket, else the zone-level
   all-sizes median is used).
 - **Result**: `ObservedMedianEURPerM2` (all-tenancies observed median,
   **€/m²/month hors charges**), `ObservedRecentMedianEURPerM2` (the "emménagés

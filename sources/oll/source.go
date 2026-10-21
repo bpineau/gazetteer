@@ -20,7 +20,11 @@ const Name = "oll"
 // v2 adds the relet ("emménagés récents", <1 an) median alongside the
 // all-tenancies median and makes RentEstimate prefer it — the artifact gains a
 // relet_median field, so a v1 datadir cache must be superseded.
-const sourceVersion = 2
+//
+// v3 refuses a house (ErrUnsupportedPropertyType). The cells are apartment
+// rents, and v2 answered a house with them, which appraisal.RentValue then
+// blended into the house's rent next to carteloyers' house typology.
+const sourceVersion = 3
 
 // Version exposes sourceVersion so callers that wrap the Source can mirror it.
 const Version = sourceVersion
@@ -120,11 +124,13 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	}, nil
 }
 
-// residential accepts apartments and houses (OLL publishes appartement cells;
-// houses simply won't match downstream). Everything else is out of scope.
+// residential accepts apartments only. The embedded cells are the OLL
+// "Appartement" cohort (the transform keeps nothing else), and the lookup is
+// by commune and rooms, so a house would be answered with the flats' rent per
+// m2, not left unmatched. Everything else is out of scope.
 func residential(pt string) bool {
 	switch strings.ToLower(strings.TrimSpace(pt)) {
-	case "apartment", "flat", "appartement", "house", "maison":
+	case "apartment", "flat", "appartement":
 		return true
 	default:
 		return false

@@ -178,7 +178,7 @@ locservice      v1
 logiris         v1
 lovac           v1
 nuisances       v2
-oll             v2
+oll             v3
 osm_transit     v5
 qpv             v4
 rnc             v3
