@@ -76,9 +76,20 @@ const (
 const zoneCoordDecimals = 6
 
 // parisYear pins the published vintage kept from the Paris export, which
-// carries every year since 2019. The committed snapshot keeps only the
-// most recent grille (annee 2025). Bump when a newer arrêté lands.
-const parisYear = 2025
+// carries every year since 2019. The committed snapshot keeps only the grille
+// in force (annee 2026). Bump when a newer arrêté lands.
+//
+// The 2026 grille (arrêté IDF-2026-06-12-00003 of 12 June 2026, in force
+// from 1 July 2026 to 24 November 2026, the end of the ELAN experiment it
+// rests on) is NOT in the export yet: opendata.paris.fr still stopped at
+// annee 2025 on 2026-10-21. The committed snapshot was transcribed from the
+// arrêté's annexes 1 (quartier to secteur) and 2 (per-secteur cells), every
+// cell checked against majoré = 1.2 x référence, minoré = 0.7 x référence and
+// meublé = vide + majoration, onto the export's own rows (same quartiers,
+// codes and names). Until the export catches up, refreshing this Set fails
+// loudly ("no rows for annee 2026") instead of reinstalling the 2025 grille,
+// and the embedded snapshot keeps serving.
+const parisYear = 2026
 
 // lyonOpenEndedPiece is the upstream label for the open-ended piece bucket in
 // the Lyon "valeurs" object, whose other keys are the plain "1", "2" and "3".

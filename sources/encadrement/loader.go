@@ -31,7 +31,7 @@ var (
 		Raw:                   []dataset.File{{Name: rawParisName, URL: rawParisURL}},
 		Transform:             transformParis,
 		Validate:              validateParis,
-		Vintage:               "2025-07", // Ville de Paris grille 2025 (annual arrêté)
+		Vintage:               "2026-07", // Paris arrêté of 12 June 2026, in force from 1 July (see parisYear)
 		ExpectedCadenceMonths: 12,
 	}
 	setPlaineCommune = dataset.Set{

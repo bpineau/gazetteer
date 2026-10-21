@@ -90,8 +90,8 @@ func TestTransformParis_Golden(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &rows); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	// The fixture has 3 rows for parisYear (2025) and 2 for 2024; only the
-	// 2025 rows survive the year filter, in upstream order.
+	// The fixture has 3 rows for parisYear (2026) and 2 for 2025; only the
+	// 2026 rows survive the year filter, in upstream order.
 	if len(rows) != 3 {
 		t.Fatalf("rows = %d, want 3 (year filter must drop non-%d)", len(rows), parisYear)
 	}
@@ -103,7 +103,7 @@ func TestTransformParis_Golden(t *testing.T) {
 	// First row mapping: meuble_txt → bool, ref/min/max → *_eur_m2.
 	got := rows[0]
 	want := parisRow{
-		Annee: 2025, IDZone: 5, IDQuartier: 38, NomQuartier: "Porte-Saint-Denis",
+		Annee: 2026, IDZone: 5, IDQuartier: 38, NomQuartier: "Porte-Saint-Denis",
 		CodeGrandQuartier: 7511038, Piece: 2, Epoque: "1946-1970", Meuble: false,
 		RefEURPerM2: 27.4, MinEURPerM2: 19.2, MaxEURPerM2: 32.9,
 	}

@@ -37,7 +37,8 @@ func TestBaremeVintage_NotStale(t *testing.T) {
 // époque) cells against the reference values of the arrêtés the guard claims
 // to ship — so the constants above cannot drift away from the embedded data.
 // Values transcribed from the DRIHL référence-loyer barème "du 01 juin 2026"
-// (EPTs) and the Ville de Paris 2025 grille (loyers nus, HC, €/m²/mois).
+// (EPTs) and the Paris arrêté IDF-2026-06-12-00003 of 12 June 2026, in force
+// from 1 July 2026, annexe 2 (loyers nus, HC, €/m²/mois).
 func TestBaremeVintage_SpotChecks(t *testing.T) {
 	t.Parallel()
 	idx, err := Load("")
@@ -79,11 +80,20 @@ func TestBaremeVintage_SpotChecks(t *testing.T) {
 			piece:   1, epoque: "avant 1946", ref: 24.6, min: 17.2, majore: 29.5,
 		},
 		{
-			// Ville de Paris 2025 grille, quartier Halles (code_grand_quartier
-			// 7510102), 1 pièce, après 1990, non meublé.
+			// Paris 2026 arrêté, quartier Halles (code_grand_quartier
+			// 7510102, secteur 5), 1 pièce, après 1990, non meublé. The 2025
+			// grille read 30.0 / 21.0 / 36.0.
 			name:    "paris/Halles/1p/apres1990",
 			entries: idx.LookupParis("01"), zoneID: "7510102",
-			piece: 1, epoque: "Apres 1990", ref: 30.0, min: 21.0, majore: 36.0,
+			piece: 1, epoque: "Apres 1990", ref: 31.5, min: 22.1, majore: 37.8,
+		},
+		{
+			// Paris 2026 arrêté, quartier Gare (code_grand_quartier 7511350,
+			// secteur 13), 3 pièces, 1971-1990, non meublé: the cheapest
+			// secteur, where the 2025 grille read 16.5 / 11.6 / 19.8.
+			name:    "paris/Gare/3p/1971-1990",
+			entries: idx.LookupParis("13"), zoneID: "7511350",
+			piece: 3, epoque: "1971-1990", ref: 16.7, min: 11.7, majore: 20.0,
 		},
 	}
 	for _, c := range cases {

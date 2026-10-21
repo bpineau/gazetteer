@@ -344,10 +344,16 @@ Lyon / Villeurbanne.
     (Saint-Denis, Montreuil) collapse across their zones at
     `ConfidenceLow`. `Evidence.ZoneID` records the resolved zone(s).
 - **Eligibility**: residential only.
-- **Vintages**: Paris 2025, Lyon 2025-2026, Plaine Commune & Est Ensemble
-  barème "du 01 juin 2026" (DRIHL référence-loyer KML; zonage 2022). Zone
-  numbers are not unique across EPTs, so lookups are scoped by
-  `(zone_source, zone)`.
+- **Vintages**: Paris 2026 (arrêté of 12 June 2026, in force from 1 July;
+  transcribed from the arrêté because opendata.paris.fr still stops at 2025,
+  so refreshing the Paris set fails until the export catches up), Lyon
+  2025-2026, Plaine Commune & Est Ensemble barème "du 01 juin 2026" (DRIHL
+  référence-loyer KML; zonage 2022). Zone numbers are not unique across
+  EPTs, so lookups are scoped by `(zone_source, zone)`.
+- **Sunset**: the arrêtés rest on the ELAN experiment (art. 140), which
+  ends on 24 November 2026 unless a law extends it. The Source does not
+  encode that date: if the experiment lapses, the shipped caps stop being
+  law and the barèmes must be withdrawn by hand.
 
 ## `sources/catnat`
 

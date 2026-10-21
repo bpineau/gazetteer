@@ -53,7 +53,12 @@ const Name = "encadrement"
 // v6 places a Seine-Saint-Denis listing by point-in-polygon only at street
 // precision or finer: a commune centre used to pin the mairie's zone of a
 // multi-zone commune at ConfidenceMedium, and now takes the commune path.
-const sourceVersion = 6
+//
+// v7 ships the Paris grille in force since 1 July 2026 (arrêté of 12 June
+// 2026). v6 still served the 2025 one, 3.3 % lower on average and up to
+// 8.5 % lower on a cell. Bumped so a datadir copy built from the 2025 export
+// is superseded by the embedded 2026 snapshot.
+const sourceVersion = 7
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.

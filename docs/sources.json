@@ -260,7 +260,7 @@
   },
   {
     "name": "encadrement",
-    "version": 6,
+    "version": 7,
     "default": true,
     "summary": "Legal rent-control caps (loyer de référence + majoré).",
     "inputs": [
