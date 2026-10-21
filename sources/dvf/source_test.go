@@ -233,6 +233,46 @@ func TestSource_INSEEListingShortCircuit(t *testing.T) {
 }
 
 func TestSource_AddressRadius(t *testing.T) {
+	res := queryAddressRadius(t, banx.PrecisionHouseNumber)
+	if res.Evidence.LevelUsed != "address_radius" {
+		t.Errorf("LevelUsed = %q, want address_radius", res.Evidence.LevelUsed)
+	}
+	if res.Evidence.RadiusM != DVFAddressRadiusMeters {
+		t.Errorf("RadiusM = %v, want %v", res.Evidence.RadiusM, DVFAddressRadiusMeters)
+	}
+	if res.Evidence.AuctionLat == nil || *res.Evidence.AuctionLat != 48.8580 {
+		t.Errorf("AuctionLat = %v, want 48.8580", res.Evidence.AuctionLat)
+	}
+	if res.Evidence.NUniqueParcelles == 0 {
+		t.Error("NUniqueParcelles = 0, want > 0")
+	}
+}
+
+// TestSource_AddressRadius_CommuneCentreIsNotAnAddress: BAN answers an
+// unknown street with the commune centre. A 500 m disk around the mairie is a
+// sample of the mairie's quartier, not of the address, yet it used to win the
+// address_radius tier and publish at ConfidenceHigh. Coordinates coarser than
+// a street now skip the tier, so the reading falls to the commune level it
+// actually describes.
+func TestSource_AddressRadius_CommuneCentreIsNotAnAddress(t *testing.T) {
+	for _, p := range []banx.Precision{banx.PrecisionMunicipality, banx.PrecisionLocality} {
+		res := queryAddressRadius(t, p)
+		if res.Evidence.LevelUsed != "commune" {
+			t.Errorf("precision %q: LevelUsed = %q, want commune", p, res.Evidence.LevelUsed)
+		}
+		if res.Evidence.RadiusM != 0 || res.Evidence.AuctionLat != nil {
+			t.Errorf("precision %q: radius evidence %v/%v, want none", p, res.Evidence.RadiusM, res.Evidence.AuctionLat)
+		}
+	}
+	if res := queryAddressRadius(t, banx.PrecisionStreet); res.Evidence.LevelUsed != "address_radius" {
+		t.Errorf("street precision: LevelUsed = %q, want address_radius", res.Evidence.LevelUsed)
+	}
+}
+
+// queryAddressRadius runs one Query over a 16-sale pool clustered on the
+// listing's point, with the listing's coordinates reported at precision p.
+func queryAddressRadius(t *testing.T, p banx.Precision) *Result {
+	t.Helper()
 	// Synthesize a tight 16-mutation pool clustered around (lat, lon)
 	// so the address_radius tier wins.
 	mLat := 48.8580
@@ -308,24 +348,14 @@ func TestSource_AddressRadius(t *testing.T) {
 		Lat:          &lat,
 		Lon:          &lon,
 		SurfaceM2:    &surf,
+
+		CoordPrecision: p,
 	}
 	data, err := src.Query(context.Background(), l)
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
-	res := data.(*Result)
-	if res.Evidence.LevelUsed != "address_radius" {
-		t.Errorf("LevelUsed = %q, want address_radius", res.Evidence.LevelUsed)
-	}
-	if res.Evidence.RadiusM != DVFAddressRadiusMeters {
-		t.Errorf("RadiusM = %v, want %v", res.Evidence.RadiusM, DVFAddressRadiusMeters)
-	}
-	if res.Evidence.AuctionLat == nil || *res.Evidence.AuctionLat != mLat {
-		t.Errorf("AuctionLat = %v, want %v", res.Evidence.AuctionLat, mLat)
-	}
-	if res.Evidence.NUniqueParcelles == 0 {
-		t.Error("NUniqueParcelles = 0, want > 0")
-	}
+	return data.(*Result)
 }
 
 func TestSource_CircuitTripped_ShortCircuits(t *testing.T) {

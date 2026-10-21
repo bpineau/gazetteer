@@ -243,7 +243,9 @@ data.gouv.fr Etalab.
   cohort (`dvf.Window`, `dvf.WindowEndingAt`), so an as-of valuation never
   answers with sales made after its own reference date.
 - **Ladder**: 4-tier `helpers/fallback.Walk`:
-  1. `address_radius` — 500 m disk around `(Lat, Lon)`, MinSample 12
+  1. `address_radius`: 500 m disk around `(Lat, Lon)`, MinSample 12;
+     skipped when `Listing.CoordPrecision` is coarser than a street (a
+     commune centre is the mairie's micro-market, not the address's)
   2. `commune` — listing's INSEE
   3. `neighborhood` — commune + its haversine neighbours
   4. `department` — entire département

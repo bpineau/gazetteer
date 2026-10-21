@@ -64,7 +64,11 @@ const Name = "dvf"
 //     border address priced a market half the size: Bezons (95063) saw
 //     2 of its 10 neighbours, Paray-Vieille-Poste (91479) 7 of 14. Any
 //     stored reading whose tier is `neighborhood` must be re-derived.
-const sourceVersion = 6
+//   - v7: the `address_radius` tier needs coordinates at street precision or
+//     finer (Listing.CoordsAtLeast). A commune-centre match used to win it
+//     with a 500 m disk around the mairie, published as the address's
+//     micro-market at ConfidenceHigh; it now starts at the commune tier.
+const sourceVersion = 7
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -304,11 +308,17 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		asOf = l.AsOf
 	}
 	tc := &tierContext{
-		target:     target,
-		window:     WindowEndingAt(asOf),
-		auctionLat: l.Lat,
-		auctionLon: l.Lon,
-		memo:       newQueryMemo(),
+		target: target,
+		window: WindowEndingAt(asOf),
+		memo:   newQueryMemo(),
+	}
+	// The address_radius tier is a disk around the ADDRESS. A commune or
+	// locality centre (BAN's answer to a street it cannot find) would make
+	// it a disk around the mairie, published as the address's own
+	// micro-market at the tier's high confidence: such a listing goes
+	// straight to the commune tier it actually describes.
+	if lat, lon, ok := l.CoordsAtLeast(banx.PrecisionStreet); ok {
+		tc.auctionLat, tc.auctionLon = &lat, &lon
 	}
 	ladder := s.buildLadder(insee, tc)
 	// The DVF tiers close over tc + their INSEE lists and ignore the

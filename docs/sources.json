@@ -198,7 +198,7 @@
   },
   {
     "name": "dvf",
-    "version": 6,
+    "version": 7,
     "default": true,
     "summary": "Demandes de Valeurs Foncières — historical transaction price €/m² (median + quartiles).",
     "inputs": [
