@@ -250,12 +250,14 @@ func RentValue(d gazetteer.Dossier, opts ...RentOptions) RentConsolidated {
 	vals := make([]float64, len(inputs))
 	weights := make([]float64, len(inputs))
 	confs := make([]Confidence, len(inputs))
+	datasets := make([]string, len(inputs)) // every rent Source is its own dataset
 	for i, in := range inputs {
 		vals[i] = float64(in.Estimate.EurPerM2Cents)
 		weights[i] = in.Weight
 		confs[i] = in.Estimate.Confidence
+		datasets[i] = in.Source
 	}
-	mean, mask, conf, ok := synthesizeCents(vals, weights, confs, o.MinSources, o.OutlierZScore)
+	mean, mask, conf, ok := synthesizeCents(vals, weights, confs, datasets, o.MinSources, o.OutlierZScore)
 	for i := range inputs {
 		if mask[i] {
 			inputs[i].Excluded = true

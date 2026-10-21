@@ -55,9 +55,11 @@ func TestPriceEstimate_ConfidenceTiers(t *testing.T) {
 	}
 }
 
-// TestPricePerM2_DVFAndDVFAgg is the core of Item 4: with both a live dvf
-// reading and the embedded dvfagg commune median, appraisal.PricePerM2 clears
-// its MinSources=2 floor and reports Medium/High — no longer structurally Low.
+// TestPricePerM2_DVFAndDVFAgg: a live dvf reading and the embedded dvfagg
+// commune median are two cuts of ONE dataset (the DVF mutations). Both enter
+// the mean, but together they count once against MinSources=2, so the
+// synthesis stays Low. It used to clear the floor and report High on a single
+// source of truth.
 func TestPricePerM2_DVFAndDVFAgg(t *testing.T) {
 	t.Parallel()
 	cents := int64(610000) // 6100 €/m²
@@ -71,8 +73,8 @@ func TestPricePerM2_DVFAndDVFAgg(t *testing.T) {
 	}}
 
 	got := appraisal.PricePerM2(d)
-	if got.Confidence == appraisal.ConfidenceLow {
-		t.Fatalf("Confidence = Low, want Medium/High (dvf + dvfagg satisfy MinSources=2)")
+	if got.Confidence != appraisal.ConfidenceLow {
+		t.Fatalf("Confidence = %v, want Low (dvf + dvfagg are one dataset, below MinSources=2)", got.Confidence)
 	}
 	if len(got.Inputs) != 2 {
 		t.Errorf("Inputs = %d, want 2 (dvf + dvfagg)", len(got.Inputs))

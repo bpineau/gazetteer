@@ -193,10 +193,11 @@ offline batch complement to the live, per-address `dvf` source.
   T1–T2 rent), `N` / `NSmall` (sample sizes), `Dept`. Empty when the
   commune had no qualifying sale.
 - **Feeds `appraisal.PricePerM2`**: `PriceEstimate()` contributes the
-  commune median (confidence per sample size + dispersion), so the price
-  synthesis can clear its MinSources=2 floor from embedded data alone —
-  pairing with the live `dvf` reading instead of forcing `price_confidence`
-  structurally Low.
+  commune median (confidence per sample size + dispersion), with no network
+  reading. It declares `Dataset: appraisal.DatasetDVF`, as `dvf` does: the
+  two are cuts of the same mutations, so together they count ONCE against
+  the synthesis's MinSources=2 floor and cannot lift `price_confidence`
+  above Low without an independent estimator.
 - **Plausibility bounds**: a kept sale is 9-250 m² at 300-25 000 €/m²;
   anything outside is dropped, never clamped. These are TIGHTER than
   `dvf`'s (9-1 000 m², 100-50 000 €/m²) because the cohorts differ:

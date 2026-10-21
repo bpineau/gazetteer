@@ -28,14 +28,18 @@ func lookupWeight(name string, override, defaults map[string]float64, fallback f
 // entry per contributing input, in caller order): MAD-based outlier
 // flagging (only meaningful with ≥ 3 contributors), weighted mean of the
 // non-flagged values, and consolidated Confidence (ConfidenceLow when
-// fewer than minSources contribute, else from the average of the
-// contributors' own confidences).
+// fewer than minSources DISTINCT datasets contribute, else from the
+// average of the contributors' own confidences).
+//
+// datasets names each input's underlying dataset: two inputs cut from the
+// same one (dvf and dvfagg) are one corroboration, so the floor counts
+// distinct non-excluded datasets, never inputs.
 //
 // The returned mask is aligned with vals so the caller can surface
 // Excluded/ExcludedWhy on its typed inputs. ok is false when nothing
 // contributes to the mean (all weights zero) — the caller returns its
 // low-confidence zero value.
-func synthesizeCents(vals, weights []float64, confs []Confidence, minSources int, outlierZ float64) (mean int64, mask []bool, conf Confidence, ok bool) {
+func synthesizeCents(vals, weights []float64, confs []Confidence, datasets []string, minSources int, outlierZ float64) (mean int64, mask []bool, conf Confidence, ok bool) {
 	if len(vals) >= 3 {
 		mask = stats.MADOutliers(vals, outlierZ)
 	} else {
@@ -44,6 +48,7 @@ func synthesizeCents(vals, weights []float64, confs []Confidence, minSources int
 
 	var sumW, sumWV float64
 	var sumConf, contributing int
+	independent := make(map[string]struct{}, len(vals))
 	for i, v := range vals {
 		if mask[i] {
 			continue
@@ -52,13 +57,14 @@ func synthesizeCents(vals, weights []float64, confs []Confidence, minSources int
 		sumWV += weights[i] * v
 		sumConf += int(confs[i])
 		contributing++
+		independent[datasets[i]] = struct{}{}
 	}
 	if sumW == 0 || contributing == 0 {
 		return 0, mask, ConfidenceLow, false
 	}
 
 	conf = ConfidenceLow
-	if contributing >= minSources {
+	if len(independent) >= minSources {
 		avg := float64(sumConf) / float64(contributing)
 		switch {
 		case avg >= 1.5:

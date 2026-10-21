@@ -1,6 +1,7 @@
 package appraisal
 
 import (
+	"cmp"
 	"sort"
 
 	"github.com/bpineau/gazetteer/gazetteer"
@@ -21,7 +22,20 @@ type PriceEstimate struct {
 	Confidence    Confidence
 	SampleSize    int    // 0 if unknown
 	Method        string // short human-readable label, e.g. "dvf_median_5y_750m"
+
+	// Dataset names the underlying dataset the reading is cut from, when
+	// several Sources read the same one: dvf (the mutations near the
+	// address) and dvfagg (the same mutations, aggregated per commune) both
+	// declare DatasetDVF. PricePerM2 counts DISTINCT datasets against
+	// PriceOptions.MinSources, so two cuts of one dataset are one
+	// corroboration, not two. Empty means "independent of every other
+	// contributor": the Source counts as its own dataset.
+	Dataset string
 }
+
+// DatasetDVF is the PriceEstimate.Dataset every reading cut from the DVF
+// mutations declares (dvf, dvfagg, and any plugin that prices off DVF).
+const DatasetDVF = "dvf"
 
 // EURPerM2 returns the estimate in euros per m² (the cents field ÷ 100)
 // — for callers that render or compare without caring about the
@@ -40,8 +54,10 @@ type PriceOptions struct {
 	// DefaultPriceWeights. Defaults to 0.4 when unset.
 	DefaultWeight float64
 
-	// MinSources is the minimum number of contributing sources required
-	// to keep the synthesised Confidence above Low. Defaults to 2.
+	// MinSources is the minimum number of INDEPENDENT contributing
+	// datasets required to keep the synthesised Confidence above Low.
+	// Defaults to 2. Contributors sharing a PriceEstimate.Dataset count
+	// once (dvf and dvfagg are one dataset).
 	MinSources int
 
 	// OutlierZScore is the MAD-based z-score threshold above which a
@@ -99,11 +115,10 @@ type PriceInput struct {
 // dvfagg carries the DefaultWeight value explicitly rather than reaching it by
 // omission: it is a shipped in-tree estimator, and a weight that appears only
 // as a fallback is a decision nobody made. Note what pairing it with dvf does
-// NOT buy — both read the same DVF mutations, cut per address and per commune,
-// so two contributors here are one dataset and the MAD filter (inert below
-// three) can never have them disagree usefully. A Dossier carrying only those
-// two clears MinSources and can report ConfidenceHigh on a single source of
-// truth; a caller who cares should weigh them as one.
+// NOT buy: both read the same DVF mutations, cut per address and per commune,
+// so the two are one dataset. Both declare PriceEstimate.Dataset DatasetDVF,
+// and a Dossier carrying only those two stays below MinSources=2 (Low), where
+// it used to clear it and report ConfidenceHigh on a single source of truth.
 var DefaultPriceWeights = map[string]float64{
 	"meilleursagents": 1.0,
 	"dvf":             0.9,
@@ -167,12 +182,14 @@ func PricePerM2(d gazetteer.Dossier, opts ...PriceOptions) PriceConsolidated {
 	vals := make([]float64, len(inputs))
 	weights := make([]float64, len(inputs))
 	confs := make([]Confidence, len(inputs))
+	datasets := make([]string, len(inputs))
 	for i, in := range inputs {
 		vals[i] = float64(in.Estimate.EurPerM2Cents)
 		weights[i] = in.Weight
 		confs[i] = in.Estimate.Confidence
+		datasets[i] = cmp.Or(in.Estimate.Dataset, in.Source)
 	}
-	mean, mask, conf, ok := synthesizeCents(vals, weights, confs, o.MinSources, o.OutlierZScore)
+	mean, mask, conf, ok := synthesizeCents(vals, weights, confs, datasets, o.MinSources, o.OutlierZScore)
 	for i := range inputs {
 		if mask[i] {
 			inputs[i].Excluded = true

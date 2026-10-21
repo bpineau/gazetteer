@@ -145,6 +145,8 @@ func (r *Result) PriceEstimate() appraisal.PriceEstimate {
 		Method: fmt.Sprintf("dvf_%s_%dy",
 			nonEmptyOr(r.Evidence.LevelUsed, "unknown"),
 			r.Evidence.WindowYears),
+		// dvfagg reads the same mutations: one dataset against MinSources.
+		Dataset: appraisal.DatasetDVF,
 	}
 }
 

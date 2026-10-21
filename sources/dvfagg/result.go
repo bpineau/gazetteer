@@ -64,9 +64,13 @@ const (
 
 // PriceEstimate satisfies appraisal.PriceEstimator: it contributes the
 // commune-wide median €/m² (over single-lot apartment sales, 3-year window) to
-// appraisal.PricePerM2. This lets the synthesis reach its MinSources=2 floor —
-// and thus a Medium/High price_confidence — from embedded data alone, pairing
-// with the live dvf source without a second network reading.
+// appraisal.PricePerM2, from embedded data alone, without a network reading.
+//
+// It declares Dataset appraisal.DatasetDVF, as the live dvf Source does: both
+// are cuts of the same DVF mutations, so the pair counts as ONE dataset
+// against MinSources and cannot by itself lift the synthesis above Low. It
+// corroborates nothing dvf did not already say; an independent estimator
+// (a listings-based one) is what moves the confidence.
 //
 // Confidence tracks the sample size and dispersion: a large, tight commune
 // (N≥50, P75/P25<2) is High; a solid one (N≥15) Medium; a thin or bimodal
@@ -74,13 +78,14 @@ const (
 // gate on IsEmpty first.
 func (r *Result) PriceEstimate() appraisal.PriceEstimate {
 	if r == nil {
-		return appraisal.PriceEstimate{Method: priceEstimateName}
+		return appraisal.PriceEstimate{Method: priceEstimateName, Dataset: appraisal.DatasetDVF}
 	}
 	return appraisal.PriceEstimate{
 		EurPerM2Cents: int64(math.Round(r.PriceMedianEURM2 * 100)),
 		Confidence:    r.priceConfidence(),
 		SampleSize:    r.N,
 		Method:        priceEstimateName,
+		Dataset:       appraisal.DatasetDVF,
 	}
 }
 
