@@ -171,3 +171,13 @@ A Source memoising upstream responses should distinguish:
 
 Conflating the two locks a queue against a transiently-broken upstream
 for the full TTL.
+
+## When the cache backend itself fails
+
+A cache is an optimisation, so an unavailable backend must cost a
+round-trip, never the answer. `banx.CachedGeocoder` treats both
+directions alike: a `Get` error other than `kvcache.ErrNotFound` is
+logged at Warn (`geocode.cache.read_failed`) and handled as a miss, so
+the delegate answers; a `Set` error is logged at Warn
+(`geocode.cache.write_failed`) and the answer is served uncached. The
+caller's own cancelled context is the one error that still ends the call.

@@ -129,8 +129,13 @@ func NewDefaultGeocoder(hc *httpx.Client) Geocoder {
 
 // NewCachedGeocoder wraps delegate with a kvcache.Cache-backed cache.
 // ttl=0 → 1-year fallback. The logger defaults to slog.Default() and is
-// used only for rare write-skip warnings (incoherent BAN response). Use
-// WithLogger to override it.
+// used only for rare warnings (an incoherent BAN response not cached, a
+// cache backend that failed a read or a write). Use WithLogger to override
+// it.
+//
+// The cache never fails a geocode: a backend read error is a miss (the
+// delegate answers) and a write error leaves the answer uncached, both
+// logged at Warn. Only the caller's own cancelled context ends the call.
 func NewCachedGeocoder(delegate Geocoder, c kvcache.Cache, ttl time.Duration) *CachedGeocoder {
 	if ttl == 0 {
 		ttl = 365 * 24 * time.Hour
@@ -195,7 +200,9 @@ func (c *CachedGeocoder) Geocode(ctx context.Context, q GeocodeQuery) (GeocodeRe
 			// fallthrough on json error → re-query
 		}
 	} else if !errors.Is(err, kvcache.ErrNotFound) {
-		return GeocodeResult{}, fmt.Errorf("banx cache: %w", err)
+		if cerr := c.readFailed(ctx, key, err); cerr != nil {
+			return GeocodeResult{}, cerr
+		}
 	}
 
 	res, err := c.delegate.Geocode(ctx, q)
@@ -235,18 +242,50 @@ func (c *CachedGeocoder) Geocode(ctx context.Context, q GeocodeQuery) (GeocodeRe
 		)
 		return res, nil
 	}
-	b, err := json.Marshal(res)
-	if err != nil {
-		return res, nil // serve from delegate even if cache write fails
-	}
-	exp := c.now().Add(c.ttl)
-	_ = c.cache.Set(ctx, kvcache.Entry{
-		Key:       key,
-		Value:     b,
-		FetchedAt: c.now(),
-		ExpiresAt: &exp,
-	})
+	c.store(ctx, key, res)
 	return res, nil
+}
+
+// readFailed decides what a cache read error costs. The cache is an
+// optimisation, so a backend that cannot be read degrades to a miss: the
+// error is logged at Warn and nil is returned, so the delegate answers.
+// The one exception is the caller's own context ending, which is returned
+// as is: that is the caller giving up, not the backend failing, and it must
+// still stop the call.
+//
+// It is the read-side twin of store's write path, so both directions treat
+// an unavailable backend the same way: visible in the logs, never fatal.
+func (c *CachedGeocoder) readFailed(ctx context.Context, key string, err error) error {
+	if cerr := ctx.Err(); cerr != nil {
+		return cerr
+	}
+	c.logger.Warn("geocode.cache.read_failed: serving from the delegate",
+		slog.String("key", key),
+		slog.Any("err", err),
+	)
+	return nil
+}
+
+// store persists res under key with the geocoder's TTL. A marshal or
+// backend error is logged at Warn and otherwise ignored: the caller already
+// has its answer, and a failed write only costs a future round-trip.
+func (c *CachedGeocoder) store(ctx context.Context, key string, res GeocodeResult) {
+	b, err := json.Marshal(res)
+	if err == nil {
+		exp := c.now().Add(c.ttl)
+		err = c.cache.Set(ctx, kvcache.Entry{
+			Key:       key,
+			Value:     b,
+			FetchedAt: c.now(),
+			ExpiresAt: &exp,
+		})
+	}
+	if err != nil {
+		c.logger.Warn("geocode.cache.write_failed: result served but not cached",
+			slog.String("key", key),
+			slog.Any("err", err),
+		)
+	}
 }
 
 // Reverse implements ReverseGeocoder when the underlying delegate also
@@ -277,7 +316,9 @@ func (c *CachedGeocoder) Reverse(ctx context.Context, lat, lon float64) (Geocode
 			}
 		}
 	} else if !errors.Is(err, kvcache.ErrNotFound) {
-		return GeocodeResult{}, fmt.Errorf("banx reverse cache: %w", err)
+		if cerr := c.readFailed(ctx, key, err); cerr != nil {
+			return GeocodeResult{}, cerr
+		}
 	}
 
 	res, err := rev.Reverse(ctx, lat, lon)
@@ -298,17 +339,7 @@ func (c *CachedGeocoder) Reverse(ctx context.Context, lat, lon float64) (Geocode
 		)
 		return res, nil
 	}
-	b, err := json.Marshal(res)
-	if err != nil {
-		return res, nil
-	}
-	exp := c.now().Add(c.ttl)
-	_ = c.cache.Set(ctx, kvcache.Entry{
-		Key:       key,
-		Value:     b,
-		FetchedAt: c.now(),
-		ExpiresAt: &exp,
-	})
+	c.store(ctx, key, res)
 	return res, nil
 }
 
