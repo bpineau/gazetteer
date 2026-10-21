@@ -369,7 +369,7 @@
   },
   {
     "name": "iris",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "INSEE IRIS code/name/type at the address; also resolves Listing.IRIS for downstream sources.",
     "inputs": [

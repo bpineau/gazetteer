@@ -21,9 +21,11 @@ type Listing struct {
 	Lon     *float64 `json:"lon,omitempty"`
 
 	// IRIS is the 9-digit INSEE IRIS code (sub-commune statistical zone, e.g.
-	// "751104201"), populated by a Normalizer that has an IRISResolver. Empty
-	// when unresolved (outside the resolver's coverage, or no resolver wired).
-	// Sources keyed at IRIS granularity read it; commune-level sources ignore it.
+	// "751114201"), populated by a Normalizer that has an IRISResolver. Empty
+	// when unresolved (outside the resolver's coverage, no resolver wired, or
+	// coordinates coarser than a street: a commune centre's IRIS is the
+	// mairie's, not the address's). Sources keyed at IRIS granularity read
+	// it; commune-level sources ignore it.
 	IRIS string `json:"iris,omitempty"`
 
 	// CoordPrecision is what Lat/Lon are the position OF: the address

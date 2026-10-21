@@ -7,13 +7,18 @@ import (
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
 )
 
 // Name is the canonical Source identifier. Stable; the Dossier results key.
 const Name = "iris"
 
 // sourceVersion bumps when the Source's internal logic changes.
-const sourceVersion = 1
+//
+// v2 refuses coordinates coarser than a street (Listing.CoordPrecision
+// municipality or locality) with ErrInsufficientInputs: a commune centre's
+// IRIS is the mairie's, and v1 reported it at ConfidenceHigh as the address's.
+const sourceVersion = 2
 
 // Version exposes sourceVersion so callers that wrap the Source can mirror it.
 const Version = sourceVersion
@@ -108,6 +113,13 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	// Island, which is far from any covered IRIS anyway.
 	if lat == 0 && lon == 0 {
 		return nil, fmt.Errorf("iris: %w: lat/lon=0,0 sentinel", gazetteer.ErrInsufficientInputs)
+	}
+	// A commune or locality centre lies inside an IRIS (the mairie's), which
+	// is not the address's: the IRIS is a neighbourhood reading and needs a
+	// street-precision point at least.
+	if _, _, ok := l.CoordsAtLeast(banx.PrecisionStreet); !ok {
+		return nil, fmt.Errorf("iris: %w: coordinates are a %s centre, coarser than a street",
+			gazetteer.ErrInsufficientInputs, l.CoordPrecision)
 	}
 
 	ev := Evidence{ListingLat: lat, ListingLon: lon, Source: "geometry", PerimeterIRIS: idx.Count()}

@@ -368,7 +368,11 @@ modelled hazard, `catnat` reports the realised sinistralité.
 Resolves a coordinate to its INSEE IRIS — the sub-commune statistical zone
 (≈ 2 000 inhabitants), the finest official mesh for census/income data.
 
-- **Needs**: lat/lon (or a pre-resolved `Listing.IRIS`, which it reuses).
+- **Needs**: lat/lon at street precision or finer (or a pre-resolved
+  `Listing.IRIS`, which it reuses). A commune or locality centre
+  (`Listing.CoordPrecision`) is refused with `ErrInsufficientInputs`, and the
+  normalizer leaves `Listing.IRIS` empty for it: the point lies in the
+  mairie's IRIS, not the address's.
 - **Result**: `code_iris` (9-digit), `nom_iris`, `typ_iris` (H/A/D/Z).
 - **Dual role**: the Source also implements `gazetteer.IRISResolver`. The
   factory (and CLI) wire it into the BANNormalizer via `WithIRIS`, so every

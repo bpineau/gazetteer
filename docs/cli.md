@@ -172,7 +172,7 @@ filosofi        v1
 georisques      v1
 gpe             v2
 ips_ecoles      v1
-iris            v1
+iris            v2
 links           v3
 locservice      v1
 logiris         v1

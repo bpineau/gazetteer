@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
 )
 
 // TestLoad smokes the embedded contours.
@@ -109,5 +110,21 @@ func TestQuery_MissingCoords(t *testing.T) {
 	t.Parallel()
 	if _, err := Query(context.Background(), Options{}, gazetteer.Listing{}); !errors.Is(err, gazetteer.ErrInsufficientInputs) {
 		t.Errorf("err = %v, want ErrInsufficientInputs", err)
+	}
+}
+
+// TestQuery_CoarseCoordinatesRefused: a commune-centre point sits inside the
+// mairie's IRIS, which v1 reported at ConfidenceHigh as the address's.
+func TestQuery_CoarseCoordinatesRefused(t *testing.T) {
+	t.Parallel()
+	for _, p := range []banx.Precision{banx.PrecisionMunicipality, banx.PrecisionLocality} {
+		_, err := Query(context.Background(), Options{}, gazetteer.Listing{Lat: new(48.8627), Lon: new(2.4436), CoordPrecision: p})
+		if !errors.Is(err, gazetteer.ErrInsufficientInputs) {
+			t.Errorf("precision %q: err = %v, want ErrInsufficientInputs", p, err)
+		}
+	}
+	res, err := Query(context.Background(), Options{}, gazetteer.Listing{Lat: new(48.8627), Lon: new(2.4436), CoordPrecision: banx.PrecisionStreet})
+	if err != nil || res.IsEmpty() {
+		t.Errorf("street precision: res %+v err %v, want the IRIS", res, err)
 	}
 }

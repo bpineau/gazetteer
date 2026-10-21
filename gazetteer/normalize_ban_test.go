@@ -210,3 +210,31 @@ func TestBANNormalizer_UnknownINSEELeavesCityEmpty(t *testing.T) {
 		t.Errorf("City = %q, want empty when INSEE not found", got.City)
 	}
 }
+
+// A commune-centre match is a perfectly ordinary coordinate inside some IRIS,
+// usually the mairie's. Attributing that IRIS to the address hands filoiris,
+// logiris and the Paris encadrement quartier the town hall's neighbourhood.
+// The IRIS is a neighbourhood-scale reading: a street centroid is fine, a
+// commune or locality centre is not. An unreported precision is never
+// refused (a hand-built geocoder stub reports none).
+func TestBANNormalizer_CoarseMatchGetsNoIRIS(t *testing.T) {
+	for _, c := range []struct {
+		precision banx.Precision
+		want      string
+	}{
+		{banx.PrecisionMunicipality, ""},
+		{banx.PrecisionLocality, ""},
+		{banx.PrecisionStreet, "930660802"},
+		{banx.PrecisionHouseNumber, "930660802"},
+		{banx.PrecisionUnknown, "930660802"},
+	} {
+		g := &stubGeocoder{res: banx.GeocodeResult{Lat: 48.93, Lon: 2.35, CityCode: "93066", Precision: c.precision}}
+		got, err := NewBANNormalizer(g, nil).WithIRIS(&stubIRIS{code: "930660802", ok: true}).Normalize(context.Background(), "x")
+		if err != nil {
+			t.Fatalf("%s: Normalize: %v", c.precision, err)
+		}
+		if got.IRIS != c.want {
+			t.Errorf("precision %q: IRIS = %q, want %q", c.precision, got.IRIS, c.want)
+		}
+	}
+}

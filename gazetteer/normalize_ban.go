@@ -82,9 +82,12 @@ func (n *BANNormalizer) Normalize(ctx context.Context, addr string) (Listing, er
 			l.City = c.Name
 		}
 	}
-	// Resolve the IRIS from the geocoded point. (0,0) is the "unset coords"
-	// sentinel — a real address never geocodes to Null Island.
-	if n.iris != nil && !(lat == 0 && lon == 0) {
+	// Resolve the IRIS from the geocoded point, at street precision or finer.
+	// A commune or locality centre lies inside some IRIS (usually the
+	// mairie's), and attributing it to the address would hand the IRIS-keyed
+	// readings (filoiris, logiris, the Paris encadrement quartier) the town
+	// hall's neighbourhood. CoordsAtLeast also refuses the (0,0) sentinel.
+	if _, _, ok := l.CoordsAtLeast(banx.PrecisionStreet); n.iris != nil && ok {
 		if code, ok := n.iris.ResolveIRIS(lat, lon); ok {
 			l.IRIS = code
 		}
