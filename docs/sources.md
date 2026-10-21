@@ -187,6 +187,10 @@ offline batch complement to the live, per-address `dvf` source.
   believe. Note the direction — this dataset needs the OPPOSITE of
   `communes.FoldArrondissement`, and `communes.IsArrondissementParent` is the
   test for it.
+- **Property type**: apartments only. A listing typed as a house, a shop or
+  land is refused with `ErrUnsupportedPropertyType` (an unset type reads as
+  an apartment): the flats' median is not a reading of a house's price, and
+  `appraisal.PricePerM2` would otherwise blend it in.
 - **Result**: `PriceMedianEURM2` / `PriceP25EURM2` / `PriceP75EURM2`
   (dispersion over single-lot apartment sales; a wide spread flags a
   bimodal commune), `PriceMedianSmallEURM2` (18–55 m², to pair with a

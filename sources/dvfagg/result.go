@@ -20,7 +20,10 @@ const Name = "dvfagg"
 //     dataset, and a Paris/Lyon/Marseille PARENT code is refused with
 //     ErrInsufficientInputs instead of answering "no qualifying sale".
 //     Both change what a caller stores for those inputs.
-const Version = 3
+//   - v4: a listing typed as a house, a shop or land is refused with
+//     ErrUnsupportedPropertyType. v3 answered it with the APARTMENT median,
+//     which appraisal.PricePerM2 then blended into the house's price.
+const Version = 4
 
 // Result is the per-commune DVF price aggregate, in EUR/m², 3-year window.
 // Built at refresh time from single-lot apartment sales; see transform.go.

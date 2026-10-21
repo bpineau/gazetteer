@@ -8,6 +8,7 @@ import (
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/communes"
+	"github.com/bpineau/gazetteer/helpers/proptype"
 )
 
 // Options configures a dvfagg Source. Zero value is usable (embedded only).
@@ -38,6 +39,9 @@ func (s *Source) Datasets() []dataset.Set { return []dataset.Set{theSet} }
 // Query implements gazetteer.Source: returns the commune aggregate for the
 // listing's INSEE. Without an INSEE it emits gazetteer.ErrInsufficientInputs;
 // a present-but-unmatched commune surfaces as IsEmpty() (no qualifying sale).
+// A listing typed as anything but an apartment (house, commercial, land...)
+// emits gazetteer.ErrUnsupportedPropertyType: the aggregate is cut from
+// apartment sales only. An unset PropertyType reads as an apartment.
 //
 // A Paris / Lyon / Marseille PARENT code (75056, 69123, 13055) also emits
 // ErrInsufficientInputs rather than an empty Result. geo-dvf keys those three
@@ -47,6 +51,13 @@ func (s *Source) Datasets() []dataset.Set { return []dataset.Set{theSet} }
 // "75000") returns exactly that parent code, so the case is reachable from
 // ordinary inputs; the caller's fix is to pass the arrondissement.
 func (s *Source) Query(_ context.Context, l gazetteer.Listing) (any, error) {
+	// The aggregate is an APARTMENT median: a house or a shop answered with
+	// it would hand appraisal.PricePerM2 the flats' price as a reading of
+	// theirs. An unknown type keeps the documented apartment default.
+	if pt := proptype.Normalize(string(l.PropertyType)); pt.IsKnown() && pt != proptype.Apartment {
+		return nil, fmt.Errorf("dvfagg: %w: %q (the aggregate covers apartments only)",
+			gazetteer.ErrUnsupportedPropertyType, l.PropertyType)
+	}
 	insee := strings.TrimSpace(l.INSEE)
 	if insee == "" {
 		return nil, fmt.Errorf("dvfagg: %w: listing.INSEE required", gazetteer.ErrInsufficientInputs)
