@@ -104,7 +104,7 @@ var sourceDescriptors = map[string]sourceDescriptor{
 	},
 	"encadrement": {
 		Batch:    true,
-		Summary:  "Legal rent-control caps (loyer de référence + majoré).",
+		Summary:  "Legal rent-control caps (loyer de référence + majoré), unfurnished and furnished (meublé).",
 		Inputs:   []inputClause{need("zip", "INSEE"), need("property_type"), need("rooms"), optional("for 93", "lat/lon")},
 		Coverage: "Paris + Plaine Commune & Est Ensemble (93) + Lyon/Villeurbanne",
 		Feeds:    []string{"appraisal.RentValue"},

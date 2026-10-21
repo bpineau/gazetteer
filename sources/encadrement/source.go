@@ -62,7 +62,14 @@ const Name = "encadrement"
 // v8 reads a house in Plaine Commune or Est Ensemble from the maison grille
 // those EPTs publish (Evidence.Maison). v7 dropped every maison cell and
 // served the apartment one, about 16 % lower in zone 311.
-const sourceVersion = 8
+//
+// v9 also returns the FURNISHED cap (LoyerRefMajMeubleEURPerM2HC,
+// LoyerRefMeubleEURPerM2HC), collapsed from the meublé cells every shipped
+// grille publishes beside the unfurnished ones. v8 dropped every meublé cell,
+// so a furnished letting could only be held to the unfurnished ceiling, which
+// is lower on every cell (Paris 1er, 1 room, pre-1946: 42.60 against 48.60
+// EUR/m2/month).
+const sourceVersion = 9
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -121,7 +128,8 @@ func (s *Source) Datasets() []dataset.Set {
 //     INSEE-commune fallback (see resolve93).
 //  5. On a match, collapse the cells matching (pièces, époque,
 //     non-meublé, maison for a house where the zone publishes a maison
-//     grille, apartment otherwise) by median of LoyerRefMaxEURPerM2HC.
+//     grille, apartment otherwise) by median of LoyerRefMaxEURPerM2HC, and
+//     the meublé cells of the same selection into the furnished pair.
 //
 // Rooms and BuildYear both narrow the grille cell, and both are optional:
 // an absent one spans every published bucket for that axis and is recorded
@@ -282,15 +290,18 @@ type cellFilter struct {
 	house bool
 	// maison selects the maison cells instead of the apartment ones.
 	maison bool
+	// meuble selects the meublé (furnished) cells instead of the unfurnished
+	// ones. collapse runs the selection once each way.
+	meuble bool
 }
 
-// matches reports whether e is one of the cells this filter selects. Furnished
-// cells are never selected (the published meublé grille is a different cap),
-// and the maison and apartment cells are told apart by f.maison: the two 93
-// EPTs publish a separate maison grille, which in Plaine Commune zone 311 sits
-// about 16 % above the apartment one.
+// matches reports whether e is one of the cells this filter selects. The
+// meublé and unfurnished cells are two different caps, told apart by
+// f.meuble, and the maison and apartment cells are told apart by f.maison:
+// the two 93 EPTs publish a separate maison grille, which in Plaine Commune
+// zone 311 sits about 16 % above the apartment one.
 func (f cellFilter) matches(e Entry) bool {
-	if e.Meuble || e.Maison != f.maison {
+	if e.Meuble != f.meuble || e.Maison != f.maison {
 		return false
 	}
 	if f.piece > 0 && e.Piece != f.piece && (!e.PieceOpenEnded || f.piece < e.Piece) {
@@ -311,6 +322,10 @@ func (f cellFilter) matches(e Entry) bool {
 // When a BuildYear selects no cell — a territory whose époque vocabulary this
 // package does not parse — the collapse retries across every époque rather
 // than reporting the address unregulated, and says so in the Evidence.
+//
+// The unfurnished selection decides the reading (its époque fallback, its
+// emptiness, its confidence); the furnished pair is then the same selection
+// over the meublé cells, so the two caps always describe the same cells.
 func collapse(entries []Entry, label, zoneSource string, sel cellFilter, ev Evidence, conf string) *Result {
 	if sel.house {
 		for _, e := range entries {
@@ -341,14 +356,22 @@ func collapse(entries []Entry, label, zoneSource string, sel cellFilter, ev Evid
 	if sel.piece == 0 && conf == ConfidenceMedium {
 		conf = ConfidenceLow
 	}
-	return &Result{
+	r := &Result{
 		LoyerRefMajEURPerM2HC: stats.Median(majs),
 		LoyerRefEURPerM2HC:    stats.Median(refs),
 		Zone:                  label,
 		ZoneSource:            zoneSource,
 		Confidence:            conf,
-		Evidence:              ev,
 	}
+	furnished := sel
+	furnished.meuble = true
+	if mMajs, mRefs, _ := selectCells(entries, furnished); len(mMajs) > 0 {
+		r.LoyerRefMajMeubleEURPerM2HC = stats.Median(mMajs)
+		r.LoyerRefMeubleEURPerM2HC = stats.Median(mRefs)
+		ev.NbMeubleCellsMatched = len(mMajs)
+	}
+	r.Evidence = ev
+	return r
 }
 
 // selectCells gathers the majoré and référence readings of the cells sel

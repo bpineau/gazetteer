@@ -268,8 +268,11 @@ func renderCarteloyers(r *carteloyers.Result) (string, []string) {
 }
 
 func renderEncadrement(r *encadrement.Result) (string, []string) {
-	headline := fmt.Sprintf("loyer ref %.2f €/m²/mois HC, majoré %.2f (zone %s)",
-		r.LoyerRefEURPerM2HC, r.LoyerRefMajEURPerM2HC, r.Zone)
+	headline := fmt.Sprintf("loyer ref %.2f €/m²/mois HC, majoré %.2f", r.LoyerRefEURPerM2HC, r.LoyerRefMajEURPerM2HC)
+	if r.LoyerRefMajMeubleEURPerM2HC > 0 {
+		headline += fmt.Sprintf("; meublé ref %.2f, majoré %.2f", r.LoyerRefMeubleEURPerM2HC, r.LoyerRefMajMeubleEURPerM2HC)
+	}
+	headline += fmt.Sprintf(" (zone %s)", r.Zone)
 	return headline, nil
 }
 

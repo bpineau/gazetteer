@@ -314,13 +314,24 @@ Lyon / Villeurbanne.
   and multiplying by a surface is the caller's step.
 - **Result**: `LoyerRefMajEURPerM2HC` (the **legal max**, loyer de référence
   majoré, €/m²/month HC), `LoyerRefEURPerM2HC` (the published reference, ~20 %
-  below), `Zone` + `ZoneSource` (resolved zone, e.g. `Paris 11e` /
-  `plaine_commune`) and `Confidence`. Also satisfies `appraisal.RentEstimator`.
+  below), the same pair for a FURNISHED letting
+  (`LoyerRefMajMeubleEURPerM2HC`, `LoyerRefMeubleEURPerM2HC`: the meublé
+  grille, which is what caps an LMNP rent), `Zone` + `ZoneSource` (resolved
+  zone, e.g. `Paris 11e` / `plaine_commune`) and `Confidence`. Also satisfies
+  `appraisal.RentEstimator`; its `RentCap` is the unfurnished majoré.
 - **Cell identification** — the published grille is keyed by (zone, pièces,
-  époque de construction, meublé). The Source reads the non-meublé,
-  apartment cells (the maison ones for a house, in the two 93 EPTs that
-  publish a separate maison grille; Paris and Lyon set one grille for every
-  dwelling) and narrows them with what the Listing carries:
+  époque de construction, meublé). The Source reads the apartment cells
+  (the maison ones for a house, in the two 93 EPTs that publish a separate
+  maison grille; Paris and Lyon set one grille for every dwelling), once
+  over the non-meublé cells for the unfurnished pair and once over the
+  meublé cells for the furnished one. Every shipped grille publishes one
+  meublé cell per unfurnished one, above it: Paris 2026 adds a "majoration
+  unitaire" of 2.1 to 5.3 €/m²/month to the référence, by secteur and cell
+  (1 room, pre-1946, secteur 1: 42.60 unfurnished majoré, 48.60 furnished).
+  A test holds every shipped cell to majoré = 1.2 x référence and minoré =
+  0.7 x référence, pairs every meublé cell with exactly one unfurnished
+  twin, and pins cells of each grille to its arrêté. Both selections are
+  narrowed with what the Listing carries:
   - `Rooms` picks the pièces bucket, saturating at the open-ended top cell
     ("4 pièces et plus"), so a T6 reads the same cap as a T4. Without it the
     collapse spans every bucket and `Confidence` is capped at

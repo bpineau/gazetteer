@@ -260,9 +260,9 @@
   },
   {
     "name": "encadrement",
-    "version": 8,
+    "version": 9,
     "default": true,
-    "summary": "Legal rent-control caps (loyer de référence + majoré).",
+    "summary": "Legal rent-control caps (loyer de référence + majoré), unfurnished and furnished (meublé).",
     "inputs": [
       "zip or INSEE",
       "property_type",
@@ -277,6 +277,8 @@
     "result_schema": {
       "loyer_ref_maj_eur_per_m2_hc": 0,
       "loyer_ref_eur_per_m2_hc": 0,
+      "loyer_ref_maj_meuble_eur_per_m2_hc": 0,
+      "loyer_ref_meuble_eur_per_m2_hc": 0,
       "confidence": ""
     }
   },

@@ -2,7 +2,8 @@
 // lookup (Paris, Plaine Commune, Est Ensemble, Lyon / Villeurbanne) into
 // a standalone gazetteer Source. Given a Listing the Source resolves the
 // arrondissement / zone / IRIS for the property and returns the legal
-// loyer de référence (and majoré cap) per m² month HC.
+// loyer de référence (and majoré cap) per m² month HC, for an unfurnished
+// and for a furnished letting.
 //
 // The Source is fully offline: embedded JSON tables (barèmes) and
 // GeoJSON-derived zonage geometry ship under `data/`.
@@ -52,6 +53,22 @@ type Result struct {
 	// LoyerRefEURPerM2HC is the loyer de référence (the published
 	// reference, ~20 % below the majoré).
 	LoyerRefEURPerM2HC float64 `json:"loyer_ref_eur_per_m2_hc"`
+
+	// LoyerRefMajMeubleEURPerM2HC is the loyer de référence majoré of a
+	// FURNISHED letting (location meublée) on the same cells, EUR/m²/month HC:
+	// the legal max of a meublé lease, which is what caps a furnished (LMNP)
+	// rent. LoyerRefMajEURPerM2HC caps an unfurnished lease only and sits below
+	// it on every published cell (Paris 2026 adds 2.1 to 5.3 EUR/m²/month to the
+	// référence depending on the secteur and cell, so 1.2 times that to the
+	// majoré). Collapsed across the same zone, pièces and époque selection as
+	// the unfurnished pair, by median. Zero when the property sits outside the
+	// shipped zones or the zone publishes no meublé cell for the selection.
+	LoyerRefMajMeubleEURPerM2HC float64 `json:"loyer_ref_maj_meuble_eur_per_m2_hc"`
+
+	// LoyerRefMeubleEURPerM2HC is the loyer de référence of a furnished letting
+	// on the same cells, EUR/m²/month HC (the meublé reference, ~20 % below
+	// LoyerRefMajMeubleEURPerM2HC). Zero under the same conditions.
+	LoyerRefMeubleEURPerM2HC float64 `json:"loyer_ref_meuble_eur_per_m2_hc"`
 
 	// Zone is the human-readable zone label ("Paris 11e", "Lyon 3e",
 	// "Villeurbanne"). Empty when no match.
@@ -123,8 +140,15 @@ type Evidence struct {
 
 	// NbCellsMatched is the number of grille cells that matched the
 	// (zone, pièces, époque, non-meublé, maison-or-apartment) filter.
-	// Drives the median collapse.
+	// Drives the median collapse of the unfurnished pair.
 	NbCellsMatched int `json:"nb_cells_matched,omitempty"`
+
+	// NbMeubleCellsMatched is the number of meublé cells behind the furnished
+	// pair (LoyerRefMajMeubleEURPerM2HC, LoyerRefMeubleEURPerM2HC): the same
+	// filter as NbCellsMatched with meublé in place of non-meublé. Every
+	// shipped grille publishes one meublé cell per unfurnished one, so the
+	// two counts agree; zero when the furnished pair is zero.
+	NbMeubleCellsMatched int `json:"nb_meuble_cells_matched,omitempty"`
 
 	// ZoneID is the resolved zone identifier inside the source: the Plaine
 	// Commune / Est Ensemble zone number (e.g. "311"), the Paris quartier's
@@ -184,7 +208,8 @@ func (r *Result) RentEstimate() appraisal.RentEstimate {
 // RentCap satisfies appraisal.RentCapper: it contributes the loyer de référence
 // majoré (the legal ceiling, HC €/m²/month → centimes) so consumers can clamp a
 // market rent to the legal maximum without re-deriving the cap. ok is false
-// outside an encadrement zone (no published majoré).
+// outside an encadrement zone (no published majoré). It is the UNFURNISHED
+// ceiling; a furnished rent is capped by LoyerRefMajMeubleEURPerM2HC.
 func (r *Result) RentCap() (int64, bool) {
 	if r == nil || r.LoyerRefMajEURPerM2HC <= 0 {
 		return 0, false

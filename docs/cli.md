@@ -166,7 +166,7 @@ dpedist         v1
 dvf             v8
 dvfagg          v5
 education       v1
-encadrement     v8
+encadrement     v9
 filoiris        v1
 filosofi        v1
 georisques      v2

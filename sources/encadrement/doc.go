@@ -33,6 +33,13 @@
 // a four-room flat (38.00 to 29.50 EUR/m²/month in Paris 1er, 20.50 to 14.00
 // in Lyon 3e), so a default would be a guess dressed as a lookup.
 //
+// The same selection over the zone's meublé cells gives the FURNISHED pair,
+// LoyerRefMajMeubleEURPerM2HC and LoyerRefMeubleEURPerM2HC: every shipped
+// grille publishes one meublé cell per unfurnished one, above it (Paris 2026
+// adds 2.1 to 5.3 EUR/m²/month to the référence, by secteur and cell). A
+// furnished letting is held to the meublé majoré, never to the unfurnished
+// one, which would understate its legal ceiling.
+//
 // The *Result satisfies appraisal.RentEstimator with Bracket populated, so
 // consumers can label the rent as a "loyer de référence" rather than a market
 // estimate.
@@ -59,4 +66,6 @@
 //	    r.LoyerRefEURPerM2HC)
 //	fmt.Printf("loyer de réf. majoré  : %.2f €/m²/mois HC (legal max)\n",
 //	    r.LoyerRefMajEURPerM2HC)
+//	fmt.Printf("majoré meublé         : %.2f €/m²/mois HC (furnished max)\n",
+//	    r.LoyerRefMajMeubleEURPerM2HC)
 package encadrement
