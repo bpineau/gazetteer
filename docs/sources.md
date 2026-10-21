@@ -87,7 +87,9 @@ dataset on data.gouv.fr.
   `Evidence.Surface{AnchorM2,Comparable,Matched}` says why. The band is
   wide on purpose: loi Carrez and surface habitable are different
   conventions. Supply `SurfaceM2` whenever you have it; without it the
-  Source cannot tell the dwelling from its neighbour.
+  Source cannot tell the dwelling from its neighbour. When the listing has
+  a house number and no certificate carries it, the result is empty
+  (`SkipReason` `number_not_found`), never another address's DPE.
 - **`IsEmpty()`**: true when the API returns `results: []`.
 - **Eligibility**: residential only; commercial/land returns `Skipped`
   via the typed Result rather than an error.

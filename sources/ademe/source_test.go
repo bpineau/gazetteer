@@ -437,12 +437,13 @@ func TestSource_WrongStreetOnlyIsNotHigh(t *testing.T) {
 	}
 }
 
-func TestSource_ConfidenceMediumWhenNoNumberMatch(t *testing.T) {
+func TestSource_NoNumberMatchIsNoMatch(t *testing.T) {
 	t.Parallel()
 
-	// None of the rows match the listing's number "82" → PickBest
-	// fallback (row 0); confidence should be medium because the
-	// etiquette is filled but the number did not match.
+	// None of the rows match the listing's number "82". The PickBest
+	// fallback used to return row 0, number 78's DPE "E", as the
+	// listing's at medium confidence: another building's certificate.
+	// A number that no row carries is now a no-match.
 	body := []byte(`{"total":2,"results":[
         {"numero_dpe":"a","etiquette_dpe":"E","adresse_ban":"78 Rue X 75011 Paris"},
         {"numero_dpe":"b","etiquette_dpe":"D","adresse_ban":"86 Rue X 75011 Paris"}
@@ -461,8 +462,8 @@ func TestSource_ConfidenceMediumWhenNoNumberMatch(t *testing.T) {
 		t.Fatalf("Query: %v", err)
 	}
 	res := data.(*Result)
-	if res.Confidence != ConfidenceMedium {
-		t.Errorf("Confidence = %q, want medium", res.Confidence)
+	if !res.IsEmpty() || !res.Skipped || res.SkipReason != SkipReasonNumberNotFound {
+		t.Errorf("got %+v (DPE %+v), want a skipped %q result", res, res.DPE, SkipReasonNumberNotFound)
 	}
 }
 

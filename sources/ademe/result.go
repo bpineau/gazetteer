@@ -13,6 +13,9 @@ const (
 // wire contract — downstream consumers group on these values.
 const (
 	SkipReasonNoMatch = "no_match"
+	// SkipReasonNumberNotFound: the listing has a house number and no
+	// certificate returned carries it, so none of them is the listing's.
+	SkipReasonNumberNotFound = "number_not_found"
 )
 
 // Result is the typed payload returned by Source.Query. Groups the

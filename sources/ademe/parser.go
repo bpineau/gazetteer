@@ -21,7 +21,9 @@
 //  2. Query the ADEME endpoint with the zip + the trimmed listing
 //     address (number + street tokens).
 //  3. Pick the row whose adresse_ban / adresse_brut starts with the
-//     listing's number; fall back to the top-_score row when none match.
+//     listing's number. When the listing has a number and no row carries
+//     it, report no match (SkipReasonNumberNotFound): every row is another
+//     address's certificate. Without a number, take the top-_score row.
 //  4. Empty result → IsEmpty()==true (Result.SampleSize==0); the
 //     framework records Status == StatusOKEmpty.
 package ademe

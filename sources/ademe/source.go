@@ -35,7 +35,11 @@ const Name = "ademe"
 //     caller's anchor (SurfaceAgrees) is now ConfidenceMedium, and
 //     Evidence carries the anchor and the verdict. Result.Confidence
 //     moves for those rows, so a stored one must be re-derived.
-const sourceVersion = 4
+//   - v5: a listing with a house number that no returned certificate
+//     carries is a no-match (SkipReasonNumberNotFound). v4 fell back to
+//     the full-text top hit, another address's DPE (possibly on another
+//     street of the zip), at ConfidenceMedium whenever it had a label.
+const sourceVersion = 5
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -189,10 +193,26 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	idx := -1
 	numberMatched := false
 	if parts.Number != "" {
-		if i, ok := PickBestByNumber(rows, parts.Number, wantStreetKey, wantSurface); ok {
-			idx = i
-			numberMatched = true
+		i, ok := PickBestByNumber(rows, parts.Number, wantStreetKey, wantSurface)
+		if !ok {
+			// The listing names its house number and no certificate
+			// returned carries it: every row is another address's, and
+			// the full-text top hit may not even be on the same street.
+			logger.Debug("ademe.number_not_found",
+				slog.String("zip", resolvedZip),
+				slog.String("number", parts.Number),
+				slog.Int("raw_count", len(rows)),
+			)
+			return &Result{
+				Confidence: ConfidenceLow,
+				SampleSize: 0,
+				Skipped:    true,
+				SkipReason: SkipReasonNumberNotFound,
+				Evidence:   emptyEvidence(len(rows)),
+			}, nil
 		}
+		idx = i
+		numberMatched = true
 	}
 	if idx == -1 {
 		i, ok := PickBest(rows, wantSurface)
@@ -211,12 +231,6 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 			}, nil
 		}
 		idx = i
-		if parts.Number != "" {
-			logger.Debug("ademe.number_fallback",
-				slog.String("number", parts.Number),
-				slog.Int("raw_count", len(rows)),
-			)
-		}
 	}
 	row := rows[idx]
 
