@@ -21,8 +21,9 @@ import (
 const (
 	ConfidenceMedium = "medium"
 	// ConfidenceLow flags a resolved-but-ambiguous reading: a multi-zone EPT
-	// commune (Saint-Denis, Montreuil) queried without coordinates, collapsed
-	// across all its zones.
+	// commune (Saint-Denis, Montreuil) queried without coordinates, or a Paris
+	// or Lyon arrondissement queried without an IRIS whose zones carry
+	// different caps, collapsed across all its zones.
 	ConfidenceLow  = "low"
 	ConfidenceNone = ""
 )
@@ -119,10 +120,12 @@ type Evidence struct {
 	// median collapse.
 	NbCellsMatched int `json:"nb_cells_matched,omitempty"`
 
-	// ZoneID is the resolved zone identifier inside the source — the Plaine
-	// Commune / Est Ensemble zone number (e.g. "311"). For the ambiguous
+	// ZoneID is the resolved zone identifier inside the source: the Plaine
+	// Commune / Est Ensemble zone number (e.g. "311"), the Paris quartier's
+	// code_grand_quartier (e.g. "7511350") or the Lyon IRIS (e.g.
+	// "693830101") when Listing.IRIS pinned one. For the ambiguous 93
 	// commune-fallback path it is the "+"-joined set of the commune's zones
-	// (e.g. "311+312"). Empty outside the Seine-Saint-Denis EPTs.
+	// (e.g. "311+312"). Empty when the reading is an arrondissement collapse.
 	ZoneID string `json:"zone_id,omitempty"`
 }
 

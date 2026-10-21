@@ -54,8 +54,10 @@ func TestQuery_Paris(t *testing.T) {
 	if res.LoyerRefMajEURPerM2HC < 15 || res.LoyerRefMajEURPerM2HC > 60 {
 		t.Errorf("LoyerRefMajEURPerM2HC = %.2f, want in [15, 60]", res.LoyerRefMajEURPerM2HC)
 	}
-	if res.Confidence != ConfidenceMedium {
-		t.Errorf("Confidence = %q, want %q", res.Confidence, ConfidenceMedium)
+	// The 11e straddles two secteurs and the listing carries no IRIS to
+	// pin its quartier: a collapse across distinct caps is Low.
+	if res.Confidence != ConfidenceLow {
+		t.Errorf("Confidence = %q, want %q", res.Confidence, ConfidenceLow)
 	}
 }
 
@@ -328,8 +330,9 @@ func TestQuery_ImplausibleBuildYearSpans(t *testing.T) {
 // medium-confidence badge.
 func TestQuery_UnknownRoomsSpansAtLowConfidence(t *testing.T) {
 	t.Parallel()
-	unknown := query(t, gazetteer.Listing{Zip: "75001"})
-	studio := query(t, gazetteer.Listing{Zip: "75001", Rooms: intp(1)})
+	// The 3e sits in one secteur, so only the rooms axis is left open.
+	unknown := query(t, gazetteer.Listing{Zip: "75003"})
+	studio := query(t, gazetteer.Listing{Zip: "75003", Rooms: intp(1)})
 
 	if unknown.IsEmpty() {
 		t.Fatalf("unknown rooms: IsEmpty(), want a spanning reading")

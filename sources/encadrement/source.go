@@ -40,7 +40,15 @@ const Name = "encadrement"
 // ConfidenceLow instead of silently quoting the studio cap; and Paris resolves
 // from INSEE as well as zip (Lyon from zip as well as INSEE). Bumped so a
 // datadir cache built from the v3 Lyon artifact is superseded.
-const sourceVersion = 4
+//
+// v5 reads the zone the cap is actually set on. Paris caps are per quartier
+// and Lyon's per IRIS, but both used to collapse a whole arrondissement at
+// ConfidenceMedium: a Paris 13e, 3-room, 1971-1990 flat in quartier Gare was
+// told 27.15 EUR/m2/month where its own cell says 19.80. A Listing.IRIS of
+// the arrondissement now pins the quartier (Paris) or the IRIS (Lyon), and a
+// collapse across distinct caps is ConfidenceLow, the rule the multi-zone 93
+// communes already followed.
+const sourceVersion = 5
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -141,20 +149,45 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 				},
 			}, nil
 		}
-		return collapse(entries, "Paris "+arr+"e", ZoneSourceParis, sel, Evidence{
+		ev := Evidence{
 			Zip:            zip,
 			INSEE:          insee,
 			Arrondissement: arr,
-		}, ConfidenceMedium), nil
+		}
+		// Paris caps are set per quartier, and an arrondissement can straddle
+		// up to four secteurs (the 13e reads 19.80 to 28.70 EUR/m2/month on
+		// one cell). The IRIS carries the quartier: pin it when it does, and
+		// otherwise mark a multi-secteur collapse as the ambiguity it is.
+		conf := ConfidenceMedium
+		if q := parisQuartierZone(l.IRIS, arr); q != "" {
+			if sub := entriesInZone(entries, q); len(sub) > 0 {
+				entries, ev.ZoneID = sub, q
+			}
+		}
+		if ev.ZoneID == "" && spansSeveralCaps(entries) {
+			conf = ConfidenceLow
+		}
+		return collapse(entries, "Paris "+arr+"e", ZoneSourceParis, sel, ev, conf), nil
 	}
 
 	// Lyon / Villeurbanne, keyed by INSEE with a zip fallback.
 	if lyon := lyonINSEE(insee, zip); lyon != "" {
 		if entries := idx.LookupLyonInsee(lyon); len(entries) > 0 {
-			return collapse(entries, lyonZoneLabel(lyon), ZoneSourceLyonVilleurbanne, sel, Evidence{
-				Zip:   zip,
-				INSEE: lyon,
-			}, ConfidenceMedium), nil
+			ev := Evidence{Zip: zip, INSEE: lyon}
+			// The Lyon grille is zoned per IRIS (five zones; Lyon 3e reads
+			// 12.50 to 16.30 EUR/m2/month on one cell). A caller-supplied
+			// IRIS of this commune pins its own cells; without one, a
+			// collapse across distinct caps is Low, as in Paris.
+			conf := ConfidenceMedium
+			if iris := strings.TrimSpace(l.IRIS); len(iris) == 9 && strings.HasPrefix(iris, lyon) {
+				if sub := idx.LookupLyonIRIS(iris); len(sub) > 0 {
+					entries, ev.ZoneID = sub, iris
+				}
+			}
+			if ev.ZoneID == "" && spansSeveralCaps(entries) {
+				conf = ConfidenceLow
+			}
+			return collapse(entries, lyonZoneLabel(lyon), ZoneSourceLyonVilleurbanne, sel, ev, conf), nil
 		}
 	}
 
@@ -359,6 +392,64 @@ func parisArrondissementFromZip(zip string) string {
 // code 75056 carries no arrondissement and yields "".
 func parisArrondissementFromINSEE(insee string) string {
 	return twoDigitKey(arrondissementNumber(insee, "751", 20))
+}
+
+// parisQuartierZone reads the quartier off a Paris IRIS code and returns it as
+// the barème's zone identifier (code_grand_quartier), or "" when the IRIS
+// names no quartier of arrondissement arr.
+//
+// A Paris IRIS is "751" + the arrondissement (2 digits) + the quartier's
+// city-wide number (2 digits, 01..80) + a sequence (2 digits): "751135001" is
+// the first IRIS of quartier 50, Gare, in the 13e. The IRIS are nested in the
+// quartiers, so its first seven characters ARE the code_grand_quartier the
+// Ville de Paris keys its grille on ("7511350"). An IRIS of another
+// arrondissement is refused rather than trusted over the INSEE.
+func parisQuartierZone(iris, arr string) string {
+	iris = strings.TrimSpace(iris)
+	if len(iris) != 9 || !strings.HasPrefix(iris, "751"+arr) {
+		return ""
+	}
+	q, err := strconv.Atoi(iris[5:7])
+	if err != nil || q < 1 || q > 80 {
+		return ""
+	}
+	if _, err := strconv.Atoi(iris[7:]); err != nil {
+		return ""
+	}
+	return iris[:7]
+}
+
+// entriesInZone keeps the cells of one zone (a Paris quartier).
+func entriesInZone(entries []Entry, zoneID string) []Entry {
+	var out []Entry
+	for _, e := range entries {
+		if e.ZoneID == zoneID {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// spansSeveralCaps reports whether entries hold more than one zone with
+// DIFFERENT caps on the same grille cell, i.e. whether collapsing them across
+// zones blends distinct legal ceilings. An arrondissement inside a single
+// secteur (the Paris 3e) does not; one straddling several (the 13e) does.
+func spansSeveralCaps(entries []Entry) bool {
+	type cell struct {
+		piece  int
+		epoque string
+		meuble bool
+		maison bool
+	}
+	seen := make(map[cell]float64, len(entries))
+	for _, e := range entries {
+		k := cell{e.Piece, e.Epoque, e.Meuble, e.Maison}
+		if v, ok := seen[k]; ok && v != e.LoyerRefMaxEURPerM2HC {
+			return true
+		}
+		seen[k] = e.LoyerRefMaxEURPerM2HC
+	}
+	return false
 }
 
 // twoDigitKey zero-pads an arrondissement number into the index's key, or

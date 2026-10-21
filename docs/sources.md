@@ -315,9 +315,19 @@ Lyon / Villeurbanne.
     when the reading spanned several.
 - **Zone identification**:
   - Paris by INSEE (75101..75120) or, for a listing carrying none, by zip
-    (75001..75020, 75116); arrondissement-median.
+    (75001..75020, 75116). Paris caps are set per QUARTIER (80 quartiers in
+    14 secteurs), and an arrondissement can straddle four secteurs (the 13e
+    reads 19.80 to 28.70 €/m²/month on one cell). A `Listing.IRIS` of the
+    arrondissement pins the quartier, since a Paris IRIS code is
+    `751` + arrondissement + quartier number + sequence; `Evidence.ZoneID`
+    is then the quartier's `code_grand_quartier`. Without one the reading is
+    the arrondissement median, at `ConfidenceLow` when its quartiers carry
+    different caps.
   - Lyon / Villeurbanne by INSEE (69381..69389, 69266) or, failing that, by
-    zip (69001..69009, 69100).
+    zip (69001..69009, 69100). The grille is zoned per IRIS: a
+    caller-supplied `Listing.IRIS` of the commune pins its cells (the `iris`
+    resolver covers Île-de-France only, so nothing fills it automatically),
+    and a collapse across distinct caps is `ConfidenceLow`.
   - A set INSEE is authoritative: a contradicting zip never promotes an
     out-of-perimeter commune into Paris or Lyon.
   - Plaine Commune (9 communes) & Est Ensemble (9 communes) by

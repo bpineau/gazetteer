@@ -6,10 +6,15 @@
 // The Source matches the listing to a zone:
 //
 //   - Paris by INSEE (75101..75120), or by zip (75001..75020, 75116) when
-//     the listing carries no INSEE
+//     the listing carries no INSEE. The cap itself is set per quartier: a
+//     Listing.IRIS of the arrondissement pins it (a Paris IRIS code embeds
+//     the quartier number), and without one an arrondissement whose
+//     quartiers carry different caps collapses across them at low
+//     confidence
 //   - Lyon / Villeurbanne by INSEE (69381..69389, 69266), or by zip
-//     (69001..69009, 69100) likewise. A set INSEE is authoritative: a
-//     contradicting zip never promotes a listing into either perimeter
+//     (69001..69009, 69100) likewise, zoned per IRIS the same way. A set
+//     INSEE is authoritative: a contradicting zip never promotes a listing
+//     into either perimeter
 //   - Plaine Commune & Est Ensemble (18 communes du 93) by
 //     point-in-polygon over an embedded zonage: the listing's
 //     coordinates pick the exact sub-communal zone, with an
