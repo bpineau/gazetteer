@@ -20,7 +20,12 @@ const Name = "bdnb"
 //
 // Version 2 incorporates the residence-prefix leak fix in
 // fraddr.Parse + IlikePatternFor.
-const sourceVersion = 2
+//
+// Version 3: a listing whose house number no building on the street
+// carries is a no-match (SkipReasonNumberNotFound). v2 fell back to the
+// street's most complete row and returned a neighbour's construction year,
+// dwelling count and DPE as the listing's.
+const sourceVersion = 3
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -164,13 +169,29 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		}, nil
 	}
 
-	// Pick the row whose street number matches (when we have one).
-	// Fall back to the most-complete row when no match.
+	// Pick the row whose street number matches (when we have one). When
+	// the listing has a number and no building on the street carries it,
+	// none of them is the listing's: the most complete row would be a
+	// neighbour's year, dwelling count and DPE, so report no match.
+	// Without a number, fall back to the most-complete row.
 	idx := -1
 	if parts.Number != "" {
-		if i, ok := PickBestByNumber(rows, parts.Number); ok {
-			idx = i
+		i, ok := PickBestByNumber(rows, parts.Number)
+		if !ok {
+			logger.Debug("bdnb.number_not_found",
+				slog.String("insee", insee),
+				slog.String("number", parts.Number),
+				slog.Int("raw_count", len(rows)),
+			)
+			return &Result{
+				Confidence: ConfidenceLow,
+				SampleSize: 0,
+				Skipped:    true,
+				SkipReason: SkipReasonNumberNotFound,
+				Evidence:   emptyEvidence(len(rows)),
+			}, nil
 		}
+		idx = i
 	}
 	if idx == -1 {
 		i, ok := PickBest(rows, "")
@@ -189,12 +210,6 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 			}, nil
 		}
 		idx = i
-		if parts.Number != "" {
-			logger.Debug("bdnb.number_fallback",
-				slog.String("number", parts.Number),
-				slog.Int("raw_count", len(rows)),
-			)
-		}
 	}
 	row := rows[idx]
 

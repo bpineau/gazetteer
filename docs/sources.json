@@ -34,7 +34,7 @@
   },
   {
     "name": "bdnb",
-    "version": 2,
+    "version": 3,
     "default": false,
     "summary": "Base de Données Nationale des Bâtiments — building age, type, dwelling count (opt-in).",
     "inputs": [

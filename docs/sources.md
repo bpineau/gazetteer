@@ -106,6 +106,12 @@ Building-level facts from the Base de Données Nationale des Bâtiments
   `Confidence` and `SampleSize`. Each sub-struct is a nil pointer when the
   picked row carried none of its fields. `Evidence` records the address pattern
   and number of candidate rows.
+- **Picking the building**: the query returns every building on the street;
+  the one whose main address carries the listing's house number is picked.
+  When the listing has a number that no building on the street carries, the
+  result is empty (`SkipReason` `number_not_found`) rather than a neighbour's
+  facts. A building known by the first number of a range (12 for "12-18")
+  is therefore missed from 14: a miss, never a stranger's building.
 - **Quota**: BDNB enforces a per-key rolling 10 000-call quota.
   Callers wire a `helpers/circuit.HTTPFetcher` (see
   [circuit_breakers.md](circuit_breakers.md)) to trip the breaker on
