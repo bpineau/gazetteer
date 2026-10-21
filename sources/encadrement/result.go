@@ -115,9 +115,15 @@ type Evidence struct {
 	// rather than reporting the address unregulated.
 	EpoqueUnmatched bool `json:"epoque_unmatched,omitempty"`
 
+	// Maison is true when the reading comes from the zone's maison grille:
+	// a house listing in a zone that publishes one (Plaine Commune, Est
+	// Ensemble). False for apartments, and for a house in a zone with a
+	// single grille for every dwelling type (Paris, Lyon / Villeurbanne).
+	Maison bool `json:"maison,omitempty"`
+
 	// NbCellsMatched is the number of grille cells that matched the
-	// (zone, pièces, époque, non-meublé, non-maison) filter. Drives the
-	// median collapse.
+	// (zone, pièces, époque, non-meublé, maison-or-apartment) filter.
+	// Drives the median collapse.
 	NbCellsMatched int `json:"nb_cells_matched,omitempty"`
 
 	// ZoneID is the resolved zone identifier inside the source: the Plaine

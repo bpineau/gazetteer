@@ -310,7 +310,9 @@ Lyon / Villeurbanne.
   `plaine_commune`) and `Confidence`. Also satisfies `appraisal.RentEstimator`.
 - **Cell identification** — the published grille is keyed by (zone, pièces,
   époque de construction, meublé). The Source reads the non-meublé,
-  non-maison cells and narrows them with what the Listing carries:
+  apartment cells (the maison ones for a house, in the two 93 EPTs that
+  publish a separate maison grille; Paris and Lyon set one grille for every
+  dwelling) and narrows them with what the Listing carries:
   - `Rooms` picks the pièces bucket, saturating at the open-ended top cell
     ("4 pièces et plus"), so a T6 reads the same cap as a T4. Without it the
     collapse spans every bucket and `Confidence` is capped at

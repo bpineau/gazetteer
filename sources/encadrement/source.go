@@ -58,7 +58,11 @@ const Name = "encadrement"
 // 2026). v6 still served the 2025 one, 3.3 % lower on average and up to
 // 8.5 % lower on a cell. Bumped so a datadir copy built from the 2025 export
 // is superseded by the embedded 2026 snapshot.
-const sourceVersion = 7
+//
+// v8 reads a house in Plaine Commune or Est Ensemble from the maison grille
+// those EPTs publish (Evidence.Maison). v7 dropped every maison cell and
+// served the apartment one, about 16 % lower in zone 311.
+const sourceVersion = 8
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -116,7 +120,8 @@ func (s *Source) Datasets() []dataset.Set {
 //     sub-communal zone from the listing's coordinates, with an
 //     INSEE-commune fallback (see resolve93).
 //  5. On a match, collapse the cells matching (pièces, époque,
-//     non-meublé, non-maison) by median of LoyerRefMaxEURPerM2HC.
+//     non-meublé, maison for a house where the zone publishes a maison
+//     grille, apartment otherwise) by median of LoyerRefMaxEURPerM2HC.
 //
 // Rooms and BuildYear both narrow the grille cell, and both are optional:
 // an absent one spans every published bucket for that axis and is recorded
@@ -143,6 +148,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	sel := cellFilter{
 		piece:     clampPiece(intDeref(l.Rooms)),
 		buildYear: usableBuildYear(l.BuildYear, time.Now()),
+		house:     normalizePropertyType(string(l.PropertyType)) == "house",
 	}
 
 	// Paris. Either identifier resolves the arrondissement, INSEE first: a
@@ -232,18 +238,13 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	}, nil
 }
 
-// propertyTypeEligible accepts residential apartments only — houses
-// are out of scope for the encadrement perimeter (Paris explicitly
-// publishes for "logement classique" / apartment grilles; Plaine
-// Commune publishes a separate Maison cell that we don't currently
-// surface).
+// propertyTypeEligible accepts the two residential types the grilles cover.
+// The encadrement applies to every dwelling let as a main residence, house or
+// apartment: Paris and Lyon set one grille for both, and the two 93 EPTs
+// publish a separate maison grille, which collapse selects for a house.
 func propertyTypeEligible(pt string) bool {
 	switch normalizePropertyType(pt) {
 	case "apartment", "house":
-		// We accept houses here so the Source mirrors the wrapper's
-		// existing perimeter (the rental wrapper consumes the result
-		// for both); houses outside the published Maison cells will
-		// simply not match downstream.
 		return true
 	default:
 		return false
@@ -275,13 +276,21 @@ type cellFilter struct {
 	// buildYear is the construction year, or 0 when BuildYear was absent
 	// or implausible (see usableBuildYear).
 	buildYear int
+	// house is true for a house listing. It reads the zone's maison cells
+	// where the zone publishes them (collapse sets maison then), and the
+	// shared grille where it does not.
+	house bool
+	// maison selects the maison cells instead of the apartment ones.
+	maison bool
 }
 
 // matches reports whether e is one of the cells this filter selects. Furnished
-// and maison cells are never selected: the published meublé grille is a
-// different cap, and the rare maison cells are a different perimeter.
+// cells are never selected (the published meublé grille is a different cap),
+// and the maison and apartment cells are told apart by f.maison: the two 93
+// EPTs publish a separate maison grille, which in Plaine Commune zone 311 sits
+// about 16 % above the apartment one.
 func (f cellFilter) matches(e Entry) bool {
-	if e.Meuble || e.Maison {
+	if e.Meuble || e.Maison != f.maison {
 		return false
 	}
 	if f.piece > 0 && e.Piece != f.piece && (!e.PieceOpenEnded || f.piece < e.Piece) {
@@ -303,6 +312,15 @@ func (f cellFilter) matches(e Entry) bool {
 // package does not parse — the collapse retries across every époque rather
 // than reporting the address unregulated, and says so in the Evidence.
 func collapse(entries []Entry, label, zoneSource string, sel cellFilter, ev Evidence, conf string) *Result {
+	if sel.house {
+		for _, e := range entries {
+			if e.Maison {
+				sel.maison = true
+				ev.Maison = true
+				break
+			}
+		}
+	}
 	majs, refs, epoque := selectCells(entries, sel)
 	if len(majs) == 0 && sel.buildYear > 0 {
 		sel.buildYear = 0

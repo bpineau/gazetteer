@@ -23,7 +23,8 @@
 //     Saint-Denis or Montreuil — collapses across its zones at low
 //     confidence)
 //
-// then collapses the non-meublé, non-maison cells of that zone by median of
+// then collapses the non-meublé cells of that zone (its maison cells for a
+// house where the zone publishes them, the apartment ones otherwise) by median of
 // LoyerRefMaxEURPerM2HC. Listing.Rooms and Listing.BuildYear each narrow the
 // collapse to one bucket of the grille — the pièces bucket and the époque de
 // construction — and an absent one spans every bucket on that axis rather
