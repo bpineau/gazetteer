@@ -131,7 +131,7 @@
   },
   {
     "name": "cdsr",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "Nearby region-flagged distressed condominiums (IDF copro-difficulty signal).",
     "inputs": [
@@ -260,7 +260,7 @@
   },
   {
     "name": "encadrement",
-    "version": 5,
+    "version": 6,
     "default": true,
     "summary": "Legal rent-control caps (loyer de référence + majoré).",
     "inputs": [
@@ -318,7 +318,7 @@
   },
   {
     "name": "georisques",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "Natural + technological hazards (flood, soil, industrial) at the coordinates.",
     "inputs": [
@@ -339,7 +339,7 @@
   },
   {
     "name": "gpe",
-    "version": 2,
+    "version": 3,
     "default": true,
     "summary": "Nearest FUTURE Grand Paris Express station + line + distance (informational, not scored).",
     "inputs": [
@@ -448,7 +448,7 @@
   },
   {
     "name": "nuisances",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "IDF cumulative environmental-nuisance grid (noise + air, 500 m cells), tier + point-noir.",
     "inputs": [
@@ -486,7 +486,7 @@
   },
   {
     "name": "osm_transit",
-    "version": 4,
+    "version": 5,
     "default": true,
     "summary": "Walking distance to the nearest métro / RER / tram / Transilien station.",
     "inputs": [
@@ -524,7 +524,7 @@
   },
   {
     "name": "rnc",
-    "version": 2,
+    "version": 3,
     "default": true,
     "summary": "Copropriété context from the Registre National d'Immatriculation (syndic type, mandate status, lots, construction period, cadastral parcelles, QPV, ANAH-aided, ACV/PVD programme perimeters). Low-confidence 'à vérifier' triage hint (governance vacuum, non-pro syndic on a large copro, large+old+QPV fragile archetype); NO hard distress flag — financials/procedures/arrêtés are redacted upstream.",
     "inputs": [

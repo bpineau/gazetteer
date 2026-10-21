@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
 )
 
 // TestLoad_93 smokes the Est Ensemble barème and the zonage geometry.
@@ -193,5 +194,26 @@ func TestQuery_93_PrefersPointOverFallback(t *testing.T) {
 	}
 	if res.Evidence.ZoneID == "311+312" {
 		t.Errorf("Evidence.ZoneID = %q, want a single zone (point-in-polygon)", res.Evidence.ZoneID)
+	}
+}
+
+// TestQuery_93_CoarseCoordinatesFallBackToCommune: a commune-centre point is
+// inside SOME zone of a multi-zone commune (the mairie's), and v4 published
+// that zone's cap at ConfidenceMedium as the address's. Coordinates coarser
+// than a street now take the commune path, which says what it knows: the
+// commune's zones, collapsed at ConfidenceLow.
+func TestQuery_93_CoarseCoordinatesFallBackToCommune(t *testing.T) {
+	t.Parallel()
+	coarse := query(t, gazetteer.Listing{INSEE: "93066", Lat: new(48.9355), Lon: new(2.3590),
+		CoordPrecision: banx.PrecisionMunicipality, Rooms: intp(2)})
+	noCoords := query(t, gazetteer.Listing{INSEE: "93066", Rooms: intp(2)})
+	if coarse.Confidence != ConfidenceLow || coarse.Evidence.ZoneID != noCoords.Evidence.ZoneID {
+		t.Errorf("municipality precision: conf %q zone %q, want the commune fallback %q/%q",
+			coarse.Confidence, coarse.Evidence.ZoneID, ConfidenceLow, noCoords.Evidence.ZoneID)
+	}
+	street := query(t, gazetteer.Listing{INSEE: "93066", Lat: new(48.9355), Lon: new(2.3590),
+		CoordPrecision: banx.PrecisionStreet, Rooms: intp(2)})
+	if street.Evidence.ZoneID != "311" || street.Confidence != ConfidenceMedium {
+		t.Errorf("street precision: zone %q conf %q, want 311/medium", street.Evidence.ZoneID, street.Confidence)
 	}
 }

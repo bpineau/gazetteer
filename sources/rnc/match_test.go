@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
 )
 
 func f64(v float64) *float64 { return &v }
@@ -55,5 +56,29 @@ func TestMatch_None_TooFar(t *testing.T) {
 	e, _, c, _ := idxFixture().match(gazetteer.Listing{INSEE: "75102", Lat: f64(48.9000), Lon: f64(2.4000)})
 	if e != nil || c != ConfidenceNone {
 		t.Errorf("want none, got %+v / %q", e, c)
+	}
+}
+
+// The geo match names ONE building, the nearest copro within 60 m. A street
+// centroid or a commune centre has a nearest copro too (the one mid-street,
+// the one beside the mairie), which used to be returned as the listing's own
+// at medium or high confidence. Only a house-number point may take the geo
+// path; a coarser one falls to the street-only match, which answers only when
+// the street is unambiguous.
+func TestMatch_CoarsePointTakesNoGeoMatch(t *testing.T) {
+	t.Parallel()
+	idx := idxFixture()
+	for _, p := range []banx.Precision{banx.PrecisionMunicipality, banx.PrecisionLocality, banx.PrecisionStreet} {
+		e, m, c, _ := idx.match(gazetteer.Listing{INSEE: "75102", Lat: f64(48.87052), Lon: f64(2.33702), CoordPrecision: p})
+		if e != nil || m != MatchNone || c != ConfidenceNone {
+			t.Errorf("precision %q: got %+v %q %q, want no match (no street to fall back on)", p, e, m, c)
+		}
+	}
+	e, m, _, _ := idx.match(gazetteer.Listing{INSEE: "75102", Lat: f64(48.87052), Lon: f64(2.33702), CoordPrecision: banx.PrecisionStreet, Address: "20 r de gramont"})
+	if e == nil || e.Immatriculation != "AA1" || m != MatchVoie {
+		t.Errorf("street precision with a street: got %+v %q, want AA1 by street", e, m)
+	}
+	if e, m, _, _ := idx.match(gazetteer.Listing{INSEE: "75102", Lat: f64(48.87052), Lon: f64(2.33702), CoordPrecision: banx.PrecisionHouseNumber}); e == nil || m != MatchGeoVoie {
+		t.Errorf("house-number precision: got %+v %q, want the geo match", e, m)
 	}
 }

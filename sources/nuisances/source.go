@@ -7,13 +7,22 @@ import (
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
 )
 
 // Name is the canonical Source identifier. Stable; the Dossier results key.
 const Name = "nuisances"
 
 // sourceVersion bumps when the Source's internal logic changes.
-const sourceVersion = 1
+//
+// v2 refuses coordinates coarser than MinCoordPrecision: a commune centre's
+// cell is the mairie's exposure, which v1 reported as the address's.
+const sourceVersion = 2
+
+// MinCoordPrecision is the coarsest geocoder granularity this Source reads a
+// cell from. A street centroid lands in the street's 500 m cell or the next
+// one; a commune or locality centre says nothing about the dwelling's.
+const MinCoordPrecision = banx.PrecisionStreet
 
 // Version exposes sourceVersion so callers that wrap the Source can mirror it.
 const Version = sourceVersion
@@ -65,6 +74,10 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	lat, lon := *l.Lat, *l.Lon
 	if lat == 0 && lon == 0 {
 		return nil, fmt.Errorf("nuisances: %w: lat/lon=0,0 sentinel", gazetteer.ErrInsufficientInputs)
+	}
+	if l.CoordPrecision.CoarserThan(MinCoordPrecision) {
+		return nil, fmt.Errorf("nuisances: %w: %w: listing coordinates are %q, where %q or finer is required",
+			gazetteer.ErrInsufficientInputs, banx.ErrCoarseMatch, l.CoordPrecision, MinCoordPrecision)
 	}
 
 	idx := s.opts.Index

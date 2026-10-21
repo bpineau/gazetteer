@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/fraddr"
 	"github.com/bpineau/gazetteer/helpers/geodist"
 )
@@ -15,6 +16,14 @@ const (
 	// geoMaxMeters: the proximity gate. Beyond this, geo does not match.
 	geoMaxMeters = 60.0
 )
+
+// MinGeoMatchPrecision is the coarsest geocoder granularity the geo match
+// accepts. It names ONE building, the nearest copro within geoMaxMeters, so
+// it needs the address itself: a street centroid's nearest copro is whoever
+// lives mid-street, a commune centre's is the mairie's neighbour. A coarser
+// listing falls to the street-only match, which answers only when the street
+// holds a single copro.
+const MinGeoMatchPrecision = banx.PrecisionHouseNumber
 
 // normVoie reduces a raw address to its canonical street tokens (street-type
 // markers like "rue"/"avenue" stripped, house number dropped). The SAME
@@ -35,7 +44,7 @@ func (idx *Index) match(l gazetteer.Listing) (*Entry, MatchMethod, string, float
 	cands := idx.ByInsee[insee]
 
 	// 1) geo-proximity (primary), street as a confidence booster.
-	if lat, lon, ok := l.Coords(); ok {
+	if lat, lon, ok := l.CoordsAtLeast(MinGeoMatchPrecision); ok {
 		bestIdx, bestD := -1, geoMaxMeters
 		for _, i := range cands {
 			e := &idx.Copros[i]

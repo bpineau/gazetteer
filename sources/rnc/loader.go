@@ -18,7 +18,11 @@ var embedFS embed.FS
 const Name = "rnc"
 
 // Version bumps when the Source's logic or payload shape changes.
-const Version = 2
+//
+// v3: the geo match needs house-number coordinates (MinGeoMatchPrecision).
+// A street centroid or a commune centre used to pick the nearest copro within
+// 60 m as the listing's own building, at medium or high confidence.
+const Version = 3
 
 // set binds the embedded artifact to the datadir/refresh pipeline. Refresh
 // downloads the upstream daily CSV and rebuilds the gzipped JSON via

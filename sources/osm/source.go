@@ -11,6 +11,7 @@ import (
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
 )
 
 // Name is the canonical Source identifier. Stable; used as the
@@ -35,7 +36,16 @@ const Name = "osm_transit"
 //     what it also serves, still settles the question first.
 //     Station.Type moves for those nodes, on the live-fallback path
 //     immediately and in the catalog at its next refresh.
-const sourceVersion = 4
+//   - v5: coordinates coarser than MinCoordPrecision are refused. A commune
+//     centre is usually the town's best-served point, so the walk to the
+//     nearest station was measured from the mairie and read as the
+//     address's: the accès axis of the zone score rode on it.
+const sourceVersion = 5
+
+// MinCoordPrecision is the coarsest geocoder granularity this Source measures
+// a walking distance from: a street centroid is tens to a few hundred metres
+// off, a commune or locality centre can be kilometres off.
+const MinCoordPrecision = banx.PrecisionStreet
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -164,6 +174,10 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	lon := *l.Lon
 	if lat == 0 && lon == 0 {
 		return nil, fmt.Errorf("osm: %w: lat/lon=0,0 sentinel", gazetteer.ErrInsufficientInputs)
+	}
+	if l.CoordPrecision.CoarserThan(MinCoordPrecision) {
+		return nil, fmt.Errorf("osm: %w: %w: listing coordinates are %q, where %q or finer is required",
+			gazetteer.ErrInsufficientInputs, banx.ErrCoarseMatch, l.CoordPrecision, MinCoordPrecision)
 	}
 
 	cat := s.catalog.Load()

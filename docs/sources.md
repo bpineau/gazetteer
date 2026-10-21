@@ -395,7 +395,7 @@ Bruitparif, 500 m cells): how many nuisances (road/rail/air-traffic noise + air
 pollution) overlap the listing's cell — a cadre-de-vie signal that drives
 property decotes.
 
-- **Needs**: lat/lon.
+- **Needs**: lat/lon at `nuisances.MinCoordPrecision` (a street centroid) or finer; a commune or locality centre is refused (`ErrInsufficientInputs`, `banx.ErrCoarseMatch`).
 - **Result**: nuisance count (0–4), a "point noir environnemental" flag, and an
   exposure tier (calme / modéré / exposé / très exposé). `IsEmpty`
   (StatusOKEmpty) outside the IDF grid; a resolved count-0 cell is reported (a
@@ -410,7 +410,7 @@ property decotes.
 Proximity to Île-de-France condominiums labelled "en difficulté soutenue par
 la Région" (CDSR) — a small, curated, high-precision copro-risk red-flag.
 
-- **Needs**: lat/lon (the Source is purely spatial — no name matching).
+- **Needs**: lat/lon at `cdsr.MinCoordPrecision` (a street centroid) or finer (the Source is purely spatial, no name matching); a commune or locality centre is refused.
 - **Result**: nearest labelled copro within `MaxNearestMeters` (3 km), counts
   within 500 m and 3 km, and the nearby copros (name, address, commune, lot
   count, label year, distance). `IsEmpty` (StatusOKEmpty) when none is in
@@ -502,7 +502,7 @@ single dense commune.
 Natural and technological hazards from georisques.gouv.fr (BRGM
 rapport-risque).
 
-- **Needs**: lat/lon (resolved via Geocoder when absent).
+- **Needs**: lat/lon at `georisques.MinCoordPrecision` (a street centroid) or finer, resolved via Geocoder when absent under the same floor; a commune or locality centre is refused (the report is a point reading).
 - **Result**: `Naturels` (map of 12 natural-hazard keys → `RiskBlob`:
   flood, soil/clay, seismic…) and `Technos` (6 technological keys: ICPE,
   Seveso, nuclear…), `Summary` (operator-actionable counters + red flags),
@@ -531,7 +531,7 @@ Walking distance to the nearest métro / RER / tram / Transilien
 station, from an OpenStreetMap Overpass extract. Registered under the
 canonical name `osm_transit`.
 
-- **Needs**: lat/lon AND a non-empty offline catalog.
+- **Needs**: lat/lon at `osm.MinCoordPrecision` (a street centroid) or finer AND a non-empty offline catalog; a commune or locality centre is refused.
 - **Catalog**: installed at `Source` construction (`Options.Catalog`)
   or hot-swapped later via `Source.UpdateCatalog`. Empty catalogs are
   ignored so a failed background refresh cannot silently discard a
@@ -561,7 +561,8 @@ a major rental-demand and capital-appreciation driver for the "near a
 station, not Paris" thesis (pairs with the `transport` ZoneScore profile).
 
 - **Needs**: lat/lon (a (0, 0) pair is the "unset" sentinel, not Null
-  Island, and is refused rather than measured from).
+  Island, and is refused rather than measured from), at `gpe.MinCoordPrecision`
+  (a street centroid) or finer; a commune or locality centre is refused.
 - **Result**: nearest station name + line (verbatim SGP label, e.g. `L15`
   or `L16/L17` at an interchange) + distance, plus station counts within
   1.5 km / 3 km. Empty beyond 6 km.
@@ -928,7 +929,7 @@ counterpart to the per-address `Client.Collect`.
 
 Copropriété context from the Registre National d'Immatriculation des Copropriétés (RNC, ANAH / data.gouv.fr).
 
-- **Needs**: INSEE (5-digit). Lat/Lon strongly recommended (primary matching key); Address used to normalize the street. Without INSEE the Source emits `gazetteer.ErrInsufficientInputs`.
+- **Needs**: INSEE (5-digit). Lat/Lon at house-number precision strongly recommended (the geo match, `rnc.MinGeoMatchPrecision`, names one building; coarser coordinates fall to the street-only match); Address used to normalize the street. Without INSEE the Source emits `gazetteer.ErrInsufficientInputs`.
 - **Match**: geo-proximity (≤ ~60 m) + normalized street within the commune. `MatchMethod` (`geo_voie`/`voie`) + `Confidence` (`high`/`medium`/`low`) are exposed. The Source does not consume a parcelle input, but each Result now carries the copro's cadastral parcelles (`Cadastre`, canonical 14-char refs) so a caller can verify/override the match against DVF, the cadastre source, or an auction fiche's parsed parcelles.
 - **Result**: `Immatriculation`, `NomUsage`, lots (`LotsTotal`/`LotsHabitation`/`LotsStationnement`), `ConstructionPeriod`, `TypeSyndic`, `MandatEnCours`/`MandatFin`, `CoproAidee`, `Cadastre []Parcelle`, programme perimeters (`CoproACV`/`CoproPVD`/`CoproPDP`), QPV, `WebURL`, plus `Attention` + `Signals` — a LOW-CONFIDENCE triage hint, **not a distress verdict**.
 - **Signals** (stable keys): `no_active_mandate` (mandate absent or expired with no successor), `syndic_unknown`/`syndic_benevole` (non-pro/undeclared syndic, **only on a copro of ≥ 50 lots**), `copro_aidee` (engaged ANAH subsidy — weak, since 2020 it also counts MaPrimeRénov' Copro on healthy copros), `fragile_profile` (the "grand ensemble dégradé" archetype: large + pre-1975 + inside a QPV).

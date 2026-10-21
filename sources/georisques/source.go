@@ -17,7 +17,18 @@ const Name = "georisques"
 
 // sourceVersion bumps when the Source's internal logic changes.
 // Stateful callers gate cache invalidation on it.
-const sourceVersion = 1
+//
+// v2 reads the report at street precision or finer (MinCoordPrecision), on
+// the Listing's coordinates and on the geocoder fallback alike. The
+// rapport-risque is a point reading (flood zones, clay shrink-swell, mining
+// cavities, nearby industrial sites): at a commune centre it described the
+// mairie's plot, and v1 reported that as the address's.
+const sourceVersion = 2
+
+// MinCoordPrecision is the coarsest geocoder granularity this Source asks
+// the rapport-risque for. A street centroid is a neighbourhood reading; a
+// commune or locality centre is the mairie's.
+const MinCoordPrecision = banx.PrecisionStreet
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -176,14 +187,21 @@ func (s *Source) fetch(ctx context.Context, u string) ([]byte, error) {
 }
 
 // resolveLatLon returns (lat, lon) for the listing: the Listing's own
-// coordinates when usable (Listing.Coords), else the Geocoder fallback
-// via banx.ResolveLatLon.
+// coordinates when usable at MinCoordPrecision (Listing.CoordsAtLeast), else
+// the Geocoder fallback under the same floor (banx.ResolveLatLonAt). Present
+// but coarser coordinates are refused with banx.ErrCoarseMatch.
 func (s *Source) resolveLatLon(ctx context.Context, l gazetteer.Listing) (float64, float64, error) {
-	if lat, lon, ok := l.Coords(); ok {
+	if lat, lon, ok := l.CoordsAtLeast(MinCoordPrecision); ok {
 		return lat, lon, nil
 	}
-	lat, lon, err := banx.ResolveLatLon(ctx, s.opts.Geocoder,
-		strings.TrimSpace(l.Address+" "+l.Zip+" "+l.City), l.City, l.Zip)
+	if _, _, ok := l.Coords(); ok {
+		// Coordinates are present; only their precision disqualified them.
+		// The geocoder would answer the same address with the same centre.
+		return 0, 0, fmt.Errorf("georisques: %w: listing coordinates are %q, where %q or finer is required",
+			banx.ErrCoarseMatch, l.CoordPrecision, MinCoordPrecision)
+	}
+	lat, lon, _, err := banx.ResolveLatLonAt(ctx, s.opts.Geocoder,
+		strings.TrimSpace(l.Address+" "+l.Zip+" "+l.City), l.City, l.Zip, MinCoordPrecision, 0)
 	if err != nil {
 		return 0, 0, fmt.Errorf("georisques: %w", err)
 	}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
+	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/stats"
 )
 
@@ -48,7 +49,11 @@ const Name = "encadrement"
 // the arrondissement now pins the quartier (Paris) or the IRIS (Lyon), and a
 // collapse across distinct caps is ConfidenceLow, the rule the multi-zone 93
 // communes already followed.
-const sourceVersion = 5
+//
+// v6 places a Seine-Saint-Denis listing by point-in-polygon only at street
+// precision or finer: a commune centre used to pin the mairie's zone of a
+// multi-zone commune at ConfidenceMedium, and now takes the commune path.
+const sourceVersion = 6
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -192,9 +197,15 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	}
 
 	// Seine-Saint-Denis EPTs (Plaine Commune, Est Ensemble): resolve the
-	// sub-communal zone by geometry when coordinates are present, else by
-	// commune membership.
-	if m, ok := idx.resolve93(insee, l.Lat, l.Lon); ok {
+	// sub-communal zone by geometry when coordinates are present at street
+	// precision or finer, else by commune membership. A commune centre lies
+	// in SOME zone of a multi-zone commune (the mairie's), so it must take
+	// the commune path, not pin that zone as the address's.
+	var zLat, zLon *float64
+	if lat, lon, ok := l.CoordsAtLeast(banx.PrecisionStreet); ok {
+		zLat, zLon = &lat, &lon
+	}
+	if m, ok := idx.resolve93(insee, zLat, zLon); ok {
 		var entries []Entry
 		for _, z := range m.zones {
 			entries = append(entries, idx.LookupEPTZone(m.ept, z)...)
