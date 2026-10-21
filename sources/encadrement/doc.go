@@ -11,6 +11,12 @@
 // Territory and an Evidence.Note, and IsEmpty is false. Read Result.Regulation,
 // never the zero caps alone, to decide whether a rent is free.
 //
+// Every cap rests on the art. 140 ELAN experiment, whose last day is
+// 24 November 2026 unless a law published in the JO extends it. The Source
+// reads Listing.AsOf (today when zero): past that day a regulated reading is
+// RegulationLapsed, with no cap. legal.go records the extension's status and
+// what to change when one is promulgated.
+//
 // The Source matches the listing to a zone:
 //
 //   - Paris by INSEE (75101..75120), or by zip (75001..75020, 75116) when

@@ -157,7 +157,7 @@ var sourceRenderers = map[string]sourceRenderer{
 	dvf.Name:          typed("no comparable transactions", renderDVF),
 	dvfagg.Name:       typed("no commune-level DVF aggregate", renderDVFAgg),
 	education.Name:    typed("no schools registered", renderEducation),
-	encadrement.Name:  typed("outside any encadrement zone", renderEncadrement),
+	encadrement.Name:  renderEncadrementData, // bespoke guard: a lapsed reading is empty but says why
 	filoiris.Name:     typed("no IRIS-level income (outside the ≥5000-hab perimeter)", renderFiloIris),
 	filosofi.Name:     typed("absent from Filosofi", renderFilosofi),
 	georisques.Name:   typed("no risk data for these coords", renderGeorisques),
@@ -267,9 +267,29 @@ func renderCarteloyers(r *carteloyers.Result) (string, []string) {
 	return headline, nil
 }
 
+// renderEncadrementData is the encadrement renderer with its own empty guard:
+// a lapsed reading is empty (no cap applies) yet must not read as "outside
+// any zone".
+func renderEncadrementData(data any) (string, []string) {
+	r, ok := data.(*encadrement.Result)
+	if !ok || r == nil {
+		return "outside any encadrement zone", nil
+	}
+	if r.Regulation == encadrement.RegulationLapsed {
+		return "rent-cap experiment ended (art. 140 ELAN): no cap applies", nil
+	}
+	if r.IsEmpty() {
+		return "outside any encadrement zone", nil
+	}
+	return renderEncadrement(r)
+}
+
 func renderEncadrement(r *encadrement.Result) (string, []string) {
 	switch r.Regulation {
 	case encadrement.RegulationNotCovered:
+		if r.Territory == "" {
+			return fmt.Sprintf("rent-capped zone %s, cap unknown (shipped grille not in force)", r.Zone), nil
+		}
 		return fmt.Sprintf("rent-capped territory %s, cap unknown (grille not embedded)", r.Territory), nil
 	case encadrement.RegulationPartialCommune:
 		return fmt.Sprintf("commune partly in rent-capped territory %s, address not resolved", r.Territory), nil

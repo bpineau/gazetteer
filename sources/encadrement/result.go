@@ -43,6 +43,13 @@ const (
 	// (a set of IRIS) and the Source does not resolve which part, so the
 	// address may or may not be capped.
 	RegulationPartialCommune = "partial_commune"
+	// RegulationLapsed: the address lies in a territory the art. 140
+	// experiment covered, but the reading date (Listing.AsOf, or today) is
+	// past the experiment's end with no extension published (see
+	// elanLastDay in legal.go), so no cap applies. The caps are zero and
+	// IsEmpty is true: "no cap" is then the right answer, and Regulation
+	// plus Evidence.Note say why.
+	RegulationLapsed = "lapsed"
 )
 
 // ZoneSource enumerates the published zones encadrées this Source covers.
@@ -108,9 +115,10 @@ type Result struct {
 	// in a decreed rent-cap territory whose grille this Source does not ship
 	// (its rent IS capped, by a figure unknown here, so never read the zero
 	// caps as "no cap"); RegulationPartialCommune when the decree covers only
-	// part of the commune and the Source cannot tell which. Empty when the
-	// address lies in no decreed territory, or carries neither an INSEE nor
-	// a zip the Source can place.
+	// part of the commune and the Source cannot tell which; RegulationLapsed
+	// when the reading date is past the end of the art. 140 experiment.
+	// Empty when the address lies in no decreed territory, or carries
+	// neither an INSEE nor a zip the Source can place.
 	Regulation string `json:"regulation,omitempty"`
 
 	// Territory is the decreed rent-cap territory behind a
@@ -204,12 +212,13 @@ type Evidence struct {
 // records Status == StatusOKEmpty then). A RegulationNotCovered or
 // RegulationPartialCommune reading is NOT empty even though its caps are
 // zero: "this rent is capped, by an unknown figure" is data, and reporting it
-// as empty would read as "no cap".
+// as empty would read as "no cap". A RegulationLapsed reading IS empty: no cap
+// applies any more, which is what an empty Result says.
 func (r *Result) IsEmpty() bool {
 	if r == nil {
 		return true
 	}
-	return r.LoyerRefMajEURPerM2HC <= 0 && r.Regulation == ""
+	return r.LoyerRefMajEURPerM2HC <= 0 && (r.Regulation == "" || r.Regulation == RegulationLapsed)
 }
 
 // RentEstimate satisfies appraisal.RentEstimator. The encadrement

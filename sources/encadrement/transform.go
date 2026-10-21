@@ -34,8 +34,10 @@ const (
 	rawParisName = "encadrement_paris.raw.json"
 	rawParisURL  = "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/logement-encadrement-des-loyers/exports/json"
 
-	// eptBaremeVintage is the DRIHL arrêté period the EPT barèmes are drawn
-	// from ("du 01 juin 2026 au 31 mai 2027"); it selects the KML directory.
+	// eptBaremeVintage is the start of the DRIHL arrêté period the EPT barèmes
+	// are drawn from; it selects the KML directory. The DRIHL site labels it
+	// "du 01 juin 2026 au 31 mai 2027", but the arrêtés themselves end on
+	// 24 November 2026 (see gridValidity in legal.go).
 	// eptBaremeYear is its year, gated by the vintage legality test so a stale
 	// arrêté can never ship silently again.
 	eptBaremeVintage = "2026-06-01"

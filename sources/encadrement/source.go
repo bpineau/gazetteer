@@ -77,7 +77,13 @@ const Name = "encadrement"
 // Regulation (RegulationNotCovered, or RegulationPartialCommune for the
 // Grenoble communes covered in part), Territory and an Evidence.Note, at
 // ConfidenceNone and with no cap figure; IsEmpty is false for them.
-const sourceVersion = 10
+//
+// v11 honours the date (Listing.AsOf, or today). Past 24 November 2026, the
+// last day of the art. 140 experiment, with no extension in the JO, every
+// regulated reading is RegulationLapsed with no cap; a date outside a shipped
+// grille's own arrêté period lowers the confidence (before it) or withdraws
+// the figure (after it). v10 quoted the 2026 caps for any date.
+const sourceVersion = 11
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -145,6 +151,11 @@ func (s *Source) Datasets() []dataset.Set {
 // ConfidenceLow, because the cap per m² falls by a fifth to a third from a
 // studio to a four-room flat). SurfaceM2 is not consulted: this Source
 // publishes a per-m² cap, and multiplying by a surface is the caller's step.
+//
+// The reading is then held to its date, Listing.AsOf or today (see dated in
+// legal.go): past the end of the art. 140 experiment no cap is law
+// (RegulationLapsed), and a date outside the shipped grille's own period
+// degrades or withdraws its figure.
 func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	if !propertyTypeEligible(string(l.PropertyType)) {
 		return nil, fmt.Errorf("encadrement: %w: %q", gazetteer.ErrUnsupportedPropertyType, l.PropertyType)
@@ -159,6 +170,17 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		idx = loaded
 	}
 
+	asOf := l.AsOf
+	if asOf.IsZero() {
+		asOf = clock()
+	}
+	r := lookup(idx, l)
+	return dated(r, r.ZoneSource, dayOf(asOf), elanLastDay), nil
+}
+
+// lookup resolves the listing's zone and collapses its cells, with no regard
+// to the date (Query applies dated on top).
+func lookup(idx *Index, l gazetteer.Listing) *Result {
 	zip := strings.TrimSpace(l.Zip)
 	insee := strings.TrimSpace(l.INSEE)
 	sel := cellFilter{
@@ -182,7 +204,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 					Arrondissement: arr,
 					Note:           "Paris is capped (décret n° 2019-315) but the embedded grille has no cell for arrondissement " + arr,
 				},
-			}, nil
+			}
 		}
 		ev := Evidence{
 			Zip:            zip,
@@ -202,7 +224,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		if ev.ZoneID == "" && spansSeveralCaps(entries) {
 			conf = ConfidenceLow
 		}
-		return collapse(entries, "Paris "+arr+"e", ZoneSourceParis, sel, ev, conf), nil
+		return collapse(entries, "Paris "+arr+"e", ZoneSourceParis, sel, ev, conf)
 	}
 
 	// Lyon / Villeurbanne, keyed by INSEE with a zip fallback.
@@ -222,7 +244,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 			if ev.ZoneID == "" && spansSeveralCaps(entries) {
 				conf = ConfidenceLow
 			}
-			return collapse(entries, lyonZoneLabel(lyon), ZoneSourceLyonVilleurbanne, sel, ev, conf), nil
+			return collapse(entries, lyonZoneLabel(lyon), ZoneSourceLyonVilleurbanne, sel, ev, conf)
 		}
 	}
 
@@ -244,14 +266,14 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 			Zip:    zip,
 			INSEE:  insee,
 			ZoneID: strings.Join(m.zones, "+"),
-		}, m.conf), nil
+		}, m.conf)
 	}
 
 	// A decreed territory whose grille is not shipped: the rent IS capped, by
 	// a figure this Source does not carry. Reporting it like the commune next
 	// door would tell the caller there is no cap at all.
 	if t, partial, ok := lookupTerritory(insee); ok {
-		return uncoveredResult(t, partial, Evidence{Zip: zip, INSEE: insee}), nil
+		return uncoveredResult(t, partial, Evidence{Zip: zip, INSEE: insee})
 	}
 
 	// Outside every decreed territory: a none-confidence result records the
@@ -262,7 +284,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 			Zip:   zip,
 			INSEE: insee,
 		},
-	}, nil
+	}
 }
 
 // uncoveredResult is the reading for a commune of a decreed rent-cap territory

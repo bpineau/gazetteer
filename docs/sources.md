@@ -389,10 +389,25 @@ Lyon / Villeurbanne.
   2025-2026, Plaine Commune & Est Ensemble barème "du 01 juin 2026" (DRIHL
   référence-loyer KML; zonage 2022). Zone numbers are not unique across
   EPTs, so lookups are scoped by `(zone_source, zone)`.
-- **Sunset**: the arrêtés rest on the ELAN experiment (art. 140), which
-  ends on 24 November 2026 unless a law extends it. The Source does not
-  encode that date: if the experiment lapses, the shipped caps stop being
-  law and the barèmes must be withdrawn by hand.
+- **Sunset and dates**: every cap rests on the ELAN experiment (art. 140 of
+  loi 2018-1021, eight years since loi 2022-217) from the law's publication
+  in the JO of 24 November 2018, so its last day is **24 November 2026**: the
+  prefect's 2026 arrêtés say so ("prend fin le 24 novembre 2026 à minuit")
+  and are themselves in force "jusqu'au 24 novembre 2026" (the Sénat's report
+  dates the end on the 23rd, counting the day of publication). The Source
+  reads `Listing.AsOf`, or today: past that day every regulated reading is
+  `Regulation = lapsed`, with no cap figure, `ConfidenceNone`, an
+  `Evidence.Note`, and `IsEmpty()` true. As of 2026-10-21 no extension is in
+  the JO (the proposition de loi "Retrouver la confiance et l'équilibre dans
+  les rapports locatifs", whose Sénat commission text n° 48 (2026-2027) would
+  replace "huit" by "dix", was in Sénat sitting that day); `legal.go` says
+  exactly what to change when one is published. Each grille also has its own
+  period (Paris 1 July to 24 November 2026, Plaine Commune and Est Ensemble
+  1 June to 24 November 2026, Lyon from 1 November 2025): a date before it
+  keeps the cap at `ConfidenceLow` with a Note (the previous arrêté, not
+  shipped, applied), and a date past it withdraws the figure
+  (`regulated_not_covered`). `overview` is undated and does not apply the
+  lapse.
 
 ## `sources/catnat`
 
