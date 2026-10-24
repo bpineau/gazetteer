@@ -56,7 +56,7 @@ func TestBANClient_HappyPath(t *testing.T) {
 	}))
 	defer srv.Close()
 	BANEndpoint = srv.URL + "/search/"
-	defer func() { BANEndpoint = "https://api-adresse.data.gouv.fr/search/" }()
+	defer func() { BANEndpoint = "https://data.geopf.fr/geocodage/search" }()
 
 	hc, err := httpx.New(httpx.Options{})
 	if err != nil {
@@ -101,7 +101,7 @@ func TestBANClient_TruncatesOverlongQuery(t *testing.T) {
 	}))
 	defer srv.Close()
 	BANEndpoint = srv.URL + "/search/"
-	defer func() { BANEndpoint = "https://api-adresse.data.gouv.fr/search/" }()
+	defer func() { BANEndpoint = "https://data.geopf.fr/geocodage/search" }()
 
 	hc, _ := httpx.New(httpx.Options{})
 	defer func() { _ = hc.Close() }()
@@ -130,7 +130,7 @@ func TestBANClient_NotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 	BANEndpoint = srv.URL + "/search/"
-	defer func() { BANEndpoint = "https://api-adresse.data.gouv.fr/search/" }()
+	defer func() { BANEndpoint = "https://data.geopf.fr/geocodage/search" }()
 
 	hc, _ := httpx.New(httpx.Options{})
 	defer func() { _ = hc.Close() }()
@@ -181,8 +181,8 @@ func TestINSEEResolver_CachedGeocoderUnlocksReverse(t *testing.T) {
 	BANEndpoint = srv.URL + "/search/"
 	BANReverseEndpoint = srv.URL + "/reverse/"
 	defer func() {
-		BANEndpoint = "https://api-adresse.data.gouv.fr/search/"
-		BANReverseEndpoint = "https://api-adresse.data.gouv.fr/reverse/"
+		BANEndpoint = "https://data.geopf.fr/geocodage/search"
+		BANReverseEndpoint = "https://data.geopf.fr/geocodage/reverse"
 	}()
 
 	hc, _ := httpx.New(httpx.Options{})
@@ -221,7 +221,7 @@ func TestCachedGeocoder_ReverseHitsCache(t *testing.T) {
 	}))
 	defer srv.Close()
 	BANReverseEndpoint = srv.URL + "/reverse/"
-	defer func() { BANReverseEndpoint = "https://api-adresse.data.gouv.fr/reverse/" }()
+	defer func() { BANReverseEndpoint = "https://data.geopf.fr/geocodage/reverse" }()
 
 	hc, _ := httpx.New(httpx.Options{})
 	defer func() { _ = hc.Close() }()
@@ -251,7 +251,7 @@ func TestCachedGeocoder_HitsCache(t *testing.T) {
 	}))
 	defer srv.Close()
 	BANEndpoint = srv.URL + "/search/"
-	defer func() { BANEndpoint = "https://api-adresse.data.gouv.fr/search/" }()
+	defer func() { BANEndpoint = "https://data.geopf.fr/geocodage/search" }()
 
 	hc, _ := httpx.New(httpx.Options{})
 	defer func() { _ = hc.Close() }()

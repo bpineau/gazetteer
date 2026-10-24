@@ -132,7 +132,7 @@ yield data. `--json` emits the full `Comparison`.
 ### `normalize`
 
 Resolve a free-text address via the BAN
-(`api-adresse.data.gouv.fr`) and print the canonical Listing.
+(`data.geopf.fr/geocodage`) and print the canonical Listing.
 
 ```bash
 $ gazetteer normalize "1 rue de rivoli, 75001 paris"

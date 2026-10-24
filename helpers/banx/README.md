@@ -1,7 +1,8 @@
 # banx — BAN (Base Adresse Nationale) client
 
 A small, opinionated Go client for the French national address service
-at `api-adresse.data.gouv.fr`. It bundles:
+served by the IGN Géoplateforme at `data.geopf.fr/geocodage` (which replaced
+the retired `api-adresse.data.gouv.fr`, same contract). It bundles:
 
 - **Forward geocoding** — free-form FR address → lat/lon + INSEE
   commune code.
@@ -37,7 +38,7 @@ real-estate / mobility / public-data app.
    +-+-------------------------------+
      |
      v
-   api-adresse.data.gouv.fr
+   data.geopf.fr/geocodage
 ```
 
 ## Example

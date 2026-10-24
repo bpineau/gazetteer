@@ -15,7 +15,7 @@
 // Package layout:
 //
 //	geocode.go         Geocoder/ReverseGeocoder interfaces + result type.
-//	ban.go             BANClient that hits api-adresse.data.gouv.fr.
+//	ban.go             BANClient that hits the BAN on data.geopf.fr/geocodage.
 //	cache.go           CachedGeocoder + coherence guard.
 //	insee_resolver.go  INSEEResolver cascade.
 //	precision.go       Precision: what a coordinate is the position OF.

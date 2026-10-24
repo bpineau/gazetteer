@@ -111,7 +111,7 @@ type Entry struct {
 //   - DVF + cadastre (data.gouv.fr CDN): high — DVF fans out one call
 //     per cadastral section, so the polite default 2 req/s would
 //     serialize a dense-commune lookup into 20 s+ (see dvf.HostRateLimits).
-//   - BAN (api-adresse.data.gouv.fr): advertises 50 req/s; 20 is ample.
+//   - BAN geocoding (data.geopf.fr): advertises 50 req/s; 20 is ample.
 //   - api.bdnb.io: 10 000 req/month quota — 1 req/s stays well under it.
 //   - Public .gouv.fr APIs (georisques, ADEME data-fair, éducation,
 //     API Carto): no documented quota; 2 req/s is polite.
@@ -127,7 +127,7 @@ func HostRateLimits() map[string]httpx.HostOptions {
 		return httpx.HostOptions{RateLimit: &rate, Burst: &burst}
 	}
 	m := dvf.HostRateLimits() // dvf-api.data.gouv.fr + cadastre, high rate
-	m["api-adresse.data.gouv.fr"] = lim(20, 30)
+	m["data.geopf.fr"] = lim(20, 30)
 	m["api.bdnb.io"] = lim(1, 2)
 	m["georisques.gouv.fr"] = lim(2, 4)
 	m["data.ademe.fr"] = lim(2, 4)

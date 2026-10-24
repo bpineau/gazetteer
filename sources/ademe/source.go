@@ -47,7 +47,7 @@ const Version = sourceVersion
 
 // Options configures an ademe Source. The zero value is usable: every
 // field has a sane default (BaseURL → DefaultBaseURL; Geocoder → BAN
-// hitting the public api-adresse.data.gouv.fr endpoint; HTTPClient →
+// hitting the public BAN geocoder (data.geopf.fr); HTTPClient →
 // gazetteer.HTTPClientFrom(ctx) at Query time).
 type Options struct {
 	// BaseURL overrides the ADEME data-fair endpoint. Tests use this to

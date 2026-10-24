@@ -13,15 +13,17 @@ import (
 
 // BANEndpoint is the base URL of the BAN search API. Exposed as a var so
 // tests can swap it.
-var BANEndpoint = "https://api-adresse.data.gouv.fr/search/"
+var BANEndpoint = "https://data.geopf.fr/geocodage/search"
 
 // BANReverseEndpoint is the base URL of the BAN reverse-geocoding API.
 // Returns the same GeoJSON shape as `/search/` but indexed by lat/lon
 // instead of free-form address. More reliable than forward-search when
 // the upstream payload exposes coords directly.
-var BANReverseEndpoint = "https://api-adresse.data.gouv.fr/reverse/"
+var BANReverseEndpoint = "https://data.geopf.fr/geocodage/reverse"
 
-// BANClient is the HTTP-backed Geocoder hitting api-adresse.data.gouv.fr.
+// BANClient is the HTTP-backed Geocoder hitting the BAN through the IGN
+// Géoplateforme (data.geopf.fr/geocodage), which replaced the retired
+// api-adresse.data.gouv.fr with the same GeoJSON contract.
 type BANClient struct {
 	http *httpx.Client
 }

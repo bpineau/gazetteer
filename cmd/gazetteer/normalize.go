@@ -23,7 +23,7 @@ func runNormalize(ctx context.Context, args []string, w streams) error {
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Usage: gazetteer normalize [--json] [--verbose] <addr>")
 		fmt.Fprintln(fs.Output())
-		fmt.Fprintln(fs.Output(), "Resolves <addr> via the BAN (api-adresse.data.gouv.fr) and prints")
+		fmt.Fprintln(fs.Output(), "Resolves <addr> via the BAN (data.geopf.fr/geocodage) and prints")
 		fmt.Fprintln(fs.Output(), "the canonical Listing (address, city, zip, INSEE, lat, lon).")
 		fmt.Fprintln(fs.Output())
 		fs.PrintDefaults()
