@@ -11,9 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xuri/excelize/v2"
-
 	"github.com/bpineau/gazetteer/helpers/stats"
+	"github.com/bpineau/gazetteer/helpers/xlsx"
 )
 
 // memRawSet serves named in-memory raw inputs, implementing dataset.RawSet
@@ -38,27 +37,23 @@ func (e errFixtureMissing) Error() string { return "fixture missing: " + string(
 // per-ZE aligned with quarters.
 func buildRatesXLSX(t *testing.T, quarters []string, rates map[string][]float64) []byte {
 	t.Helper()
-	f := excelize.NewFile()
-	idx, _ := f.NewSheet(ratesSheet)
-	f.SetActiveSheet(idx)
-	_ = f.DeleteSheet("Sheet1")
-
-	setRow(t, f, ratesSheet, 1, []string{"Taux de chômage localisés — banner"})
-	setRow(t, f, ratesSheet, 2, []string{"Source : Insee"})
+	g := newGrid()
+	g.set(1, "Taux de chômage localisés - banner")
+	g.set(2, "Source : Insee")
 	header := []string{"ZE2020", "LIBZE2020", "REG", "LIBREG"}
 	header = append(header, quarters...)
-	setRow(t, f, ratesSheet, 4, header)
+	g.set(4, header...)
 
 	row := 5
 	for ze, series := range rates {
-		rec := []any{ze, "rates-libelle-" + ze, "00", "REGION"}
+		rec := []string{ze, "rates-libelle-" + ze, "00", "REGION"}
 		for _, v := range series {
-			rec = append(rec, v)
+			rec = append(rec, strconv.FormatFloat(v, 'f', -1, 64))
 		}
-		setRowAny(t, f, ratesSheet, row, rec)
+		g.set(row, rec...)
 		row++
 	}
-	return toBytes(t, f)
+	return encode(t, xlsx.Sheet{Name: ratesSheet, Rows: g.rows})
 }
 
 // buildAppartZIP builds a tiny appartenance workbook (COM +
@@ -66,35 +61,35 @@ func buildRatesXLSX(t *testing.T, quarters []string, rates map[string][]float64)
 // upstream layout.
 func buildAppartZIP(t *testing.T, communes map[string]string, labels map[string]string) []byte {
 	t.Helper()
-	f := excelize.NewFile()
-	comIdx, _ := f.NewSheet(comSheet)
-	_, _ = f.NewSheet(supraSheet)
-	f.SetActiveSheet(comIdx)
-	_ = f.DeleteSheet("Sheet1")
 
 	// COM: banner rows then header CODGEO LIBGEO DEP ... ZE2020 ...
-	setRow(t, f, comSheet, 1, []string{"Table d'appartenance — banner"})
-	setRow(t, f, comSheet, 4, []string{"CODGEO", "LIBGEO", "DEP", "ZE2020"})
+	com := newGrid()
+	com.set(1, "Table d'appartenance - banner")
+	com.set(4, "CODGEO", "LIBGEO", "DEP", "ZE2020")
 	row := 5
 	for insee, ze := range communes {
-		setRow(t, f, comSheet, row, []string{insee, "com-" + insee, "00", ze})
+		com.set(row, insee, "com-"+insee, "00", ze)
 		row++
 	}
 
 	// Zones_supra_communales: NIVGEO CODGEO LIBGEO NB_COM. Include a couple
 	// of non-ZE2020 rows that must be ignored.
-	setRow(t, f, supraSheet, 1, []string{"Zones supra — banner"})
-	setRow(t, f, supraSheet, 4, []string{"NIVGEO", "CODGEO", "LIBGEO", "NB_COM"})
+	supra := newGrid()
+	supra.set(1, "Zones supra - banner")
+	supra.set(4, "NIVGEO", "CODGEO", "LIBGEO", "NB_COM")
 	srow := 5
-	setRow(t, f, supraSheet, srow, []string{"DEP", "00", "Some departement", "1"})
+	supra.set(srow, "DEP", "00", "Some departement", "1")
 	srow++
 	for code, label := range labels {
-		setRow(t, f, supraSheet, srow, []string{"ZE2020", code, label, "1"})
+		supra.set(srow, "ZE2020", code, label, "1")
 		srow++
 	}
-	setRow(t, f, supraSheet, srow, []string{"REG", "84", "Some region", "1"})
+	supra.set(srow, "REG", "84", "Some region", "1")
 
-	xlsxBytes := toBytes(t, f)
+	xlsxBytes := encode(t,
+		xlsx.Sheet{Name: comSheet, Rows: com.rows},
+		xlsx.Sheet{Name: supraSheet, Rows: supra.rows},
+	)
 
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
@@ -111,33 +106,26 @@ func buildAppartZIP(t *testing.T, communes map[string]string, labels map[string]
 	return buf.Bytes()
 }
 
-func setRow(t *testing.T, f *excelize.File, sheet string, row int, vals []string) {
-	t.Helper()
-	anyVals := make([]any, len(vals))
-	for i, v := range vals {
-		anyVals[i] = v
+// grid is a sparse sheet under construction: set fills 1-based row n,
+// leaving the rows it skips empty like the INSEE banners do.
+type grid struct{ rows [][]string }
+
+func newGrid() *grid { return &grid{} }
+
+func (g *grid) set(row int, vals ...string) {
+	for len(g.rows) < row {
+		g.rows = append(g.rows, nil)
 	}
-	setRowAny(t, f, sheet, row, anyVals)
+	g.rows[row-1] = vals
 }
 
-func setRowAny(t *testing.T, f *excelize.File, sheet string, row int, vals []any) {
+func encode(t *testing.T, sheets ...xlsx.Sheet) []byte {
 	t.Helper()
-	cell, err := excelize.CoordinatesToCellName(1, row)
+	b, err := xlsx.Encode(sheets...)
 	if err != nil {
-		t.Fatalf("coords: %v", err)
+		t.Fatalf("encode xlsx: %v", err)
 	}
-	if err := f.SetSheetRow(sheet, cell, &vals); err != nil {
-		t.Fatalf("set row: %v", err)
-	}
-}
-
-func toBytes(t *testing.T, f *excelize.File) []byte {
-	t.Helper()
-	var buf bytes.Buffer
-	if err := f.Write(&buf); err != nil {
-		t.Fatalf("write xlsx: %v", err)
-	}
-	return buf.Bytes()
+	return b
 }
 
 func TestTransform_Golden(t *testing.T) {

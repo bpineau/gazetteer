@@ -10,11 +10,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/xuri/excelize/v2"
-
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/helpers/frnorm"
 	"github.com/bpineau/gazetteer/helpers/stats"
+	"github.com/bpineau/gazetteer/helpers/xlsx"
 )
 
 // ratesRawName / appartRawName are the datadir filenames for the two
@@ -139,13 +138,12 @@ func readRates(raw dataset.RawSet) ([]string, map[string][]float64, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	f, err := excelize.OpenReader(bytes.NewReader(body))
+	f, err := xlsx.OpenBytes(body)
 	if err != nil {
 		return nil, nil, fmt.Errorf("chomage: open rates xlsx: %w", err)
 	}
-	defer func() { _ = f.Close() }()
 
-	rows, err := f.GetRows(ratesSheet)
+	rows, err := f.Rows(ratesSheet)
 	if err != nil {
 		return nil, nil, fmt.Errorf("chomage: read sheet %q: %w", ratesSheet, err)
 	}
@@ -226,11 +224,10 @@ func readAppartenance(raw dataset.RawSet) (map[string]string, map[string]string,
 	if err != nil {
 		return nil, nil, fmt.Errorf("chomage: read zip member %q: %w", member.Name, err)
 	}
-	f, err := excelize.OpenReader(bytes.NewReader(xbytes))
+	f, err := xlsx.OpenBytes(xbytes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("chomage: open appartenance xlsx: %w", err)
 	}
-	defer func() { _ = f.Close() }()
 
 	communes, err := readCommunes(f)
 	if err != nil {
@@ -245,8 +242,8 @@ func readAppartenance(raw dataset.RawSet) (map[string]string, map[string]string,
 
 // readCommunes builds the commune INSEE → ZE2020 crosswalk from the COM
 // sheet.
-func readCommunes(f *excelize.File) (map[string]string, error) {
-	rows, err := f.GetRows(comSheet)
+func readCommunes(f *xlsx.Workbook) (map[string]string, error) {
+	rows, err := f.Rows(comSheet)
 	if err != nil {
 		return nil, fmt.Errorf("chomage: read sheet %q: %w", comSheet, err)
 	}
@@ -277,8 +274,8 @@ func readCommunes(f *excelize.File) (map[string]string, error) {
 // readLabels builds the ZE2020 → label map from the supra-communal sheet,
 // keeping only rows whose NIVGEO is ZE2020. These labels carry the
 // canonical accented forms used in the committed artifact.
-func readLabels(f *excelize.File) (map[string]string, error) {
-	rows, err := f.GetRows(supraSheet)
+func readLabels(f *xlsx.Workbook) (map[string]string, error) {
+	rows, err := f.Rows(supraSheet)
 	if err != nil {
 		return nil, fmt.Errorf("chomage: read sheet %q: %w", supraSheet, err)
 	}

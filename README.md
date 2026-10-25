@@ -212,7 +212,8 @@ guards (`helpers/banx`), the embedded commune table with offline INSEE
 resolution (`helpers/communes`), French text/number/address parsing
 (`helpers/frnorm`, `helpers/fraddr`, `helpers/proptype`), geometry kernels
 (`helpers/geodist`, `geopoly`, `geoindex`), scraping + anti-bot detection
-(`helpers/scrape`), a pluggable KV cache (`helpers/kvcache`), and the
+(`helpers/scrape`), a pluggable KV cache (`helpers/kvcache`), a
+dependency-free reader of .xlsx cell grids (`helpers/xlsx`), and the
 embed-and-refresh dataset pipeline (`dataset`) - even for apps that never
 build a Dossier. **[docs/helpers.md](docs/helpers.md) is the map.**
 

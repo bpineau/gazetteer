@@ -142,6 +142,7 @@ quarter or year: `chomage`), bump it and re-commit the embedded data via
 `--go-embed-update` when a new edition ships. `refresh` accepts its flags
 before or after the source names.
 
-Reading an xlsx upstream (`chomage`) pulls in `github.com/xuri/excelize/v2`;
-every other transform uses only the standard library plus the project HTTP
-helper.
+An xlsx upstream (`chomage`, both of its INSEE inputs) is read by
+`helpers/xlsx`, a standard-library reader of the cell grid: a transform
+never pulls a spreadsheet engine into the module graph. Every transform
+uses only the standard library plus the project helpers.
