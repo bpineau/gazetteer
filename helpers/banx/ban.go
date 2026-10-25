@@ -11,15 +11,24 @@ import (
 	"github.com/bpineau/gazetteer/helpers/httpx"
 )
 
+// DefaultBANEndpoint and DefaultBANReverseEndpoint are the BAN search and
+// reverse-geocoding URLs on the IGN Géoplateforme, the values BANEndpoint
+// and BANReverseEndpoint start from and that a test restores after
+// swapping in its own server.
+const (
+	DefaultBANEndpoint        = "https://data.geopf.fr/geocodage/search"
+	DefaultBANReverseEndpoint = "https://data.geopf.fr/geocodage/reverse"
+)
+
 // BANEndpoint is the base URL of the BAN search API. Exposed as a var so
 // tests can swap it.
-var BANEndpoint = "https://data.geopf.fr/geocodage/search"
+var BANEndpoint = DefaultBANEndpoint
 
 // BANReverseEndpoint is the base URL of the BAN reverse-geocoding API.
 // Returns the same GeoJSON shape as `/search/` but indexed by lat/lon
 // instead of free-form address. More reliable than forward-search when
 // the upstream payload exposes coords directly.
-var BANReverseEndpoint = "https://data.geopf.fr/geocodage/reverse"
+var BANReverseEndpoint = DefaultBANReverseEndpoint
 
 // BANClient is the HTTP-backed Geocoder hitting the BAN through the IGN
 // Géoplateforme (data.geopf.fr/geocodage), which replaced the retired

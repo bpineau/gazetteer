@@ -62,8 +62,8 @@ func TestBANClient_HTTPError(t *testing.T) {
 	BANEndpoint = srv.URL + "/search/"
 	BANReverseEndpoint = srv.URL + "/reverse/"
 	defer func() {
-		BANEndpoint = "https://data.geopf.fr/geocodage/search"
-		BANReverseEndpoint = "https://data.geopf.fr/geocodage/reverse"
+		BANEndpoint = DefaultBANEndpoint
+		BANReverseEndpoint = DefaultBANReverseEndpoint
 	}()
 
 	// MaxRetries: -1 disables the retry loop so the 5xx fixture fails
@@ -95,8 +95,8 @@ func TestBANClient_MalformedCoordinates(t *testing.T) {
 	BANEndpoint = srv.URL + "/search/"
 	BANReverseEndpoint = srv.URL + "/reverse/"
 	defer func() {
-		BANEndpoint = "https://data.geopf.fr/geocodage/search"
-		BANReverseEndpoint = "https://data.geopf.fr/geocodage/reverse"
+		BANEndpoint = DefaultBANEndpoint
+		BANReverseEndpoint = DefaultBANReverseEndpoint
 	}()
 
 	hc, _ := httpx.New(httpx.Options{})
@@ -119,7 +119,7 @@ func TestBANClient_Reverse_NotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 	BANReverseEndpoint = srv.URL + "/reverse/"
-	defer func() { BANReverseEndpoint = "https://data.geopf.fr/geocodage/reverse" }()
+	defer func() { BANReverseEndpoint = DefaultBANReverseEndpoint }()
 
 	hc, _ := httpx.New(httpx.Options{})
 	defer func() { _ = hc.Close() }()
