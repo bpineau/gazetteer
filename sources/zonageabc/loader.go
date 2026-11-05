@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
+
+	"github.com/bpineau/gazetteer/helpers/communes"
 )
 
 //go:embed data/zonage_abc_communes.json
@@ -67,12 +69,15 @@ func parseIndex(r io.Reader) (*Index, error) {
 
 // Lookup returns the zonage classification for the given INSEE. `ok`
 // is false when the commune is absent (rare; only fires for INSEE
-// codes that do not exist in the embedded revision).
+// codes that do not exist in the embedded revision). A Paris, Lyon or
+// Marseille arrondissement code reads its parent commune's row (the
+// dataset only carries 75056, 69123 and 13055), so a batch caller gets
+// the same answer as the per-address Source.
 func (idx *Index) Lookup(insee string) (Zone, bool) {
 	if idx == nil {
 		return ZoneUnknown, false
 	}
-	insee = strings.TrimSpace(insee)
+	insee = communes.FoldArrondissement(strings.TrimSpace(insee))
 	if insee == "" {
 		return ZoneUnknown, false
 	}

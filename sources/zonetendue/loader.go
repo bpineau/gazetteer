@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
+
+	"github.com/bpineau/gazetteer/helpers/communes"
 )
 
 //go:embed data/zonage_tlv_communes.json
@@ -74,12 +76,15 @@ func parseIndex(r io.Reader) (*Index, error) {
 }
 
 // Lookup returns the entry for the given INSEE. `ok` is false when
-// the commune is absent ; absence semantically means TierNonTendue.
+// the commune is absent; absence semantically means TierNonTendue. A
+// Paris, Lyon or Marseille arrondissement code reads its parent commune's
+// row (the dataset only carries 75056, 69123 and 13055), so a batch caller
+// gets the same answer as the per-address Source.
 func (idx *Index) Lookup(insee string) (Entry, bool) {
 	if idx == nil {
 		return Entry{}, false
 	}
-	insee = strings.TrimSpace(insee)
+	insee = communes.FoldArrondissement(strings.TrimSpace(insee))
 	if insee == "" {
 		return Entry{}, false
 	}
