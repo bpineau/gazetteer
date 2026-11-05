@@ -40,6 +40,11 @@ one place those layers live; every consumer embeds it.
   transport (useful for tests with `httptest.Server`). `HTTPClient()`
   returns the raw `*http.Client` for the rare multipart POST.
   `WithBypassCache` / `WithSnapshot` opt-out per-request.
+- **Only idempotent requests are retried.** GET, HEAD, PUT, DELETE (and
+  the other RFC 9110 idempotent methods) keep their retries; a POST or
+  PATCH is sent once unless it carries an `Idempotency-Key` header or its
+  context says `WithRetryUnsafe` (a read sent as a POST, such as an
+  Overpass query).
 - **Layers are independent.** Drop the cache by leaving `HTTPCacheDir`
   empty; drop snapshots by leaving `SnapshotDir` empty; drop
   rate-limiting by setting `RateLimitPerHost` extremely high. No

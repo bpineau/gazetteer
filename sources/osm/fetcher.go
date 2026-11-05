@@ -250,7 +250,8 @@ const overpassUserAgent = "gazetteer/1.0 (+https://github.com/bpineau/gazetteer)
 func (f *HTTPOverpassFetcher) queryOne(ctx context.Context, endpoint, ql string) ([]byte, error) {
 	form := url.Values{}
 	form.Set("data", ql)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
+	// An Overpass query is a read sent as a POST form: replaying it is safe.
+	req, err := http.NewRequestWithContext(httpx.WithRetryUnsafe(ctx), http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("osm: build request: %w", err)
 	}

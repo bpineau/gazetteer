@@ -14,6 +14,7 @@ import (
 )
 
 // retryTransport wraps the inner transport and retries on:
+// (only for a replayable request, see replayable)
 //   - transport errors that are deemed retryable (DNS, dial, EOF, reset…)
 //   - HTTP 408, 429, and any 5xx except 501.
 //
@@ -57,6 +58,9 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	ctx := req.Context()
 	maxAttempts := t.resolved.maxRetries + 1
+	if !replayable(req) {
+		maxAttempts = 1
+	}
 	var lastErr error
 
 	for attempt := range maxAttempts {
@@ -223,4 +227,18 @@ func isRetryableNetErr(err error) bool {
 	// Otherwise, default to retryable: transport-level failures from
 	// http.Transport are typically transient (broken pipe, refused…).
 	return true
+}
+
+// replayable reports whether the retry layer may send req more than once:
+// an idempotent method (RFC 9110 §9.2.2: GET, HEAD, OPTIONS, TRACE, PUT,
+// DELETE), a request carrying an Idempotency-Key header, or one whose
+// context opted in with WithRetryUnsafe. A POST that failed with a 5xx or
+// lost its response may still have been applied upstream: replaying it
+// would apply it twice.
+func replayable(req *http.Request) bool {
+	switch req.Method {
+	case "", http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodTrace, http.MethodPut, http.MethodDelete:
+		return true
+	}
+	return req.Header.Get("Idempotency-Key") != "" || RetryUnsafeFromContext(req.Context())
 }

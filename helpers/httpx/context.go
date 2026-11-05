@@ -10,6 +10,7 @@ const (
 	ctxKeyRunID
 	ctxKeyBypassCache
 	ctxKeySnapshotDir
+	ctxKeyRetryUnsafe
 )
 
 // WithSource tags the context with a source name (e.g. "licitor"), used by
@@ -66,4 +67,21 @@ func WithSnapshot(ctx context.Context, dir string) context.Context {
 		return ctx
 	}
 	return context.WithValue(ctx, ctxKeySnapshotDir, dir)
+}
+
+// WithRetryUnsafe lets the retry layer replay this request even though its
+// method is not idempotent (POST, PATCH). Only a caller that knows the
+// request has no side effect upstream (an Overpass query sent as a POST
+// form, a search endpoint) should set it: by default a non-idempotent
+// request is sent once, since a 5xx or a lost response does not prove the
+// server did not apply it. A request carrying an Idempotency-Key header is
+// replayed without this option.
+func WithRetryUnsafe(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxKeyRetryUnsafe, true)
+}
+
+// RetryUnsafeFromContext reports whether WithRetryUnsafe was applied.
+func RetryUnsafeFromContext(ctx context.Context) bool {
+	v, ok := ctx.Value(ctxKeyRetryUnsafe).(bool)
+	return ok && v
 }
