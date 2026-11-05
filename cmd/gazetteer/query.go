@@ -178,19 +178,7 @@ func executeQuery(ctx context.Context, q *queryFlags, w streams) (gazetteer.Doss
 	// normalised Listing so sources that gate on them (DVF, encadrement,
 	// taxefonciere, carteloyers, locservice, …) can produce a useful
 	// answer.
-	listing.PropertyType = pt
-	if q.surface > 0 {
-		s := q.surface
-		listing.SurfaceM2 = &s
-	}
-	if q.rooms > 0 {
-		r := q.rooms
-		listing.Rooms = &r
-	}
-	if q.buildYear > 0 {
-		y := q.buildYear
-		listing.BuildYear = &y
-	}
+	q.applyPropertyInputs(&listing, pt)
 
 	builder := gazetteer.NewBuilder().
 		WithHTTPClient(deps.HTTP.HTTPClient()).
@@ -315,4 +303,24 @@ func optedOutSources(d gazetteer.Dossier) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// applyPropertyInputs layers the user-supplied property attributes (type,
+// surface, rooms, construction year) on a normalised Listing. query,
+// appraise and compare all go through it, so one property reads the same
+// through the three commands.
+func (q *queryFlags) applyPropertyInputs(l *gazetteer.Listing, pt gazetteer.PropertyType) {
+	l.PropertyType = pt
+	if q.surface > 0 {
+		s := q.surface
+		l.SurfaceM2 = &s
+	}
+	if q.rooms > 0 {
+		r := q.rooms
+		l.Rooms = &r
+	}
+	if q.buildYear > 0 {
+		y := q.buildYear
+		l.BuildYear = &y
+	}
 }

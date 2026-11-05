@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
@@ -100,12 +101,17 @@ func parseInterleaved(fs *flag.FlagSet, argv []string) ([]string, error) {
 		if err := fs.Parse(rest); err != nil {
 			return nil, err
 		}
+		// fs.Parse consumes a "--" it meets in flag position and stops
+		// there, so the terminator is the last token it consumed, not the
+		// first of fs.Args(): everything after it is positional verbatim.
+		consumed := len(rest) - len(fs.Args())
+		terminated := consumed > 0 && rest[consumed-1] == "--" &&
+			(consumed < 2 || !takesValue(fs, rest[consumed-2]))
 		rest = fs.Args()
-		if len(rest) == 0 {
-			return positional, nil
+		if terminated {
+			return append(positional, rest...), nil
 		}
-		if rest[0] == "--" {
-			positional = append(positional, rest[1:]...)
+		if len(rest) == 0 {
 			return positional, nil
 		}
 		positional = append(positional, rest[0])
@@ -137,4 +143,24 @@ func parsePositional(fs *flag.FlagSet, positional []string, what string) (string
 		joined += " " + w
 	}
 	return joined, nil
+}
+
+// takesValue reports whether arg is a flag of fs written without "=" that
+// consumes the next token as its value ("-profile", not "-json" nor
+// "-profile=x"), in which case a "--" right after it is that value, not
+// the end-of-options marker.
+func takesValue(fs *flag.FlagSet, arg string) bool {
+	name, ok := strings.CutPrefix(arg, "-")
+	if !ok || strings.Contains(name, "=") {
+		return false
+	}
+	name = strings.TrimPrefix(name, "-")
+	f := fs.Lookup(name)
+	if f == nil {
+		return false
+	}
+	if b, ok := f.Value.(interface{ IsBoolFlag() bool }); ok && b.IsBoolFlag() {
+		return false
+	}
+	return true
 }

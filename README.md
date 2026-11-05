@@ -277,7 +277,7 @@ gazetteer refresh   [sources|all]       # download/rebuild datasets into the dat
 gazetteer version                       # build version
 ```
 
-`query` and `appraise` honour the listing's property attributes when
+`query`, `appraise` and `compare` honour the listing's property attributes when
 supplied - DVF, encadrement, taxe-foncière and the rental Sources need
 them to produce a useful answer:
 

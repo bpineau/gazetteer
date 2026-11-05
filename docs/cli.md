@@ -53,6 +53,9 @@ $ gazetteer query --json "1 rue de Rivoli, 75001 Paris" | jq .
   every bucket of the grille and returns a low-confidence reading.
 - `--build-year <YYYY>` — construction year. Picks the époque cell of the
   encadrement grille; without it the cap spans every construction period.
+  `compare` takes it too, applied to every candidate.
+- `--` ends the options: everything after it is an address, even a token
+  that looks like a flag.
 - `--source` — comma-separated Source names. Default: every Source
   the CLI knows how to instantiate (every `Default: true` entry in the
   registry — only `bdnb` is opt-in, see below).

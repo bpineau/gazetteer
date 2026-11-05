@@ -62,15 +62,7 @@ func runCompare(ctx context.Context, args []string, w streams) error {
 	}
 
 	listings, err := normalizeCandidates(ctx, deps.Normalizer, addrs, func(l *gazetteer.Listing) {
-		l.PropertyType = pt
-		if cf.surface > 0 {
-			s := cf.surface
-			l.SurfaceM2 = &s
-		}
-		if cf.rooms > 0 {
-			r := cf.rooms
-			l.Rooms = &r
-		}
+		cf.applyPropertyInputs(l, pt)
 	})
 	if err != nil {
 		return err
@@ -164,7 +156,7 @@ func parseCompareFlags(args []string, w streams) (*queryFlags, []string, error) 
 	fs.SetOutput(w.err)
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(),
-			"Usage: gazetteer compare [--property-type ...] [--surface m²] [--rooms N] [--source ...] [--json] [--verbose] \"<addr1>\" \"<addr2>\" [...]\n")
+			"Usage: gazetteer compare [--property-type ...] [--surface m²] [--rooms N] [--build-year YYYY] [--source ...] [--json] [--verbose] \"<addr1>\" \"<addr2>\" [...]\n")
 		fmt.Fprintln(fs.Output(), "\nRanks the addresses best-first by yield-first zone score. Quote each address separately.")
 		fmt.Fprintln(fs.Output())
 		fs.PrintDefaults()
@@ -174,6 +166,7 @@ func parseCompareFlags(args []string, w streams) (*queryFlags, []string, error) 
 	fs.StringVar(&q.propertyType, "property-type", "apartment", "Property type: apartment | house | land | commercial.")
 	fs.Float64Var(&q.surface, "surface", 0, "Habitable surface in m².")
 	fs.IntVar(&q.rooms, "rooms", 0, "Room count (1, 2, 3…).")
+	fs.IntVar(&q.buildYear, "build-year", 0, "Construction year of the building(s) (e.g. 1930): selects the encadrement époque cell.")
 	fs.DurationVar(&q.timeout, "timeout", 30*time.Second, "Overall budget for the collects (0 disables).")
 	fs.BoolVar(&q.jsonOut, "json", false, "Emit the full Comparison as indented JSON")
 	fs.StringVar(&q.profile, "profile", "",
