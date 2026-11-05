@@ -109,8 +109,11 @@ type Options struct {
 // HostOptions holds per-host overrides. Pointer fields distinguish
 // "explicitly set" from "absent": a nil override means "inherit Options".
 type HostOptions struct {
-	RateLimit  *float64
-	Burst      *int
+	RateLimit *float64
+	Burst     *int
+	// DefaultTTL overrides Options.DefaultTTL for this host's cache
+	// entries (the TTL used when a response carries neither max-age nor
+	// Expires). Non-positive values are ignored.
 	DefaultTTL *time.Duration
 	UserAgent  *string
 	Headers    http.Header
@@ -251,4 +254,13 @@ type DownloadResult struct {
 	Cached  bool
 	Skipped bool
 	Path    string
+}
+
+// ttlFor is the fallback cache TTL for a response from host: its
+// HostOptions.DefaultTTL when set and positive, else Options.DefaultTTL.
+func (r resolved) ttlFor(host string) time.Duration {
+	if h, ok := r.perHost[host]; ok && h.DefaultTTL != nil && *h.DefaultTTL > 0 {
+		return *h.DefaultTTL
+	}
+	return r.defaultTTL
 }

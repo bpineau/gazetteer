@@ -49,6 +49,13 @@ one place those layers live; every consumer embeds it.
   burst of identical requests costs one request, and the caller that
   started it cannot cancel it for the callers that joined it. Failures
   reach every waiter as errors and are never cached.
+- **The cache only shares what is shareable.** The key is the method, the
+  URL and every request header, so a negotiated variant (`Vary`) only
+  serves an identical request. A request carrying credentials
+  (`Authorization`, `Cookie`, URL userinfo) bypasses the cache and the
+  coalescing; a `no-store` or `Vary: *` response is never written, and
+  `no-cache` revalidates on every use, whatever the directive order.
+  `HostOptions.DefaultTTL` overrides the fallback TTL per host.
 - **Pruning is the caller's call.** The disk cache never evicts on its
   own. `(*Client) PruneCache(PruneOptions{MaxAge, MaxBytes})` removes old
   and excess entries (plus any half-written ones) when *you* run it: a

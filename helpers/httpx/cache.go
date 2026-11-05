@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -27,6 +28,12 @@ import (
 // Logic:
 //   - Cacheable methods : GET, HEAD.
 //   - Cacheable statuses: 200, 203, 300, 301, 308.
+//   - Never cached nor coalesced: a request carrying credentials
+//     (Authorization, Proxy-Authorization, Cookie, URL userinfo).
+//   - Never stored: a response whose Cache-Control holds no-store, or that
+//     varies on "*". no-cache stores but revalidates on every use.
+//   - Key: method, URL and every request header (requestHash), so a
+//     negotiated variant (Vary) is only served to an identical request.
 //   - On a fresh hit (now < expires_at): served straight from disk, never
 //     forwarded.
 //   - On a stale hit with validators: forward with If-None-Match /
@@ -81,6 +88,12 @@ func (t *cacheTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.Method != http.MethodGet && req.Method != http.MethodHead {
 		return t.next.RoundTrip(req)
 	}
+	// A request carrying credentials is never cached nor coalesced: its
+	// response belongs to that identity, and the cache is a world-readable
+	// directory shared by every caller of the Client.
+	if carriesCredentials(req) {
+		return t.next.RoundTrip(req)
+	}
 
 	hash := requestHash(req)
 	metaPath, bodyPath := t.pathsFor(hash)
@@ -133,9 +146,9 @@ const sharedFetchTimeout = defaultClientTimeout
 //     caller gets its own reader over those bytes, so N waiters read one
 //     buffer instead of racing over one socket.
 //
-// The coalescing key is the cache key, which is method+URL (requestHash):
-// two requests that differ only by header therefore share one response, the
-// same way they already shared one cache entry.
+// The coalescing key is the cache key (requestHash: method, URL and request
+// headers), so only identical requests share a trip, the same way only they
+// share a cache entry.
 func (t *cacheTransport) fetchShared(req *http.Request, key, metaPath, bodyPath string) (*fetched, error) {
 	ctx := req.Context()
 	ch := t.flights.DoChan(key, func() (any, error) {
@@ -195,7 +208,7 @@ func (t *cacheTransport) forward(req *http.Request, metaPath, bodyPath string) (
 				// Refresh fetched_at + expires_at if Cache-Control said so.
 				now := t.resolved.now()
 				meta.FetchedAtSec = now.Unix()
-				meta.ExpiresAtSec = computeExpiry(resp.Header, now, t.resolved.defaultTTL)
+				meta.ExpiresAtSec = computeExpiry(resp.Header, now, t.resolved.ttlFor(req.URL.Host))
 				_ = t.writeMeta(metaPath, meta)
 				return fetchedFromEntry(meta, body), nil
 			}
@@ -304,7 +317,7 @@ func (t *cacheTransport) persist(req *http.Request, resp *http.Response, metaPat
 		body:       body,
 	}
 
-	if !isStatusCacheable(resp.StatusCode) {
+	if !isStatusCacheable(resp.StatusCode) || !isStorable(resp.Header) {
 		return out, nil
 	}
 
@@ -315,7 +328,7 @@ func (t *cacheTransport) persist(req *http.Request, resp *http.Response, metaPat
 		Status:       resp.StatusCode,
 		Header:       canonicalizeHeader(resp.Header),
 		FetchedAtSec: now.Unix(),
-		ExpiresAtSec: computeExpiry(resp.Header, now, t.resolved.defaultTTL),
+		ExpiresAtSec: computeExpiry(resp.Header, now, t.resolved.ttlFor(req.URL.Host)),
 		BodyLen:      int64(len(body)),
 	}
 	if err := t.writeEntry(metaPath, bodyPath, meta, body); err != nil {
@@ -431,19 +444,80 @@ func writeFileAtomic(path string, data []byte) error {
 	return os.Rename(tmp, path)
 }
 
-// requestHash returns the cache key for a request.
-//
-// Key = sha256(method "\n" url). v1 ignores Vary when hashing the
-// first request and relies on the response's Vary header to
-// disambiguate later — a varyKey parameter is intentionally absent
-// so the call sites stay simple. Extend the signature when v2 wires
-// proactive Vary-derived hashing.
+// requestHash returns the cache key for a request: sha256 of the method,
+// the URL and every request header (names canonical and sorted, values in
+// order). Two requests share an entry, and a coalesced flight, only when
+// they would send the very same request, so a response that varies on a
+// request header (Vary: Accept-Language, Accept, ...) is never served to a
+// request that differs on it. The conditional headers the cache adds itself
+// (If-None-Match, If-Modified-Since) go on a clone after the key is taken.
+// A response with "Vary: *" is not stored at all (isStorable).
 func requestHash(req *http.Request) string {
 	h := sha256.New()
 	_, _ = io.WriteString(h, req.Method)
 	_, _ = io.WriteString(h, "\n")
 	_, _ = io.WriteString(h, req.URL.String())
+	names := make([]string, 0, len(req.Header))
+	for k := range req.Header {
+		names = append(names, http.CanonicalHeaderKey(k))
+	}
+	slices.Sort(names)
+	for _, k := range names {
+		for _, v := range req.Header.Values(k) {
+			_, _ = io.WriteString(h, "\n"+k+": "+v)
+		}
+	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// credentialHeaders are the request headers that tie a response to an
+// identity. See carriesCredentials.
+var credentialHeaders = []string{"Authorization", "Proxy-Authorization", "Cookie"}
+
+// carriesCredentials reports whether req authenticates itself, by header
+// or by URL userinfo.
+func carriesCredentials(req *http.Request) bool {
+	if req.URL != nil && req.URL.User != nil {
+		return true
+	}
+	for _, k := range credentialHeaders {
+		if req.Header.Get(k) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// cacheDirectives returns the lower-cased Cache-Control directives of h,
+// each with its argument when it has one ("max-age" → "600").
+func cacheDirectives(h http.Header) map[string]string {
+	out := map[string]string{}
+	for _, cc := range h.Values("Cache-Control") {
+		for p := range strings.SplitSeq(cc, ",") {
+			name, arg, _ := strings.Cut(strings.TrimSpace(strings.ToLower(p)), "=")
+			if name != "" {
+				out[name] = strings.Trim(arg, `"`)
+			}
+		}
+	}
+	return out
+}
+
+// isStorable reports whether a response may be written to disk at all: not
+// when its Cache-Control says no-store (whatever else it holds, in whatever
+// order), nor when it varies on "*", which no later request can match.
+func isStorable(h http.Header) bool {
+	if _, ok := cacheDirectives(h)["no-store"]; ok {
+		return false
+	}
+	for _, v := range h.Values("Vary") {
+		for f := range strings.SplitSeq(v, ",") {
+			if strings.TrimSpace(f) == "*" {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // isStatusCacheable per spec §"Politique".
@@ -460,19 +534,17 @@ func isStatusCacheable(status int) bool {
 // validators") when none is present and no defaultTTL is set; otherwise
 // falls back to defaultTTL.
 func computeExpiry(h http.Header, now time.Time, defaultTTL time.Duration) int64 {
-	if cc := h.Get("Cache-Control"); cc != "" {
-		// Look for max-age=N and no-store.
-		parts := strings.SplitSeq(cc, ",")
-		for p := range parts {
-			p = strings.TrimSpace(strings.ToLower(p))
-			if p == "no-store" || p == "no-cache" {
-				return 0 // forces revalidation every time
-			}
-			if after, ok := strings.CutPrefix(p, "max-age="); ok {
-				if n, err := strconv.Atoi(after); err == nil && n >= 0 {
-					return now.Add(time.Duration(n) * time.Second).Unix()
-				}
-			}
+	// The whole directive set is read before deciding: "max-age=600,
+	// no-cache" must revalidate exactly as "no-cache, max-age=600" does.
+	dirs := cacheDirectives(h)
+	_, noCache := dirs["no-cache"]
+	_, noStore := dirs["no-store"]
+	if noCache || noStore {
+		return 0 // forces revalidation every time
+	}
+	if arg, ok := dirs["max-age"]; ok {
+		if n, err := strconv.Atoi(arg); err == nil && n >= 0 {
+			return now.Add(time.Duration(n) * time.Second).Unix()
 		}
 	}
 	if exp := h.Get("Expires"); exp != "" {
