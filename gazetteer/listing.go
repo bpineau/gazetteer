@@ -40,6 +40,12 @@ type Listing struct {
 	// via CoordsAtLeast; commune-keyed sources ignore it.
 	CoordPrecision banx.Precision `json:"coord_precision,omitempty"`
 
+	// GeocodeScore is the geocoder's confidence in the match, in (0, 1]
+	// (BAN's score), 0 when unreported. A Normalizer that judged the match
+	// too weak to locate the address has already demoted CoordPrecision;
+	// the score is kept so a consumer can apply a stricter policy.
+	GeocodeScore float64 `json:"geocode_score,omitempty"`
+
 	PropertyType PropertyType `json:"property_type,omitempty"`
 	SurfaceM2    *float64     `json:"surface_m2,omitempty"`
 	Rooms        *int         `json:"rooms,omitempty"`

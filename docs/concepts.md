@@ -207,6 +207,14 @@ type Normalizer interface {
 `factory.NewDefault` wiring installs `gazetteer.BANNormalizer` (BAN
 forward geocoder + `helpers/communes` table) by default.
 
+It does not take BAN's best candidate on faith: a postcode written in the
+address anchors a département guard (a homonym elsewhere is
+`ErrAddressNotFound`), and a weak match (a score below
+`DefaultMinGeocodeScore` within the input's postcode, or a contradicting
+type de voie) keeps its commune but has its coordinates demoted to
+`PrecisionMunicipality`; a low score outside the input's postcode is refused.
+The score itself travels in `Listing.GeocodeScore`.
+
 ### Cache (`kvcache.Cache`)
 
 A pluggable persistent key/value cache that the Sources needing

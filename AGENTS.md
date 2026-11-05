@@ -58,8 +58,9 @@ When a trade-off is unclear, these decide it, in order.
    descriptors are compared against the live registry by tests: a new source is
    not done until all three know about it.
 6. **Never hammer an upstream.** Live sources go through the rate-limited,
-   cached HTTP stack; the atomic `Query` path deliberately has none of that, so
-   use a factory-built Client for anything repeated.
+   retrying HTTP stack (no disk cache by default: the BAN geocode cache and
+   DVF's memo carry the repeated work); the atomic `Query` path deliberately
+   has none of that, so use a factory-built Client for anything repeated.
 7. **This repo is public: nothing personal in it.** No real address anyone
    lives at presented as somebody's, no name, no home path, no session
    narration, in code, docs, tests or commit messages.
@@ -374,6 +375,12 @@ walking away.
   `Listing.CoordsAtLeast(banx.PrecisionX)`; commune-keyed sources ignore it.
   Never take `Coords()` alone as permission to attribute a parcel, a building or
   a distance to a dwelling.
+  `BANNormalizer` itself demotes a match it does not trust to
+  `PrecisionMunicipality` (keeping the commune): a BAN score below
+  `DefaultMinGeocodeScore` in the input's own postcode, or a type de voie
+  that contradicts the input's ("av." answered by a "place"). A postcode in
+  the free text also anchors the département guard; `Listing.GeocodeScore`
+  keeps the score.
 - **Measure to a polygon's BOUNDARY, not to its nearest vertex.**
   `geopoly.MultiPolygon.BoundaryDistanceM` (used by `geoindex`) is the correct
   distance to a zone: a vertex distance overstates the gap along a long straight

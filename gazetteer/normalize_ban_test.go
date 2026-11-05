@@ -238,3 +238,74 @@ func TestBANNormalizer_CoarseMatchGetsNoIRIS(t *testing.T) {
 		}
 	}
 }
+
+// TestBANNormalizer_DepartmentGuard pins that a postcode written in the
+// free text anchors the query and refuses a candidate in another
+// département, through the real cache wrapper as well as bare.
+func TestBANNormalizer_DepartmentGuard(t *testing.T) {
+	t.Parallel()
+	g := &stubGeocoder{res: banx.GeocodeResult{
+		Lat: 44.84, Lon: -0.58, Label: "1 Rue Exemple 33000 Bordeaux", Score: 0.95,
+		Precision: banx.PrecisionHouseNumber, CityCode: "33063", PostCode: "33000",
+	}}
+	_, err := NewBANNormalizer(g, nil).Normalize(context.Background(), "1 rue Exemple 75001 Paris")
+	if !errors.Is(err, ErrAddressNotFound) || !errors.Is(err, banx.ErrDepartmentMismatch) {
+		t.Errorf("cross-département candidate: err = %v, want ErrAddressNotFound wrapping ErrDepartmentMismatch", err)
+	}
+	if g.gotQuery.Zip != "75001" {
+		t.Errorf("GeocodeQuery.Zip = %q, want the free-text postcode 75001", g.gotQuery.Zip)
+	}
+}
+
+// TestBANNormalizer_ScoreFloor pins the weak-match policy: in the input's
+// postcode the commune is kept and the coordinates demoted; elsewhere the
+// match is refused; a strong match is untouched and carries its score.
+func TestBANNormalizer_ScoreFloor(t *testing.T) {
+	t.Parallel()
+	weak := banx.GeocodeResult{
+		Lat: 48.86, Lon: 2.38, Label: "3 Rue Autre 75011 Paris", Score: 0.12,
+		Precision: banx.PrecisionHouseNumber, CityCode: "75111", PostCode: "75011",
+	}
+	l, err := NewBANNormalizer(&stubGeocoder{res: weak}, nil).Normalize(context.Background(), "3 rue Exemple 75011 Paris")
+	if err != nil {
+		t.Fatalf("weak match in the input's postcode: %v", err)
+	}
+	if l.INSEE != "75111" || l.CoordPrecision != banx.PrecisionMunicipality || l.Address != "3 rue Exemple 75011 Paris" || l.GeocodeScore != 0.12 {
+		t.Errorf("weak match: INSEE %q precision %q address %q score %v; want the commune, municipality precision, the input text, 0.12",
+			l.INSEE, l.CoordPrecision, l.Address, l.GeocodeScore)
+	}
+
+	if _, err := NewBANNormalizer(&stubGeocoder{res: weak}, nil).Normalize(context.Background(), "3 rue Exemple Paris"); !errors.Is(err, ErrAddressNotFound) {
+		t.Errorf("weak match without a postcode anchor: err = %v, want ErrAddressNotFound", err)
+	}
+
+	strong := weak
+	strong.Score = 0.97
+	l, err = NewBANNormalizer(&stubGeocoder{res: strong}, nil).Normalize(context.Background(), "3 rue Autre 75011 Paris")
+	if err != nil || l.CoordPrecision != banx.PrecisionHouseNumber || l.Address != strong.Label || l.GeocodeScore != 0.97 {
+		t.Errorf("strong match: %+v, %v", l, err)
+	}
+
+	// The floor can be disabled.
+	l, err = NewBANNormalizer(&stubGeocoder{res: weak}, nil).WithMinScore(0).Normalize(context.Background(), "3 rue Exemple Paris")
+	if err != nil || l.CoordPrecision != banx.PrecisionHouseNumber {
+		t.Errorf("floor disabled: %+v, %v", l, err)
+	}
+}
+
+// TestBANNormalizer_StreetTypeContradiction pins that a candidate on a
+// differently typed street of the commune keeps the commune only.
+func TestBANNormalizer_StreetTypeContradiction(t *testing.T) {
+	t.Parallel()
+	g := &stubGeocoder{res: banx.GeocodeResult{
+		Lat: 48.86, Lon: 2.44, Label: "12 Place Exemple 93100 Montreuil", Score: 0.9,
+		Precision: banx.PrecisionHouseNumber, CityCode: "93048", PostCode: "93100",
+	}}
+	l, err := NewBANNormalizer(g, nil).Normalize(context.Background(), "12 av Exemple Montreuil")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.INSEE != "93048" || l.CoordPrecision != banx.PrecisionMunicipality {
+		t.Errorf("INSEE %q precision %q, want 93048 at municipality precision", l.INSEE, l.CoordPrecision)
+	}
+}

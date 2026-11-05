@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/communes"
+	"github.com/bpineau/gazetteer/helpers/fraddr"
+	"github.com/bpineau/gazetteer/helpers/frnorm"
 )
 
 // IRISResolver maps a coordinate to its 9-digit INSEE IRIS code. The core
@@ -30,6 +33,15 @@ type BANNormalizer struct {
 	geocoder banx.Geocoder
 	communes communes.Communes
 	iris     IRISResolver
+	minScore *float64 // nil = DefaultMinGeocodeScore; see WithMinScore
+}
+
+// scoreFloor is the score below which a match does not locate the address.
+func (n *BANNormalizer) scoreFloor() float64 {
+	if n.minScore == nil {
+		return DefaultMinGeocodeScore
+	}
+	return *n.minScore
 }
 
 // NewBANNormalizer wires a Geocoder (required) and a Communes lookup
@@ -51,9 +63,56 @@ func (n *BANNormalizer) WithIRIS(r IRISResolver) *BANNormalizer {
 	return n
 }
 
-// Normalize implements gazetteer.Normalizer.
+// DefaultMinGeocodeScore is the BAN score below which Normalize does not
+// trust a match to locate the address. Calibrated on a small live sample
+// (2026-11): a street that does not exist ("3 rue imaginaire qui n'existe
+// pas 75011 Paris") came back at housenumber precision with 0.44, while real
+// addresses written sloppily scored 0.53 ("12 av J Jaures Montreuil") to
+// 0.61 ("106 bd Voltair 75011 Paris"), and clean ones above 0.95. It is a
+// floor against the worst guesses, not a proof of a match.
+const DefaultMinGeocodeScore = 0.5
+
+// WithMinScore sets the score floor Normalize applies (see Normalize); a
+// value <= 0 disables it. Returns the receiver for chaining.
+func (n *BANNormalizer) WithMinScore(s float64) *BANNormalizer {
+	n.minScore = &s
+	return n
+}
+
+// Normalize implements gazetteer.Normalizer. Two guards stand between the
+// geocoder's best candidate and the Listing, because BAN answers every query
+// it can parse with SOMETHING:
+//
+//   - Département: a postcode written in addr anchors the query (it is
+//     passed as GeocodeQuery.Zip, so banx.CachedGeocoder applies its own
+//     guard too), and a candidate in another département is refused with
+//     ErrAddressNotFound (wrapping banx.ErrDepartmentMismatch): a homonym
+//     across the country is not the address.
+//
+//   - Score: a candidate scored below the floor (DefaultMinGeocodeScore, see
+//     WithMinScore) does not locate the address. When it lies in the very
+//     postcode addr names, its commune is kept (INSEE, Zip, City) but the
+//     coordinates are demoted to PrecisionMunicipality and Address keeps
+//     the input text, so per-address Sources refuse it and commune-keyed
+//     ones carry on; otherwise it is ErrAddressNotFound.
+//
+//   - Street type: a candidate whose type de voie contradicts the one addr
+//     names ("12 av J Jaures" answered by "12 Place Jean Jaures") is on
+//     another street, whatever its score, and is treated as a weak match.
+//
+// Listing.GeocodeScore carries the score either way.
 func (n *BANNormalizer) Normalize(ctx context.Context, addr string) (Listing, error) {
-	r, err := n.geocoder.Geocode(ctx, banx.GeocodeQuery{Address: addr})
+	inputZip, _ := frnorm.ExtractZipFromAddress(addr)
+	r, err := n.geocoder.Geocode(ctx, banx.GeocodeQuery{Address: addr, Zip: inputZip})
+	if err == nil && inputZip != "" && r.PostCode != "" && !banx.ZipsShareDepartment(inputZip, r.PostCode) {
+		err = fmt.Errorf("%w: %s geocoded to postcode %s", banx.ErrDepartmentMismatch, inputZip, r.PostCode)
+	}
+	lowScore := err == nil && r.Score > 0 && r.Score < n.scoreFloor()
+	if lowScore && (inputZip == "" || r.PostCode != inputZip) {
+		err = fmt.Errorf("%w: best candidate %q scored %.2f, below %.2f", banx.ErrNotFound, r.Label, r.Score, n.scoreFloor())
+	}
+	// A weak match keeps its commune but not its position.
+	weak := err == nil && (lowScore || streetTypeContradicts(addr, r.Label))
 	if err != nil {
 		// Raise the "no such address" cases to the core taxonomy so consumers
 		// classify on gazetteer.ErrAddressNotFound instead of importing banx.
@@ -76,6 +135,14 @@ func (n *BANNormalizer) Normalize(ctx context.Context, addr string) (Listing, er
 		// the per-address Sources refuse it while the commune-keyed ones
 		// carry on.
 		CoordPrecision: r.Precision,
+		GeocodeScore:   r.Score,
+	}
+	if weak {
+		// The commune is right (the candidate is in the postcode addr
+		// names), the position within it is not: a different street's
+		// number, labelled as if it were the address.
+		l.Address = strings.TrimSpace(addr)
+		l.CoordPrecision = banx.PrecisionMunicipality
 	}
 	if n.communes != nil && r.CityCode != "" {
 		if c, ok := n.communes.Lookup(r.CityCode); ok {
@@ -93,4 +160,12 @@ func (n *BANNormalizer) Normalize(ctx context.Context, addr string) (Listing, er
 		}
 	}
 	return l, nil
+}
+
+// streetTypeContradicts reports whether addr and label both name a type de
+// voie and the two differ: the candidate is then another street of the
+// commune (an avenue answered by a place of the same name).
+func streetTypeContradicts(addr, label string) bool {
+	in, out := fraddr.StreetOf(addr), fraddr.StreetOf(label)
+	return in.Type != "" && out.Type != "" && in.Type != out.Type
 }

@@ -139,7 +139,12 @@ func HostRateLimits() map[string]httpx.HostOptions {
 }
 
 // NewHTTPClient builds the shared httpx client both the factory and the
-// CLI use, pre-configured with HostRateLimits.
+// CLI use, pre-configured with HostRateLimits: per-host rate limits and
+// retries, and NO disk HTTP cache (HTTPCacheDir is empty). Repeated work is
+// memoised where it pays, by the Sources themselves: the BAN geocoder's
+// cache, DVF's per-Query memo and section cache, the coalescing of
+// concurrent identical fetches. A caller that wants a disk cache builds its
+// own httpx client with HTTPCacheDir and passes it to the factory.
 func NewHTTPClient() (*httpx.Client, error) {
 	hc, err := httpx.New(httpx.Options{PerHost: HostRateLimits()})
 	if err != nil {
