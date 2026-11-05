@@ -280,6 +280,11 @@ data.gouv.fr Etalab.
 - **Circuit breaker**: 3 consecutive transport errors OR 3 consecutive
   429s trip the breaker. Returns `dvf.ErrCircuitTripped` (matches
   `gazetteer.ErrSourceCircuitTripped`).
+- **Unavailable sections**: a section (or a commune's section list) that
+  fails transiently is not an empty section. A walk that finds no sale
+  while such fetches stayed unavailable returns a transient error; a
+  nonempty reading counts them in `Evidence.SectionsFailed` (0 = complete
+  cohort).
 
 ## `sources/dpedist`
 

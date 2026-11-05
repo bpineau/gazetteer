@@ -94,6 +94,14 @@ type Evidence struct {
 	// within the disk), not the commune's full section count.
 	SectionsQueried int `json:"sections_queried"`
 
+	// SectionsFailed counts the upstream fetches (one cadastral section's
+	// mutations, or one commune's section list) that failed transiently
+	// during the walk and were never fetched successfully afterwards: the
+	// cohort lacks their sales. 0 means the cohort is complete. A walk
+	// that ends with no sale and SectionsFailed > 0 returns an error
+	// instead of a Result, since the absence of sales is then unknown.
+	SectionsFailed int `json:"sections_failed,omitempty"`
+
 	// RadiusM is the disk radius (in metres) the `address_radius`
 	// tier applied around (AuctionLat, AuctionLon) to filter the
 	// commune's mutations. 0 when the winning tier is not

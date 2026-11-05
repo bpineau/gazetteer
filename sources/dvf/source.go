@@ -73,7 +73,11 @@ const Name = "dvf"
 //     garden read as a two-house bundle and was dropped: 18 of 32 house
 //     sales on four live sections of 77284, the survivors skewed to houses
 //     without one (median 3 180 EUR/m2 where the full cohort reads 3 011).
-const sourceVersion = 8
+//   - v9: a failed section fetch is no longer an empty section. A walk that
+//     finds no sale while fetches stayed unavailable returns a transient
+//     error (it used to land as a successful empty Result at the department
+//     tier); a nonempty Result counts them in Evidence.SectionsFailed.
+const sourceVersion = 9
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -290,6 +294,8 @@ func (s *Source) logger() *slog.Logger {
 //   - Geocoder cannot resolve INSEE → gazetteer.ErrInsufficientInputs
 //   - Circuit tripped → ErrCircuitTripped (treated as transient)
 //   - Ladder walk failure (every tier errored) → wrapped error
+//   - No sale found while some fetches stayed unavailable → wrapped
+//     fetch error (transient): an outage is not an empty market
 //
 // Each call may issue several HTTP requests (one per section × tier
 // fan-out). Respect ctx.Done().
@@ -334,6 +340,20 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	}
 	levelUsed := out.LevelUsed
 
+	// An empty cohort is an answer only when every fetch behind it was
+	// definitive. Sections that stayed unavailable (or a breaker that
+	// opened mid-walk and stopped the fan-out) make "no sale" unknowable:
+	// that is a retryable failure, never a successful empty Result.
+	failed, failErr := tc.memo.failures()
+	if len(tc.filtered) == 0 {
+		if s.circuitTripped() {
+			return nil, ErrCircuitTripped
+		}
+		if failed > 0 {
+			return nil, fmt.Errorf("dvf: %d cadastral fetch(es) failed, the cohort is unknown: %w", failed, failErr)
+		}
+	}
+
 	confidence := PickConfidence(len(tc.filtered), levelUsed)
 
 	p25v, p50, p75v := PerM2Quartiles(tc.filtered)
@@ -371,6 +391,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		RawMutationsCount:      tc.totalRaw,
 		FilteredMutationsCount: len(tc.filtered),
 		SectionsQueried:        tc.sectionsQueried,
+		SectionsFailed:         failed,
 		NUniqueParcelles:       CountUniqueParcelles(tc.filtered),
 	}
 	if levelUsed == "address_radius" {
@@ -487,6 +508,7 @@ func (s *Source) fetchSections(ctx context.Context, memo *queryMemo, insee strin
 					memo.storeMutations(insee, sec, nil)
 					return
 				}
+				memo.recordFailure(insee+"/"+sec, err)
 				s.logger().Warn("dvf.mutations_fetch_failed",
 					slog.String("insee", insee),
 					slog.String("section", sec),
@@ -748,6 +770,7 @@ func (s *Source) resolveSections(ctx context.Context, memo *queryMemo, insee str
 		return cad
 	}
 	if cerr != nil && !errors.Is(cerr, ErrCadastreCommuneNotFound) {
+		memo.recordFailure(insee+"/*", cerr)
 		s.logger().Warn("dvf.cadastre_lookup_failed",
 			slog.String("insee", insee),
 			slog.Any("err", cerr),
