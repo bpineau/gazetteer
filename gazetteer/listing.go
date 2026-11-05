@@ -56,19 +56,24 @@ type Listing struct {
 	AsOf time.Time `json:"as_of,omitzero"`
 }
 
-// Coords returns the listing's coordinates when both are present and not
-// the (0, 0) null-island placeholder, which no French address resolves
-// to. This is the canonical "does the listing carry usable coordinates"
+// Coords returns the listing's coordinates when both are present, finite,
+// within range (latitude -90..90, longitude -180..180) and not the (0, 0)
+// null-island placeholder, which no French address resolves to. This is the canonical "does the listing carry usable coordinates"
 // test — spatial sources and renderers should use it rather than
 // hand-checking the Lat/Lon pointers.
 func (l Listing) Coords() (lat, lon float64, ok bool) {
 	if l.Lat == nil || l.Lon == nil {
 		return 0, 0, false
 	}
-	if *l.Lat == 0 && *l.Lon == 0 {
+	lat, lon = *l.Lat, *l.Lon
+	if lat == 0 && lon == 0 {
 		return 0, 0, false
 	}
-	return *l.Lat, *l.Lon, true
+	// NaN fails both comparisons; ±Inf fails the range.
+	if !(lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+		return 0, 0, false
+	}
+	return lat, lon, true
 }
 
 // CoordsAtLeast is Coords with a precision floor: ok is false when the

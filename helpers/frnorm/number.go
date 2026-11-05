@@ -1,6 +1,7 @@
 package frnorm
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"unicode"
@@ -10,7 +11,8 @@ import (
 // "1 234,5" with a no-break or narrow no-break space as the thousands
 // separator). Every Unicode space is stripped and the comma decimal mark
 // is normalised before strconv.ParseFloat. ok is false for an empty or
-// unparseable cell.
+// unparseable cell, and for the non-finite values ParseFloat accepts
+// ("NaN", "Inf", "1e999"): no French dataset publishes them as numbers.
 //
 // Special markers ("NA", "s", "n.d."…) vary per producer; callers screen
 // them before calling (they all fail to parse, so the ok=false fallback
@@ -27,7 +29,7 @@ func ParseFRFloat(s string) (float64, bool) {
 		return 0, false
 	}
 	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
 		return 0, false
 	}
 	return f, true
