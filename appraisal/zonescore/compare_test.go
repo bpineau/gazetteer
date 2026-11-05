@@ -184,3 +184,31 @@ func TestCompare_CancelledMidFlight_LeavesQueueUncollected(t *testing.T) {
 		t.Errorf("entries = %d, want %d (every candidate keeps an entry)", len(cmp.Entries), len(listings))
 	}
 }
+
+// TestCompare_HeadlineYieldIsTheCappedOne pins that the headline rent and
+// yield are the rendement axis's own: a binding encadrement ceiling caps
+// both, and the uncapped market reading is reported apart.
+func TestCompare_HeadlineYieldIsTheCappedOne(t *testing.T) {
+	t.Parallel()
+	// Market 36 HC (40 CC) and reference 36, ceiling 20: the chargeable
+	// rent is 20, a 2.4 % gross yield at 10 000 EUR/m2.
+	c := stubCollector{byAddr: map[string]gazetteer.Dossier{
+		"capped": yieldDossier(pricePerM2, marketRentCC, marketRentHC, 20),
+	}}
+	e := Compare(context.Background(), c, []gazetteer.Listing{{Address: "capped"}}).Entries[0]
+	if e.RentEURPerM2 != 20 || e.YieldPct != 2.4 {
+		t.Errorf("headline rent %.1f, yield %.1f%%; want the capped 20 and 2.4%%", e.RentEURPerM2, e.YieldPct)
+	}
+	if e.MarketRentEURPerM2 <= e.RentEURPerM2 {
+		t.Errorf("MarketRentEURPerM2 = %.1f, want the uncapped blend above the cap", e.MarketRentEURPerM2)
+	}
+
+	// The ceiling alone (no market estimator) still yields a headline.
+	capOnly := yieldDossier(pricePerM2, 0, 0, 20)
+	delete(capOnly.Results, "carteloyers")
+	c = stubCollector{byAddr: map[string]gazetteer.Dossier{"cap-only": capOnly}}
+	e = Compare(context.Background(), c, []gazetteer.Listing{{Address: "cap-only"}}).Entries[0]
+	if !hasRendement(e) || e.YieldPct != 2.4 {
+		t.Errorf("cap-only: rendement present %v, yield %.1f%%; want present and 2.4%%", hasRendement(e), e.YieldPct)
+	}
+}

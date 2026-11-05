@@ -47,7 +47,7 @@ func scoreRendement(d gazetteer.Dossier) axisResult {
 	if p <= 0 || r <= 0 {
 		return axisResult{}
 	}
-	yield := r * 12 / p * 100
+	yield := grossYieldPct(r, p)
 	reason := fmt.Sprintf("rendement brut %.1f%% (loyer %.0f€/m²/mois, prix %.0f€/m²)", yield, r, p)
 	if c := rent.CapEurPerM2Cents; c > 0 && c < rent.EurPerM2Cents {
 		reason += fmt.Sprintf(", loyer plafonné par l'encadrement (marché %.0f€)", rent.EURPerM2())
@@ -58,6 +58,13 @@ func scoreRendement(d gazetteer.Dossier) axisResult {
 		sources: priceRentSources(price, rent),
 		present: true,
 	}
+}
+
+// grossYieldPct is the gross rental yield in percent of a monthly rent and a
+// price, both per m² (EUR/m²/month, EUR/m²). The rendement axis and
+// Compare's headline share it, so they can never disagree.
+func grossYieldPct(rentEURPerM2Month, priceEURPerM2 float64) float64 {
+	return rentEURPerM2Month * 12 / priceEURPerM2 * 100
 }
 
 // priceRentSources collects the non-excluded contributors behind the yield.

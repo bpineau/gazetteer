@@ -34,14 +34,25 @@ type ComparisonEntry struct {
 	// Score is the yield-first composite zone score and its axis breakdown.
 	Score Score `json:"score"`
 
-	// YieldPct is the gross rental yield (rent×12/price), 0 when price or rent
-	// is unavailable.
+	// YieldPct is the gross rental yield in percent (RentEURPerM2×12 /
+	// PriceEURPerM2×100), 0 when price or rent is unavailable. It is the very
+	// yield the rendement axis scores.
 	YieldPct float64 `json:"yield_pct,omitempty"`
 
-	// PriceEURPerM2 / RentEURPerM2 are the consolidated €/m² readings driving
-	// the yield (rent is €/m²/month).
+	// PriceEURPerM2 is the consolidated price in EUR/m².
 	PriceEURPerM2 float64 `json:"price_eur_per_m2,omitempty"`
-	RentEURPerM2  float64 `json:"rent_eur_per_m2,omitempty"`
+
+	// RentEURPerM2 is the rent the yield uses, in EUR/m²/month hors charges:
+	// the legally chargeable rent (appraisal.RentConsolidated.
+	// EffectiveEURPerM2), i.e. the market blend capped by the encadrement
+	// ceiling, or the ceiling alone when no market estimator answered.
+	RentEURPerM2 float64 `json:"rent_eur_per_m2,omitempty"`
+
+	// MarketRentEURPerM2 is the uncapped market blend in EUR/m²/month hors
+	// charges, set only when the ceiling binds (it then exceeds
+	// RentEURPerM2). It is what the market asks, not what a landlord may
+	// charge: never a yield input.
+	MarketRentEURPerM2 float64 `json:"market_rent_eur_per_m2,omitempty"`
 
 	// Rank is the 1-based position in the comparison (1 = best).
 	Rank int `json:"rank"`
@@ -126,11 +137,14 @@ loop:
 		if price.EurPerM2Cents > 0 {
 			e.PriceEURPerM2 = float64(price.EurPerM2Cents) / 100
 		}
-		if rent.EurPerM2Cents > 0 {
-			e.RentEURPerM2 = float64(rent.EurPerM2Cents) / 100
+		// The headline rent and yield are the axis's own: the legally
+		// chargeable rent, never the raw blend a ceiling forbids.
+		e.RentEURPerM2 = rent.EffectiveEURPerM2()
+		if c := rent.CapEurPerM2Cents; c > 0 && c < rent.EurPerM2Cents {
+			e.MarketRentEURPerM2 = rent.EURPerM2()
 		}
 		if e.PriceEURPerM2 > 0 && e.RentEURPerM2 > 0 {
-			e.YieldPct = stats.Round(e.RentEURPerM2*12/e.PriceEURPerM2*100, 1)
+			e.YieldPct = stats.Round(grossYieldPct(e.RentEURPerM2, e.PriceEURPerM2), 1)
 		}
 		entries[i] = e
 	}
