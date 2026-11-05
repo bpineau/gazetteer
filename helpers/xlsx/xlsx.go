@@ -17,6 +17,21 @@ import (
 // commune table is about 20 MB; a member past this cap is refused.
 const MaxPartSize = 512 << 20
 
+// Sheet dimension bounds. A worksheet's row and cell references place
+// values in the grid directly, so a few bytes of XML ("<row r=\"1000000\">",
+// a cell at XFD1) would otherwise make the reader allocate a huge sparse
+// grid that MaxPartSize, a bound on the XML, cannot see.
+const (
+	// MaxRows and MaxColumns are Excel's own sheet limits (1 048 576 rows,
+	// columns A to XFD); a reference beyond them is malformed.
+	MaxRows    = 1 << 20
+	MaxColumns = 1 << 14
+	// MaxCells caps the cells a sheet expands to, the padding of sparse
+	// rows and columns included: 16 Mi cells, about 50 times the largest
+	// INSEE commune table.
+	MaxCells = 16 << 20
+)
+
 // ErrNoSheet is returned by Rows for a sheet name the workbook does not
 // have; Sheets lists the ones it has.
 var ErrNoSheet = errors.New("xlsx: no such sheet")
@@ -289,6 +304,7 @@ func (w *Workbook) parseSheet(r io.Reader) ([][]string, error) {
 		rowIdx int // 1-based sheet row of `row`; 0 = none open
 		colIdx int // 0-based column of the open cell
 		cell   cellState
+		cells  int // cells allocated so far, padding included (MaxCells)
 	)
 	flush := func() {
 		if rowIdx == 0 {
@@ -316,8 +332,8 @@ func (w *Workbook) parseSheet(r io.Reader) ([][]string, error) {
 				rowIdx = len(rows) + 1
 				if v := attr(t, "r"); v != "" {
 					n, err := strconv.Atoi(v)
-					if err != nil || n < rowIdx {
-						return nil, fmt.Errorf("row %q: bad or out-of-order index", v)
+					if err != nil || n < rowIdx || n > MaxRows {
+						return nil, fmt.Errorf("row %q: bad, out-of-order or out-of-sheet index", v)
 					}
 					rowIdx = n
 				}
@@ -333,6 +349,9 @@ func (w *Workbook) parseSheet(r io.Reader) ([][]string, error) {
 					}
 					if n < colIdx {
 						return nil, fmt.Errorf("cell %q: out-of-order column", ref)
+					}
+					if n >= MaxColumns {
+						return nil, fmt.Errorf("cell %q: column past XFD", ref)
 					}
 					colIdx = n
 				}
@@ -356,6 +375,9 @@ func (w *Workbook) parseSheet(r io.Reader) ([][]string, error) {
 				val, err := w.cellValue(cell)
 				if err != nil {
 					return nil, fmt.Errorf("row %d col %d: %w", rowIdx, colIdx+1, err)
+				}
+				if cells += colIdx - len(row) + 1; cells > MaxCells {
+					return nil, fmt.Errorf("sheet expands past %d cells", MaxCells)
 				}
 				for len(row) < colIdx {
 					row = append(row, "")
@@ -434,6 +456,9 @@ func columnOf(ref string) (int, error) {
 			break
 		}
 		n = n*26 + int(ch-'A'+1)
+		if n > MaxColumns {
+			return 0, fmt.Errorf("cell %q: column past XFD", ref)
+		}
 	}
 	if n == 0 {
 		return 0, fmt.Errorf("cell %q: no column letters", ref)

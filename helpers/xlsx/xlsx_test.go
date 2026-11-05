@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -272,5 +273,48 @@ func TestColumnNames(t *testing.T) {
 	}
 	if _, err := columnOf("12"); err == nil {
 		t.Error("columnOf(\"12\") succeeded")
+	}
+}
+
+// TestRows_DimensionBounds pins that a few bytes of sheet XML cannot make
+// the reader allocate a huge sparse grid: references past Excel's sheet
+// limits, and a grid past MaxCells, are refused before allocation.
+func TestRows_DimensionBounds(t *testing.T) {
+	t.Parallel()
+	sheet := func(data string) []byte {
+		return rawWorkbook(t, map[string]string{
+			"xl/workbook.xml":            `<workbook xmlns:r="r"><sheets><sheet name="S" r:id="rId1"/></sheets></workbook>`,
+			"xl/_rels/workbook.xml.rels": `<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>`,
+			"xl/worksheets/sheet1.xml":   `<worksheet><sheetData>` + data + `</sheetData></worksheet>`,
+		})
+	}
+	var dense strings.Builder
+	for r := 1; r <= MaxCells/(MaxColumns-1)+1; r++ {
+		fmt.Fprintf(&dense, `<row r="%d"><c r="XFD%d"><v>1</v></c></row>`, r, r)
+	}
+	cases := map[string]string{
+		"row past the sheet": `<row r="1048577"><c><v>1</v></c></row>`,
+		"column past XFD":    `<row r="1"><c r="XFE1"><v>1</v></c></row>`,
+		"overflowing column": `<row r="1"><c r="ZZZZZZZZZZZZZZZ1"><v>1</v></c></row>`,
+		"grid past MaxCells": dense.String(),
+	}
+	for name, data := range cases {
+		wb, err := OpenBytes(sheet(data))
+		if err != nil {
+			t.Fatalf("%s: Open: %v", name, err)
+		}
+		if _, err := wb.Rows("S"); err == nil {
+			t.Errorf("%s: Rows succeeded, want an error", name)
+		} else {
+			t.Logf("%s: %v", name, err)
+		}
+	}
+	// The last valid cell is fine.
+	wb, err := OpenBytes(sheet(`<row r="1048576"><c r="XFD1048576"><v>1</v></c></row>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wb.Rows("S"); err != nil {
+		t.Errorf("XFD1048576: %v", err)
 	}
 }
