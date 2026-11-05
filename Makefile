@@ -12,6 +12,14 @@ GO           ?= go
 GOFMT        ?= gofmt
 GOIMPORTS    ?= goimports
 GOLANGCI     ?= golangci-lint
+GOVULNCHECK  ?= govulncheck
+
+# Pinned developer tooling: `make tools` installs exactly these, locally and in
+# CI, so a tool release never changes the gate for an unchanged revision.
+# golangci-lint must stay on the v2 major (.golangci.yml uses the v2 schema).
+GOIMPORTS_VERSION   ?= v0.52.0
+GOLANGCI_VERSION    ?= v2.15.0
+GOVULNCHECK_VERSION ?= v1.9.0
 
 GO_PACKAGES  := ./...
 GO_TIMEOUT   ?= 180s
@@ -63,10 +71,15 @@ vet: ## go vet across the module.
 lint: ## golangci-lint run (uses .golangci.yml).
 	$(GOLANGCI) run
 
+.PHONY: vuln
+vuln: ## govulncheck: report known vulnerabilities reachable from this module.
+	$(GOVULNCHECK) ./...
+
 .PHONY: tools
-tools: ## Install developer tooling (goimports, golangci-lint).
-	$(GO) install golang.org/x/tools/cmd/goimports@latest
-	$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+tools: ## Install the pinned developer tooling (goimports, golangci-lint v2, govulncheck).
+	$(GO) install golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION)
+	$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
+	$(GO) install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 
 # ----- Tests ---------------------------------------------------------
 

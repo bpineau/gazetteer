@@ -289,7 +289,7 @@ See [docs/plugins.md](docs/plugins.md) for out-of-tree plugins.
 ## How to work: the gate, CI, and commits
 
 ```bash
-make tools      # once: installs goimports + golangci-lint
+make tools      # once: installs the pinned goimports, golangci-lint v2, govulncheck
 make hooks      # once: installs .githooks, so pre-commit runs `make precommit`
 make precommit  # THE GATE: fmt-check + vet + lint + test + tidy-check
 make test-race  # what CI adds on top; run it after touching anything concurrent

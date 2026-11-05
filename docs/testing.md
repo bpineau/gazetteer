@@ -50,10 +50,17 @@ srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.R
 defer srv.Close()
 
 src := ademe.NewSource(ademe.Options{
-    BaseURL: srv.URL,
+    BaseURL:    srv.URL,
+    HTTPClient: srv.Client(), // never the shared default transport
 })
 result, err := src.Query(ctx, listing)
 ```
+
+Always give the Source the server's own client: one falling back on
+`gazetteer.DefaultHTTPClient` shares `http.DefaultTransport` with every
+other test in the package, and a neighbour's `srv.Close()` then closes its
+idle connections mid-request. `internal/lint` enforces this for Options
+literals fed a server URL.
 
 Sources with multiple endpoints (DVF: section catalog + mutations
 API) take a single `httptest.Server` and route by path:
