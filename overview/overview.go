@@ -3,6 +3,7 @@ package overview
 import (
 	"math"
 	"sort"
+	"time"
 
 	"github.com/bpineau/gazetteer/helpers/communes"
 	"github.com/bpineau/gazetteer/helpers/geodist"
@@ -68,6 +69,12 @@ type CommuneOverview struct {
 	// upper bound, not the chargeable rent. Some Grenoble-Alpes Métropole
 	// communes are covered only in part.
 	EncadrementNotCovered bool `json:"encadrement_not_covered,omitempty"`
+	// EncadrementLapsed is true for a commune that the art. 140 rent-cap
+	// experiment covered, read on a date (Options.AsOf) past the
+	// experiment's end or past its shipped grille's: no cap is known to
+	// apply, so Encadree is false and RentCapEURM2HC nil. Re-check the
+	// commune when an extension or a new arrêté is published.
+	EncadrementLapsed bool `json:"encadrement_lapsed,omitempty"`
 
 	// Socio-economic
 	DelinquanceLevel string   `json:"delinquance_level"`
@@ -97,6 +104,13 @@ type Options struct {
 	// Depts restricts output to the given department codes (e.g. ["75","95"]).
 	// Empty means all departments present in the dvfagg source.
 	Depts []string
+
+	// AsOf is the date the regulatory fields are read for (the zero time
+	// means today): the encadrement caps follow the validity of their
+	// arrêté and of the art. 140 experiment, exactly as the encadrement
+	// Source does for Listing.AsOf. The market fields are the embedded
+	// snapshots whatever the date.
+	AsOf time.Time
 }
 
 // Build joins all embedded gazetteer sources for the communes that have DVF
@@ -170,14 +184,8 @@ func Build(o Options) ([]CommuneOverview, error) {
 			row.RentMarketEURM2HC = r.HCEURPerM2()
 		}
 
-		// Encadrement representative T2 majoré cap.
-		if cap, ok := RepresentativeT2Majore(enc, insee); ok {
-			row.Encadree = true
-			row.RentCapEURM2HC = &cap
-		} else if _, _, ok := encadrement.UncoveredTerritory(insee); ok {
-			row.Encadree = true
-			row.EncadrementNotCovered = true
-		}
+		// Encadrement representative T2 majoré cap, as in force on AsOf.
+		setEncadrement(&row, enc, insee, o.AsOf)
 
 		// Délinquance level.
 		row.DelinquanceLevel = dl.Level(insee).String()

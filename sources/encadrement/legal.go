@@ -148,3 +148,26 @@ func dated(r *Result, zoneSource string, day, lastDay time.Time) *Result {
 	}
 	return r
 }
+
+// RegulationOn is the batch form of the Source's date rule, for callers
+// that read the grilles without a Listing (overview). zoneSource names the
+// shipped grille (a ZoneSource* constant) behind a capped reading, or is
+// empty for a decreed territory whose grille is not shipped
+// (UncoveredTerritory). day is the reading date; the zero time means today.
+//
+// It returns the Regulation a Query would report on day: RegulationLapsed
+// past the art. 140 experiment's last day, RegulationNotCovered past the
+// shipped grille's own end (or for an unshipped grille), RegulationCapped
+// otherwise. Before a grille's start the shipped cap is still the nearest
+// reading, so it stays RegulationCapped, as the Source keeps it at
+// ConfidenceLow.
+func RegulationOn(zoneSource string, day time.Time) string {
+	if day.IsZero() {
+		day = clock()
+	}
+	reg := RegulationCapped
+	if zoneSource == "" {
+		reg = RegulationNotCovered
+	}
+	return dated(&Result{Regulation: reg}, zoneSource, dayOf(day), elanLastDay).Regulation
+}

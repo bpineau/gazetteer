@@ -122,3 +122,27 @@ func TestGridValidity_Consistent(t *testing.T) {
 		}
 	}
 }
+
+// TestRegulationOn pins the batch date rule on both sides of the shipped
+// boundaries: the Paris grille's start, and the experiment's last day.
+func TestRegulationOn(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		zoneSource string
+		day        time.Time
+		want       string
+	}{
+		{ZoneSourceParis, civilDate(2026, time.June, 30), RegulationCapped}, // before the grille: nearest reading
+		{ZoneSourceParis, civilDate(2026, time.November, 24), RegulationCapped},
+		{ZoneSourceParis, civilDate(2026, time.November, 25), RegulationLapsed},
+		{ZoneSourceLyonVilleurbanne, civilDate(2026, time.November, 25), RegulationLapsed},
+		{"", civilDate(2026, time.November, 24), RegulationNotCovered},
+		{"", civilDate(2026, time.November, 25), RegulationLapsed},
+		{ZoneSourceParis, time.Time{}, RegulationCapped}, // zero day = the pinned clock
+	}
+	for _, c := range cases {
+		if got := RegulationOn(c.zoneSource, c.day); got != c.want {
+			t.Errorf("RegulationOn(%q, %s) = %q, want %q", c.zoneSource, c.day.Format(time.DateOnly), got, c.want)
+		}
+	}
+}

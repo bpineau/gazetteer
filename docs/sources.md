@@ -1010,6 +1010,12 @@ A commune of a decreed rent-cap territory whose grille is not embedded
 and a nil `RentCapEURM2HC`: its rents are capped by a figure the row does not
 carry, so its `EffectiveRentEURM2HC` is an upper bound.
 
+The encadrement fields are read for `Options.AsOf` (zero = today) with the
+encadrement Source's own date rule (`encadrement.RegulationOn`): past a
+grille's arrêté or the art. 140 experiment's last day, a commune loses its
+cap and comes back `EncadrementLapsed` instead. The market fields are the
+embedded snapshots whatever the date.
+
 `overview.Build` does no network I/O; it iterates the communes `dvfagg` has
 price data for (`Depts` empty = national). It is the batch/screening
 counterpart to the per-address `Client.Collect`.

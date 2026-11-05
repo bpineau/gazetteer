@@ -2,9 +2,14 @@ package overview
 
 import (
 	"testing"
+	"time"
 
 	"github.com/bpineau/gazetteer/sources/encadrement"
 )
+
+// grilleDay is a date every shipped grille is in force on, so the cap tests
+// do not change verdict on their own when the art. 140 experiment ends.
+var grilleDay = time.Date(2026, time.October, 21, 0, 0, 0, 0, time.UTC)
 
 func TestRepresentativeT2Majore(t *testing.T) {
 	t.Parallel()
@@ -15,7 +20,7 @@ func TestRepresentativeT2Majore(t *testing.T) {
 	}
 
 	// Paris arrondissement 19e (75119) should return a positive cap.
-	cap, ok := RepresentativeT2Majore(idx, "75119")
+	cap, ok := RepresentativeT2Majore(idx, "75119", grilleDay)
 	if !ok {
 		t.Fatal("RepresentativeT2Majore(75119) = _, false; want true (Paris 19e is encadré)")
 	}
@@ -25,7 +30,7 @@ func TestRepresentativeT2Majore(t *testing.T) {
 	t.Logf("Paris 75119 T2 majoré cap = %.2f €/m²/mois HC", cap)
 
 	// Plaine Commune commune (Saint-Denis 93066) should return a positive cap.
-	capPC, okPC := RepresentativeT2Majore(idx, "93066")
+	capPC, okPC := RepresentativeT2Majore(idx, "93066", grilleDay)
 	if !okPC {
 		t.Fatal("RepresentativeT2Majore(93066) = _, false; want true (Saint-Denis is Plaine Commune)")
 	}
@@ -35,7 +40,7 @@ func TestRepresentativeT2Majore(t *testing.T) {
 	t.Logf("Plaine Commune 93066 T2 majoré cap = %.2f €/m²/mois HC", capPC)
 
 	// Est Ensemble commune (Montreuil 93048) should return a positive cap.
-	capEE, okEE := RepresentativeT2Majore(idx, "93048")
+	capEE, okEE := RepresentativeT2Majore(idx, "93048", grilleDay)
 	if !okEE {
 		t.Fatal("RepresentativeT2Majore(93048) = _, false; want true (Montreuil is Est Ensemble)")
 	}
@@ -45,7 +50,7 @@ func TestRepresentativeT2Majore(t *testing.T) {
 	t.Logf("Est Ensemble 93048 T2 majoré cap = %.2f €/m²/mois HC", capEE)
 
 	// Non-encadré commune (Provins 77284) should return ok=false.
-	_, okNone := RepresentativeT2Majore(idx, "77284")
+	_, okNone := RepresentativeT2Majore(idx, "77284", grilleDay)
 	if okNone {
 		t.Fatal("RepresentativeT2Majore(77284) = _, true; want false (Provins is not encadré)")
 	}
@@ -64,7 +69,7 @@ func TestRepresentativeT2Majore_Lyon(t *testing.T) {
 		t.Fatalf("encadrement.Load: %v", err)
 	}
 	for _, insee := range []string{"69381", "69383", "69389", "69266"} {
-		cap, ok := RepresentativeT2Majore(idx, insee)
+		cap, ok := RepresentativeT2Majore(idx, insee, grilleDay)
 		if !ok {
 			t.Errorf("RepresentativeT2Majore(%s) = _, false; want true (inside the Lyon perimeter)", insee)
 			continue
@@ -77,7 +82,7 @@ func TestRepresentativeT2Majore_Lyon(t *testing.T) {
 	}
 	// The Lyon parent commune carries no grille of its own (dvfagg keys the
 	// arrondissements), and must not borrow one.
-	if _, ok := RepresentativeT2Majore(idx, "69123"); ok {
+	if _, ok := RepresentativeT2Majore(idx, "69123", grilleDay); ok {
 		t.Error("RepresentativeT2Majore(69123) = _, true; want false (parent commune, no grille)")
 	}
 }
@@ -88,7 +93,7 @@ func TestRepresentativeT2Majore_Lyon(t *testing.T) {
 // territory, stays unregulated.
 func TestBuild_DecreedTerritoryWithoutGrille(t *testing.T) {
 	t.Parallel()
-	rows, err := Build(Options{Depts: []string{"31", "33"}})
+	rows, err := Build(Options{Depts: []string{"31", "33"}, AsOf: grilleDay})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -109,5 +114,38 @@ func TestBuild_DecreedTerritoryWithoutGrille(t *testing.T) {
 	}
 	if tls.Encadree || tls.EncadrementNotCovered {
 		t.Errorf("Toulouse: Encadree %v NotCovered %v, want false false", tls.Encadree, tls.EncadrementNotCovered)
+	}
+}
+
+// TestBuild_EncadrementFollowsItsValidity pins that the screen applies the
+// encadrement Source's date rule: the day after the art. 140 experiment's
+// last day, no commune keeps a cap or a not-covered flag.
+func TestBuild_EncadrementFollowsItsValidity(t *testing.T) {
+	t.Parallel()
+	last := time.Date(2026, time.November, 24, 0, 0, 0, 0, time.UTC)
+	rowOf := func(day time.Time, insee string) CommuneOverview {
+		t.Helper()
+		rows, err := Build(Options{Depts: []string{"75", "33"}, AsOf: day})
+		if err != nil {
+			t.Fatalf("Build: %v", err)
+		}
+		for _, r := range rows {
+			if r.INSEE == insee {
+				return r
+			}
+		}
+		t.Fatalf("no %s row", insee)
+		return CommuneOverview{}
+	}
+	if r := rowOf(last, "75101"); !r.Encadree || r.RentCapEURM2HC == nil || r.EncadrementLapsed {
+		t.Errorf("75101 on %s: Encadree %v cap %v lapsed %v, want a cap in force", last.Format(time.DateOnly), r.Encadree, r.RentCapEURM2HC, r.EncadrementLapsed)
+	}
+	after := last.AddDate(0, 0, 1)
+	for _, insee := range []string{"75101", "33063"} {
+		r := rowOf(after, insee)
+		if r.Encadree || r.RentCapEURM2HC != nil || r.EncadrementNotCovered || !r.EncadrementLapsed {
+			t.Errorf("%s on %s: Encadree %v cap %v notCovered %v lapsed %v, want lapsed with no cap",
+				insee, after.Format(time.DateOnly), r.Encadree, r.RentCapEURM2HC, r.EncadrementNotCovered, r.EncadrementLapsed)
+		}
 	}
 }
