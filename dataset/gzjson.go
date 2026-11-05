@@ -13,6 +13,9 @@ import (
 // format of the embedded commune-keyed indexes — into a freshly allocated
 // T. The JSON is streamed through the decoder, so the gunzipped body is
 // never materialised as one buffer (some artifacts gunzip to >100 MB).
+// The stream must hold one JSON value and nothing after it, and its gzip
+// integrity check (CRC-32 and length, verified at EOF) must pass: a
+// corrupt or truncated artifact is an error, never a decoded value.
 // errPrefix prefixes error messages, conventionally the Source name.
 func ReadGzJSON[T any](r io.Reader, errPrefix string) (*T, error) {
 	zr, err := gzip.NewReader(r)
@@ -21,8 +24,18 @@ func ReadGzJSON[T any](r io.Reader, errPrefix string) (*T, error) {
 	}
 	defer func() { _ = zr.Close() }()
 	var v T
-	if err := json.NewDecoder(zr).Decode(&v); err != nil {
+	dec := json.NewDecoder(zr)
+	if err := dec.Decode(&v); err != nil {
 		return nil, fmt.Errorf("%s: parse json: %w", errPrefix, err)
+	}
+	// The artifact is exactly one JSON value, and the gzip stream must be
+	// read to its end: gzip verifies its CRC and size only at EOF, so a
+	// corrupt trailer or a truncated stream only shows up there.
+	switch _, err := dec.Token(); {
+	case err == nil:
+		return nil, fmt.Errorf("%s: parse json: trailing data after the JSON value", errPrefix)
+	case !errors.Is(err, io.EOF):
+		return nil, fmt.Errorf("%s: gunzip: %w", errPrefix, err)
 	}
 	return &v, nil
 }

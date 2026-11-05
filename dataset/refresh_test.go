@@ -172,7 +172,7 @@ func TestRefresh_PartialFailureDoesNotAbortBatch(t *testing.T) {
 	good := Set{Source: "good", Version: 1, Processed: File{Name: "good.csv.gz"},
 		Raw: []File{{Name: "in.csv", URL: srv.URL}}, Transform: upperGzipTransform}
 	bad := Set{Source: "bad", Version: 1, Processed: File{Name: "bad.csv.gz"},
-		Raw: []File{{Name: "in.csv", URL: srv.URL + "/missing"}}, Transform: upperGzipTransform}
+		Raw: []File{{Name: "bad-in.csv", URL: srv.URL + "/missing"}}, Transform: upperGzipTransform}
 
 	rep, err := Refresh(context.Background(), newTestClient(t), []Set{bad, good}, RefreshOptions{Dir: dir})
 	if err == nil {

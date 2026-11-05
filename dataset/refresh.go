@@ -122,17 +122,43 @@ func Refresh(ctx context.Context, c *httpx.Client, sets []Set, opts RefreshOptio
 	return report, errors.Join(errs...)
 }
 
-// checkNoCollisions rejects a batch in which two Sets would write the same
-// flat-datadir processed filename — they would clobber each other (and the
-// per-source manifests could not even tell them apart). Names are expected
-// to be globally unique (source-prefixed by convention).
+// checkNoCollisions rejects a batch in which two artifacts would share a
+// flat-datadir filename and clobber each other: two processed files, a raw
+// file and a processed one, any artifact and a source's manifest, or two
+// Sets' raw inputs fetched from different URLs. Two Sets may share a raw
+// file only when both declare it from the same URL (the same content
+// identity). Names are expected to be globally unique (source-prefixed by
+// convention).
 func checkNoCollisions(sets []Set) error {
-	seen := make(map[string]string, len(sets))
-	for _, s := range sets {
-		if prev, ok := seen[s.Processed.Name]; ok {
-			return fmt.Errorf("dataset: processed file %q declared by both %q and %q", s.Processed.Name, prev, s.Source)
+	type owner struct{ source, kind, url string }
+	seen := map[string]owner{}
+	claim := func(name string, o owner) error {
+		prev, ok := seen[name]
+		if !ok {
+			seen[name] = o
+			return nil
 		}
-		seen[s.Processed.Name] = s.Source
+		if prev.kind == "raw" && o.kind == "raw" && prev.url == o.url {
+			return nil // one input, declared twice
+		}
+		return fmt.Errorf("dataset: file %q declared as %s by %q and as %s by %q", name, prev.kind, prev.source, o.kind, o.source)
+	}
+	manifests := map[string]bool{}
+	for _, s := range sets {
+		if err := claim(s.Processed.Name, owner{s.Source, "processed", ""}); err != nil {
+			return err
+		}
+		for _, r := range s.Raw {
+			if err := claim(r.Name, owner{s.Source, "raw", r.URL}); err != nil {
+				return err
+			}
+		}
+		manifests[filepath.Base(manifestPath("", s.Source))] = true
+	}
+	for name := range manifests {
+		if o, ok := seen[name]; ok {
+			return fmt.Errorf("dataset: file %q declared as %s by %q is a manifest name", name, o.kind, o.source)
+		}
 	}
 	return nil
 }
@@ -174,12 +200,18 @@ func refreshOne(ctx context.Context, c *httpx.Client, s Set, dir string, opts Re
 		maxBytes = defaultMaxRawBytes
 	}
 
+	// A raw file already in the datadir is reused only when the manifest
+	// says it was fetched from the URL the Set declares now: a new Version
+	// that moves its raw input to another URL under the same file name must
+	// download it, not rebuild from the old bytes and record the new URL as
+	// their provenance. An unreadable manifest only costs a download.
+	prev, _ := readManifest(dir, s.Source)
 	urls := make([]string, 0, len(s.Raw))
 	for _, raw := range s.Raw {
 		dest := filepath.Join(dir, raw.Name)
 		opts.emit(Event{Source: s.Source, Phase: "download", File: raw.Name})
 		dr, err := c.Download(ctx, raw.URL, dest, httpx.DownloadOptions{
-			SkipIfExists:   !opts.Force,
+			SkipIfExists:   !opts.Force && rawFetchedFrom(prev, raw),
 			ExpectedSHA256: raw.SHA256,
 			MaxBytes:       maxBytes,
 		})

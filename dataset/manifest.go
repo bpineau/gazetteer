@@ -104,3 +104,11 @@ func loadOrInitManifest(dir, source string) (*manifest, error) {
 	m.Source = source
 	return m, nil
 }
+
+// rawFetchedFrom reports whether m records raw's file as downloaded from
+// exactly raw.URL, which is the only case where an existing copy in the
+// datadir may stand for it.
+func rawFetchedFrom(m *manifest, raw File) bool {
+	e, ok := m.entry(raw.Name)
+	return ok && len(e.URLs) == 1 && e.URLs[0] == raw.URL
+}

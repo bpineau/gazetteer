@@ -54,6 +54,15 @@ gazetteer refresh [sources...|all] [flags]
 - `gazetteer refresh --go-embed-update` rebuilds into the datadir **and**
   copies each artifact back into `sources/<name>/data/` so you can re-commit
   the embedded data. It must run inside the module checkout.
+- Without `--force`, a raw file already in the datadir is reused only when
+  the source's manifest records it as fetched from the URL the Set declares
+  now: a new version that moves its raw input to another URL downloads it.
+- A batch whose artifacts would share a datadir filename (two processed
+  files, a raw and a processed file, a manifest name, or one raw name
+  declared from two URLs) is rejected before anything is written.
+- Every gzipped JSON artifact is read to its end (`dataset.ReadGzJSON`): a
+  corrupt or truncated gzip trailer, or data after the JSON value, is an
+  error, never a decoded index.
 
 From code, the CLI is a thin mirror of:
 
