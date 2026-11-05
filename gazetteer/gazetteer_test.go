@@ -428,3 +428,28 @@ func TestCollect_CancelledCollectDoesNotRunQueuedSources(t *testing.T) {
 	}
 	cancel()
 }
+
+// lateFallbackSource waits for its context to end, then answers a
+// nonempty value with a nil error: the shape of a Source that swallows its
+// cut fetches into a fallback reading.
+type lateFallbackSource struct{}
+
+func (lateFallbackSource) Name() string { return "late" }
+func (lateFallbackSource) Version() int { return 1 }
+func (lateFallbackSource) Query(ctx context.Context, _ Listing) (any, error) {
+	<-ctx.Done()
+	return &struct{ V int }{V: 42}, nil
+}
+
+// TestPerSourceTimeout_LateNilErrorIsAFailure pins that a Source returning
+// after its deadline is not recorded as a success because it said nil.
+func TestPerSourceTimeout_LateNilErrorIsAFailure(t *testing.T) {
+	c, _ := NewBuilder().With(lateFallbackSource{}).WithPerSourceTimeout(time.Millisecond).Build()
+	got := c.Collect(context.Background(), Listing{}).Results["late"]
+	if got.Status != StatusFailedTransient || got.Err == nil || got.Data != nil {
+		t.Errorf("late source: status %v err %v data %v, want transient failure without data", got.Status, got.Err, got.Data)
+	}
+	if !errors.Is(got.Err, context.DeadlineExceeded) {
+		t.Errorf("err = %v, want it to wrap context.DeadlineExceeded", got.Err)
+	}
+}

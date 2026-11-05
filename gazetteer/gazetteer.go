@@ -113,6 +113,13 @@ func (b *Builder) WithMaxConcurrency(n int) *Builder {
 // retryable), while its fast siblings complete normally. Every Result —
 // including the timed-out one — carries its ElapsedMS.
 //
+// Enforcement is cooperative: Query runs synchronously, so a Source that
+// ignores its context is not interrupted, only judged when it returns. A
+// Source that returns after its context ended is a failure whatever it
+// returned: a value built once the deadline had cut its fetches (a
+// fallback, a partial reading) is not trusted as a successful Result, so
+// Data is dropped and the Status is StatusFailedTransient.
+//
 // The default is 0 (disabled): no per-source deadline, matching the
 // historical behavior. This is deliberate — "the data is the product",
 // and multi-request Sources (dvf's per-section fan-out, osm's mirror
@@ -355,6 +362,12 @@ func runOne(ctx context.Context, s Source, l Listing, timeout time.Duration) (r 
 		defer cancel()
 	}
 	data, err := s.Query(ctx, l)
+	if err == nil && ctx.Err() != nil {
+		// The Source answered after its deadline (or the Collect's
+		// cancellation): whatever it built then was built without the
+		// fetches the deadline cut, so it is not a successful reading.
+		err = fmt.Errorf("source %s returned after its context ended: %w", s.Name(), context.Cause(ctx))
+	}
 	if err != nil {
 		r.Err = err
 		r.Status = classifyErr(err)
