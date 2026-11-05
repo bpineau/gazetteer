@@ -188,7 +188,7 @@ rnc             v3
 rpls            v1
 sensible        v2
 sitadel         v1
-taxefonciere    v1
+taxefonciere    v2
 vacance         v1
 zonageabc       v1
 zonetendue      v1

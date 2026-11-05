@@ -197,3 +197,26 @@ func TestDeptFromInsee(t *testing.T) {
 		}
 	}
 }
+
+// TestQuery_V1FallbackCarriesNoEstimate pins the unit of the V1 branch: its
+// artifact is a valeur locative tariff (a tax base before rate and
+// abattement), so tariff × surface is not the tax due and must not be
+// published as EstimatedEURPerYear.
+func TestQuery_V1FallbackCarriesNoEstimate(t *testing.T) {
+	t.Parallel()
+	idx := &Index{
+		V1: &V1Index{Communes: map[string]float64{"99001": 90}},
+		V2: &V2Index{},
+	}
+	surface := 50.0
+	res, err := Query(context.Background(), Options{Index: idx}, gazetteer.Listing{INSEE: "99001", SurfaceM2: &surface})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.EstimatedEURPerYear != 0 || !res.IsEmpty() || res.Confidence != ConfidenceNone {
+		t.Errorf("V1 fallback: estimate %v, empty %v, confidence %q; want 0, true, none", res.EstimatedEURPerYear, res.IsEmpty(), res.Confidence)
+	}
+	if !res.UsedV1Fallback || res.VLEURPerM2 != 90 || res.Evidence.PathUsed != "v1_commune" {
+		t.Errorf("V1 fallback: used %v, VL %v, path %q; want true, 90, v1_commune", res.UsedV1Fallback, res.VLEURPerM2, res.Evidence.PathUsed)
+	}
+}

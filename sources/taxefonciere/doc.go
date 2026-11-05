@@ -2,11 +2,11 @@
 // annual taxe foncière (FR property tax) from offline DGFiP datasets.
 //
 // The Source needs Listing.INSEE and Listing.SurfaceM2. It tries the
-// V2 path first (DGFiP voted TFPB/TEOM rates × VLC tariff × surface
-// × abattement) and falls back to V1 (legacy per-m² ratio × surface)
-// when V2 has no signal at all. Commune hits yield ConfidenceHigh
-// (V2) or ConfidenceMedium (V1); département fallbacks yield one
-// level lower.
+// V2 path (DGFiP voted TFPB/TEOM rates × VLC tariff × surface ×
+// abattement): a commune hit yields ConfidenceHigh, a département fallback
+// ConfidenceMedium. When V2 has no signal at all, the V1 dataset still
+// gives the commune's per-m² valeur locative (VLEURPerM2), a tax base
+// without a rate, so the Result carries no estimate (IsEmpty).
 //
 // Property type is not consulted — the TF estimate applies to the
 // habitable surface regardless of apartment vs house. Callers that

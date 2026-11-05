@@ -18,7 +18,12 @@ const Name = "taxefonciere"
 // v1 combines the legacy per-m² ratio fallback with taxe_fonciere_v2
 // (DGFiP taux votés + VLC proxy + TEOM breakdown). V2 runs first; V1
 // only when V2 misses on both commune and département.
-const sourceVersion = 1
+//
+// v2: the V1 fallback no longer returns vl × surface as EstimatedEURPerYear.
+// The V1 artifact holds a valeur locative tariff, a tax base before rate
+// and abattement; the branch now reports that tariff in VLEURPerM2 with no
+// estimate (IsEmpty, ConfidenceNone).
+const sourceVersion = 2
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -128,23 +133,22 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		}, nil
 	}
 
-	// V2 missed completely — try V1 (legacy per-m² ratio).
+	// V2 missed completely. V1 carries the per-m² valeur locative
+	// cadastrale only, a tax BASE: without a voted rate there is no tax to
+	// compute (vl × surface is the base, not the bill, and would read about
+	// three times too high). Report the tariff for reference, no estimate.
 	if vl, fb, ok := idx.V1.LookupV1(insee); ok {
-		yearly := vl * surface
-		conf := ConfidenceMedium
 		path := "v1_commune"
 		if fb {
-			conf = ConfidenceLow
 			path = "v1_dept"
 		}
 		ev.PathUsed = path
 		return &Result{
-			EstimatedEURPerYear: yearly,
-			VLEURPerM2:          vl,
-			UsedDeptFallback:    fb,
-			UsedV1Fallback:      true,
-			Confidence:          conf,
-			Evidence:            ev,
+			VLEURPerM2:       vl,
+			UsedDeptFallback: fb,
+			UsedV1Fallback:   true,
+			Confidence:       ConfidenceNone,
+			Evidence:         ev,
 		}, nil
 	}
 

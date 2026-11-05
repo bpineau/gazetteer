@@ -659,9 +659,10 @@ Per-commune `taxe foncière` estimate.
   — surfaced separately so it doesn't pollute net cashflow), `TauxTFPBApplied` /
   `TauxTEOMApplied` (voted rates, **%**), `VLEURPerM2` (the per-m² valeur
   locative applied), `UsedDeptFallback` / `UsedV1Fallback` flags and
-  `Confidence`. Confidence reflects whether the V2 (DGFiP voted rates × VLC ×
-  surface) or V1 (legacy per-m² ratio) path applied, and whether the lookup hit
-  the commune or fell back to the department.
+  `Confidence`. Only the V2 path (DGFiP voted rates × VLC × surface) estimates,
+  and Confidence says whether it hit the commune or fell back to the
+  department. When V2 has no signal at all, the V1 per-m² valeur locative is
+  reported in `VLEURPerM2` (a tax base, no rate to apply) with no estimate.
 - **Limitation (read before trusting the €)**: this is an *order-of-magnitude*
   estimate, not the exact bill. The voted taux are real, but they multiply a
   per-m² valeur-locative **proxy**, not the dwelling's actual cadastral base, so

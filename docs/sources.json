@@ -596,7 +596,7 @@
   },
   {
     "name": "taxefonciere",
-    "version": 1,
+    "version": 2,
     "default": true,
     "summary": "Estimated annual taxe foncière (DGFiP voted TFPB/TEOM rates × valeur locative proxy × surface).",
     "inputs": [

@@ -5,9 +5,9 @@
 // DGFiP voted TFPB/TEOM taux for the commune (or dept median
 // fallback), and computes the yearly TF the landlord pays plus the
 // separately-itemised TEOM (recoverable from the tenant). The V2 path
-// (DGFiP taux votés + TEOM breakdown) runs first; the V1 per-m² ratio
-// fallback runs only when V2 has no signal at all (commune + dept
-// both missing).
+// (DGFiP taux votés + TEOM breakdown) is the only one that estimates; the
+// V1 per-m² valeur locative is read only when V2 has no signal at all
+// (commune + dept both missing), and then reported without an estimate.
 //
 // LIMITATION — this is an order-of-magnitude estimate, not the exact bill.
 // The voted taux are real, but they are applied to a valeur-locative *proxy*
@@ -53,7 +53,7 @@ type Result struct {
 
 	// TauxTFPBApplied is the voted TFPB rate in percent (e.g. 32.5 =
 	// 32.5 %). Echoed for traceability. Zero means no voted rate was
-	// available (a V1-fallback estimate, not a 0 % tax rate) — consumers
+	// available (a V1 fallback, which carries no estimate; not a 0 % tax rate) — consumers
 	// must treat 0 as "no reading" for this field specifically.
 	TauxTFPBApplied float64 `json:"taux_tfpb_applied,omitempty"`
 
@@ -63,9 +63,9 @@ type Result struct {
 
 	// VLEURPerM2 is the per-m² valeur locative tariff actually
 	// applied. For V2 estimates this is the national VLC tariff
-	// (~90 €/m²/an); for V1 fallback estimates this is the per-m² TF
-	// ratio drawn from the legacy DGFiP "Tarifs des locaux
-	// d'habitation" CSV.
+	// (~90 EUR/m²/year); on the V1 fallback it is the commune's median
+	// valeur locative cadastrale per m² from the DGFiP "Tarifs des locaux
+	// d'habitation" export, a tax base before rate and abattement.
 	VLEURPerM2 float64 `json:"vl_eur_per_m2"`
 
 	// UsedDeptFallback is true when the per-commune row was missing
@@ -73,14 +73,15 @@ type Result struct {
 	UsedDeptFallback bool `json:"used_dept_fallback,omitempty"`
 
 	// UsedV1Fallback is true when the V2 fiscalité-locale index had
-	// no signal at all (commune + dept both missing) and the Source
-	// fell back to the V1 per-m² ratio. The TEOM fields are zero in
-	// this branch since V1 does not separate TFPB from TEOM.
+	// no signal at all (commune + dept both missing) and the Source read
+	// the V1 per-m² valeur locative instead. That tariff has no rate to
+	// apply, so the branch carries no estimate: EstimatedEURPerYear and
+	// TEOMEURPerYear are 0 and Confidence is ConfidenceNone.
 	UsedV1Fallback bool `json:"used_v1_fallback,omitempty"`
 
-	// Confidence is one of "high" / "medium" / "low" — High when
-	// commune-row V2 hit, Medium on dept fallback OR V1 commune hit,
-	// Low on V1 dept fallback, ConfidenceNone when no data.
+	// Confidence is "high" on a commune-row V2 hit, "medium" on the V2
+	// département fallback, ConfidenceNone when there is no estimate (no
+	// data, or the V1 fallback).
 	Confidence string `json:"confidence"`
 
 	// Evidence captures reproducibility metadata about the query that
