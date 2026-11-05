@@ -138,7 +138,7 @@ func dated(r *Result, zoneSource string, day, lastDay time.Time) *Result {
 			Regulation: RegulationLapsed,
 			Evidence:   r.Evidence,
 		}
-		lapsed.Evidence.Note = fmt.Sprintf("the art. 140 loi 2018-1021 rent-cap experiment ended on %s and no extension had been published in the JO when this Source was built; on %s no cap applies",
+		lapsed.Evidence.Note = fmt.Sprintf("the art. 140 loi 2018-1021 rent-cap experiment ends on %s, the term this Source applies (see its legal status); on %s no cap applies",
 			lastDay.Format(time.DateOnly), day.Format(time.DateOnly))
 		return lapsed
 	}
