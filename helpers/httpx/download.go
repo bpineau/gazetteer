@@ -102,7 +102,11 @@ func (c *Client) Download(ctx context.Context, url, destPath string, opts Downlo
 	if timeout <= 0 {
 		timeout = defaultDownloadTimeout
 	}
-	dlCtx, cancel := context.WithTimeout(ctx, timeout)
+	// The download bypasses the disk HTTP cache: the destination file is
+	// already the persistent copy, and the cache buffers whole bodies in
+	// memory under the client's MaxResponseBytes, which would override a
+	// larger DownloadOptions.MaxBytes.
+	dlCtx, cancel := context.WithTimeout(WithBypassCache(ctx), timeout)
 	defer cancel()
 	dlClient := *c.http
 	dlClient.Timeout = 0
@@ -122,7 +126,6 @@ func (c *Client) Download(ctx context.Context, url, destPath string, opts Downlo
 	if resp.StatusCode >= 400 {
 		return DownloadResult{}, &ErrHTTP{Status: resp.StatusCode, URL: url}
 	}
-	fromCache := resp.Header.Get("X-From-Cache") == "1"
 
 	// A tmpfile unique to this download: two concurrent downloads of the same
 	// destination would otherwise open, truncate and interleave their bytes in
@@ -212,7 +215,6 @@ func (c *Client) Download(ctx context.Context, url, destPath string, opts Downlo
 	return DownloadResult{
 		SHA256: sum,
 		Bytes:  n,
-		Cached: fromCache,
 		Path:   finalPath,
 	}, nil
 }

@@ -1,6 +1,9 @@
 package httpx
 
-import "context"
+import (
+	"context"
+	"sync/atomic"
+)
 
 // Non-exported context keys to avoid collisions with caller code.
 type ctxKey int
@@ -84,4 +87,34 @@ func WithRetryUnsafe(ctx context.Context) context.Context {
 func RetryUnsafeFromContext(ctx context.Context) bool {
 	v, ok := ctx.Value(ctxKeyRetryUnsafe).(bool)
 	return ok && v
+}
+
+// attemptsKey carries the *atomic.Int32 the retry layer bumps on every
+// upstream send of one request, so GetBytes and the snapshot layer, which
+// sit above it, can report how many sends it took.
+type attemptsKey struct{}
+
+// withAttemptCounter returns ctx carrying a fresh attempt counter, or ctx
+// itself when one is already present (the snapshot layer and GetBytes then
+// share it).
+func withAttemptCounter(ctx context.Context) (context.Context, *atomic.Int32) {
+	if n, ok := ctx.Value(attemptsKey{}).(*atomic.Int32); ok {
+		return ctx, n
+	}
+	n := new(atomic.Int32)
+	return context.WithValue(ctx, attemptsKey{}, n), n
+}
+
+// countAttempt records one upstream send on ctx's counter, if any.
+func countAttempt(ctx context.Context) {
+	if n, ok := ctx.Value(attemptsKey{}).(*atomic.Int32); ok {
+		n.Add(1)
+	}
+}
+
+// attemptsOf reads a counter for a report: the sends the retry layer made,
+// or 1 when it made none (retries disabled, a cache hit, a trip shared with
+// another caller), since the response was then obtained in one go.
+func attemptsOf(n *atomic.Int32) int {
+	return max(int(n.Load()), 1)
 }

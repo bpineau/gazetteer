@@ -29,7 +29,7 @@ func TestWriteFileAtomicConcurrentWriters(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			errs[i] = writeFileAtomic(path, payloads[i])
+			errs[i] = writeFileAtomic(path, payloads[i], cacheFileMode)
 		}()
 	}
 	wg.Wait()

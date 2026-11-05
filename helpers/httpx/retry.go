@@ -67,6 +67,7 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		// Replay body for every attempt.
 		reqCopy := req.Clone(ctx)
 		resetBody(reqCopy)
+		countAttempt(ctx)
 
 		resp, err := t.next.RoundTrip(reqCopy)
 

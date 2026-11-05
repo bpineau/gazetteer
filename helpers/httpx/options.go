@@ -218,10 +218,14 @@ func firstNonEmpty(s ...string) string {
 // by GetBytes alongside the body. *http.Response is intentionally not
 // exported (it'd leak an undrained body).
 type Response struct {
-	Status      int
-	Header      http.Header
-	DurationMs  int64
-	FromCache   bool
+	Status     int
+	Header     http.Header
+	DurationMs int64
+	FromCache  bool
+	// Attempts is how many times the retry layer sent the request upstream
+	// (1 = the first send answered). It is 1 too when the retry layer made
+	// no send: retries disabled, a disk-cache hit, a trip shared with a
+	// concurrent identical request.
 	Attempts    int
 	URL         string
 	ContentType string
@@ -249,8 +253,13 @@ type DownloadOptions struct {
 
 // DownloadResult is what Client.Download returns on success.
 type DownloadResult struct {
-	SHA256  string
-	Bytes   int64
+	SHA256 string
+	Bytes  int64
+	// Cached is always false.
+	//
+	// Deprecated: a download bypasses the disk HTTP cache (the file it
+	// writes is the persistent copy), so nothing is ever served from it.
+	// Use Skipped to tell an existing file reused by SkipIfExists.
 	Cached  bool
 	Skipped bool
 	Path    string

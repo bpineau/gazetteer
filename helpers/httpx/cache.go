@@ -377,7 +377,7 @@ func (t *cacheTransport) writeEntry(metaPath, bodyPath string, meta *cacheMeta, 
 	if err := os.MkdirAll(filepath.Dir(metaPath), 0o755); err != nil { //nolint:gosec // public HTTP cache dir; not a secrets store
 		return err
 	}
-	if err := writeFileAtomic(bodyPath, body); err != nil {
+	if err := writeFileAtomic(bodyPath, body, cacheFileMode); err != nil {
 		return err
 	}
 	if err := t.writeMeta(metaPath, meta); err != nil {
@@ -394,15 +394,15 @@ func (t *cacheTransport) writeMeta(metaPath string, meta *cacheMeta) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(metaPath, mb)
+	return writeFileAtomic(metaPath, mb, cacheFileMode)
 }
 
 // cacheFileMode is the mode of every on-disk cache file: world-readable, like
 // the cache directory itself (a public HTTP cache, not a secrets store).
 const cacheFileMode os.FileMode = 0o644
 
-// writeFileAtomic writes data to path via a sibling tmpfile + rename, the
-// tmpfile unique to this writer.
+// writeFileAtomic writes data to path, with the given mode, via a sibling
+// tmpfile + rename, the tmpfile unique to this writer.
 //
 // Uniqueness is load-bearing: fetchShared now coalesces the concurrent
 // misses of ONE key, but two writers for the same entry are still reachable
@@ -416,13 +416,13 @@ const cacheFileMode os.FileMode = 0o644
 // before the rename so a crash can't leave a renamed-but-empty cache
 // entry that would later be served as a valid response. atomicfs serves
 // callers whose artifacts are re-derivable and skips the fsync cost.
-func writeFileAtomic(path string, data []byte) error {
+func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
 	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp") //nolint:gosec // path is derived from a SHA-256 cache key, not user input
 	if err != nil {
 		return err
 	}
 	tmp := f.Name()
-	if err := f.Chmod(cacheFileMode); err != nil { // os.CreateTemp always creates 0600
+	if err := f.Chmod(mode); err != nil { // os.CreateTemp always creates 0600
 		_ = f.Close()
 		_ = os.Remove(tmp)
 		return err

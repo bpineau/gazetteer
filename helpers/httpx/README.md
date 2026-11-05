@@ -40,6 +40,13 @@ one place those layers live; every consumer embeds it.
   transport (useful for tests with `httptest.Server`). `HTTPClient()`
   returns the raw `*http.Client` for the rare multipart POST.
   `WithBypassCache` / `WithSnapshot` opt-out per-request.
+- **Snapshots are bounded and private.** A snapshot captures at most
+  `MaxResponseBytes` (flagged `body_truncated` beyond), masks credential
+  headers (`Authorization`, `Cookie`, `Set-Cookie`, API-key and token
+  headers) and credential-like query parameters, and is written 0600 in
+  0700 directories. `Response.Attempts` and the snapshot's `attempts`
+  count the retry layer's real sends. `Download` bypasses the disk cache,
+  so its `MaxBytes` is the only size bound on the file.
 - **Only idempotent requests are retried.** GET, HEAD, PUT, DELETE (and
   the other RFC 9110 idempotent methods) keep their retries; a POST or
   PATCH is sent once unless it carries an `Idempotency-Key` header or its

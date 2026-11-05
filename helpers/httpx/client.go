@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"time"
 )
 
 // Client is the project's single HTTP client. It wraps an *http.Client
@@ -79,6 +78,7 @@ func (c *Client) GetJSON(ctx context.Context, url string, hdr http.Header, out a
 // summary. The caller does not need to close anything (the body has been
 // fully read by the time GetBytes returns).
 func (c *Client) GetBytes(ctx context.Context, url string, hdr http.Header) ([]byte, *Response, error) {
+	ctx, attempts := withAttemptCounter(ctx)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("httpx: build request for %s: %w", url, err)
@@ -108,9 +108,9 @@ func (c *Client) GetBytes(ctx context.Context, url string, hdr http.Header) ([]b
 	r := &Response{
 		Status:      resp.StatusCode,
 		Header:      resp.Header.Clone(),
-		DurationMs:  time.Since(start).Milliseconds(),
+		DurationMs:  c.resolved.now().Sub(start).Milliseconds(),
 		FromCache:   resp.Header.Get("X-From-Cache") == "1",
-		Attempts:    1, // detailed retry-attempt count is not threaded through; debug log carries it
+		Attempts:    attemptsOf(attempts),
 		URL:         url,
 		ContentType: resp.Header.Get("Content-Type"),
 		BodyBytes:   int64(len(body)),
