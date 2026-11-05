@@ -146,6 +146,26 @@ func TestClassifyRisk(t *testing.T) {
 			RiskUnknown,
 		},
 		{
+			"only an unrelated indicator: unknown, not low",
+			map[string]float64{"burglary": 1.2},
+			RiskUnknown,
+		},
+		{
+			"one classifier input missing, the rest low: unknown",
+			map[string]float64{"drug_trafficking": 0.2, "violence_outside_family": 0.4},
+			RiskUnknown,
+		},
+		{
+			"one present input crosses a high threshold: high despite the gaps",
+			map[string]float64{"violence_outside_family": 6},
+			RiskHigh,
+		},
+		{
+			"measured zeros are real zeros: low",
+			map[string]float64{"drug_trafficking": 0, "violence_outside_family": 0, "robbery_unarmed": 0},
+			RiskLow,
+		},
+		{
 			"neuilly-like: low across the board",
 			map[string]float64{"drug_trafficking": 0.57, "violence_outside_family": 1.33, "robbery_unarmed": 0.81, "burglary": 6.51},
 			RiskLow,

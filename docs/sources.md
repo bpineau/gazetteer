@@ -842,8 +842,11 @@ framework.
 - **Needs**: INSEE.
 - **Result**: `delinquance.Result` exposing rates per 1 000 inhabitants
   for ~14 indicators (cambriolage, vandalisme, violences, vols,
-  fraude, stupéfiants) plus a peer-relative risk flag for the latest
-  reference year (2024 at the time of the embed).
+  fraude, stupéfiants) plus a social-distress flag (drug trafficking,
+  street violence, unarmed robbery) for the latest reference year (2024 at
+  the time of the embed). The flag is `unknown` when one of those three
+  indicators is missing from the commune's row, unless a present one is
+  already high: an unpublished indicator is not a measured zero.
 - **Backend**: gzipped JSON embedded under `data/`.
 
 ## `sources/education`

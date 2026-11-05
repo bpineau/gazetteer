@@ -147,15 +147,23 @@ func (r *Result) IsEmpty() bool {
 // RiskUnknown for those communes; consumers should compose
 // QPV + Filosofi (income) + chomage to get a credible signal for
 // arrondissement-split cities.
+//
+// Missing indicators: SSMSI leaves an indicator out of a commune's row when
+// it does not publish it, which is not a measured zero. A present reading
+// that crosses a high threshold is enough for RiskHigh; low and medium need
+// all three, since a missing one could be the reading that tips the commune
+// to high. Short of that the flag is RiskUnknown. A published 0 is a real
+// zero and counts as present.
 func classifyRisk(rates map[string]float64) RiskFlag {
-	if len(rates) == 0 {
-		return RiskUnknown
-	}
-	dt := rates["drug_trafficking"]
-	vof := rates["violence_outside_family"]
-	ru := rates["robbery_unarmed"]
-	if dt >= 2.5 || vof >= 5 || ru >= 4 || (dt >= 1.5 && vof >= 4) {
+	dt, hasDT := rates["drug_trafficking"]
+	vof, hasVOF := rates["violence_outside_family"]
+	ru, hasRU := rates["robbery_unarmed"]
+	if (hasDT && dt >= 2.5) || (hasVOF && vof >= 5) || (hasRU && ru >= 4) ||
+		(hasDT && hasVOF && dt >= 1.5 && vof >= 4) {
 		return RiskHigh
+	}
+	if !hasDT || !hasVOF || !hasRU {
+		return RiskUnknown
 	}
 	if dt <= 1 && vof <= 2.5 && ru <= 1.5 {
 		return RiskLow

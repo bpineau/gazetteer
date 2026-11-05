@@ -35,7 +35,12 @@ const Name = "delinquance"
 // the flag entirely for arrondissement-split cities (where commune-
 // level rates cannot distinguish the Goutte-d'Or from Auteuil).
 // Cache invalidation: bump consumes the prior v2 classifications.
-const sourceVersion = 3
+//
+// v4: a commune whose row lacks one of the three classifier indicators is
+// no longer RiskLow by default (a missing key read as 0): it is RiskHigh
+// when a present indicator crosses a high threshold, RiskUnknown otherwise.
+// Three embedded communes (55039, 55050, 55189) lacked all three.
+const sourceVersion = 4
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.

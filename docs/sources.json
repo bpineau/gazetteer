@@ -165,7 +165,7 @@
   },
   {
     "name": "delinquance",
-    "version": 3,
+    "version": 4,
     "default": true,
     "summary": "SSMSI État 4001 per-commune crime indicators + a coarse risk flag.",
     "inputs": [
