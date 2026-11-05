@@ -224,6 +224,11 @@ offline batch complement to the live, per-address `dvf` source.
   of the 9 090 communes have a median of exactly 300 €/m², each on a
   single sale. Do not compare a `dvfagg` median with a `dvf` median as
   if they measured the same population.
+- **Valuation date**: `DataThrough` (YYYY-MM) is the last month the
+  aggregate covers. It cannot be cut at a date, so a `Listing.AsOf` before
+  the end of that month gets an empty Result (with an `Evidence.Note`)
+  rather than a past valuation priced with later sales; the live `dvf`
+  source answers dated questions.
 - **Build**: `gazetteer refresh -go-embed-update dvfagg` downloads the
   geo-dvf bulk files (dept × last 3 years, currently 2023-2025), keeps
   single-lot apartment *Vente* mutations, and writes the embedded

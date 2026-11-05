@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/bpineau/gazetteer/gazetteer"
 )
@@ -95,5 +96,35 @@ func TestQuery_ArrondissementParentIsRefused(t *testing.T) {
 	}
 	if res.IsEmpty() || res.PriceMedianEURM2 <= 0 {
 		t.Errorf("Query(75101) = %+v, want a populated Paris 1er aggregate", res)
+	}
+}
+
+// TestQuery_AsOfBeforeTheDataIsEmpty pins that a valuation dated before the
+// aggregate's last month gets no reading (the aggregate cannot be cut at a
+// date), while a later or unset date reads the aggregate and its coverage.
+func TestQuery_AsOfBeforeTheDataIsEmpty(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	at := func(asOf time.Time) *Result {
+		t.Helper()
+		r, err := Query(ctx, Options{}, gazetteer.Listing{INSEE: "75101", AsOf: asOf})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	now := at(time.Time{})
+	if now.IsEmpty() || now.DataThrough == "" {
+		t.Fatalf("unset AsOf: empty %v, through %q; want the aggregate and its coverage", now.IsEmpty(), now.DataThrough)
+	}
+	end, _ := monthEnd(now.DataThrough)
+	if r := at(end.AddDate(0, 0, -1)); !r.IsEmpty() || r.Evidence.Note == "" {
+		t.Errorf("AsOf inside the data window: empty %v note %q, want empty with a note", r.IsEmpty(), r.Evidence.Note)
+	}
+	if r := at(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)); !r.IsEmpty() {
+		t.Errorf("AsOf 2000-01-01: got %v EUR/m2 from later sales", r.PriceMedianEURM2)
+	}
+	if r := at(end); r.IsEmpty() {
+		t.Error("AsOf at the data's end: empty, want the aggregate")
 	}
 }

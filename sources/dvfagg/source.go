@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/bpineau/gazetteer/dataset"
 	"github.com/bpineau/gazetteer/gazetteer"
@@ -50,6 +51,10 @@ func (s *Source) Datasets() []dataset.Set { return []dataset.Set{theSet} }
 // the kind of wrong that gets believed. communes.ResolveINSEE("Paris",
 // "75000") returns exactly that parent code, so the case is reachable from
 // ordinary inputs; the caller's fix is to pass the arrondissement.
+//
+// A Listing.AsOf before the end of the aggregate's data (Result.DataThrough)
+// yields an empty Result: the aggregate cannot be cut at a date, and a
+// valuation dated in the past must not be priced with sales that followed it.
 func (s *Source) Query(_ context.Context, l gazetteer.Listing) (any, error) {
 	// The aggregate is an APARTMENT median: a house or a shop answered with
 	// it would hand appraisal.PricePerM2 the flats' price as a reading of
@@ -74,7 +79,19 @@ func (s *Source) Query(_ context.Context, l gazetteer.Listing) (any, error) {
 		}
 		idx = loaded
 	}
+	through := idx.DataThrough()
+	if end, ok := monthEnd(through); ok && !l.AsOf.IsZero() && l.AsOf.Before(end) {
+		// The aggregate pools every sale up to its last month: read for an
+		// earlier valuation date it would price the past with later sales.
+		// There is no dated slice to fall back on, so there is no answer.
+		return &Result{DataThrough: through, Evidence: Evidence{
+			INSEE: insee,
+			Note: fmt.Sprintf("the aggregate includes sales through %s, after the valuation date %s; it has no reading as of that date",
+				through, l.AsOf.Format(time.DateOnly)),
+		}}, nil
+	}
 	r, _ := idx.Lookup(insee)
+	r.DataThrough = through
 	r.Evidence = Evidence{INSEE: insee}
 	return &r, nil
 }
@@ -95,4 +112,13 @@ func (s *Source) QueryResult(ctx context.Context, l gazetteer.Listing) (*Result,
 
 func init() {
 	gazetteer.Register(Name, func() any { return &Result{} })
+}
+
+// monthEnd returns the first instant after the month ym ("YYYY-MM"), in UTC.
+func monthEnd(ym string) (time.Time, bool) {
+	t, err := time.Parse("2006-01", ym)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return t.AddDate(0, 1, 0), true
 }

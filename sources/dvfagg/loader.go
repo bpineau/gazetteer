@@ -38,7 +38,24 @@ func newSet() dataset.Set {
 var theSet = newSet()
 
 // Index is the in-memory INSEE → aggregate lookup.
-type Index struct{ byINSEE map[string]Result }
+type Index struct {
+	byINSEE map[string]Result
+	// dataThrough is the last month (YYYY-MM) whose sales the loaded copy
+	// may include; see DataThrough.
+	dataThrough string
+}
+
+// DataThrough returns the last month (YYYY-MM) whose sales the loaded
+// aggregate may include: the embedded copy's declared vintage, or the end
+// of the refresh window (the last of the geo-dvf years) for a copy
+// refreshed into the datadir. An index built without Load reports the
+// embedded vintage.
+func (idx *Index) DataThrough() string {
+	if idx == nil || idx.dataThrough == "" {
+		return theSet.Vintage
+	}
+	return idx.dataThrough
+}
 
 // Lookup returns the commune aggregate, or (zero,false).
 func (idx *Index) Lookup(insee string) (Result, bool) {
@@ -75,7 +92,23 @@ var lazyIndex dataset.Lazy[Index]
 // Load returns the singleton index, resolving the CSV from dir (datadir)
 // with embedded fallback. Sticky: first call's dir and error win.
 func Load(dir string) (*Index, error) {
-	return lazyIndex.Load(theSet, dir, parseCSV)
+	return lazyIndex.Load(theSet, dir, func(r io.Reader) (*Index, error) {
+		idx, err := parseCSV(r)
+		if err == nil {
+			idx.dataThrough = dataThroughFor(dir)
+		}
+		return idx, err
+	})
+}
+
+// dataThroughFor is the last month the copy Load reads from dir covers: a
+// datadir copy was built from the current refresh window (years), the
+// embedded one is the declared Vintage.
+func dataThroughFor(dir string) string {
+	if origin, err := theSet.Resolve(dir); err == nil && origin == dataset.OriginDatadir {
+		return years[len(years)-1] + "-12"
+	}
+	return theSet.Vintage
 }
 
 func parseCSV(src io.Reader) (*Index, error) {

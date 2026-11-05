@@ -28,7 +28,10 @@ const Name = "dvfagg"
 //     de culture of its parcel is one apartment, not a two-flat bundle. The
 //     embedded aggregate predates the rule and changes at its next refresh
 //     (`gazetteer refresh --go-embed-update dvfagg`).
-const Version = 5
+//   - v6: Result.DataThrough states the last month the aggregate covers,
+//     and a Listing.AsOf before its end gets an empty Result: v5 answered
+//     a 2000-01-01 valuation with 2022-2024 sales.
+const Version = 6
 
 // Result is the per-commune DVF price aggregate, in EUR/m², 3-year window.
 // Built at refresh time from single-lot apartment sales; see transform.go.
@@ -46,6 +49,11 @@ type Result struct {
 	NSmall int    `json:"n_small"`
 	Dept   string `json:"department"`
 
+	// DataThrough is the last month (YYYY-MM) whose sales the aggregate may
+	// include (the window is the three DVF years ending there). A
+	// Listing.AsOf before its end gets an empty Result.
+	DataThrough string `json:"data_through,omitempty"`
+
 	// Evidence is the reproducibility sidecar (json:"-"), per the uniform
 	// Source contract. It records which commune INSEE produced the aggregate.
 	Evidence Evidence `json:"-"`
@@ -55,6 +63,9 @@ type Result struct {
 type Evidence struct {
 	// INSEE is the commune code that was looked up to produce this Result.
 	INSEE string `json:"insee,omitempty"`
+	// Note explains an empty Result that is not a commune without sales
+	// (a valuation date the aggregate cannot answer for).
+	Note string `json:"note,omitempty"`
 }
 
 // IsEmpty satisfies gazetteer.EmptyReporter: no sales ⇒ empty.
