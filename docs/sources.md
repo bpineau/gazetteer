@@ -409,20 +409,22 @@ Lyon / Villeurbanne.
   in the JO of 24 November 2018, so its last day is **24 November 2026**: the
   prefect's 2026 arrêtés say so ("prend fin le 24 novembre 2026 à minuit")
   and are themselves in force "jusqu'au 24 novembre 2026" (the Sénat's report
-  dates the end on the 23rd, counting the day of publication). The Source
-  reads `Listing.AsOf`, or today: past that day every regulated reading is
-  `Regulation = lapsed`, with no cap figure, `ConfidenceNone`, an
-  `Evidence.Note`, and `IsEmpty()` true. As of 2026-10-21 no extension is in
-  the JO (the proposition de loi "Retrouver la confiance et l'équilibre dans
-  les rapports locatifs", whose Sénat commission text n° 48 (2026-2027) would
-  replace "huit" by "dix", was in Sénat sitting that day); `legal.go` says
-  exactly what to change when one is published. Each grille also has its own
-  period (Paris 1 July to 24 November 2026, Plaine Commune and Est Ensemble
-  1 June to 24 November 2026, Lyon from 1 November 2025): a date before it
-  keeps the cap at `ConfidenceLow` with a Note (the previous arrêté, not
-  shipped, applied), and a date past it withdraws the figure
-  (`regulated_not_covered`). `overview` is undated and does not apply the
-  lapse.
+  dates the end on the 23rd, counting the day of publication). The Sénat
+  adopted a two-year extension on 21 October 2026 ("huit" replaced by "dix",
+  territories already regulated only); the Assemblée nationale séance is
+  scheduled on 18 November 2026. Until that outcome is checked, the Source
+  **assumes the extension**: it reads `Listing.AsOf`, or today, and up to
+  24 November 2026 a cap is plain; from 25 November 2026 to 24 November 2028
+  it is kept at `ConfidenceLow` with an `Evidence.Note` saying the extension
+  is assumed, not yet law; past 24 November 2028 every regulated reading is
+  `Regulation = lapsed`, with no cap figure, `ConfidenceNone`, and
+  `IsEmpty()` true. `legal.go` (STATUS) says what to change once the vote is
+  known. Each grille also has its own period (Paris 1 July to 24 November
+  2026, Plaine Commune and Est Ensemble 1 June to 24 November 2026, Lyon from
+  1 November 2025): outside it the shipped cells are the nearest reading
+  (the previous arrêté before it, the successor not yet shipped after it),
+  kept at `ConfidenceLow` with a Note. `overview.Build` applies the same rule
+  for `Options.AsOf` and flags such caps `RentCapHedged`.
 
 ## `sources/catnat`
 

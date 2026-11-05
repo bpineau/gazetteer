@@ -2,6 +2,7 @@ package encadrement
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,8 +19,9 @@ func TestMain(m *testing.M) {
 }
 
 // The caps rest on the art. 140 experiment, whose eight years end on
-// 24 November 2026. The Source used to quote them for any date, so an auction
-// heard in 2027 would have been told a cap that is no longer law.
+// 24 November 2026 under the published law; the Source assumes the two-year
+// extension to 24 November 2028 (see legal.go STATUS). Past the published end
+// a reading is hedged, past the assumed one it lapses.
 func TestQuery_HonoursTheExperimentEnd(t *testing.T) {
 	t.Parallel()
 	paris := gazetteer.Listing{INSEE: "75101", IRIS: "751010201", Rooms: intp(1), BuildYear: intp(2000)}
@@ -38,25 +40,35 @@ func TestQuery_HonoursTheExperimentEnd(t *testing.T) {
 		t.Errorf("24 Nov 23:30 CET: %q, want capped", r.Regulation)
 	}
 
-	// The day after: no cap, said so.
+	// The day after the published end: the assumed extension keeps the cap,
+	// at low confidence, with the note that says it is assumed.
+	for _, l := range []gazetteer.Listing{paris, {INSEE: "69383", Rooms: intp(2)}, {INSEE: "93048", Rooms: intp(2)}} {
+		r := at(l, civilDate(2026, time.November, 25))
+		if r.Regulation != RegulationCapped || r.LoyerRefMajEURPerM2HC <= 0 || r.Confidence != ConfidenceLow ||
+			!strings.Contains(r.Evidence.Note, "assumes its two-year extension") {
+			t.Errorf("%s 25 Nov 2026: %q %.2f %q note %q, want capped, low, the assumed-extension note", l.INSEE, r.Regulation, r.LoyerRefMajEURPerM2HC, r.Confidence, r.Evidence.Note)
+		}
+	}
+
+	// The day after the assumed end: no cap, said so.
 	for _, l := range []gazetteer.Listing{
 		paris,
 		{INSEE: "69383", Rooms: intp(2)},
 		{INSEE: "93048", Rooms: intp(2)},
 		{INSEE: "33063", Rooms: intp(2)}, // a territory without a shipped grille lapses too
 	} {
-		r := at(l, civilDate(2026, time.November, 25))
+		r := at(l, civilDate(2028, time.November, 25))
 		if r.Regulation != RegulationLapsed || !r.IsEmpty() || r.Confidence != ConfidenceNone {
-			t.Errorf("%s 25 Nov: Regulation %q IsEmpty %v Confidence %q, want lapsed, empty, none", l.INSEE, r.Regulation, r.IsEmpty(), r.Confidence)
+			t.Errorf("%s 25 Nov 2028: Regulation %q IsEmpty %v Confidence %q, want lapsed, empty, none", l.INSEE, r.Regulation, r.IsEmpty(), r.Confidence)
 		}
 		if r.LoyerRefMajEURPerM2HC != 0 || r.LoyerRefEURPerM2HC != 0 || r.LoyerRefMajMeubleEURPerM2HC != 0 || r.LoyerRefMeubleEURPerM2HC != 0 {
-			t.Errorf("%s 25 Nov: a cap figure survived the lapse: %+v", l.INSEE, r)
+			t.Errorf("%s 25 Nov 2028: a cap figure survived the lapse: %+v", l.INSEE, r)
 		}
 		if r.Evidence.Note == "" {
-			t.Errorf("%s 25 Nov: no Evidence.Note", l.INSEE)
+			t.Errorf("%s 25 Nov 2028: no Evidence.Note", l.INSEE)
 		}
 		if _, ok := r.RentCap(); ok {
-			t.Errorf("%s 25 Nov: RentCap ok", l.INSEE)
+			t.Errorf("%s 25 Nov 2028: RentCap ok", l.INSEE)
 		}
 	}
 
@@ -73,8 +85,8 @@ func TestQuery_HonoursTheExperimentEnd(t *testing.T) {
 
 // Each grille has its own period. Before it the previous arrêté applied, which
 // is not shipped: the cap is kept at low confidence with a Note. Past it,
-// which an extension of the experiment would make reachable, the shipped
-// cells are no longer law and the figure is withdrawn.
+// which the extension makes reachable, the successor's cells are not shipped
+// and the shipped ones are carried over at low confidence.
 func TestDated_GrillePeriod(t *testing.T) {
 	t.Parallel()
 	paris := gazetteer.Listing{INSEE: "75101", IRIS: "751010201", Rooms: intp(1), BuildYear: intp(2000)}
@@ -90,12 +102,12 @@ func TestDated_GrillePeriod(t *testing.T) {
 		t.Errorf("Lyon March 2026: %q note %q, want medium, no note", r.Confidence, r.Evidence.Note)
 	}
 
-	// Simulate an extension to 2028: the Paris arrêté still ends on
-	// 24 November 2026, so 2027 reads regulated, figure unknown.
+	// Under the extension the Paris arrêté still ends on 24 November 2026:
+	// in 2027 its cells are carried over, at low confidence, with a note.
 	capped := query(t, paris)
 	r := dated(capped, ZoneSourceParis, civilDate(2027, time.January, 15), civilDate(2028, time.November, 24))
-	if r.Regulation != RegulationNotCovered || r.LoyerRefMajEURPerM2HC != 0 || r.LoyerRefMajMeubleEURPerM2HC != 0 || r.IsEmpty() || r.Evidence.Note == "" {
-		t.Errorf("Paris 2027 under an extension: %+v, want not covered, no figure, a note", r)
+	if r.Regulation != RegulationCapped || r.LoyerRefMajEURPerM2HC != 37.8 || r.Confidence != ConfidenceLow || !strings.Contains(r.Evidence.Note, "carried over") {
+		t.Errorf("Paris 2027 under an extension: %+v, want the shipped cap carried over at low confidence", r)
 	}
 	// Lyon's arrêté states no end: under the same extension it still reads.
 	lr := query(t, gazetteer.Listing{INSEE: "69381", Rooms: intp(2)})
@@ -134,10 +146,12 @@ func TestRegulationOn(t *testing.T) {
 	}{
 		{ZoneSourceParis, civilDate(2026, time.June, 30), RegulationCapped}, // before the grille: nearest reading
 		{ZoneSourceParis, civilDate(2026, time.November, 24), RegulationCapped},
-		{ZoneSourceParis, civilDate(2026, time.November, 25), RegulationLapsed},
-		{ZoneSourceLyonVilleurbanne, civilDate(2026, time.November, 25), RegulationLapsed},
-		{"", civilDate(2026, time.November, 24), RegulationNotCovered},
-		{"", civilDate(2026, time.November, 25), RegulationLapsed},
+		{ZoneSourceParis, civilDate(2026, time.November, 25), RegulationCapped}, // assumed extension, grille carried over
+		{ZoneSourceParis, civilDate(2028, time.November, 24), RegulationCapped},
+		{ZoneSourceParis, civilDate(2028, time.November, 25), RegulationLapsed},
+		{ZoneSourceLyonVilleurbanne, civilDate(2028, time.November, 25), RegulationLapsed},
+		{"", civilDate(2026, time.November, 25), RegulationNotCovered},
+		{"", civilDate(2028, time.November, 25), RegulationLapsed},
 		{ZoneSourceParis, time.Time{}, RegulationCapped}, // zero day = the pinned clock
 	}
 	for _, c := range cases {

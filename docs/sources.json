@@ -260,7 +260,7 @@
   },
   {
     "name": "encadrement",
-    "version": 11,
+    "version": 12,
     "default": true,
     "summary": "Legal rent-control caps (loyer de référence + majoré), unfurnished and furnished (meublé).",
     "inputs": [

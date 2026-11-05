@@ -20,26 +20,40 @@ import (
 // also the one the delay rules of art. 641 and 642 of the code de procédure
 // civile give (a delay in years ends on the same date, at midnight).
 //
-// STATUS as of 2026-10-21: NOT EXTENDED. The proposition de loi "Retrouver la
-// confiance et l'équilibre dans les rapports locatifs" (AN texte adopté
-// n° 196 of 11 December 2025, Sénat n° 217 (2025-2026)) would make the regime
-// permanent; the Sénat's commission rewrote it on 14 October 2026 (texte de la
-// commission n° 48 (2026-2027)) into a two-year extension, replacing "huit" by
-// "dix" in art. 140, and the Sénat sitting on it was 21 October 2026. Nothing
-// is adopted in identical terms by both chambers, let alone promulgated, so
-// past elanLastDay the Source answers RegulationLapsed: no cap.
-// Dossier: https://www.senat.fr/dossier-legislatif/ppl25-217.html
+// STATUS as of 2026-11-05: EXTENSION ASSUMED, NOT YET LAW. The proposition
+// de loi "Retrouver la confiance et l'équilibre dans les rapports locatifs"
+// (AN texte adopté n° 196 of 11 December 2025, Sénat n° 217 (2025-2026)) was
+// adopted by the Sénat on 21 October 2026 (texte n° 14 (2026-2027), 325 votes
+// to 17) as a two-year extension: its article 1er replaces "huit" by "dix" in
+// art. 140, for the territories already regulated. The AN commission des
+// affaires économiques deposited its second-reading text (n° 3432-A0) on
+// 4 November 2026 and the séance publique is scheduled on 18 November 2026; a
+// vote "conforme" then promulgation before 24 November 2026 would make it law.
+// By the owner's decision the Source assumes that outcome: elanLastDay is the
+// extended last day ("dix ans" from the same publication), and a reading past
+// elanPublishedLastDay, the last day of the law as published, is held at
+// ConfidenceLow with an Evidence.Note saying the extension is assumed.
+// Dossiers: https://www.senat.fr/dossier-legislatif/ppl25-217.html and
+// https://www.assemblee-nationale.fr/17/dossiers/retrouver_confiance_equilibre_rapports_locatifs_17e.asp
 //
-// WHEN AN EXTENSION IS PUBLISHED IN THE JO, change, in one commit:
-//  1. elanLastDay to the new last day the law gives (a "dix ans" from the same
-//     publication would read 24 November 2028; a permanent regime means
-//     removing the lapse altogether), and this STATUS paragraph, with the
-//     law's number and JO date;
-//  2. gridValidity for every grille re-issued under it (the 2026 Paris and
-//     93 arrêtés end on 24 November 2026 by their own terms, so until their
-//     successors ship those zones read RegulationNotCovered, not capped);
-//  3. sourceVersion, and the "Sunset" paragraph of docs/sources.md.
-var elanLastDay = civilDate(2026, time.November, 24)
+// RE-CHECK after 18 November 2026, then in one commit:
+//  1. extension published in the JO: elanPublishedLastDay to the law's last
+//     day (elanLastDay, or no lapse at all for a permanent regime), this
+//     STATUS with the law's number and JO date, and gridValidity for every
+//     successor arrêté as its grille ships;
+//  2. extension rejected or not law by 24 November 2026: elanLastDay back to
+//     elanPublishedLastDay;
+//  3. either way, sourceVersion and the "Sunset" paragraph of docs/sources.md.
+var elanLastDay = civilDate(2028, time.November, 24)
+
+// elanPublishedLastDay is the experiment's last day under the law as
+// published in the JO: eight years from 24 November 2018. A reading dated
+// past it rests on the assumed extension (see STATUS) and says so.
+var elanPublishedLastDay = civilDate(2026, time.November, 24)
+
+// assumedExtensionNote explains a reading that rests on the assumed
+// extension of art. 140.
+const assumedExtensionNote = "the art. 140 loi 2018-1021 experiment ends on 24 November 2026 under the law in the JO; this reading assumes its two-year extension (adopted by the Sénat on 21 October 2026, Assemblée nationale séance scheduled on 18 November 2026), which is not yet law"
 
 // validity is the period a shipped grille's arrêté puts it in force, both
 // bounds inclusive. A zero until means the arrêté states no end: the grille
@@ -102,9 +116,12 @@ func dayOf(t time.Time) time.Time {
 //
 //   - Past lastDay no art. 140 cap is law: any regulated reading becomes
 //     RegulationLapsed, with no figure and ConfidenceNone.
-//   - Past the grille's own end (only reachable once an extension moves
-//     elanLastDay), the shipped cells are no longer the ones in force: no
-//     figure, RegulationNotCovered.
+//   - Past elanPublishedLastDay (and up to lastDay) the reading rests on the
+//     assumed extension: kept, at ConfidenceLow at most, with a Note.
+//   - Past the grille's own end, its successor's cells are not shipped: the
+//     shipped cap is carried over as the nearest reading, at ConfidenceLow,
+//     with a Note (a successor grille moves by a few percent; the figure is
+//     not the one in force).
 //   - Before the grille's start, the cells in force were the previous
 //     arrêté's, which this Source does not ship: the shipped cap is kept as
 //     the nearest reading, at ConfidenceLow, with a Note.
@@ -125,28 +142,34 @@ func dated(r *Result, zoneSource string, day, lastDay time.Time) *Result {
 			lastDay.Format(time.DateOnly), day.Format(time.DateOnly))
 		return lapsed
 	}
+	if day.After(elanPublishedLastDay) {
+		hedge(r, assumedExtensionNote)
+	}
 	v, ok := gridValidity[zoneSource]
 	if !ok || r.Regulation != RegulationCapped {
 		return r
 	}
 	switch {
 	case !v.until.IsZero() && day.After(v.until):
-		expired := &Result{
-			Zone:       r.Zone,
-			ZoneSource: r.ZoneSource,
-			Confidence: ConfidenceNone,
-			Regulation: RegulationNotCovered,
-			Evidence:   r.Evidence,
-		}
-		expired.Evidence.Note = fmt.Sprintf("the shipped grille (%s) was in force until %s; the one in force on %s is not embedded",
-			v.arrete, v.until.Format(time.DateOnly), day.Format(time.DateOnly))
-		return expired
+		hedge(r, fmt.Sprintf("the shipped grille (%s) was in force until %s; its successor is not embedded, so its cells are carried over on %s",
+			v.arrete, v.until.Format(time.DateOnly), day.Format(time.DateOnly)))
 	case day.Before(v.from):
-		r.Confidence = ConfidenceLow
-		r.Evidence.Note = fmt.Sprintf("the shipped grille (%s) is in force from %s; on %s the previous arrêté applied, whose cells this Source does not ship",
-			v.arrete, v.from.Format(time.DateOnly), day.Format(time.DateOnly))
+		hedge(r, fmt.Sprintf("the shipped grille (%s) is in force from %s; on %s the previous arrêté applied, whose cells this Source does not ship",
+			v.arrete, v.from.Format(time.DateOnly), day.Format(time.DateOnly)))
 	}
 	return r
+}
+
+// hedge lowers r's confidence to ConfidenceLow (a ConfidenceNone reading,
+// which carries no figure, stays none) and appends note to its Evidence.
+func hedge(r *Result, note string) {
+	if r.Confidence != ConfidenceNone {
+		r.Confidence = ConfidenceLow
+	}
+	if r.Evidence.Note != "" {
+		note = r.Evidence.Note + "; " + note
+	}
+	r.Evidence.Note = note
 }
 
 // RegulationOn is the batch form of the Source's date rule, for callers
@@ -170,4 +193,18 @@ func RegulationOn(zoneSource string, day time.Time) string {
 		reg = RegulationNotCovered
 	}
 	return dated(&Result{Regulation: reg}, zoneSource, dayOf(day), elanLastDay).Regulation
+}
+
+// CapHedgedOn reports whether a capped reading from the shipped grille
+// zoneSource (a ZoneSource* constant) is hedged on day (the zero time means
+// today): held at ConfidenceLow because it rests on the assumed extension of
+// art. 140, or because day falls outside the grille's own arrêté period (its
+// cells are then the nearest reading, not the law in force). Batch callers
+// (overview) surface it next to the cap figure.
+func CapHedgedOn(zoneSource string, day time.Time) bool {
+	if day.IsZero() {
+		day = clock()
+	}
+	r := dated(&Result{Regulation: RegulationCapped, Confidence: ConfidenceMedium}, zoneSource, dayOf(day), elanLastDay)
+	return r.Regulation == RegulationCapped && r.Confidence == ConfidenceLow
 }

@@ -77,6 +77,8 @@ func setEncadrement(row *CommuneOverview, idx *encadrement.Index, insee string, 
 	if cap, ok := RepresentativeT2Majore(idx, insee, day); ok {
 		row.Encadree = true
 		row.RentCapEURM2HC = &cap
+		_, zs := grilleCells(idx, insee)
+		row.RentCapHedged = encadrement.CapHedgedOn(zs, day)
 		return
 	}
 	zoneSource := ""

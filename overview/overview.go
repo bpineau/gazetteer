@@ -75,6 +75,13 @@ type CommuneOverview struct {
 	// apply, so Encadree is false and RentCapEURM2HC nil. Re-check the
 	// commune when an extension or a new arrêté is published.
 	EncadrementLapsed bool `json:"encadrement_lapsed,omitempty"`
+	// RentCapHedged is true when RentCapEURM2HC is not known to be the law in
+	// force on Options.AsOf: it rests on the assumed two-year extension of
+	// the art. 140 experiment (past 24 November 2026, not yet in the JO when
+	// this module was built), or the grille's own arrêté period does not
+	// cover the date (its cells are carried over as the nearest reading). The
+	// encadrement Source returns such readings at ConfidenceLow.
+	RentCapHedged bool `json:"rent_cap_hedged,omitempty"`
 
 	// Socio-economic
 	DelinquanceLevel string   `json:"delinquance_level"`

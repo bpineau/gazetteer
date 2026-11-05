@@ -11,11 +11,13 @@
 // Territory and an Evidence.Note, and IsEmpty is false. Read Result.Regulation,
 // never the zero caps alone, to decide whether a rent is free.
 //
-// Every cap rests on the art. 140 ELAN experiment, whose last day is
-// 24 November 2026 unless a law published in the JO extends it. The Source
-// reads Listing.AsOf (today when zero): past that day a regulated reading is
-// RegulationLapsed, with no cap. legal.go records the extension's status and
-// what to change when one is promulgated.
+// Every cap rests on the art. 140 ELAN experiment, whose last day under the
+// published law is 24 November 2026. The Source assumes the two-year
+// extension the Sénat adopted on 21 October 2026, not yet law: it reads
+// Listing.AsOf (today when zero), keeps a cap dated 25 November 2026 to
+// 24 November 2028 at ConfidenceLow with an Evidence.Note saying so, and past
+// that answers RegulationLapsed, with no cap. legal.go records the status and
+// what to change once the Assemblée nationale vote is known.
 //
 // The Source matches the listing to a zone:
 //

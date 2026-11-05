@@ -83,7 +83,13 @@ const Name = "encadrement"
 // regulated reading is RegulationLapsed with no cap; a date outside a shipped
 // grille's own arrêté period lowers the confidence (before it) or withdraws
 // the figure (after it). v10 quoted the 2026 caps for any date.
-const sourceVersion = 11
+//
+// v12 assumes the two-year extension of art. 140 adopted by the Sénat on
+// 21 October 2026 (the Assemblée nationale vote is scheduled on 18 November
+// 2026): readings from 25 November 2026 to 24 November 2028 keep their cap at
+// ConfidenceLow with a Note, instead of lapsing; a grille past its own
+// arrêté is carried over at ConfidenceLow instead of being withdrawn.
+const sourceVersion = 12
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
