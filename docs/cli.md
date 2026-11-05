@@ -153,7 +153,7 @@ List every Source registered with the library plus its version:
 $ gazetteer sources list
 ademe           v5
 anct            v1
-bdnb            v3  (opt-in via --source)
+bdnb            v4  (opt-in via --source)
 bpe             v2
 cadastre        v2
 carteloyers     v1
@@ -163,7 +163,7 @@ cdsr            v2
 chomage         v1
 delinquance     v3
 dpedist         v1
-dvf             v8
+dvf             v9
 dvfagg          v5
 education       v1
 encadrement     v11

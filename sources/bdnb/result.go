@@ -16,6 +16,10 @@ const (
 	// SkipReasonNumberNotFound: the street matched, but no building on it
 	// carries the listing's house number, so none of them is the listing's.
 	SkipReasonNumberNotFound = "number_not_found"
+	// SkipReasonAmbiguousStreet: the rows at the listing's number sit on
+	// several streets that all spell like the listing's (a type de voie
+	// missing on one side), none of them exactly: choosing one would guess.
+	SkipReasonAmbiguousStreet = "ambiguous_street"
 )
 
 // Result is the typed payload returned by Source.Query. Groups the

@@ -35,6 +35,20 @@ func main() {
 }
 ```
 
+## Street identity
+
+`Parse` drops the type de voie on purpose, so its tokens cannot tell "9 Rue
+Voltaire" from "9 boulevard Voltaire". `StreetOf` keeps it, canonicalised
+(`av.` reads `avenue`, `bd` reads `boulevard`), with the full accent-folded
+name, and `SameStreet` compares two of them:
+
+```go
+a := fraddr.StreetOf("106 bd Voltaire, 75011 Paris")        // {boulevard voltaire}
+b := fraddr.StreetOf("106 Boulevard Voltaire 75011 Paris")   // {boulevard voltaire}
+c := fraddr.StreetOf("9 Rue Voltaire 75011 Paris")           // {rue voltaire}
+fmt.Println(fraddr.SameStreet(a, b), fraddr.SameStreet(a, c)) // true false
+```
+
 ## Parser pipeline
 
 `Parse` runs the following steps in order:

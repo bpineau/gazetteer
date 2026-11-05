@@ -34,7 +34,7 @@
   },
   {
     "name": "bdnb",
-    "version": 3,
+    "version": 4,
     "default": false,
     "summary": "Base de Données Nationale des Bâtiments — building age, type, dwelling count (opt-in).",
     "inputs": [
@@ -198,7 +198,7 @@
   },
   {
     "name": "dvf",
-    "version": 8,
+    "version": 9,
     "default": true,
     "summary": "Demandes de Valeurs Foncières — historical transaction price €/m² (median + quartiles).",
     "inputs": [

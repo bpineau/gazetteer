@@ -15,6 +15,7 @@ import (
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/banx"
 	"github.com/bpineau/gazetteer/helpers/circuit"
+	"github.com/bpineau/gazetteer/helpers/fraddr"
 )
 
 // TestSource_InjectedFetcher pins the Options.Fetcher seam: when set,
@@ -492,5 +493,77 @@ func TestResult_JSONShape(t *testing.T) {
 		if !strings.Contains(s, want) {
 			t.Errorf("JSON missing %q in: %s", want, s)
 		}
+	}
+}
+
+// TestSource_HomonymousStreetIsNotTheListings pins that the picked row is
+// on the listing's street: the name-only ilike also matches a cour of the
+// same name, and its building (listed first, at the same number) is not
+// the listing's.
+func TestSource_HomonymousStreetIsNotTheListings(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`[
+        {"batiment_groupe_id":"cour","libelle_adr_principale_ban":"8 Cour Exemple 75011 Paris","code_commune_insee":"75111","nb_log":50},
+        {"batiment_groupe_id":"rue","libelle_adr_principale_ban":"8 Rue Exemple 75011 Paris","code_commune_insee":"75111","nb_log":5}
+    ]`)
+	srv := newStubServer(t, http.StatusOK, body)
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}, HTTPClient: srv.Client()})
+	res, err := s.QueryResult(context.Background(), gazetteer.Listing{Address: "8 rue Exemple 75011 Paris", Zip: "75011"})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if res.Identity == nil || res.Identity.BatimentGroupeID != "rue" {
+		t.Fatalf("picked %v, want the rue building", res.Identity)
+	}
+
+	// With only the cour's building at that number, there is no match.
+	onlyCour := newStubServer(t, http.StatusOK, []byte(`[
+        {"batiment_groupe_id":"cour","libelle_adr_principale_ban":"8 Cour Exemple 75011 Paris","code_commune_insee":"75111","nb_log":50}
+    ]`))
+	s = NewSource(Options{BaseURL: onlyCour.URL, Geocoder: stubGeocoder{cityCode: "75111"}, HTTPClient: onlyCour.Client()})
+	res, err = s.QueryResult(context.Background(), gazetteer.Listing{Address: "8 rue Exemple 75011 Paris", Zip: "75011"})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if !res.IsEmpty() || res.SkipReason != SkipReasonNoMatch {
+		t.Errorf("got %+v (skip %q), want an empty no_match", res.Identity, res.SkipReason)
+	}
+}
+
+// TestSource_NumberedQueryIsAnchored pins that a numbered address is
+// searched at its number: a street-wide page of 20 rows would not
+// necessarily contain the listing's building.
+func TestSource_NumberedQueryIsAnchored(t *testing.T) {
+	t.Parallel()
+
+	srv := newStubServer(t, http.StatusOK, []byte(`[]`))
+	s := NewSource(Options{BaseURL: srv.URL, Geocoder: stubGeocoder{cityCode: "75111"}, HTTPClient: srv.Client()})
+	if _, err := s.QueryResult(context.Background(), gazetteer.Listing{Address: "106 boulevard Exemple 75011 Paris", Zip: "75011"}); err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	u, err := url.Parse(srv.lastURL)
+	if err != nil {
+		t.Fatalf("parse %q: %v", srv.lastURL, err)
+	}
+	if got := u.Query().Get("libelle_adr_principale_ban"); got != "ilike.106 *Exemple*" {
+		t.Errorf("ilike filter = %q, want %q", got, "ilike.106 *Exemple*")
+	}
+}
+
+func TestPickByAddress_AmbiguousStreet(t *testing.T) {
+	t.Parallel()
+
+	rows := []Row{
+		{BatimentGroupeID: "a", LibelleAdrPrincipale: "8 Rue Exemple 75011 Paris"},
+		{BatimentGroupeID: "b", LibelleAdrPrincipale: "8 Cour Exemple 75011 Paris"},
+	}
+	// A listing without a type de voie is compatible with both and exact
+	// with neither: choosing would guess.
+	if i, skip := PickByAddress(rows, fraddr.StreetOf("8 Exemple"), "8"); i != -1 || skip != SkipReasonAmbiguousStreet {
+		t.Errorf("PickByAddress = (%d, %q), want (-1, %q)", i, skip, SkipReasonAmbiguousStreet)
+	}
+	if i, skip := PickByAddress(rows, fraddr.StreetOf("8 rue Exemple"), "9"); i != -1 || skip != SkipReasonNumberNotFound {
+		t.Errorf("PickByAddress(9) = (%d, %q), want (-1, %q)", i, skip, SkipReasonNumberNotFound)
 	}
 }

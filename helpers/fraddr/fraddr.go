@@ -171,38 +171,16 @@ func Parse(addr string) Parts {
 		return Parts{}
 	}
 
-	// Step 1: if the address begins with a non-digit character, split on ","
-	// and look for the first segment whose first non-space character is a digit.
-	// This skips commercial / residence name prefixes that some scrapers emit.
-	// Addresses starting with digits ("9, rue Aubert", "30-32, av. X") bypass
-	// this step entirely because addr[0] is already a digit.
-	if len(addr) > 0 && (addr[0] < '0' || addr[0] > '9') {
-		for seg := range strings.SplitSeq(addr, ",") {
-			seg = strings.TrimSpace(seg)
-			if len(seg) > 0 && seg[0] >= '0' && seg[0] <= '9' {
-				addr = seg
-				break
-			}
-		}
-	}
-
-	// Step 1.5 (embedded-anchor fallback): if Step 1 didn't re-anchor
-	// (addr still begins with a non-digit), scan the full input for an
-	// embedded "<n> <street-type>" pattern and re-anchor on the digit
-	// when found. Catches:
+	// Steps 1 and 1.5 (see anchor): an address that does not begin with a
+	// digit is re-anchored on its first digit-led comma segment, which skips
+	// the commercial or residence name some scrapers prepend, else on an
+	// embedded "<n> <street-type>" run:
 	//   "Residence Park Avenue, Adresse postale : 93 bd Rodin"  → "93 bd Rodin"
 	//   "ZAC Charas Nord - 6 rue Kleber"                        → "6 rue Kleber"
 	//   "A l'angle du 46 a 52 av. de Stalingrad"                → "46 a 52 av. de Stalingrad"
-	//
-	// The regex caps the leading digit run at 4 chars to prevent matching a
-	// 5-digit French postal code ("75011 Paris" stays untouched). If Step 1
-	// already produced a digit-prefixed canonical, addr[0] is a digit and
-	// this branch is skipped (no double-anchor).
-	if len(addr) > 0 && (addr[0] < '0' || addr[0] > '9') {
-		if loc := embeddedHouseNumberRe.FindStringIndex(addr); loc != nil {
-			addr = strings.TrimSpace(addr[loc[0]:])
-		}
-	}
+	// The embedded run caps the leading digits at 4 characters, so a 5-digit
+	// postcode ("75011 Paris") never anchors.
+	addr = anchor(addr)
 
 	// Step 2: strip commas.
 	addr = strings.ReplaceAll(addr, ",", " ")

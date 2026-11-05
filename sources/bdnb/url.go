@@ -13,9 +13,12 @@ import (
 // the other HTTP-backed Sources.
 var BaseURL = "https://api.bdnb.io/v1/bdnb/donnees/batiment_groupe_complet"
 
-// DefaultLimit is the PostgREST `limit` applied. At most a handful of
-// batiment-groupes per filter are expected; 5 is plenty.
-const DefaultLimit = 5
+// DefaultLimit is the PostgREST `limit` applied. A numbered address is
+// queried anchored on its number ("106 *voltaire*"), which leaves the few
+// batiment-groupes at that number on every street sharing the name, plus
+// its suffixed siblings (106 bis, 106 ter): 20 covers them with room to
+// spare. An unnumbered query is a sample of the street either way.
+const DefaultLimit = 20
 
 // SelectFields is the canonical comma-separated list of columns the
 // Source requests via PostgREST's `select=`. Trims the response from

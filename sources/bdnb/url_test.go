@@ -31,7 +31,7 @@ func TestURLForBANID_Happy(t *testing.T) {
 	if !strings.Contains(q.Get("select"), "batiment_groupe_id") {
 		t.Errorf("select missing batiment_groupe_id: %q", q.Get("select"))
 	}
-	if q.Get("limit") != "5" {
+	if q.Get("limit") != "20" {
 		t.Errorf("limit = %q", q.Get("limit"))
 	}
 }

@@ -32,6 +32,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/bpineau/gazetteer/helpers/fraddr"
 )
 
 // ErrEmptyBody is returned by ParseList when the input is empty or
@@ -494,4 +496,68 @@ func risksEmpty(r Risks) bool {
 		r.PerimetreMH == nil && r.ContrainteABFAC1 == nil &&
 		r.ZonePLUBatiPatrimonial == nil && r.QuartierPrioritaire == "" &&
 		r.NomQP == "" && r.ValeurFonciereRelativeM2 == nil
+}
+
+// PickByAddress returns the index of the row that is the listing's
+// building, or -1 with the SkipReason that explains why none is.
+//
+// The ilike query that produced rows matches a street NAME, so it brings
+// back homonymous streets too ("9 Rue Voltaire" for "106 boulevard
+// Voltaire"). A row qualifies only when its address is on the listing's
+// street (fraddr.SameStreet: compatible type de voie, same name) and, when
+// the listing has a house number, at that number:
+//
+//   - no row on the street → SkipReasonNoMatch;
+//   - the street, but not the number → SkipReasonNumberNotFound;
+//   - an exact street match wins over a merely compatible one;
+//   - compatible rows on two different streets, none exact →
+//     SkipReasonAmbiguousStreet: picking one would guess.
+//
+// Among the rows that remain, the first one at the number wins, or the
+// most complete one (PickBest) when the listing has no number.
+func PickByAddress(rows []Row, want fraddr.Street, wantNum string) (int, string) {
+	wantNum = strings.TrimSpace(wantNum)
+	var (
+		streetSeen        bool
+		candidates, exact []int
+	)
+	for i, r := range rows {
+		got := fraddr.StreetOf(r.LibelleAdrPrincipale)
+		if !fraddr.SameStreet(got, want) {
+			continue
+		}
+		streetSeen = true
+		if wantNum != "" && extractLeadingNumberFromLibelle(r.LibelleAdrPrincipale) != wantNum {
+			continue
+		}
+		candidates = append(candidates, i)
+		if got == want {
+			exact = append(exact, i)
+		}
+	}
+	switch {
+	case !streetSeen:
+		return -1, SkipReasonNoMatch
+	case len(candidates) == 0:
+		return -1, SkipReasonNumberNotFound
+	}
+	if len(exact) > 0 {
+		candidates = exact
+	} else {
+		first := fraddr.StreetOf(rows[candidates[0]].LibelleAdrPrincipale)
+		for _, i := range candidates[1:] {
+			if fraddr.StreetOf(rows[i].LibelleAdrPrincipale) != first {
+				return -1, SkipReasonAmbiguousStreet
+			}
+		}
+	}
+	if wantNum != "" {
+		return candidates[0], ""
+	}
+	sub := make([]Row, len(candidates))
+	for k, i := range candidates {
+		sub[k] = rows[i]
+	}
+	best, _ := PickBest(sub, "")
+	return candidates[best], ""
 }

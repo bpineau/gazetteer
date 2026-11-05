@@ -9,6 +9,7 @@ import (
 
 	"github.com/bpineau/gazetteer/gazetteer"
 	"github.com/bpineau/gazetteer/helpers/banx"
+	"github.com/bpineau/gazetteer/helpers/fraddr"
 )
 
 // Name is the canonical Source identifier. Stable; used as the
@@ -25,7 +26,13 @@ const Name = "bdnb"
 // carries is a no-match (SkipReasonNumberNotFound). v2 fell back to the
 // street's most complete row and returned a neighbour's construction year,
 // dwelling count and DPE as the listing's.
-const sourceVersion = 3
+// Version 4: the picked building must be on the listing's street, not
+// only at its number: the name-only ilike also matched homonymous streets
+// ("9 Rue Voltaire" for "boulevard Voltaire") and the first row at the
+// number won. A numbered address is now searched anchored on its number
+// with a limit of 20, where the street-wide 5-row page often missed the
+// listing's building and reported number_not_found.
+const sourceVersion = 4
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
@@ -124,6 +131,12 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		return nil, fmt.Errorf("bdnb: %w: no street tokens available for ilike pattern", gazetteer.ErrInsufficientInputs)
 	}
 
+	// A numbered address is searched anchored on its number: the bare street
+	// name matches every building of every homonymous street, and the
+	// limit would cut the listing's out of a long one.
+	if parts.Number != "" {
+		pattern = parts.Number + " *" + pattern + "*"
+	}
 	u, err := URLForAddress(insee, pattern)
 	if err != nil {
 		return nil, fmt.Errorf("bdnb: build url: %w", err)
@@ -169,47 +182,25 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 		}, nil
 	}
 
-	// Pick the row whose street number matches (when we have one). When
-	// the listing has a number and no building on the street carries it,
-	// none of them is the listing's: the most complete row would be a
-	// neighbour's year, dwelling count and DPE, so report no match.
-	// Without a number, fall back to the most-complete row.
-	idx := -1
-	if parts.Number != "" {
-		i, ok := PickBestByNumber(rows, parts.Number)
-		if !ok {
-			logger.Debug("bdnb.number_not_found",
-				slog.String("insee", insee),
-				slog.String("number", parts.Number),
-				slog.Int("raw_count", len(rows)),
-			)
-			return &Result{
-				Confidence: ConfidenceLow,
-				SampleSize: 0,
-				Skipped:    true,
-				SkipReason: SkipReasonNumberNotFound,
-				Evidence:   emptyEvidence(len(rows)),
-			}, nil
-		}
-		idx = i
-	}
-	if idx == -1 {
-		i, ok := PickBest(rows, "")
-		if !ok {
-			logger.Debug("bdnb.no_match",
-				slog.String("insee", insee),
-				slog.String("pattern", pattern),
-				slog.Int("raw_count", len(rows)),
-			)
-			return &Result{
-				Confidence: ConfidenceLow,
-				SampleSize: 0,
-				Skipped:    true,
-				SkipReason: SkipReasonNoMatch,
-				Evidence:   emptyEvidence(len(rows)),
-			}, nil
-		}
-		idx = i
+	// Pick the listing's building: on its street (the name pattern also
+	// matches homonymous streets) and at its number. A neighbour's or
+	// another street's building would publish a foreign construction year,
+	// dwelling count and DPE as the listing's, so no pick is a no-match.
+	idx, skip := PickByAddress(rows, fraddr.StreetOf(l.Address), parts.Number)
+	if idx < 0 {
+		logger.Debug("bdnb.no_pick",
+			slog.String("insee", insee),
+			slog.String("pattern", pattern),
+			slog.String("reason", skip),
+			slog.Int("raw_count", len(rows)),
+		)
+		return &Result{
+			Confidence: ConfidenceLow,
+			SampleSize: 0,
+			Skipped:    true,
+			SkipReason: skip,
+			Evidence:   emptyEvidence(len(rows)),
+		}, nil
 	}
 	row := rows[idx]
 
