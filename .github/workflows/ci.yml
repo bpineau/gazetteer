@@ -14,9 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The latest patch of the Go series go.mod declares: go.mod pins the
+      # language floor (1.26.0), not a toolchain, and an unpatched 1.26.0
+      # standard library fails the vulnerability scan on its own.
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: "1.26.x"
+          check-latest: true
           cache: true
 
       # The pinned tool versions live in the Makefile, so CI and a developer
