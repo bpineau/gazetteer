@@ -97,13 +97,15 @@ type PriceInput struct {
 	// Excluded is false.
 	Weight float64
 
-	// Excluded is true when the MAD outlier filter dropped this
-	// contribution from the weighted mean. The entry is kept in the slice
+	// Excluded is true when this contribution was left out of the weighted
+	// mean: the MAD outlier filter dropped it, or its weight is not a
+	// finite positive number. The entry is kept in the slice
 	// so callers can show what was rejected.
 	Excluded bool
 
 	// ExcludedWhy is the stable machine-readable reason behind Excluded
-	// ("outlier_z_score"). Empty when Excluded is false.
+	// ("outlier_z_score", or "non_positive_weight" for a zero, negative,
+	// NaN or infinite weight). Empty when Excluded is false.
 	ExcludedWhy string
 }
 
@@ -189,11 +191,11 @@ func PricePerM2(d gazetteer.Dossier, opts ...PriceOptions) PriceConsolidated {
 		confs[i] = in.Estimate.Confidence
 		datasets[i] = cmp.Or(in.Estimate.Dataset, in.Source)
 	}
-	mean, mask, conf, ok := synthesizeCents(vals, weights, confs, datasets, o.MinSources, o.OutlierZScore)
+	mean, why, conf, ok := synthesizeCents(vals, weights, confs, datasets, o.MinSources, o.OutlierZScore)
 	for i := range inputs {
-		if mask[i] {
+		if why[i] != "" {
 			inputs[i].Excluded = true
-			inputs[i].ExcludedWhy = "outlier_z_score"
+			inputs[i].ExcludedWhy = why[i]
 		}
 	}
 	if !ok {
