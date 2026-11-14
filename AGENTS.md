@@ -29,6 +29,7 @@ Consumers, and how a change propagates:
 |---|---|---|
 | `cmd/gazetteer` | the CLI, the fastest way to explore the data | in this repo |
 | `../locador` | a rental-investment engine: it turns these facts into a yield and a maximum price | DEPENDS on gazetteer, **by published version** (`go.mod`). A change locador needs ships as a tagged gazetteer release, then a `go.mod` bump there. Locally it can be wired with a `replace`, which is never committed |
+| `../encheridor` | a judicial-auction screener: it enriches each auctioned property with these facts (and the plugins) to score the opportunity | DEPENDS on gazetteer and the plugins, **by published version**, like locador: a fix it needs ships as a tagged release, then a `go.mod` bump there |
 | `../gazetteer-fr-plugins` | out-of-tree Sources that stay outside this module (licence or weight) | DEPENDS on gazetteer's public API. Breaking `Source`, `Result` or the registry breaks it: check before changing them |
 
 **Deliberately NOT in scope**: anything outside France; a hosted service, an
@@ -436,7 +437,7 @@ docs/                 long-form reference (start at docs/readme.md)
 - [ ] New source? Roster entry, CLI renderer and catalog descriptor all present
       (the completeness tests fail until they are), plus `docs/sources.md` and
       godoc on every Result field, with its unit.
-- [ ] Public API changed? Checked against `../locador` and
+- [ ] Public API changed? Checked against `../locador`, `../encheridor` and
       `../gazetteer-fr-plugins`, which compile against it, and said so in the
       report.
 - [ ] Docs updated in the same commit: godoc first (it is the data dictionary),
