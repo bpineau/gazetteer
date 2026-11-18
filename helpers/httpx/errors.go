@@ -14,6 +14,9 @@ import (
 	"fmt"
 )
 
+// ErrDownloadTooLarge signals that the response exceeds the download size limit.
+var ErrDownloadTooLarge = errors.New("exceeds MaxBytes")
+
 // ErrHTTP is returned when the server responded with an unsuccessful HTTP
 // status code (>= 400) and we decided not to retry (or ran out of retries
 // for non-retryable codes). Status is the HTTP status code; Body is a

@@ -240,7 +240,8 @@ type DownloadOptions struct {
 	// SkipIfExists short-circuits the network when destPath already
 	// exists; the existing file's sha256 is computed and returned.
 	SkipIfExists bool
-	// MaxBytes guards against bombs (0 = unlimited / inherit Options).
+	// MaxBytes caps the response size in bytes (0 inherits Options.MaxResponseBytes).
+	// Download returns ErrDownloadTooLarge if the response exceeds this limit.
 	MaxBytes int64
 	// Timeout caps the whole download (connect + full body stream).
 	// 0 = the 15-minute default. Downloads deliberately bypass the

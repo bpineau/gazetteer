@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const defaultMinForwardScore = 0.7
+
 // INSEEResolver resolves an input (free-form address and/or lat/lon)
 // to a 5-digit INSEE commune code via the following cascade:
 //
@@ -103,7 +105,7 @@ func (r *INSEEResolver) Resolve(ctx context.Context, q INSEEQuery) (INSEEResolut
 		if err == nil {
 			minScore := r.MinForwardScore
 			if minScore == 0 {
-				minScore = 0.7
+				minScore = defaultMinForwardScore
 			}
 			// Trust forward when citycode non-empty AND (Score absent OR
 			// Score ≥ threshold). Score=0 is treated as "unknown, trust

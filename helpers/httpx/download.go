@@ -127,6 +127,14 @@ func (c *Client) Download(ctx context.Context, url, destPath string, opts Downlo
 		return DownloadResult{}, &ErrHTTP{Status: resp.StatusCode, URL: url}
 	}
 
+	limit := opts.MaxBytes
+	if limit == 0 {
+		limit = c.resolved.maxResponseBytes
+	}
+	if limit > 0 && resp.ContentLength > limit {
+		return DownloadResult{}, fmt.Errorf("httpx: download from %s %w=%d", url, ErrDownloadTooLarge, limit)
+	}
+
 	// A tmpfile unique to this download: two concurrent downloads of the same
 	// destination would otherwise open, truncate and interleave their bytes in
 	// the same "<dest>.tmp" before both renaming the mixture into place.
@@ -140,11 +148,6 @@ func (c *Client) Download(ctx context.Context, url, destPath string, opts Downlo
 		_ = f.Close()
 		_ = os.Remove(tmp)
 		return DownloadResult{}, fmt.Errorf("httpx: chmod tmp %s: %w", tmp, err)
-	}
-
-	limit := opts.MaxBytes
-	if limit == 0 {
-		limit = c.resolved.maxResponseBytes
 	}
 
 	hasher := sha256.New()
@@ -164,7 +167,7 @@ func (c *Client) Download(ctx context.Context, url, destPath string, opts Downlo
 	if limit > 0 && n > limit {
 		_ = f.Close()
 		_ = os.Remove(tmp)
-		return DownloadResult{}, fmt.Errorf("httpx: download from %s exceeds MaxBytes=%d", url, limit)
+		return DownloadResult{}, fmt.Errorf("httpx: download from %s %w=%d", url, ErrDownloadTooLarge, limit)
 	}
 	if err := f.Sync(); err != nil {
 		_ = f.Close()

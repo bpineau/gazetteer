@@ -994,22 +994,38 @@ func TestErrors_Wrap(t *testing.T) {
 	}
 }
 
-// Test that MaxBytes guards downloads.
 func TestDownload_MaxBytes(t *testing.T) {
-	body := strings.Repeat("a", 4096)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(body))
-	}))
-	defer srv.Close()
-
-	c := newTestClient(t, Options{RateLimitPerHost: 1000})
-	dest := filepath.Join(t.TempDir(), "big.bin")
-	_, err := c.Download(context.Background(), srv.URL+"/", dest, DownloadOptions{MaxBytes: 1024})
-	if err == nil {
-		t.Fatal("expected MaxBytes error")
-	}
-	if _, statErr := os.Stat(dest); !os.IsNotExist(statErr) {
-		t.Fatal("dest must not exist on MaxBytes error")
+	for _, tc := range []struct {
+		name     string
+		declared int64
+		body     string
+		tooLarge bool
+	}{
+		{"declared", 8, "", true},
+		{"streamed", -1, "12345", true},
+		{"at limit", 4, "1234", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inner := &fakeRoundTripper{f: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(tc.body)), ContentLength: tc.declared, Request: req}, nil
+			}}
+			c := newTestClient(t, Options{Transport: inner})
+			dir := t.TempDir()
+			dest := filepath.Join(dir, "file")
+			const url = "https://example.test/file"
+			_, err := c.Download(t.Context(), url, dest, DownloadOptions{MaxBytes: 4})
+			if tc.tooLarge {
+				if !errors.Is(err, ErrDownloadTooLarge) || err.Error() != "httpx: download from "+url+" exceeds MaxBytes=4" {
+					t.Fatalf("unexpected size error: %v", err)
+				}
+				entries, err := os.ReadDir(dir)
+				if err != nil || len(entries) != 0 {
+					t.Fatalf("download left files %v (%v)", entries, err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 

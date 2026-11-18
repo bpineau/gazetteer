@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -46,6 +47,51 @@ func TestGeocodeQueryString(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("got %q want %q", got, tc.want)
 		}
+	}
+}
+
+func TestBANClient_RepairsForwardQueries(t *testing.T) {
+	for _, tc := range []struct {
+		address, want string
+		score         float64
+		miss          bool
+	}{
+		{"(anciennement commune de Val-Vert), 12 rue du Parc 99000 Val-Neuf", "12 rue du Parc 99000 Val-Vert", .83, false},
+		{"(anciennement Val-Vert - 99), 12 rue du Parc 99000 Val-Neuf", "12 rue du Parc 99000 Val-Vert", .83, false},
+		{"(commune nouvelle de Val-Neuf), 12 rue du Parc 99000 Val-Vert", "12 rue du Parc 99000 Val-Vert", .82, false},
+		{"(commune nouvelle de Val-Neuf), 12 rue du Parc 99000", "12 rue du Parc 99000 Val-Neuf", .82, false},
+		{"« L'Étang » 99000 Val-Vert", "L'Étang 99000 Val-Vert", .91, false},
+		{"(Écluse du Canal) 99000 Val-Vert", "Écluse du Canal 99000 Val-Vert", .85, false},
+		{"« Les Sapins » 99000 Val-Vert", "Les Sapins 99000 Val-Vert", .5, true},
+		{"12 rue du Parc 99000 Val-Vert", "12 rue du Parc 99000 Val-Vert", .5, false},
+		{" - ", "", 0, true},
+	} {
+		t.Run(tc.address, func(t *testing.T) {
+			calls := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if got := r.URL.Query().Get("q"); got != tc.want {
+					t.Errorf("sent %q, want %q", got, tc.want)
+				}
+				_, _ = fmt.Fprintf(w, `{"features":[{"geometry":{"coordinates":[2,48]},"properties":{"score":%f,"type":"street"}}]}`, tc.score)
+			}))
+			defer srv.Close()
+			previous := BANEndpoint
+			BANEndpoint = srv.URL
+			defer func() { BANEndpoint = previous }()
+			hc, err := httpx.New(httpx.Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = hc.Close() }()
+			_, err = NewBANClient(hc).Geocode(t.Context(), GeocodeQuery{Address: tc.address})
+			if tc.miss && !errors.Is(err, ErrNotFound) || !tc.miss && err != nil {
+				t.Fatalf("Geocode returned %v, want miss %t", err, tc.miss)
+			}
+			if tc.want == "" && calls != 0 {
+				t.Fatalf("sent %d requests for unusable input", calls)
+			}
+		})
 	}
 }
 

@@ -46,7 +46,9 @@ one place those layers live; every consumer embeds it.
   headers) and credential-like query parameters, and is written 0600 in
   0700 directories. `Response.Attempts` and the snapshot's `attempts`
   count the retry layer's real sends. `Download` bypasses the disk cache,
-  so its `MaxBytes` is the only size bound on the file.
+  so its `MaxBytes` is the only size bound on the file. A response over the
+  effective limit returns an error matching `ErrDownloadTooLarge`, whether its
+  size is advertised by the server or discovered while streaming.
 - **Only idempotent requests are retried.** GET, HEAD, PUT, DELETE (and
   the other RFC 9110 idempotent methods) keep their retries; a POST or
   PATCH is sent once unless it carries an `Idempotency-Key` header or its

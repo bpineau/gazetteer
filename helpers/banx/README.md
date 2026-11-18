@@ -120,6 +120,10 @@ No transitive dependency on any other internal package.
   `ResolveLatLonAt(..., banx.PrecisionStreet, 0)` returns
   `ErrCoarseMatch` instead of the commune centre BAN answers a
   nonexistent address with. An unreported precision is never refused.
+- Forward search repairs leading punctuation that the API rejects. It keeps
+  quoted place names, and uses the former postal locality when a merger note
+  names it. A repaired query needs a BAN score of at least 0.7 to return a
+  match. A lower score or a punctuation-only query returns `ErrNotFound`.
 - The `banMaxQueryLen` constant caps the `q` parameter at BAN's
   200-char limit; over-long inputs are truncated rather than rejected
   so a single bad address doesn't cascade.

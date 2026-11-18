@@ -5,8 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
+	"unicode"
+	"unicode/utf8"
+
 	"strings"
 	"time"
+
+	"github.com/bpineau/gazetteer/helpers/frnorm"
 
 	"github.com/bpineau/gazetteer/helpers/httpx"
 )
@@ -75,9 +81,36 @@ type banProperties struct {
 // bad address can't cascade into a stream of failed lookups.
 const banMaxQueryLen = 200
 
-// Geocode implements Geocoder. Returns ErrNotFound when BAN returns an
-// empty feature collection or when the query is bad enough to be
-// equivalent to no input (over the API's 200-char cap).
+// municipalityNote recognizes explicit merger annotations only. Other
+// parenthesized text can be the actual name of a place.
+var municipalityNote = regexp.MustCompile(`(?i)^\((?:anciennement commune de ([^()]+)|anciennement ([^()]+) - (?:[0-9]{2,3}|2[ab])|commune nouvelle de ([^()]+))\),\s*(\S.*)$`)
+
+// repairForwardQuery keeps the street and postcode together. In a merged
+// commune, identical street names can refer to different places, so use the
+// explicitly named former commune when the address has a postal locality.
+func repairForwardQuery(s string) string {
+	if m := municipalityNote.FindStringSubmatch(s); m != nil {
+		s = m[4]
+		_, city, hasLocality := frnorm.ExtractZipCity(s)
+		switch former := m[1] + m[2]; {
+		case former != "":
+			if hasLocality {
+				s = strings.TrimSuffix(strings.TrimSuffix(s, ", France"), city)
+			}
+			s = strings.TrimSpace(s) + " " + former
+		case !hasLocality && !containsToken(s, m[3]):
+			s += " " + m[3]
+		}
+	}
+	s = strings.TrimLeftFunc(s, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+	words := strings.FieldsFunc(s, func(r rune) bool {
+		return unicode.IsSpace(r) || r == '«' || r == '»' || r == '(' || r == ')'
+	})
+	return strings.Join(words, " ")
+}
+
+// Geocode implements Geocoder. Empty results, unusable punctuation and
+// low-confidence matches on repaired inputs return ErrNotFound.
 func (c *BANClient) Geocode(ctx context.Context, q GeocodeQuery) (GeocodeResult, error) {
 	if c == nil || c.http == nil {
 		return GeocodeResult{}, errors.New("banx: nil http client")
@@ -86,8 +119,20 @@ func (c *BANClient) Geocode(ctx context.Context, q GeocodeQuery) (GeocodeResult,
 	if query == "" {
 		return GeocodeResult{}, errors.New("banx: empty query")
 	}
+	first, _ := utf8.DecodeRuneInString(query)
+	repaired := !unicode.IsLetter(first) && !unicode.IsDigit(first)
+	if repaired {
+		query = repairForwardQuery(query)
+		if query == "" {
+			return GeocodeResult{}, ErrNotFound
+		}
+	}
 	if len(query) > banMaxQueryLen {
-		query = strings.TrimSpace(query[:banMaxQueryLen])
+		end := banMaxQueryLen
+		for !utf8.RuneStart(query[end]) {
+			end--
+		}
+		query = strings.TrimSpace(query[:end])
 	}
 	u, err := url.Parse(BANEndpoint)
 	if err != nil {
@@ -106,6 +151,9 @@ func (c *BANClient) Geocode(ctx context.Context, q GeocodeQuery) (GeocodeResult,
 		return GeocodeResult{}, ErrNotFound
 	}
 	f := fc.Features[0]
+	if repaired && f.Properties.Score < defaultMinForwardScore {
+		return GeocodeResult{}, ErrNotFound
+	}
 	if len(f.Geometry.Coordinates) < 2 {
 		return GeocodeResult{}, fmt.Errorf("banx: BAN forward returned malformed coordinates for q=%q (got %d coords, want >=2)", query, len(f.Geometry.Coordinates))
 	}
