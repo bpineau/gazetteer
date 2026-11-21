@@ -17,9 +17,9 @@ GOVULNCHECK  ?= govulncheck
 # Pinned developer tooling: `make tools` installs exactly these, locally and in
 # CI, so a tool release never changes the gate for an unchanged revision.
 # golangci-lint must stay on the v2 major (.golangci.yml uses the v2 schema).
-GOIMPORTS_VERSION   ?= v0.52.0
+GOIMPORTS_VERSION   ?= v0.53.0
 GOLANGCI_VERSION    ?= v2.15.0
-GOVULNCHECK_VERSION ?= v1.9.0
+GOVULNCHECK_VERSION ?= v1.10.0
 
 GO_PACKAGES  := ./...
 GO_TIMEOUT   ?= 180s
