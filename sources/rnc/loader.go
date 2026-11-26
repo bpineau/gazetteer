@@ -97,8 +97,8 @@ func Load(dir string) (*Index, error) {
 			fullErr = err
 			return
 		}
-		if s.legacy != nil {
-			fullIndex = s.legacy
+		if s.whole != nil {
+			fullIndex = s.whole
 			return
 		}
 		fullIndex, fullErr = s.archive.all()

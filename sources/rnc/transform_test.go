@@ -30,7 +30,7 @@ func TestTransform_Golden(t *testing.T) {
 	}
 	idx, err := a.all()
 	if err != nil {
-		t.Fatalf("parseIndexStream: %v", err)
+		t.Fatalf("all: %v", err)
 	}
 	if idx.Count() != 4 {
 		t.Fatalf("Count = %d, want 4", idx.Count())

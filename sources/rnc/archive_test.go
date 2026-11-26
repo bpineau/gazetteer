@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 )
 
@@ -34,7 +35,7 @@ func TestArchivePreservesOrderAndScope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.legacy == nil || s.legacy.Copros[0].Immatriculation != "legacy" {
+	if s.whole == nil || s.whole.Copros[0].Immatriculation != "legacy" {
 		t.Fatal("legacy datadir override was ignored")
 	}
 	if err := os.WriteFile(filepath.Join(dir, set.Processed.Name), data, 0o600); err != nil {
@@ -92,5 +93,52 @@ func TestDamagedCommuneIsIsolated(t *testing.T) {
 	}
 	if err = validate(bytes.NewReader(data)); err == nil {
 		t.Fatal("refresh accepted a damaged archive")
+	}
+}
+
+func TestConcurrentMissesShareOneDecode(t *testing.T) {
+	data, _ := archiveFixture(t)
+	a, err := openArchive(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const n = 16
+	got := make([]*Index, n)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Go(func() {
+			<-start
+			idx, err := a.commune("93001")
+			if err != nil {
+				t.Error(err)
+			}
+			got[i] = idx
+		})
+	}
+	close(start)
+	wg.Wait()
+	for i, idx := range got {
+		if idx != got[0] || idx.Count() != 2 {
+			t.Fatalf("caller %d got a separate or wrong decode", i)
+		}
+	}
+	if len(a.pending) != 0 || len(a.cached) != 1 {
+		t.Fatalf("pending %d, cached %d after the burst", len(a.pending), len(a.cached))
+	}
+}
+
+// Not parallel: it swaps the package-level set before parallel tests start.
+func TestMissingDatasetIsEmpty(t *testing.T) {
+	saved := set
+	t.Cleanup(func() { set = saved })
+	set.Embed = nil
+	s, err := openScope(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx, err := s.commune("93001")
+	if err != nil || idx.Count() != 0 || s.rows != 0 {
+		t.Fatalf("missing dataset: %d rows, err %v", idx.Count(), err)
 	}
 }

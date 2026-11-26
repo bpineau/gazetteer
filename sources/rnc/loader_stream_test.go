@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"runtime"
 	"testing"
 
@@ -85,11 +86,24 @@ func TestSource_OutOfScope_GracefulEmpty(t *testing.T) {
 	}
 }
 
-// Set RNC_MEM_TEST=1 to inspect a fresh process after querying a commune.
-func TestMemoryFootprint_NationalVsFiltered(t *testing.T) {
-	if os.Getenv("RNC_MEM_TEST") == "" {
-		t.Skip("set RNC_MEM_TEST=1 to run the heap-footprint measurement")
+// TestMemoryFootprint_CommuneQuery guards the point of the commune archive: a
+// query against the embedded national registry decodes one commune, not the
+// 650k-row index (which held hundreds of MB resident). Other tests in this
+// package call Load, whose full index stays reachable through a package
+// global, so the heap is read in a fresh child process of the test binary.
+func TestMemoryFootprint_CommuneQuery(t *testing.T) {
+	if os.Getenv("RNC_MEM_CHILD") == "" {
+		t.Parallel()
+		cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestMemoryFootprint_CommuneQuery$", "-test.v")
+		cmd.Env = append(os.Environ(), "RNC_MEM_CHILD=1")
+		out, err := cmd.CombinedOutput()
+		t.Logf("child:\n%s", out)
+		if err != nil {
+			t.Fatalf("child process: %v", err)
+		}
+		return
 	}
+	const maxHeap = 64 << 20
 	for _, depts := range [][]string{nil, {"75", "77", "78", "91", "92", "93", "94", "95"}} {
 		s, err := openScope("", depts)
 		if err != nil {
@@ -103,5 +117,8 @@ func TestMemoryFootprint_NationalVsFiltered(t *testing.T) {
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
 		t.Logf("scope %v: %d rows, %d in commune, process heap %.1f MiB", depts, s.rows, idx.Count(), float64(m.HeapAlloc)/(1<<20))
+		if idx.Count() == 0 || m.HeapAlloc > maxHeap {
+			t.Errorf("scope %v: %d candidates, heap %d B (max %d)", depts, idx.Count(), m.HeapAlloc, maxHeap)
+		}
 	}
 }

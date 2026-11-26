@@ -59,10 +59,21 @@ type archive struct {
 	manifest
 	files map[string]*zip.File
 	// A bounded decoded cache serves repeated visits to nearby communes.
-	mu     sync.Mutex
-	recent list.List
-	cached map[string]*list.Element
-	weight int64
+	// mu guards the cache only: decoding runs outside it, so a cold commune
+	// never stalls queries on other communes.
+	mu      sync.Mutex
+	recent  list.List
+	cached  map[string]*list.Element
+	pending map[string]*decoding
+	weight  int64
+}
+
+// decoding is a commune being decoded outside the lock. Concurrent callers
+// for the same commune wait on done and share its outcome.
+type decoding struct {
+	done chan struct{}
+	idx  *Index
+	err  error
 }
 
 type cachedCommune struct {
@@ -82,7 +93,7 @@ func openArchive(r io.ReaderAt, size int64) (*archive, error) {
 	if err != nil {
 		return nil, err
 	}
-	a := &archive{files: make(map[string]*zip.File, len(z.File)), cached: make(map[string]*list.Element)}
+	a := &archive{files: make(map[string]*zip.File, len(z.File)), cached: make(map[string]*list.Element), pending: make(map[string]*decoding)}
 	for _, f := range z.File {
 		if a.files[f.Name] != nil {
 			return nil, fmt.Errorf("duplicate RNC member %q", f.Name)
@@ -158,11 +169,33 @@ func (a *archive) commune(code string) (*Index, error) {
 		return &Index{Meta: a.Meta}, nil
 	}
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	if hit := a.cached[code]; hit != nil {
 		a.recent.MoveToFront(hit)
+		a.mu.Unlock()
 		return hit.Value.(cachedCommune).index, nil
 	}
+	if d := a.pending[code]; d != nil {
+		a.mu.Unlock()
+		<-d.done
+		return d.idx, d.err
+	}
+	d := &decoding{done: make(chan struct{})}
+	a.pending[code] = d
+	a.mu.Unlock()
+
+	d.idx, d.err = a.decode(code)
+
+	a.mu.Lock()
+	delete(a.pending, code)
+	if d.err == nil {
+		a.store(code, d.idx)
+	}
+	a.mu.Unlock()
+	close(d.done)
+	return d.idx, d.err
+}
+
+func (a *archive) decode(code string) (*Index, error) {
 	idx := &Index{Meta: a.Meta, Copros: make([]Entry, 0, a.Counts[code])}
 	err := a.visit(code, func(r archiveRow) error {
 		idx.Copros = append(idx.Copros, r.Entry)
@@ -172,17 +205,24 @@ func (a *archive) commune(code string) (*Index, error) {
 		return nil, err
 	}
 	idx.buildLookups()
-	weight := int64(a.files[code].UncompressedSize64) + int64(len(idx.Copros))*entrySize
-	if weight <= communeCacheBudget {
-		for a.weight+weight > communeCacheBudget {
-			victim := a.recent.Remove(a.recent.Back()).(cachedCommune)
-			delete(a.cached, victim.code)
-			a.weight -= victim.weight
-		}
-		a.cached[code] = a.recent.PushFront(cachedCommune{code, idx, weight})
-		a.weight += weight
-	}
 	return idx, nil
+}
+
+// store caches a decoded commune, evicting the least recently used ones to
+// stay within communeCacheBudget. A commune larger than the whole budget is
+// served but not kept. The caller holds a.mu.
+func (a *archive) store(code string, idx *Index) {
+	weight := int64(a.files[code].UncompressedSize64) + int64(len(idx.Copros))*entrySize
+	if weight > communeCacheBudget {
+		return
+	}
+	for a.weight+weight > communeCacheBudget {
+		victim := a.recent.Remove(a.recent.Back()).(cachedCommune)
+		delete(a.cached, victim.code)
+		a.weight -= victim.weight
+	}
+	a.cached[code] = a.recent.PushFront(cachedCommune{code, idx, weight})
+	a.weight += weight
 }
 
 func (a *archive) all() (*Index, error) {

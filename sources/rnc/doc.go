@@ -44,7 +44,8 @@
 // `data/rnc_coproprietes.zip`. Queries read the requested INSEE member
 // and share a bounded cache of decoded communes. The full Load API still
 // returns every entry in upstream order. An existing datadir JSON gzip
-// keeps precedence over the embed until refresh publishes the ZIP.
+// keeps precedence over the embed until refresh publishes the ZIP; it is
+// parsed in full, so loading it logs a warning.
 //
 // Required Listing inputs:
 //

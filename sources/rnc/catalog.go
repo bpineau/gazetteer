@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"log/slog"
 	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
@@ -14,9 +15,12 @@ import (
 // refresh writes the seekable archive. Older installations keep their data.
 var legacySet = dataset.Set{Source: Name, Version: Version, Processed: dataset.File{Name: "rnc_coproprietes.json.gz"}}
 
+// scope serves either the commune archive or, when whole is set, an index
+// held entirely in memory: a legacy datadir file, or the empty index of a
+// dataset available nowhere.
 type scope struct {
 	archive *archive
-	legacy  *Index
+	whole   *Index
 	keep    func(string) bool
 	rows    int
 }
@@ -32,17 +36,12 @@ func openScope(dir string, depts []string) (*scope, error) {
 			return nil, err
 		}
 		if old == dataset.OriginDatadir {
-			f, err := legacySet.Open(dir)
-			if err != nil {
-				return nil, err
-			}
-			defer func() { _ = f.Close() }()
-			idx, err := parseIndexStream(f, depts)
-			if err != nil {
-				return nil, err
-			}
-			return &scope{legacy: idx, rows: idx.Count()}, nil
+			return openLegacy(dir, depts)
 		}
+	}
+	if origin == dataset.OriginNone {
+		// Never downloaded and not embedded: no data, not a failure.
+		return &scope{whole: &Index{}}, nil
 	}
 	var a *archive
 	if origin == dataset.OriginDatadir {
@@ -63,6 +62,24 @@ func openScope(dir string, depts []string) (*scope, error) {
 		}
 	}
 	return s, nil
+}
+
+// openLegacy parses a pre-archive datadir file in full. Its resident set is
+// the whole scope (hundreds of MB nationally), so it warns until a refresh
+// replaces it.
+func openLegacy(dir string, depts []string) (*scope, error) {
+	f, err := legacySet.Open(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	idx, err := parseIndexStream(f, depts)
+	if err != nil {
+		return nil, err
+	}
+	slog.Warn("rnc: legacy datadir file loaded in full; run `gazetteer refresh rnc` to switch to the commune archive",
+		slog.String("file", legacySet.Processed.Name), slog.Int("rows", idx.Count()))
+	return &scope{whole: idx, rows: idx.Count()}, nil
 }
 
 var embeddedArchive = sync.OnceValues(func() (*archive, error) {
@@ -99,8 +116,8 @@ func datadirArchive(dir string) (*archive, error) {
 }
 
 func (s *scope) commune(code string) (*Index, error) {
-	if s.legacy != nil {
-		return s.legacy, nil
+	if s.whole != nil {
+		return s.whole, nil
 	}
 	if s.keep != nil && !s.keep(code) {
 		return &Index{Meta: s.archive.Meta}, nil
