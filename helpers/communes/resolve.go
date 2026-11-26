@@ -42,9 +42,9 @@ func DeptFromZip(zip string) string {
 //     the arrondissement INSEE 75101..75120 / 75116.
 //   - Lyon: zip 69001..69009 → INSEE 69381..69389.
 //   - Marseille: zip 13001..13016 → INSEE 13201..13216.
-//   - Everywhere else: (normalized city name, département-from-zip)
-//     against the table, retrying the other Corsican département when
-//     the fuzzy 2A/2B zip split guessed wrong.
+//   - Everywhere else: an exact name and postal-code match, including
+//     postal routes crossing a département boundary. Without a known
+//     postal match, use the name in the département inferred from the zip.
 //
 // ok is false when nothing matches (unknown city, malformed zip). For
 // free-text addresses without a clean (city, zip) pair, use the live
@@ -53,7 +53,8 @@ func DeptFromZip(zip string) string {
 func (t *Table) ResolveINSEE(city, zip string) (string, bool) {
 	zip = strings.TrimSpace(zip)
 	city = strings.TrimSpace(city)
-	if len(zip) != 5 {
+	dept := DeptFromZip(zip)
+	if dept == "" {
 		return "", false
 	}
 
@@ -86,9 +87,22 @@ func (t *Table) ResolveINSEE(city, zip string) (string, bool) {
 	if t == nil || city == "" {
 		return "", false
 	}
-	dept := DeptFromZip(zip)
-	if dept == "" {
-		return "", false
+	name := normalizeCityName(city)
+	t.byNameDeptOnce.Do(t.buildByNameDept)
+	var matched string
+	for _, d := range t.CityDepts(city) {
+		for _, code := range t.byNameDept[nameDeptKey(name, d)] {
+			if ok, _ := t.ZipMatchesINSEE(code, zip); !ok {
+				continue
+			}
+			if matched != "" && matched != code {
+				return "", false
+			}
+			matched = code
+		}
+	}
+	if matched != "" {
+		return matched, true
 	}
 	if insee, ok := t.INSEEByCityDept(city, dept); ok {
 		return insee, true

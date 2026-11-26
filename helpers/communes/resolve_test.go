@@ -67,3 +67,17 @@ func TestResolveINSEE(t *testing.T) {
 		t.Error("nil table must miss for non-PLM zips")
 	}
 }
+
+func TestResolveINSEEPostalRoutesAcrossDepartments(t *testing.T) {
+	table := MustDefault()
+	for _, tc := range []struct{ city, zip, want string }{
+		{"Curbans", "05110", "04066"},
+		{"Paray-Vieille-Poste", "94390", "91479"},
+		{"Paris", "7500:", ""},
+		{"Marseille", "1300:", ""},
+	} {
+		if got, ok := table.ResolveINSEE(tc.city, tc.zip); got != tc.want || ok != (tc.want != "") {
+			t.Errorf("ResolveINSEE(%q, %q) = %q, %v; want %q", tc.city, tc.zip, got, ok, tc.want)
+		}
+	}
+}
