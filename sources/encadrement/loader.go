@@ -82,7 +82,7 @@ var (
 		Raw:                   []dataset.File{{Name: rawLyonName, URL: rawLyonURL}},
 		Transform:             transformLyon,
 		Validate:              validateLyon,
-		Vintage:               "2025-06", // Métropole de Lyon barème 2025-2026 (annual)
+		Vintage:               "2026-11", // Métropole de Lyon barème 2026-2027 (annual)
 		ExpectedCadenceMonths: 12,
 	}
 )

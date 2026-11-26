@@ -35,9 +35,7 @@ const (
 	rawParisURL  = "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/logement-encadrement-des-loyers/exports/json"
 
 	// eptBaremeVintage is the start of the DRIHL arrêté period the EPT barèmes
-	// are drawn from; it selects the KML directory. The DRIHL site labels it
-	// "du 01 juin 2026 au 31 mai 2027", but the arrêtés themselves end on
-	// 24 November 2026 (see gridValidity in legal.go).
+	// are drawn from. It selects the KML directory.
 	// eptBaremeYear is its year, gated by the vintage legality test so a stale
 	// arrêté can never ship silently again.
 	eptBaremeVintage = "2026-06-01"
@@ -67,10 +65,10 @@ const (
 	// same vintage legality test as the Paris and EPT vintages, and a test
 	// checks it against rawLyonURL, so bumping the layer without the constant
 	// (or the reverse) fails rather than shipping a stale arrêté in silence.
-	lyonBaremeYear = 2025
+	lyonBaremeYear = 2026
 
 	rawLyonName = "encadrement_lyon_villeurbanne.raw.geojson"
-	rawLyonURL  = "https://download.data.grandlyon.com/wfs/grandlyon?SERVICE=WFS&VERSION=2.0.0&request=GetFeature&typename=metropole-de-lyon:car_care.carencadrmtloyer_2025_2026&outputFormat=application/json&SRSNAME=EPSG:4326"
+	rawLyonURL  = "https://download.data.grandlyon.com/wfs/grandlyon?SERVICE=WFS&VERSION=2.0.0&request=GetFeature&typename=metropole-de-lyon:car_care.carencadrmtloyer_2026_2027&outputFormat=application/json&SRSNAME=EPSG:4326"
 )
 
 // zoneCoordDecimals rounds zonage coordinates to ~11 cm — far finer than any
@@ -82,8 +80,7 @@ const zoneCoordDecimals = 6
 // in force (annee 2026). Bump when a newer arrêté lands.
 //
 // The 2026 grille (arrêté IDF-2026-06-12-00003 of 12 June 2026, in force
-// from 1 July 2026 to 24 November 2026, the end of the ELAN experiment it
-// rests on) is NOT in the export yet: opendata.paris.fr still stopped at
+// from 1 July 2026, extended by IDF-2026-11-23-00002) is NOT in the export yet: opendata.paris.fr still stopped at
 // annee 2025 on 2026-10-21. The committed snapshot was transcribed from the
 // arrêté's annexes 1 (quartier to secteur) and 2 (per-secteur cells), every
 // cell checked against majoré = 1.2 x référence, minoré = 0.7 x référence and

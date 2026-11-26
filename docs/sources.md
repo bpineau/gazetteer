@@ -401,30 +401,19 @@ Lyon / Villeurbanne.
 - **Vintages**: Paris 2026 (arrêté of 12 June 2026, in force from 1 July;
   transcribed from the arrêté because opendata.paris.fr still stops at 2025,
   so refreshing the Paris set fails until the export catches up), Lyon
-  2025-2026, Plaine Commune & Est Ensemble barème "du 01 juin 2026" (DRIHL
+  2026-2027, Plaine Commune & Est Ensemble barème "du 01 juin 2026" (DRIHL
   référence-loyer KML; zonage 2022). Zone numbers are not unique across
   EPTs, so lookups are scoped by `(zone_source, zone)`.
-- **Sunset and dates**: every cap rests on the ELAN experiment (art. 140 of
-  loi 2018-1021, eight years since loi 2022-217) from the law's publication
-  in the JO of 24 November 2018, so its last day is **24 November 2026**: the
-  prefect's 2026 arrêtés say so ("prend fin le 24 novembre 2026 à minuit")
-  and are themselves in force "jusqu'au 24 novembre 2026" (the Sénat's report
-  dates the end on the 23rd, counting the day of publication). The Sénat
-  adopted a two-year extension on 21 October 2026 ("huit" replaced by "dix",
-  territories already regulated only); the Assemblée nationale séance is
-  scheduled on 18 November 2026. Until that outcome is checked, the Source
-  **assumes the extension**: it reads `Listing.AsOf`, or today, and up to
-  24 November 2026 a cap is plain; from 25 November 2026 to 24 November 2028
-  it is kept at `ConfidenceLow` with an `Evidence.Note` saying the extension
-  is assumed, not yet law; past 24 November 2028 every regulated reading is
-  `Regulation = lapsed`, with no cap figure, `ConfidenceNone`, and
-  `IsEmpty()` true. `legal.go` (STATUS) says what to change once the vote is
-  known. Each grille also has its own period (Paris 1 July to 24 November
-  2026, Plaine Commune and Est Ensemble 1 June to 24 November 2026, Lyon from
-  1 November 2025): outside it the shipped cells are the nearest reading
-  (the previous arrêté before it, the successor not yet shipped after it),
-  kept at `ConfidenceLow` with a Note. `overview.Build` applies the same rule
-  for `Options.AsOf` and flags such caps `RentCapHedged`.
+- **Sunset and dates**. Article 140 of the ELAN law runs for ten years from
+  its publication on 24 November 2018. After 24 November 2028, the Source
+  returns `RegulationLapsed`, no figure and `ConfidenceNone`. Article 140 I bis
+  allows requests for an earlier territorial withdrawal. The national term
+  does not set a rent amount. [Loi 2026-1072, article 1](https://www.legifrance.gouv.fr/jorf/id/JORFARTI000055119242).
+  The orders of 23 November 2026 removed the end date from the Paris grille
+  (effective 1 July 2026) and both Seine-Saint-Denis grilles (1 June 2026).
+  Lyon's 1 November 2026 grille applies through 31 October 2027. Outside a
+  shipped grille's own period, the Source keeps its nearest figure at
+  `ConfidenceLow` with an evidence note. Overview flags it as `RentCapHedged`.
 
 ## `sources/catnat`
 

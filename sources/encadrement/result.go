@@ -45,7 +45,7 @@ const (
 	RegulationPartialCommune = "partial_commune"
 	// RegulationLapsed: the address lies in a territory the art. 140
 	// experiment covered, but the reading date (Listing.AsOf, or today) is
-	// past the experiment's end, including the extension the Source assumes
+	// past the experiment's statutory end
 	// (see elanLastDay in legal.go), so no cap applies. The caps are zero and
 	// IsEmpty is true: "no cap" is then the right answer, and Regulation
 	// plus Evidence.Note say why.

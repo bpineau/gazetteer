@@ -71,16 +71,10 @@ type CommuneOverview struct {
 	EncadrementNotCovered bool `json:"encadrement_not_covered,omitempty"`
 	// EncadrementLapsed is true for a commune that the art. 140 rent-cap
 	// experiment covered, read on a date (Options.AsOf) past the
-	// experiment's end or past its shipped grille's: no cap is known to
-	// apply, so Encadree is false and RentCapEURM2HC nil. Re-check the
-	// commune when an extension or a new arrêté is published.
+	// experiment's end. Encadree is false and RentCapEURM2HC nil.
 	EncadrementLapsed bool `json:"encadrement_lapsed,omitempty"`
-	// RentCapHedged is true when RentCapEURM2HC is not known to be the law in
-	// force on Options.AsOf: it rests on the assumed two-year extension of
-	// the art. 140 experiment (past 24 November 2026, not yet in the JO when
-	// this module was built), or the grille's own arrêté period does not
-	// cover the date (its cells are carried over as the nearest reading). The
-	// encadrement Source returns such readings at ConfidenceLow.
+	// RentCapHedged is true when the shipped grille supplies the nearest
+	// available figure outside its arrêté period on Options.AsOf.
 	RentCapHedged bool `json:"rent_cap_hedged,omitempty"`
 
 	// Socio-economic

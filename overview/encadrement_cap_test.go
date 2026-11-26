@@ -117,11 +117,6 @@ func TestBuild_DecreedTerritoryWithoutGrille(t *testing.T) {
 	}
 }
 
-// TestBuild_EncadrementFollowsItsValidity pins that the screen applies the
-// encadrement Source's date rule: the cap is plain up to the published end
-// of the art. 140 experiment (24 November 2026), hedged under the assumed
-// extension after it, and gone (with no not-covered flag) the day after the
-// assumed end.
 func TestBuild_EncadrementFollowsItsValidity(t *testing.T) {
 	t.Parallel()
 	last := time.Date(2026, time.November, 24, 0, 0, 0, 0, time.UTC)
@@ -142,9 +137,9 @@ func TestBuild_EncadrementFollowsItsValidity(t *testing.T) {
 	if r := rowOf(last, "75101"); !r.Encadree || r.RentCapEURM2HC == nil || r.EncadrementLapsed || r.RentCapHedged {
 		t.Errorf("75101 on %s: Encadree %v cap %v lapsed %v hedged %v, want a plain cap in force", last.Format(time.DateOnly), r.Encadree, r.RentCapEURM2HC, r.EncadrementLapsed, r.RentCapHedged)
 	}
-	assumed := last.AddDate(0, 0, 1)
-	if r := rowOf(assumed, "75101"); !r.Encadree || r.RentCapEURM2HC == nil || !r.RentCapHedged {
-		t.Errorf("75101 on %s: Encadree %v cap %v hedged %v, want a hedged cap", assumed.Format(time.DateOnly), r.Encadree, r.RentCapEURM2HC, r.RentCapHedged)
+	extended := last.AddDate(0, 0, 1)
+	if r := rowOf(extended, "75101"); !r.Encadree || r.RentCapEURM2HC == nil || r.RentCapHedged {
+		t.Errorf("75101 on %s: Encadree %v cap %v hedged %v, want a plain cap under the amended order", extended.Format(time.DateOnly), r.Encadree, r.RentCapEURM2HC, r.RentCapHedged)
 	}
 	after := time.Date(2028, time.November, 25, 0, 0, 0, 0, time.UTC)
 	for _, insee := range []string{"75101", "33063"} {

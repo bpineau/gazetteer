@@ -100,8 +100,8 @@ func TestGrilles_MeubleCellsPairOneToOne(t *testing.T) {
 //     difference).
 //   - Plaine Commune / Est Ensemble: the DRIHL référence-loyer KML "du 01 juin
 //     2026", type "Meublée".
-//   - Lyon / Villeurbanne: arrêté 69-2025-10-24-00001 (in force from
-//     1 November 2025), annexe 1, "Locations meublées" columns.
+//   - Lyon / Villeurbanne: arrêté 69-2026-10-23-00004 (in force from
+//     1 November 2026), annexe 1, "Locations meublées" columns.
 func TestBaremeVintage_SpotChecksMeuble(t *testing.T) {
 	t.Parallel()
 	idx, err := Load("")
@@ -156,14 +156,14 @@ func TestBaremeVintage_SpotChecksMeuble(t *testing.T) {
 			// IRIS 693810101 (Lyon 1er) lies in secteur 1.
 			name:    "lyon/secteur1/2p/1946-1970",
 			entries: idx.LookupLyonIRIS("693810101"),
-			piece:   2, epoque: "1946-1970", ref: 15.4, min: 10.8, majore: 18.5,
+			piece:   2, epoque: "1946-1970", ref: 15.7, min: 11.0, majore: 18.8,
 		},
 		{
 			// IRIS 693810201 (Lyon 1er) lies in secteur 2; the grille's
 			// highest meublé majoré.
 			name:    "lyon/secteur2/1p/1991-2005",
 			entries: idx.LookupLyonIRIS("693810201"),
-			piece:   1, epoque: "1991-2005", ref: 21.9, min: 15.3, majore: 26.3,
+			piece:   1, epoque: "1991-2005", ref: 22.9, min: 16.0, majore: 27.5,
 		},
 	}
 	for _, c := range cases {

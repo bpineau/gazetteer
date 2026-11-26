@@ -66,6 +66,11 @@ func TestBaremeVintage_SpotChecks(t *testing.T) {
 		ref, min, majore float64 // reference / minoré / majoré, €/m²/mois HC
 	}{
 		{
+			name:    "lyon/Villeurbanne/692660101/1p/1946-1970",
+			entries: idx.LookupLyonIRIS("692660101"), zoneID: "692660101",
+			piece: 1, epoque: "1946-1970", ref: 15.7, min: 11, majore: 18.8,
+		},
+		{
 			// DRIHL 2026-06-01, Est Ensemble zone 308 (Montreuil), 1 pièce,
 			// avant 1946, non meublé.
 			name:    "est_ensemble/308/Montreuil/1p/avant1946",

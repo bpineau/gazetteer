@@ -14,14 +14,10 @@ import (
 // when the art. 140 experiment ends: a test that needs another date sets
 // Listing.AsOf.
 func TestMain(m *testing.M) {
-	clock = func() time.Time { return time.Date(2026, time.October, 21, 12, 0, 0, 0, time.UTC) }
+	clock = func() time.Time { return time.Date(2026, time.November, 26, 12, 0, 0, 0, time.UTC) }
 	os.Exit(m.Run())
 }
 
-// The caps rest on the art. 140 experiment, whose eight years end on
-// 24 November 2026 under the published law; the Source assumes the two-year
-// extension to 24 November 2028 (see legal.go STATUS). Past the published end
-// a reading is hedged, past the assumed one it lapses.
 func TestQuery_HonoursTheExperimentEnd(t *testing.T) {
 	t.Parallel()
 	paris := gazetteer.Listing{INSEE: "75101", IRIS: "751010201", Rooms: intp(1), BuildYear: intp(2000)}
@@ -30,7 +26,7 @@ func TestQuery_HonoursTheExperimentEnd(t *testing.T) {
 		return query(t, l)
 	}
 
-	// Last day: still law, the arrêté's own last day too.
+	// The Paris rate continues across the former sunset.
 	if r := at(paris, civilDate(2026, time.November, 24)); r.Regulation != RegulationCapped || r.LoyerRefMajEURPerM2HC != 37.8 || r.Confidence != ConfidenceMedium {
 		t.Errorf("24 Nov: %q %.2f %q, want capped 37.8 medium", r.Regulation, r.LoyerRefMajEURPerM2HC, r.Confidence)
 	}
@@ -40,17 +36,15 @@ func TestQuery_HonoursTheExperimentEnd(t *testing.T) {
 		t.Errorf("24 Nov 23:30 CET: %q, want capped", r.Regulation)
 	}
 
-	// The day after the published end: the assumed extension keeps the cap,
-	// at low confidence, with the note that says it is assumed.
-	for _, l := range []gazetteer.Listing{paris, {INSEE: "69383", Rooms: intp(2)}, {INSEE: "93048", Rooms: intp(2)}} {
-		r := at(l, civilDate(2026, time.November, 25))
-		if r.Regulation != RegulationCapped || r.LoyerRefMajEURPerM2HC <= 0 || r.Confidence != ConfidenceLow ||
-			!strings.Contains(r.Evidence.Note, "assumes its two-year extension") {
-			t.Errorf("%s 25 Nov 2026: %q %.2f %q note %q, want capped, low, the assumed-extension note", l.INSEE, r.Regulation, r.LoyerRefMajEURPerM2HC, r.Confidence, r.Evidence.Note)
+	for _, insee := range []string{"75101", "93048", "93066", "69383"} {
+		l := gazetteer.Listing{INSEE: insee, Rooms: intp(2)}
+		a := at(l, civilDate(2026, time.November, 24))
+		b := at(l, civilDate(2026, time.November, 25))
+		if b.Regulation != RegulationCapped || b.LoyerRefMajEURPerM2HC <= 0 || a.LoyerRefMajEURPerM2HC != b.LoyerRefMajEURPerM2HC || a.Confidence != b.Confidence || a.Evidence.Note != b.Evidence.Note {
+			t.Errorf("%s: reading changed across the former sunset: before %+v, after %+v", insee, a, b)
 		}
 	}
 
-	// The day after the assumed end: no cap, said so.
 	for _, l := range []gazetteer.Listing{
 		paris,
 		{INSEE: "69383", Rooms: intp(2)},
@@ -77,7 +71,7 @@ func TestQuery_HonoursTheExperimentEnd(t *testing.T) {
 		t.Errorf("Toulouse 2027: Regulation %q, want empty", r.Regulation)
 	}
 
-	// Without AsOf the clock decides (pinned to 2026-10-21 by TestMain).
+	// Without AsOf the clock decides (pinned to 2026-11-26 by TestMain).
 	if r := query(t, paris); r.Regulation != RegulationCapped {
 		t.Errorf("no AsOf: %q, want capped", r.Regulation)
 	}
@@ -96,23 +90,20 @@ func TestDated_GrillePeriod(t *testing.T) {
 	if r := query(t, before); r.LoyerRefMajEURPerM2HC != 37.8 || r.Confidence != ConfidenceLow || r.Evidence.Note == "" {
 		t.Errorf("Paris before 1 Jul 2026: maj %.2f %q note %q, want 37.8 low with a note", r.LoyerRefMajEURPerM2HC, r.Confidence, r.Evidence.Note)
 	}
-	// Lyon's grille is in force since 1 November 2025: March 2026 is inside.
-	lyon := gazetteer.Listing{INSEE: "69381", IRIS: "693810101", Rooms: intp(2), AsOf: civilDate(2026, time.March, 1)}
-	if r := query(t, lyon); r.Confidence != ConfidenceMedium || r.Evidence.Note != "" {
-		t.Errorf("Lyon March 2026: %q note %q, want medium, no note", r.Confidence, r.Evidence.Note)
-	}
-
-	// Under the extension the Paris arrêté still ends on 24 November 2026:
-	// in 2027 its cells are carried over, at low confidence, with a note.
-	capped := query(t, paris)
-	r := dated(capped, ZoneSourceParis, civilDate(2027, time.January, 15), civilDate(2028, time.November, 24))
-	if r.Regulation != RegulationCapped || r.LoyerRefMajEURPerM2HC != 37.8 || r.Confidence != ConfidenceLow || !strings.Contains(r.Evidence.Note, "carried over") {
-		t.Errorf("Paris 2027 under an extension: %+v, want the shipped cap carried over at low confidence", r)
-	}
-	// Lyon's arrêté states no end: under the same extension it still reads.
-	lr := query(t, gazetteer.Listing{INSEE: "69381", Rooms: intp(2)})
-	if got := dated(lr, ZoneSourceLyonVilleurbanne, civilDate(2027, time.January, 15), civilDate(2028, time.November, 24)); got.Regulation != RegulationCapped {
-		t.Errorf("Lyon 2027 under an extension: %q, want capped", got.Regulation)
+	lyon := gazetteer.Listing{INSEE: "69381", IRIS: "693810101", Rooms: intp(2)}
+	for _, tc := range []struct {
+		day     time.Time
+		carried bool
+	}{
+		{civilDate(2026, time.November, 1), false},
+		{civilDate(2027, time.October, 31), false},
+		{civilDate(2027, time.November, 1), true},
+	} {
+		lyon.AsOf = tc.day
+		r := query(t, lyon)
+		if r.Regulation != RegulationCapped || strings.Contains(r.Evidence.Note, "carried over") != tc.carried || (r.Confidence == ConfidenceLow) != tc.carried || CapHedgedOn(ZoneSourceLyonVilleurbanne, tc.day) != tc.carried {
+			t.Errorf("Lyon on %s: %+v, want carried over %v", tc.day.Format(time.DateOnly), r, tc.carried)
+		}
 	}
 }
 
@@ -146,7 +137,7 @@ func TestRegulationOn(t *testing.T) {
 	}{
 		{ZoneSourceParis, civilDate(2026, time.June, 30), RegulationCapped}, // before the grille: nearest reading
 		{ZoneSourceParis, civilDate(2026, time.November, 24), RegulationCapped},
-		{ZoneSourceParis, civilDate(2026, time.November, 25), RegulationCapped}, // assumed extension, grille carried over
+		{ZoneSourceParis, civilDate(2026, time.November, 25), RegulationCapped},
 		{ZoneSourceParis, civilDate(2028, time.November, 24), RegulationCapped},
 		{ZoneSourceParis, civilDate(2028, time.November, 25), RegulationLapsed},
 		{ZoneSourceLyonVilleurbanne, civilDate(2028, time.November, 25), RegulationLapsed},

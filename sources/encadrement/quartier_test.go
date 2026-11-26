@@ -79,8 +79,7 @@ func TestQuery_ParisForeignIRISIgnored(t *testing.T) {
 }
 
 // Lyon zones its grille per IRIS too. A caller-supplied IRIS pins its own
-// cells; without one, a Lyon 3e collapse spans five zones (12.50 to 16.30
-// EUR/m2/month on the same cell on the 2025-2026 grille) and is Low.
+// cells; without one, a Lyon 3e collapse spans five zones and is Low.
 func TestQuery_LyonIRISPicksTheZone(t *testing.T) {
 	t.Parallel()
 	idx, err := Load("")

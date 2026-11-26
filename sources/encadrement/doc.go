@@ -11,13 +11,10 @@
 // Territory and an Evidence.Note, and IsEmpty is false. Read Result.Regulation,
 // never the zero caps alone, to decide whether a rent is free.
 //
-// Every cap rests on the art. 140 ELAN experiment, whose last day under the
-// published law is 24 November 2026. The Source assumes the two-year
-// extension the Sénat adopted on 21 October 2026, not yet law: it reads
-// Listing.AsOf (today when zero), keeps a cap dated 25 November 2026 to
-// 24 November 2028 at ConfidenceLow with an Evidence.Note saying so, and past
-// that answers RegulationLapsed, with no cap. legal.go records the status and
-// what to change once the Assemblée nationale vote is known.
+// Article 140 of the ELAN law, amended by loi 2026-1072, extends through
+// 24 November 2028. Query uses Listing.AsOf, or today, and reports
+// RegulationLapsed after that date. A shipped grille outside its own
+// arrêté period is an estimate at ConfidenceLow with an Evidence.Note.
 //
 // The Source matches the listing to a zone:
 //
@@ -46,8 +43,7 @@
 // construction — and an absent one spans every bucket on that axis rather
 // than assuming a value. An absent Rooms additionally caps the Confidence at
 // ConfidenceLow: the cap per m² falls by a fifth to a third from a studio to
-// a four-room flat (38.00 to 29.50 EUR/m²/month in Paris 1er, 20.50 to 14.00
-// in Lyon 3e), so a default would be a guess dressed as a lookup.
+// a four-room flat (38.00 to 29.50 EUR/m²/month in Paris 1er), so a default would be a guess dressed as a lookup.
 //
 // The same selection over the zone's meublé cells gives the FURNISHED pair,
 // LoyerRefMajMeubleEURPerM2HC and LoyerRefMeubleEURPerM2HC: every shipped

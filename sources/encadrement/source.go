@@ -89,7 +89,10 @@ const Name = "encadrement"
 // 2026): readings from 25 November 2026 to 24 November 2028 keep their cap at
 // ConfidenceLow with a Note, instead of lapsing; a grille past its own
 // arrêté is carried over at ConfidenceLow instead of being withdrawn.
-const sourceVersion = 12
+//
+// v13 applies the published ten-year term and November 2026 prefectural
+// amendments and uses the Métropole de Lyon 2026-2027 rates.
+const sourceVersion = 13
 
 // Version exposes sourceVersion so callers that wrap the Source can
 // mirror it without reaching into the package internals.
