@@ -74,8 +74,8 @@ func oui(s string) bool { return strings.EqualFold(strings.TrimSpace(s), "oui") 
 // transform rebuilds the processed RNC artifact from the upstream daily CSV.
 // It keeps every row carrying a 5-digit official commune code, normalizes the
 // reference + complementary streets, reads the cadastral parcelles, the last
-// mandate end date and the public-programme flags, and emits a gzipped JSON
-// Index. The financial declarations and the legal-procedure/arrêté columns are
+// mandate end date and the public-programme flags, and builds a seekable
+// commune archive. The financial declarations and the legal-procedure/arrêté columns are
 // redacted from the open-data export and therefore cannot be read.
 func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	rc, err := raw.Open(rawName)
@@ -170,21 +170,29 @@ func transform(_ context.Context, raw dataset.RawSet, dst io.Writer) error {
 	}
 	idx.Meta.RowCount = len(idx.Copros)
 
-	if err := dataset.WriteGzJSON(dst, &idx); err != nil {
-		return fmt.Errorf("rnc: encode json: %w", err)
+	if err := writeArchive(dst, &idx); err != nil {
+		return fmt.Errorf("rnc: write archive: %w", err)
 	}
 	return nil
 }
 
-// validate gates publication: the rebuilt artifact must gunzip, parse and be
-// non-empty.
+// validate checks the directory, member checksums and row ordering before publication.
 func validate(r io.Reader) error {
-	idx, err := parseIndexStream(r, nil)
+	a, err := readArchive(r)
 	if err != nil {
 		return err
 	}
-	if idx.Count() == 0 {
-		return errors.New("rnc: validated artifact has no copros")
+	seen := make([]bool, a.RowCount)
+	for code := range a.files {
+		if err := a.visit(code, func(r archiveRow) error {
+			if seen[r.Ordinal] {
+				return fmt.Errorf("duplicate RNC ordinal %d", r.Ordinal)
+			}
+			seen[r.Ordinal] = true
+			return nil
+		}); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -3,7 +3,6 @@ package rnc
 import (
 	"context"
 	"fmt"
-	"io"
 	"regexp"
 	"strconv"
 	"strings"
@@ -23,38 +22,34 @@ type Options struct {
 	// DataDir is the gazetteer data directory; a refreshed artifact there
 	// takes precedence over the embedded one. Empty means embedded only.
 	DataDir string
-	// Depts restricts the loaded copropriétés to these departments (by INSEE
-	// prefix). Empty loads the national dataset. A build scoped to a region
-	// (e.g. Île-de-France) passes its departments here to cut the resident
-	// set from ~500 MB to a fraction; an address outside the scope simply has
-	// no copro data (a graceful empty result, never an error).
+	// Depts restricts matches by INSEE prefix. Empty covers all departments.
+	// An address outside the scope yields an empty result.
 	Depts []string
 }
 
 // Source implements gazetteer.Source for the RNC copropriété context.
 type Source struct {
-	opts Options
-	// lazy caches a dept-filtered index for the Source instance (the national
-	// singleton Load cannot be reused: its resident set depends on the filter).
-	lazy dataset.Lazy[Index]
+	opts     Options
+	filtered scopeCache
 }
 
 // NewSource builds an rnc Source. Zero-valued Options is fine.
 func NewSource(opts Options) *Source { return &Source{opts: opts} }
 
-// index resolves the copropriété index this Source queries: an injected stub,
-// the shared national singleton (no dept filter), or a per-instance
-// dept-filtered load.
-func (s *Source) index() (*Index, error) {
+func (s *Source) candidates(insee string) (*Index, int, error) {
 	if s.opts.Index != nil {
-		return s.opts.Index, nil
+		return s.opts.Index, s.opts.Index.Count(), nil
 	}
-	if len(s.opts.Depts) == 0 {
-		return Load(s.opts.DataDir)
+	cache := &nationalScope
+	if len(s.opts.Depts) > 0 {
+		cache = &s.filtered
 	}
-	return s.lazy.Load(set, s.opts.DataDir, func(r io.Reader) (*Index, error) {
-		return parseIndexStream(r, s.opts.Depts)
-	})
+	scope, err := cache.load(s.opts.DataDir, s.opts.Depts)
+	if err != nil {
+		return nil, 0, err
+	}
+	idx, err := scope.commune(insee)
+	return idx, scope.rows, err
 }
 
 // Name implements gazetteer.Source.
@@ -74,7 +69,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	if strings.TrimSpace(l.INSEE) == "" {
 		return nil, fmt.Errorf("rnc: %w: listing.INSEE required", gazetteer.ErrInsufficientInputs)
 	}
-	idx, err := s.index()
+	idx, rows, err := s.candidates(strings.TrimSpace(l.INSEE))
 	if err != nil {
 		return nil, fmt.Errorf("rnc: %w: load dataset: %w", gazetteer.ErrUpstreamPermanent, err)
 	}
@@ -82,7 +77,7 @@ func (s *Source) Query(ctx context.Context, l gazetteer.Listing) (any, error) {
 	e, method, conf, dist := idx.match(l)
 	ev := Evidence{
 		INSEE:          strings.TrimSpace(l.INSEE),
-		RowCount:       idx.Count(),
+		RowCount:       rows,
 		DataVintage:    idx.Meta.DataVintage,
 		MatchDistanceM: dist,
 		VoieQuery:      normVoie(l.Address),

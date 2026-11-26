@@ -41,7 +41,10 @@
 // but the Source does not consume a parcelle input.)
 //
 // The Source is fully offline: the processed dataset ships embedded under
-// `data/rnc_coproprietes.json.gz`.
+// `data/rnc_coproprietes.zip`. Queries read the requested INSEE member
+// and share a bounded cache of decoded communes. The full Load API still
+// returns every entry in upstream order. An existing datadir JSON gzip
+// keeps precedence over the embed until refresh publishes the ZIP.
 //
 // Required Listing inputs:
 //

@@ -7,11 +7,12 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	"github.com/bpineau/gazetteer/dataset"
 )
 
-//go:embed data/rnc_coproprietes.json.gz
+//go:embed data/rnc_coproprietes.zip
 var embedFS embed.FS
 
 // Name is the canonical Source identifier (registry + Dossier key).
@@ -25,13 +26,13 @@ const Name = "rnc"
 const Version = 3
 
 // set binds the embedded artifact to the datadir/refresh pipeline. Refresh
-// downloads the upstream daily CSV and rebuilds the gzipped JSON via
+// downloads the upstream daily CSV and rebuilds the commune archive via
 // transform.
 var set = dataset.Set{
 	Source:    Name,
 	Version:   Version,
 	Embed:     embedFS,
-	Processed: dataset.File{Name: "rnc_coproprietes.json.gz"},
+	Processed: dataset.File{Name: "rnc_coproprietes.zip"},
 	Raw:       []dataset.File{{Name: rawName, URL: rawURL}},
 	Transform: transform,
 	Validate:  validate,
@@ -83,18 +84,26 @@ type Index struct {
 	ByInsee map[string][]int `json:"-"`
 }
 
-var lazyIndex dataset.Lazy[Index]
+var fullOnce sync.Once
+var fullIndex *Index
+var fullErr error
 
-// Load returns the singleton national index, resolving from dir (datadir)
-// with a fallback to the embedded artifact, parsing on first call. A missing
-// non-embedded dataset yields an empty index (graceful degradation).
-//
-// Dept-filtered loads (rnc.Options.Depts) do NOT share this singleton — see
-// (*Source).index — because the resident set then depends on the filter.
+// Load materializes the entire national index, retaining upstream row order.
+// Address queries only decode the commune containing their candidates.
 func Load(dir string) (*Index, error) {
-	return lazyIndex.Load(set, dir, func(r io.Reader) (*Index, error) {
-		return parseIndexStream(r, nil)
+	fullOnce.Do(func() {
+		s, err := nationalScope.load(dir, nil)
+		if err != nil {
+			fullErr = err
+			return
+		}
+		if s.legacy != nil {
+			fullIndex = s.legacy
+			return
+		}
+		fullIndex, fullErr = s.archive.all()
 	})
+	return fullIndex, fullErr
 }
 
 // parseIndexStream decodes the gzipped national artifact one Entry at a time

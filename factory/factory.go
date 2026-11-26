@@ -121,10 +121,9 @@ type Options struct {
 	PerSourceTimeout time.Duration
 
 	// RNCDepts restricts the RNC copropriété source to these departments
-	// (by INSEE prefix). Empty loads the national registry (~500 MB
-	// resident). A regionally-scoped deployment (e.g. Île-de-France) sets
-	// its departments here to shrink the resident set; an address outside
-	// the scope simply carries no copro data (graceful empty, not an error).
+	// (by INSEE prefix). Empty covers the whole registry. Indexed datasets
+	// decode communes on demand in either scope. An address outside the
+	// scope returns an empty RNC result.
 	RNCDepts []string
 }
 

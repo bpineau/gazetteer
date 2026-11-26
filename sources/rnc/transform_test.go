@@ -24,7 +24,11 @@ func TestTransform_Golden(t *testing.T) {
 	if err := validate(bytes.NewReader(buf.Bytes())); err != nil {
 		t.Fatalf("validate: %v", err)
 	}
-	idx, err := parseIndexStream(bytes.NewReader(buf.Bytes()), nil)
+	a, err := readArchive(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx, err := a.all()
 	if err != nil {
 		t.Fatalf("parseIndexStream: %v", err)
 	}

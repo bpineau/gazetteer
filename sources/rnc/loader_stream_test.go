@@ -12,7 +12,7 @@ import (
 )
 
 // gzIndex renders an Index to the gzipped-JSON wire format parseIndexStream
-// consumes (the same format transform emits).
+// consumes for legacy datadir files.
 func gzIndex(t *testing.T, entries []Entry) []byte {
 	t.Helper()
 	var buf bytes.Buffer
@@ -85,37 +85,23 @@ func TestSource_OutOfScope_GracefulEmpty(t *testing.T) {
 	}
 }
 
-// TestMemoryFootprint_NationalVsFiltered loads the embedded national RNC
-// dataset both unfiltered and IDF-filtered and logs the resident heap for
-// each. It is skipped by default (parsing the 648k-row national artifact costs
-// seconds and hundreds of MB); run it explicitly to measure:
-//
-//	RNC_MEM_TEST=1 go test ./sources/rnc -run MemoryFootprint -v
+// Set RNC_MEM_TEST=1 to inspect a fresh process after querying a commune.
 func TestMemoryFootprint_NationalVsFiltered(t *testing.T) {
 	if os.Getenv("RNC_MEM_TEST") == "" {
 		t.Skip("set RNC_MEM_TEST=1 to run the heap-footprint measurement")
 	}
-	idfDepts := []string{"75", "77", "78", "91", "92", "93", "94", "95"}
-
-	measure := func(depts []string) (rows int, heapMB float64) {
-		rc, err := set.Open("")
+	for _, depts := range [][]string{nil, {"75", "77", "78", "91", "92", "93", "94", "95"}} {
+		s, err := openScope("", depts)
 		if err != nil {
-			t.Fatalf("open embedded set: %v", err)
+			t.Fatal(err)
 		}
-		defer func() { _ = rc.Close() }()
-		idx, err := parseIndexStream(rc, depts)
+		idx, err := s.commune("75110")
 		if err != nil {
-			t.Fatalf("parse: %v", err)
+			t.Fatal(err)
 		}
 		runtime.GC()
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
-		runtime.KeepAlive(idx)
-		return idx.Count(), float64(m.HeapAlloc) / (1 << 20)
+		t.Logf("scope %v: %d rows, %d in commune, process heap %.1f MiB", depts, s.rows, idx.Count(), float64(m.HeapAlloc)/(1<<20))
 	}
-
-	natRows, natHeap := measure(nil)
-	t.Logf("national: %d rows, HeapAlloc %.0f MB", natRows, natHeap)
-	idfRows, idfHeap := measure(idfDepts)
-	t.Logf("IDF-filtered: %d rows, HeapAlloc %.0f MB", idfRows, idfHeap)
 }

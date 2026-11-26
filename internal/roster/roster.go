@@ -73,7 +73,7 @@ type Deps struct {
 	DataDir string
 
 	// RNCDepts restricts the RNC source to these departments (by INSEE
-	// prefix). Empty loads the national registry. See factory.Options.RNCDepts.
+	// prefix). Empty covers the national registry. See factory.Options.RNCDepts.
 	RNCDepts []string
 }
 
